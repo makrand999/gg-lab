@@ -325,12 +325,6 @@
           ctx2.beginPath();
           ctx2.arc(sp.xPx, sp.yPx, 7, 0, 2 * Math.PI);
           ctx2.stroke();
-
-          // Snap Badge
-          ctx2.font = '11px sans-serif';
-          ctx2.fillStyle = '#0891b2';
-          var badgeText = sp.tier + (sp.id ? ' [' + sp.id + ']' : '');
-          ctx2.fillText(badgeText, sp.xPx + 10, sp.yPx - 6);
           ctx2.restore();
         }
 
@@ -443,6 +437,24 @@
         renderLayer1();
         renderLayer2(cursor, null);
       }, { passive: false });
+
+      // Right-click anywhere (canvas, HUD buttons, open menu) first undoes
+      // an active selection/rename. Capture phase + stopPropagation keeps
+      // this authoritative; the canvas menu below then sees idle clicks only.
+      // The native menu never appears anywhere on the sheet.
+      window.addEventListener('contextmenu', function (e) {
+        if (handle.sel.editing !== null || handle.sel.selectedId !== null) {
+          e.preventDefault();
+          if (typeof e.stopPropagation === 'function') e.stopPropagation();
+          EduCADCanvas.deselect(handle.sel);
+          stopCaretTimer();
+          mount.menu.classList.remove('open');
+          renderLayer1();
+          renderLayer2(null, null);
+        } else if (e.target !== c2) {
+          e.preventDefault();
+        }
+      }, true);
 
       // Right-Click: with a selection, undo it (reference cleared, any
       // rename buffer discarded, original kept); otherwise the 2-option menu.

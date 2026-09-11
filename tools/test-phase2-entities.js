@@ -3,7 +3,7 @@ var assert = require('assert');
 var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
 
 var n = 0;
-function pass(name) { n++; console.log('PASS ' + n + '/46 ' + name); }
+function pass(name) { n++; console.log('PASS ' + n + '/51 ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
 function deep(a, b, msg) { assert.deepStrictEqual(a, b, msg); }
 function ok(v, msg) { assert.ok(v, msg); }
@@ -141,6 +141,46 @@ eq(hj.thickEnds, true); eq(hj.endWidthPx, 1.0); pass('entities H thick ends px')
 var t3 = E.createTable(); E.resetIdCounter();
 t3.create('POINT', { x: 0, y: 0 }); t3.create('POINT', { x: 1, y: 1 });
 deep(t3.list().map(function (e) { return e.id; }), ['E1', 'E2']); pass('entities list order deterministic');
+// 47 cosmetic screen weights: thin 1px, thick/medium 2px
+eq(E.cosmeticWidthPx(0.50), 2);
+eq(E.cosmeticWidthPx(0.35), 2);
+eq(E.cosmeticWidthPx(0.20), 1);
+eq(E.cosmeticWidthPx(0.70), 2);
+eq(E.cosmeticWidthPx(0.10), 1);
+eq(E.COSMETIC_CUTOFF_MM, 0.35);
+throws(function () { E.cosmeticWidthPx(NaN); }); pass('entities cosmetic weights');
+// 48 cosmetic mapping per BIS code via resolveStyle
+['A', 'E'].forEach(function (code) {
+  var st = E.resolveStyle(E.createEntity('SEGMENT', { bisCode: code, x: 0, y: 0, x2: 1, y2: 1 }));
+  eq(E.cosmeticWidthPx(st.widthMm), 2, code);
+});
+['B', 'G', 'H', 'K'].forEach(function (code) {
+  var st = E.resolveStyle(E.createEntity('SEGMENT', { bisCode: code, x: 0, y: 0, x2: 1, y2: 1 }));
+  eq(E.cosmeticWidthPx(st.widthMm), 1, code);
+}); pass('entities cosmetic per BIS code');
+// 49 screen constant while export scales with zoom
+[0.05, 0.5, 2, 10, 50].forEach(function (s) {
+  eq(E.cosmeticWidthPx(0.50), 2, 'thick s=' + s);
+  eq(E.cosmeticWidthPx(0.20), 1, 'thin s=' + s);
+});
+eq(E.widthToPx(0.50, 50), 25);
+eq(E.widthToPx(0.20, 50), 10); pass('entities screen constant export scales');
+// 50 cosmetic dash cadence: raw pattern as px, defensive copy
+deep(E.cosmeticDashPx([8, 4]), [8, 4]);
+deep(E.cosmeticDashPx([12, 3, 2, 3]), [12, 3, 2, 3]);
+deep(E.cosmeticDashPx([12, 3, 2, 3, 2, 3]), [12, 3, 2, 3, 2, 3]);
+deep(E.cosmeticDashPx([]), []);
+var src50 = [8, 4];
+var out50 = E.cosmeticDashPx(src50);
+out50[0] = 999;
+eq(src50[0], 8);
+throws(function () { E.cosmeticDashPx([8, NaN]); });
+throws(function () { E.cosmeticDashPx('8,4'); }); pass('entities cosmetic dash');
+// 51 dash constant on screen while export scales with zoom
+[0.05, 0.5, 2, 10, 50].forEach(function (s) {
+  deep(E.cosmeticDashPx([8, 4]), [8, 4], 'screen s=' + s);
+});
+deep(E.dashToPx([8, 4], 50), [400, 200]); pass('entities dash constant export scales');
 
-assert.strictEqual(n, 46);
-console.log('OK 46/46 phase2 tests passed');
+assert.strictEqual(n, 51);
+console.log('OK 51/51 phase2 tests passed');

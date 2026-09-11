@@ -150,6 +150,30 @@
     return widthMm * scale;
   }
 
+  // Cosmetic screen weight: zoom-invariant so close vertices stay visible.
+  // Thin (BIS B/G/H/K, 0.20 mm) renders 1 px; thick (A, 0.50 mm) and medium
+  // (E, 0.35 mm, the series midpoint, breaking toward weight) render 2 px.
+  // Physical mm widths apply only to print/export (widthToPx), never here.
+  var COSMETIC_CUTOFF_MM = 0.35;
+
+  function cosmeticWidthPx(widthMm) {
+    assertFinite(widthMm);
+    return widthMm >= COSMETIC_CUTOFF_MM ? 2 : 1;
+  }
+
+  // Cosmetic screen cadence: dash/gap lengths stay constant px at every
+  // zoom (BIS SP 46 screen column: E [8,4], G/H [12,3,2,3],
+  // K [12,3,2,3,2,3]). Scaled mm cadences are export-only (dashToPx).
+  function cosmeticDashPx(dashMm) {
+    if (!Array.isArray(dashMm)) throw new Error('dashMm must be an array');
+    var out = [];
+    for (var i = 0; i < dashMm.length; i++) {
+      assertFinite(dashMm[i]);
+      out.push(dashMm[i]);
+    }
+    return out;
+  }
+
   function arrowheadMm() { return { lenMm: ARROW_LEN_MM, widthMm: ARROW_WIDTH_MM, ratio: ARROW_RATIO }; }
 
   // Outward flip when dimension screen length is under 30px.
@@ -352,6 +376,8 @@
     bisStyleFor: bisStyleFor, dashMmFor: dashMmFor, widthMmFor: widthMmFor, patternFor: patternFor,
     resolveStyle: resolveStyle, resolveEntityStyle: resolveStyle,
     dashToPx: dashToPx, widthToPx: widthToPx,
+    cosmeticWidthPx: cosmeticWidthPx, COSMETIC_CUTOFF_MM: COSMETIC_CUTOFF_MM,
+    cosmeticDashPx: cosmeticDashPx,
     arrowheadMm: arrowheadMm, arrowFlipNeeded: arrowFlipNeeded,
     renderEntity: renderEntity, renderJobFor: renderEntity, toRenderPx: renderEntity,
     checkProjector: checkProjector, checkEntityProjector: checkEntityProjector

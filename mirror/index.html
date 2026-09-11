@@ -244,8 +244,10 @@
         ctx.save();
         ctx.strokeStyle = strokeColor;
         ctx.fillStyle = strokeColor;
-        ctx.lineWidth = Math.max(1, EduCADEntities.widthToPx(style.widthMm, v.s));
-        var dash = EduCADEntities.dashToPx(style.dashMm, v.s);
+        // Cosmetic screen weight: 1 px thin / 2 px thick at every zoom,
+        // so vertices stay visible. Physical mm widths are export-only.
+        ctx.lineWidth = EduCADEntities.cosmeticWidthPx(style.widthMm);
+        var dash = EduCADEntities.cosmeticDashPx(style.dashMm);
         if (dash.length > 0) ctx.setLineDash(dash);
 
         if (ent.type === 'SEGMENT' || ent.type === 'LINE') {

@@ -4,7 +4,7 @@ var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
 var C = require('../mirror/files/www.geogebra.org/educad-canvas.js');
 
 var n = 0;
-function pass(name) { n++; console.log('PASS ' + n + '/49 ' + name); }
+function pass(name) { n++; console.log('PASS ' + n + '/57 ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
 function ok(v, msg) { assert.ok(v, msg); }
 function near(a, b, tol, msg) { assert.ok(Math.abs(a - b) <= tol, (msg || '') + ' |' + a + '-' + b + '|>' + tol); }
@@ -101,6 +101,85 @@ eq(C.menuCheckedState(true).plain, false);
 C.applyMenuAction(st, 'plain');
 eq(st.showGrid, false);
 throws(function () { C.applyMenuAction(st, 'grid'); }); pass('canvas menu plain/mesh + checked');
+// --- Selection + on-site rename (8) ---
+var sv = { s: 2, tx: 400, ty: 300, w: 800, h: 600 };
+var sents = [
+  { id: 'p1', type: 'POINT', x: 0, y: 0, visible: true },
+  { id: 'p2', type: 'POINT', x: 10, y: 0, visible: true },
+  { id: 'hid', type: 'POINT', x: 0, y: 0, visible: false },
+  { id: 'sg', type: 'SEGMENT', x: 0, y: 0, x2: 5, y2: 5, visible: true }
+];
+eq(C.hitTestPoint(sents, { x: 400, y: 300 }, sv), 'p1');
+eq(C.hitTestPoint(sents, { x: 0, y: 0 }, sv), null);
+eq(C.hitTestPoint(sents, { x: 415, y: 300 }, sv), 'p2');
+eq(C.hitTestPoint(sents, { x: 400, y: 300 }, sv, 0), 'p1');
+eq(C.hitTestPoint([{ id: 'a', type: 'POINT', x: 0, y: 0, visible: true },
+  { id: 'b', type: 'POINT', x: 0, y: 0, visible: true }], { x: 400, y: 300 }, sv), 'a');
+throws(function () { C.hitTestPoint(sents, { x: NaN, y: 0 }, sv); }); pass('canvas select hit test');
+var sel50 = C.createSelectionState();
+eq(sel50.selectedId, null); eq(sel50.editing, null); eq(C.isEditing(sel50), false);
+C.selectPoint(sel50, 'p1');
+eq(sel50.selectedId, 'p1');
+C.beginEdit(sel50, 'p1', "a'");
+deepStrictEqualKeys(sel50.editing, ['id', 'original', 'buffer']);
+eq(sel50.editing.original, "a'"); eq(sel50.editing.buffer, "a'");
+eq(C.isEditing(sel50), true); pass('canvas select state');
+function deepStrictEqualKeys(o, keys) { assert.deepStrictEqual(Object.keys(o).sort(), keys.slice().sort()); }
+var sel51 = C.beginEdit(C.createSelectionState(), 'p1', 'a');
+eq(C.handleRenameKey(sel51, 'b'), 'input');
+eq(sel51.editing.buffer, 'ab');
+eq(C.handleRenameKey(sel51, ' '), 'input');
+eq(sel51.editing.buffer, 'ab ');
+eq(C.handleRenameKey(sel51, 'Backspace'), 'input');
+eq(sel51.editing.buffer, 'ab');
+eq(C.handleRenameKey(sel51, 'Shift'), 'noop');
+eq(C.handleRenameKey(sel51, ''), 'noop');
+eq(C.handleRenameKey(C.createSelectionState(), 'x'), 'noop'); pass('canvas rename input keys');
+var sel52 = C.beginEdit(C.createSelectionState(), 'p1', 'a');
+eq(C.handleRenameKey(sel52, 'Enter'), 'commit');
+eq(C.handleRenameKey(sel52, 'Escape'), 'cancel');
+eq(sel52.editing.buffer, 'a'); pass('canvas rename commit/cancel keys');
+var sel53 = C.beginEdit(C.createSelectionState(), 'p1', 'a');
+sel53.editing.buffer = 'c';
+var w53 = C.commitRename(sel53);
+eq(w53.id, 'p1'); eq(w53.name, 'c');
+eq(C.isEditing(sel53), false);
+var sel53b = C.beginEdit(C.createSelectionState(), 'p1', 'a');
+eq(C.commitRename(sel53b), null);
+var sel53c = C.beginEdit(C.createSelectionState(), 'p1', 'a');
+sel53c.editing.buffer = '   ';
+eq(C.commitRename(sel53c), null);
+var sel53d = C.beginEdit(C.createSelectionState(), 'p1', 'a');
+sel53d.editing.buffer = '  b  ';
+eq(C.commitRename(sel53d).name, 'b');
+eq(C.commitRename(C.createSelectionState()), null); pass('canvas rename commit write');
+var sel54 = C.beginEdit(C.createSelectionState(), 'p1', 'a');
+sel54.editing.buffer = 'zzz';
+C.cancelEdit(sel54);
+eq(C.isEditing(sel54), false);
+eq(sel54.selectedId, 'p1');
+C.deselect(sel54);
+eq(sel54.selectedId, null); pass('canvas rename cancel keeps original');
+eq(C.SELECT_TOL_PX, 14);
+eq(C.SELECT_RING_R_PX, 7);
+eq(C.SELECT_RING_STYLE, '#f59e0b');
+eq(C.CARET_BLINK_MS, 500);
+eq(C.caretOn(0), true);
+eq(C.caretOn(499), true);
+eq(C.caretOn(500), false);
+eq(C.caretOn(1000), true); pass('canvas select ring caret consts');
+var m57 = { calls: [], strokeStyle: '', lineWidth: 0,
+  save: function () { this.calls.push('save'); },
+  restore: function () { this.calls.push('restore'); },
+  beginPath: function () { this.calls.push('beginPath'); },
+  arc: function (x, y, r) { this.calls.push(['arc', x, y, r]); },
+  stroke: function () { this.calls.push('stroke'); } };
+eq(C.drawSelectionRing(m57, 50, 60), true);
+eq(m57.strokeStyle, '#f59e0b');
+eq(m57.lineWidth, 2);
+assert.deepStrictEqual(m57.calls.filter(function (c) { return Array.isArray(c); })[0], ['arc', 50, 60, 7]);
+eq(C.drawSelectionRing(null, 0, 0), false);
+throws(function () { C.drawSelectionRing(m57, NaN, 0); }); pass('canvas select ring draw');
 
-if (n !== 49) throw new Error('expected 49 tests, ran ' + n);
-console.log('OK 49/49 phase1 tests passed');
+if (n !== 57) throw new Error('expected 57 tests, ran ' + n);
+console.log('OK 57/57 phase1 tests passed');

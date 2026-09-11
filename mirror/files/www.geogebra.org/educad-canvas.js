@@ -162,6 +162,201 @@
     return { visible: true, x: p.x, y: p.y };
   }
 
+  // Label typography defaults (shared with the label layout module).
+  var LABEL_FONT = 'italic 13px "Cambria", "Times New Roman", serif';
+  var LABEL_HALO_WIDTH_PX = 3.5;
+  var LABEL_HALO_STYLE = 'rgba(248, 250, 252, 0.95)';
+  var LABEL_FILL_STYLE = '#0f172a';
+  var LABEL_LEADER_WIDTH_PX = 1;
+  var LABEL_LEADER_STYLE = '#475569';
+
+  // Tier 3 knockout: halo stroke masks strokes behind the glyphs, then
+  // crisp foreground text. No-op (false) without a 2d context.
+  function drawKnockoutLabel(ctx, text, x, y, o) {
+    if (!ctx || typeof ctx.fillText !== 'function') return false;
+    o = o || {};
+    var font = (o.font === undefined || o.font === null) ? LABEL_FONT : o.font;
+    var haloW = (o.haloWidthPx === undefined || o.haloWidthPx === null) ?
+      LABEL_HALO_WIDTH_PX : o.haloWidthPx;
+    var halo = (o.haloStyle === undefined || o.haloStyle === null) ?
+      LABEL_HALO_STYLE : o.haloStyle;
+    var fill = (o.fillStyle === undefined || o.fillStyle === null) ?
+      LABEL_FILL_STYLE : o.fillStyle;
+    assertFinite(x, y, haloW);
+    ctx.save();
+    ctx.font = font;
+    if (typeof ctx.strokeText === 'function' && haloW > 0) {
+      ctx.lineWidth = haloW;
+      ctx.strokeStyle = halo;
+      ctx.lineJoin = 'round';
+      ctx.strokeText(String(text), x, y);
+    }
+    ctx.fillStyle = fill;
+    ctx.fillText(String(text), x, y);
+    ctx.restore();
+    return true;
+  }
+
+  // Tier 4 leader: thin BIS Type B line from the vertex to the parked
+  // label, with a small dot at the vertex end.
+  function drawLabelLeader(ctx, x1, y1, x2, y2, o) {
+    if (!ctx || typeof ctx.beginPath !== 'function') return false;
+    o = o || {};
+    var w = (o.widthPx === undefined || o.widthPx === null) ?
+      LABEL_LEADER_WIDTH_PX : o.widthPx;
+    var color = (o.color === undefined || o.color === null) ?
+      LABEL_LEADER_STYLE : o.color;
+    var dotR = (o.dotRpx === undefined || o.dotRpx === null) ? 2 : o.dotRpx;
+    assertFinite(x1, y1, x2, y2, w, dotR);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = w;
+    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    if (typeof ctx.arc === 'function' && dotR > 0) {
+      ctx.beginPath();
+      ctx.arc(x1, y1, dotR, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+    ctx.restore();
+    return true;
+  }
+
+  // Draw one label placement (leader first, then knockout text). The
+  // leader endpoints are converted from mm via forward(view, ...).
+  function drawLabelPlacement(ctx, view, placement, o) {
+    if (!ctx || typeof ctx.fillText !== 'function') return false;
+    if (!placement || typeof placement !== 'object') return false;
+    o = o || {};
+    if (placement.leader) {
+      var L = placement.leader;
+      var p1 = { x: L.x1Mm * view.s + view.tx, y: view.ty - L.y1Mm * view.s };
+      var p2 = { x: L.x2Mm * view.s + view.tx, y: view.ty - L.y2Mm * view.s };
+      drawLabelLeader(ctx, p1.x, p1.y, p2.x, p2.y, o.leader);
+    }
+    return drawKnockoutLabel(ctx, placement.text, placement.xPx, placement.yPx, o.label);
+  }
+
+  // In-canvas point selection + on-site rename. Table-agnostic state
+  // machine: the page owns commits (Enter), cancels (Escape/empty click)
+  // only touch this state, so the table is never dirtied by previews.
+  var SELECT_TOL_PX = 14;
+  var SELECT_RING_R_PX = 7;
+  var SELECT_RING_WIDTH_PX = 2;
+  var SELECT_RING_STYLE = '#f59e0b';
+  var CARET_BLINK_MS = 500;
+
+  function createSelectionState() {
+    return { selectedId: null, editing: null };
+  }
+
+  function isEditing(sel) {
+    return !!(sel && sel.editing);
+  }
+
+  // Nearest visible POINT within tolPx of the cursor (px). First wins ties.
+  function hitTestPoint(entities, cursorPx, view, tolPx) {
+    assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty);
+    if (!Array.isArray(entities)) throw new Error('entities must be an array');
+    var tol = (tolPx === undefined || tolPx === null) ? SELECT_TOL_PX : tolPx;
+    assertFinite(tol);
+    var best = null;
+    var bestD2 = tol * tol;
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (!e || e.type !== 'POINT' || e.visible === false) continue;
+      assertFinite(e.x, e.y);
+      var px = e.x * view.s + view.tx;
+      var py = view.ty - e.y * view.s;
+      var dx = px - cursorPx.x, dy = py - cursorPx.y;
+      var d2 = dx * dx + dy * dy;
+      if (d2 <= tol * tol && (best === null || d2 < bestD2)) {
+        best = e.id;
+        bestD2 = d2;
+      }
+    }
+    return best;
+  }
+
+  function selectPoint(sel, id) {
+    sel.selectedId = id;
+    return sel;
+  }
+
+  function beginEdit(sel, id, currentName) {
+    sel.selectedId = id;
+    sel.editing = { id: id, original: String(currentName), buffer: String(currentName) };
+    return sel;
+  }
+
+  // Discard the buffer; the table was never touched, so the original name
+  // is preserved by construction. Keeps the selection.
+  function cancelEdit(sel) {
+    if (sel) sel.editing = null;
+    return sel;
+  }
+
+  function deselect(sel) {
+    if (sel) { sel.selectedId = null; sel.editing = null; }
+    return sel;
+  }
+
+  // Pure key router. Returns 'commit' | 'cancel' | 'input' | 'noop' and
+  // mutates only the buffer. The caller applies commit/cancel to the table.
+  function handleRenameKey(sel, key) {
+    if (!sel || !sel.editing) return 'noop';
+    if (key === 'Enter') return 'commit';
+    if (key === 'Escape') return 'cancel';
+    if (key === 'Backspace') {
+      sel.editing.buffer = sel.editing.buffer.slice(0, -1);
+      return 'input';
+    }
+    if (typeof key === 'string' && key.length === 1 && key >= ' ') {
+      sel.editing.buffer += key;
+      return 'input';
+    }
+    return 'noop';
+  }
+
+  // Exit edit mode, returning the write {id, name} or null when there is
+  // nothing to commit (blank or unchanged). Trims accidental padding.
+  function commitRename(sel) {
+    if (!sel || !sel.editing) return null;
+    var ed = sel.editing;
+    sel.editing = null;
+    var name = ed.buffer.trim();
+    if (name === '' || name === ed.original) return null;
+    return { id: ed.id, name: name };
+  }
+
+  // Blinking caret phase: on for 500 ms, off for 500 ms.
+  function caretOn(nowMs) {
+    assertFinite(nowMs);
+    return Math.floor(nowMs / CARET_BLINK_MS) % 2 === 0;
+  }
+
+  // Amber selection halo (snap ring owns cyan). No-op without a 2d context.
+  function drawSelectionRing(ctx, x, y, o) {
+    if (!ctx || typeof ctx.beginPath !== 'function') return false;
+    o = o || {};
+    var r = (o.radiusPx === undefined || o.radiusPx === null) ? SELECT_RING_R_PX : o.radiusPx;
+    var w = (o.widthPx === undefined || o.widthPx === null) ? SELECT_RING_WIDTH_PX : o.widthPx;
+    var color = (o.color === undefined || o.color === null) ? SELECT_RING_STYLE : o.color;
+    assertFinite(x, y, r, w);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.restore();
+    return true;
+  }
+
   // Checked state of the 2-option menu for a given showGrid flag:
   // Plain is checked by default (no mesh), Box Mesh is checked when set.
   function menuCheckedState(showGrid) {
@@ -204,6 +399,31 @@
     buttonAction: buttonAction,
     onEmptyRightClick: onEmptyRightClick,
     menuCheckedState: menuCheckedState,
+    LABEL_FONT: LABEL_FONT,
+    LABEL_HALO_WIDTH_PX: LABEL_HALO_WIDTH_PX,
+    LABEL_HALO_STYLE: LABEL_HALO_STYLE,
+    LABEL_FILL_STYLE: LABEL_FILL_STYLE,
+    LABEL_LEADER_WIDTH_PX: LABEL_LEADER_WIDTH_PX,
+    LABEL_LEADER_STYLE: LABEL_LEADER_STYLE,
+    drawKnockoutLabel: drawKnockoutLabel,
+    drawLabelLeader: drawLabelLeader,
+    drawLabelPlacement: drawLabelPlacement,
+    SELECT_TOL_PX: SELECT_TOL_PX,
+    SELECT_RING_R_PX: SELECT_RING_R_PX,
+    SELECT_RING_WIDTH_PX: SELECT_RING_WIDTH_PX,
+    SELECT_RING_STYLE: SELECT_RING_STYLE,
+    CARET_BLINK_MS: CARET_BLINK_MS,
+    createSelectionState: createSelectionState,
+    isEditing: isEditing,
+    hitTestPoint: hitTestPoint,
+    selectPoint: selectPoint,
+    beginEdit: beginEdit,
+    cancelEdit: cancelEdit,
+    deselect: deselect,
+    handleRenameKey: handleRenameKey,
+    commitRename: commitRename,
+    caretOn: caretOn,
+    drawSelectionRing: drawSelectionRing,
     applyMenuAction: applyMenuAction
   };
 });

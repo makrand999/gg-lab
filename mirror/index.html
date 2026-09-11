@@ -75,6 +75,7 @@
   <script src="/files/www.geogebra.org/edugraphics-snapping.js"></script>
   <script src="/files/www.geogebra.org/edugraphics-instruments.js"></script>
   <script src="/files/www.geogebra.org/educad-curriculum.js"></script>
+  <script src="/files/www.geogebra.org/educad-labels.js"></script>
   <script src="/files/www.geogebra.org/edugraphics-common.js"></script>
   <script src="/files/www.geogebra.org/educad-boot.js"></script>
 
@@ -99,6 +100,25 @@
       var ctx2 = c2.getContext('2d');
       var dpr = mount.dpr || window.devicePixelRatio || 1;
 
+      // In-canvas selection + on-site rename (no DOM inputs; Layer 2 only).
+      handle.sel = EduCADCanvas.createSelectionState();
+      var lastLabelResult = { placements: [] };
+      var caretTimer = null;
+      function ensureCaretTimer() {
+        if (caretTimer !== null) return;
+        caretTimer = setInterval(function () { renderLayer2(null, null); }, 500);
+      }
+      function stopCaretTimer() {
+        if (caretTimer !== null) { clearInterval(caretTimer); caretTimer = null; }
+      }
+      function findPlacement(entityId) {
+        var ps = lastLabelResult.placements;
+        for (var i = 0; i < ps.length; i++) {
+          if (ps[i].entityId === entityId) return ps[i];
+        }
+        return null;
+      }
+
       // Handle window resizing
       window.addEventListener('resize', function () {
         var w = window.innerWidth, h = window.innerHeight;
@@ -118,6 +138,17 @@
 
         var v = handle.view;
         var s = v.s;
+
+        // Visible entities up front: geometry loop, datum check, label pass.
+        var entities = handle.table.list();
+        var visible = [];
+        for (var vi = 0; vi < entities.length; vi++) {
+          if (entities[vi].visible) visible.push(entities[vi]);
+        }
+        var hasDatum = false;
+        for (var di = 0; di < visible.length; di++) {
+          if (visible[di].type === 'DATUM_AXIS') { hasDatum = true; break; }
+        }
 
         // 1. Grid (if enabled via context menu)
         if (handle.canvasState.showGrid) {
@@ -157,11 +188,14 @@
           ctx1.lineTo(v.w, xyY);
           ctx1.stroke();
 
-          // Labels X and Y
-          ctx1.font = 'bold 13px serif';
-          ctx1.fillStyle = '#0f172a';
-          ctx1.fillText('X', 16, xyY - 6);
-          ctx1.fillText('Y', v.w - 24, xyY - 6);
+          // Sheet X/Y end marks (knockout halo). Skipped when a datum
+          // entity is present: it owns the X/Y labels via the label pass.
+          if (!hasDatum) {
+            EduCADCanvas.drawKnockoutLabel(ctx1, 'X', 16, xyY - 6,
+              { font: 'bold 13px serif' });
+            EduCADCanvas.drawKnockoutLabel(ctx1, 'Y', v.w - 24, xyY - 6,
+              { font: 'bold 13px serif' });
+          }
 
           // VP & HP Watermark Labels
           ctx1.font = '11px sans-serif';
@@ -171,12 +205,29 @@
           ctx1.restore();
         }
 
-        // 3. Render Committed Entities from CadEntityTable
-        var entities = handle.table.list();
-        for (var i = 0; i < entities.length; i++) {
-          var ent = entities[i];
-          if (!ent.visible) continue;
-          renderEntity(ctx1, v, ent);
+        // 3. Render Committed Entities from CadEntityTable (geometry only)
+        for (var i = 0; i < visible.length; i++) {
+          renderEntity(ctx1, v, visible[i]);
+        }
+
+        // 4. Label pass: 3-tier layout (Tier 1 semantic filter, Tier 2
+        // 8-sector optimizer) + Tier 3 knockout halo / Tier 4 leaders.
+        // The edited point keeps its placement (so the Layer 2 preview
+        // sits at the true label position) but is not drawn here.
+        if (typeof EduCADLabels !== 'undefined') {
+          ctx1.font = EduCADCanvas.LABEL_FONT;
+          var labelResult = EduCADLabels.resolve(visible, v, {
+            measure: function (t) {
+              var m = ctx1.measureText(t);
+              return { w: m.width, h: 13 * 1.15 };
+            }
+          });
+          lastLabelResult = labelResult;
+          var editingId = handle.sel.editing ? handle.sel.editing.id : null;
+          for (var li = 0; li < labelResult.placements.length; li++) {
+            if (labelResult.placements[li].entityId === editingId) continue;
+            EduCADCanvas.drawLabelPlacement(ctx1, v, labelResult.placements[li]);
+          }
         }
 
         ctx1.restore();
@@ -230,17 +281,9 @@
           ctx.stroke();
         }
 
-        // Render Primed Typography / Labels
-        if (ent.caption || ent.showLabel) {
-          var labelText = ent.caption || ent.name;
-          var lp = EduCADViewport.forward(v, { x: ent.x, y: ent.y });
-          ctx.font = 'italic 13px "Cambria", "Times New Roman", serif';
-          ctx.fillStyle = '#0f172a';
-          ctx.setLineDash([]);
-          var ox = (ent.meta && ent.meta.labelOffset && ent.meta.labelOffset.x) || 8;
-          var oy = (ent.meta && ent.meta.labelOffset && ent.meta.labelOffset.y) || -8;
-          ctx.fillText(labelText, lp.x + ox, lp.y + oy);
-        }
+        // Labels are NOT drawn here: the Tier 1-4 label pass in
+        // renderLayer1 owns all annotation (no raw internal captions,
+        // no hardcoded offsets).
 
         ctx.restore();
       }
@@ -284,6 +327,25 @@
           var badgeText = sp.tier + (sp.id ? ' [' + sp.id + ']' : '');
           ctx2.fillText(badgeText, sp.xPx + 10, sp.yPx - 6);
           ctx2.restore();
+        }
+
+        // Selection ring + on-site rename preview (amber; snap owns cyan).
+        if (handle.sel.selectedId !== null) {
+          var selEnt = handle.table.get(handle.sel.selectedId);
+          if (selEnt && selEnt.type === 'POINT' && selEnt.visible !== false) {
+            var selPx = EduCADViewport.forward(handle.view, { x: selEnt.x, y: selEnt.y });
+            EduCADCanvas.drawSelectionRing(ctx2, selPx.x, selPx.y);
+            if (handle.sel.editing && handle.sel.editing.id === handle.sel.selectedId) {
+              var pv = findPlacement(handle.sel.selectedId);
+              var prevText = handle.sel.editing.buffer +
+                (EduCADCanvas.caretOn(Date.now()) ? '|' : '');
+              if (pv) {
+                EduCADCanvas.drawKnockoutLabel(ctx2, prevText, pv.xPx, pv.yPx);
+              } else {
+                EduCADCanvas.drawKnockoutLabel(ctx2, prevText, selPx.x + 8, selPx.y - 8);
+              }
+            }
+          }
         }
 
         ctx2.restore();
@@ -387,6 +449,62 @@
         renderLayer1();
       });
 
+      // Point click: select + edit on vertex, cancel + deselect on empty.
+      // The buffer is discarded on cancel; the table is never touched.
+      c2.addEventListener('click', function (e) {
+        if (e.button !== 0 || e.shiftKey) return;
+        var cursor = { x: e.clientX, y: e.clientY };
+        var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
+        if (id === null) {
+          if (handle.sel.selectedId !== null || handle.sel.editing !== null) {
+            EduCADCanvas.deselect(handle.sel);
+            stopCaretTimer();
+            renderLayer1();
+            renderLayer2(cursor, null);
+          }
+          return;
+        }
+        if (handle.sel.editing && handle.sel.editing.id === id) return;
+        if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
+        var ent = handle.table.get(id);
+        EduCADCanvas.beginEdit(handle.sel, id, (ent.caption || ent.name || ''));
+        ensureCaretTimer();
+        renderLayer1();
+        renderLayer2(cursor, null);
+      });
+
+      // Rename keys: Enter commits to the table, Escape cancels. Handled
+      // keys are captured so Backspace/Space never leak to the browser.
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          if (handle.sel.editing !== null || handle.sel.selectedId !== null) {
+            EduCADCanvas.deselect(handle.sel);
+            stopCaretTimer();
+            renderLayer1();
+            renderLayer2(null, null);
+            e.preventDefault();
+          }
+          mount.menu.classList.remove('open');
+          return;
+        }
+        if (!handle.sel.editing) return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var action = EduCADCanvas.handleRenameKey(handle.sel, e.key);
+        if (action === 'commit') {
+          e.preventDefault();
+          var w = EduCADCanvas.commitRename(handle.sel);
+          stopCaretTimer();
+          if (w && handle.table.get(w.id)) {
+            handle.table.update(w.id, { name: w.name, caption: w.name });
+          }
+          renderLayer1();
+          renderLayer2(null, null);
+        } else if (action === 'input') {
+          e.preventDefault();
+          renderLayer2(null, null);
+        }
+      });
+
       // Zoom Buttons Click Handlers
       mount.buttons['zoom-in'].addEventListener('click', function () {
         var nv = EduCADCanvas.buttonAction(handle.view, 'zoom-in');
@@ -407,6 +525,8 @@
       // Demo Problem Loaders
       function loadDemo(type) {
         handle.table.clear();
+        EduCADCanvas.deselect(handle.sel);
+        stopCaretTimer();
         document.querySelectorAll('.demo-btn').forEach(function(b) { b.classList.remove('active'); });
 
         if (type === 'line') {

@@ -96,9 +96,9 @@
       caption: caption || '', showLabel: !!label, meta: meta || {} });
   }
 
-  function lineSpec(x1, y1, x2, y2, role, bis, caption, meta) {
+  function lineSpec(x1, y1, x2, y2, role, bis, caption, meta, label) {
     return spec('LINE', { x: x1, y: y1, x2: x2, y2: y2, bisCode: bis, viewRole: role,
-      caption: caption || '', showLabel: false, meta: meta || {} });
+      caption: caption || '', showLabel: !!label, meta: meta || {} });
   }
 
   function circleSpec(x, y, r, role, bis, caption, meta) {
@@ -238,8 +238,8 @@
       viewSeg(axMm, yaElev, bx, locusElevY, 'ELEVATION', 'A', primeLabel(labelA + labelB), 'ELEVATION'),
       viewSeg(axMm, yaPlan, axMm, yaElev, 'BOTH', 'G', 'proj-' + labelA, 'PROJECTOR_A', { kind: 'projector' }),
       viewSeg(bx, locusPlanY, bx, locusElevY, 'BOTH', 'G', 'proj-' + labelB, 'PROJECTOR_B', { kind: 'projector' }),
-      lineSpec(Math.min(axMm, bx) - 15, locusPlanY, Math.max(axMm, bx) + 15, locusPlanY, 'PLAN', 'K', 'locus-' + labelB, { kind: 'locus' }),
-      lineSpec(Math.min(axMm, bx) - 15, locusElevY, Math.max(axMm, bx) + 15, locusElevY, 'ELEVATION', 'K', 'locus-' + primeLabel(labelB), { kind: 'locus' })
+      lineSpec(Math.min(axMm, bx) - 15, locusPlanY, Math.max(axMm, bx) + 15, locusPlanY, 'PLAN', 'K', 'locus-' + labelB, { kind: 'locus' }, true),
+      lineSpec(Math.min(axMm, bx) - 15, locusElevY, Math.max(axMm, bx) + 15, locusElevY, 'ELEVATION', 'K', 'locus-' + primeLabel(labelB), { kind: 'locus' }, true)
     ];
     var loci = [locusRec('PLAN', locusPlanY, labelB), locusRec('ELEVATION', locusElevY, primeLabel(labelB))];
     var projectors = [projectorRec(axMm, yaPlan, yaElev), projectorRec(bx, locusPlanY, locusElevY)];
@@ -297,7 +297,7 @@
       segSpec(VTelev.x1, VTelev.y1, VTelev.x2, VTelev.y2, 'ELEVATION', 'A', "VT'", meta),
       segSpec(VTplan.x1, 0, VTplan.x2, 0, 'PLAN', 'G', 'VT', { kind: 'projector-mate' }),
       segSpec(vtx, 0, vtx, vty, 'BOTH', 'G', 'proj-VT', { kind: 'projector' }),
-      lineSpec(x1 - 15, 0, Math.max(x2, vtx) + 15, 0, 'BOTH', 'K', 'locus-XY', { kind: 'locus' })
+      lineSpec(x1 - 15, 0, Math.max(x2, vtx) + 15, 0, 'BOTH', 'K', 'locus-XY', { kind: 'locus' }, true)
     ];
     var loci = [locusRec('PLAN', 0, 'HT'), locusRec('ELEVATION', vty, "VT'")];
     var projectors = [projectorRec(x1, 0, 0), projectorRec(x2, 0, 0), projectorRec(vtx, 0, vty)];
@@ -342,7 +342,7 @@
       entities.push(lineSpec(x, y1, x, y2, role, 'G', 'axis', { kind: 'axis' }));
     }
     function locusH(y, role, cap) {
-      entities.push(lineSpec(xL - 15, y, xR + 15, y, role, 'K', cap, { kind: 'locus' }));
+      entities.push(lineSpec(xL - 15, y, xR + 15, y, role, 'K', cap, { kind: 'locus' }, true));
       loci.push(locusRec('ELEVATION', y, cap));
     }
     if (solid === 'PRISM') {

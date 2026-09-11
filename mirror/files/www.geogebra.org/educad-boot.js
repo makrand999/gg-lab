@@ -7,8 +7,8 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
   // EduCAD Phase 7 cold boot + lifecycle. Wires viewport, canvas, entities,
-  // shim, solver, snapping, instruments, curriculum from injected deps or
-  // window globals. Owns no deps. init is O(1) wiring only (no lesson
+  // shim, solver, snapping, instruments, curriculum, labels from injected
+  // deps or window globals. Owns no deps. init is O(1) wiring only (no lesson
   // build) so cold boot stays under 3 ms. World mm only; px is ephemeral
   // render only. Elev x equals plan x. Node-safe: DOM is touched only via
   // the common mount bridge when a container is passed.
@@ -24,11 +24,11 @@
     'educad-viewport.js', 'educad-canvas.js', 'educad-entities.js',
     'educad-shim.js', 'educad-solver.js', 'edugraphics-snapping.js',
     'edugraphics-instruments.js', 'educad-curriculum.js',
-    'edugraphics-common.js', 'educad-boot.js'
+    'educad-labels.js', 'edugraphics-common.js', 'educad-boot.js'
   ];
   var MODULE_NAMES = [
     'viewport', 'canvas', 'entities', 'shim', 'solver',
-    'snapping', 'instruments', 'curriculum', 'common'
+    'snapping', 'instruments', 'curriculum', 'labels', 'common'
   ];
 
   function getGlobal(name) {
@@ -75,8 +75,8 @@
   }
 
   // init(opts): opts may carry {viewport, canvas, entities, shim, solver,
-  // snapping, instruments, curriculum, common, container, w, h}. Core trio
-  // (viewport, canvas, entities) is required; the rest is optional.
+  // snapping, instruments, curriculum, labels, common, container, w, h}.
+  // Core trio (viewport, canvas, entities) is required; rest is optional.
   function init(opts) {
     opts = opts || {};
     var V = pick(opts.viewport, 'EduCADViewport');
@@ -91,6 +91,7 @@
     var Instr = pick(opts.instruments,
       ['EduGraphicsInstruments', 'EduCADInstruments']);
     var Curr = pick(opts.curriculum, 'EduCADCurriculum');
+    var Labels = pick(opts.labels, 'EduCADLabels');
     var Common = pick(opts.common, ['EduGraphicsCommon', 'EduCADCommon']);
     var w = toInt(opts.w, DEFAULT_W);
     var h = toInt(opts.h, DEFAULT_H);
@@ -124,7 +125,8 @@
     return {
       modules: {
         viewport: V, canvas: Cv, entities: E, shim: Shim, solver: Solver,
-        snapping: Snap, instruments: Instr, curriculum: Curr, common: Common
+        snapping: Snap, instruments: Instr, curriculum: Curr, labels: Labels,
+        common: Common
       },
       view: view, canvasState: canvasState, table: table,
       applet: applet, solverHandle: solverHandle,

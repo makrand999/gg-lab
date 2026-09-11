@@ -210,6 +210,7 @@
     hasDOM: hasDOM,
     resolveDpr: resolveDpr,
     hidpiBufferSize: hidpiBufferSize,
+    sizeCanvasForDpr: sizeCanvasForDpr,
     mountContainer: mountContainer,
     unmountContainer: unmountContainer,
     isMounted: isMounted

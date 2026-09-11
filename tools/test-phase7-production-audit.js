@@ -16,6 +16,7 @@ var Solver = require('../mirror/files/www.geogebra.org/educad-solver.js');
 var Snap = require('../mirror/files/www.geogebra.org/edugraphics-snapping.js');
 var Instr = require('../mirror/files/www.geogebra.org/edugraphics-instruments.js');
 var Curr = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
+var Labels = require('../mirror/files/www.geogebra.org/educad-labels.js');
 var Serve = require('./serve.js');
 
 var TOTAL = 33;
@@ -29,7 +30,8 @@ function throws(fn, msg) { assert.throws(fn, Error, msg); }
 function deps() {
   return {
     viewport: Vp, canvas: Cv, entities: Ent, shim: Shim, solver: Solver,
-    snapping: Snap, instruments: Instr, curriculum: Curr, common: Common
+    snapping: Snap, instruments: Instr, curriculum: Curr, labels: Labels,
+    common: Common
   };
 }
 
@@ -94,8 +96,8 @@ async function main() {
   eq(Boot.BOOT_BUDGET_MS, 3);
   eq(Boot.BUNDLE_BUDGET_KB, 80);
   eq(Boot.HEAP_BUDGET_MB, 35);
-  eq(Boot.MODULE_FILES.length, 10);
-  eq(Boot.MODULE_NAMES.length, 9);
+  eq(Boot.MODULE_FILES.length, 11);
+  eq(Boot.MODULE_NAMES.length, 10);
   pass('phase7 boot exports budgets');
 
   // 4 common exports: 3 buttons + 2 menu options, no DOM in Node
@@ -135,8 +137,9 @@ async function main() {
   ok(h7.ruler && h7.compass, 'ruler+compass');
   var m7 = h7.modules;
   eq([m7.viewport, m7.canvas, m7.entities, m7.shim, m7.solver,
-    m7.snapping, m7.instruments, m7.curriculum, m7.common]
-    .filter(function (x) { return !!x; }).length, 9);
+    m7.snapping, m7.instruments, m7.curriculum, m7.labels, m7.common]
+    .filter(function (x) { return !!x; }).length, 10);
+  eq(typeof m7.labels.resolve, 'function');
   eq(h7.booted, true);
   Boot.dispose(h7);
   pass('phase7 init wires all');

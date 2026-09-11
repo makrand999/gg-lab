@@ -1,0 +1,43 @@
+/* EduGraphics HUD + 2-option menu only. Dual-layer Canvas2D mount. */
+.edugraphics-mount {
+  position: relative;
+  overflow: hidden;
+}
+.edugraphics-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+}
+.edugraphics-layer1 { z-index: 1; }
+.edugraphics-layer2 { z-index: 2; }
+.edugraphics-hud {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+.edugraphics-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  font: 14px/1 sans-serif;
+  cursor: pointer;
+}
+.edugraphics-menu {
+  position: absolute;
+  z-index: 4;
+  display: none;
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid #888;
+  font: 13px/1.4 sans-serif;
+}
+.edugraphics-menu.open { display: block; }
+.edugraphics-menu-item {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.edugraphics-menu-item:hover { background: #eef; }

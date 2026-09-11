@@ -142,11 +142,20 @@
     else if (q === 2) { planY = distVP; elevY = distHP; }
     else if (q === 3) { planY = distVP; elevY = -distHP; }
     else { planY = -distVP; elevY = -distHP; }
-    var meta = { kind: 'quadrant-point', quadrant: q, projection: proj };
+    // Anti-collision: in Q2/Q4 both views share one side of XY, so when
+    // plan and elevation sit within 6 mm their captions overlap. Push the
+    // labels apart via meta offsets (geometry untouched).
+    var planMeta = { kind: 'quadrant-point', quadrant: q, projection: proj };
+    var elevMeta = { kind: 'quadrant-point', quadrant: q, projection: proj };
+    if (Math.abs(elevY - planY) < 6) {
+      var s = (elevY >= planY) ? 1 : -1;
+      elevMeta.labelDyMm = s * 3;
+      planMeta.labelDyMm = -s * 3;
+    }
     var entities = [
       datumSpec(xMm - 25, xMm + 25),
-      ptSpec(xMm, planY, 'PLAN', 'B', label, meta),
-      ptSpec(xMm, elevY, 'ELEVATION', 'B', primeLabel(label), meta),
+      ptSpec(xMm, planY, 'PLAN', 'B', label, planMeta),
+      ptSpec(xMm, elevY, 'ELEVATION', 'B', primeLabel(label), elevMeta),
       segSpec(xMm, planY, xMm, elevY, 'BOTH', 'G', 'proj-' + label, { kind: 'projector' })
     ];
     var loci = [locusRec('PLAN', planY, label), locusRec('ELEVATION', elevY, primeLabel(label))];
@@ -203,17 +212,32 @@
     var locusElevY = yaElev + TL * Math.sin(thetaDeg * DEG);
     var dx = Math.sqrt(Math.max(0, TL * TL - dh * dh - dd * dd));
     var bx = axMm + dx;
+    var st = Math.sin(thetaDeg * DEG), sp = Math.sin(phiDeg * DEG);
+    var physicallyImpossible = (st * st + sp * sp) > 1 + 1e-9;
     var meta = { kind: 'straight-line', TL: TL, thetaDeg: thetaDeg, phiDeg: phiDeg };
+    var degenerateViews = [];
+    // Apparent views shorter than 1e-6 mm (e.g. theta = 90 deg collapses
+    // the plan to a point) are emitted as POINTs, never zero-length
+    // SEGMENTs, so direction vectors downstream never divide by zero.
+    function viewSeg(x1, y1, x2, y2, role, bis, caption, viewTag, m) {
+      var mm = (m === undefined) ? meta : m;
+      var ddx = x2 - x1, ddy = y2 - y1;
+      if (ddx * ddx + ddy * ddy < 1e-12) {
+        degenerateViews.push(viewTag);
+        return ptSpec(x1, y1, role, bis, caption, mm);
+      }
+      return segSpec(x1, y1, x2, y2, role, bis, caption, mm);
+    }
     var entities = [
       datumSpec(Math.min(axMm, bx) - 15, Math.max(axMm, bx) + 15),
       ptSpec(axMm, yaPlan, 'PLAN', 'B', labelA, meta),
       ptSpec(bx, locusPlanY, 'PLAN', 'B', labelB, meta),
       ptSpec(axMm, yaElev, 'ELEVATION', 'B', primeLabel(labelA), meta),
       ptSpec(bx, locusElevY, 'ELEVATION', 'B', primeLabel(labelB), meta),
-      segSpec(axMm, yaPlan, bx, locusPlanY, 'PLAN', 'A', labelA + labelB, meta),
-      segSpec(axMm, yaElev, bx, locusElevY, 'ELEVATION', 'A', primeLabel(labelA + labelB), meta),
-      segSpec(axMm, yaPlan, axMm, yaElev, 'BOTH', 'G', 'proj-' + labelA, { kind: 'projector' }),
-      segSpec(bx, locusPlanY, bx, locusElevY, 'BOTH', 'G', 'proj-' + labelB, { kind: 'projector' }),
+      viewSeg(axMm, yaPlan, bx, locusPlanY, 'PLAN', 'A', labelA + labelB, 'PLAN'),
+      viewSeg(axMm, yaElev, bx, locusElevY, 'ELEVATION', 'A', primeLabel(labelA + labelB), 'ELEVATION'),
+      viewSeg(axMm, yaPlan, axMm, yaElev, 'BOTH', 'G', 'proj-' + labelA, 'PROJECTOR_A', { kind: 'projector' }),
+      viewSeg(bx, locusPlanY, bx, locusElevY, 'BOTH', 'G', 'proj-' + labelB, 'PROJECTOR_B', { kind: 'projector' }),
       lineSpec(Math.min(axMm, bx) - 15, locusPlanY, Math.max(axMm, bx) + 15, locusPlanY, 'PLAN', 'K', 'locus-' + labelB, { kind: 'locus' }),
       lineSpec(Math.min(axMm, bx) - 15, locusElevY, Math.max(axMm, bx) + 15, locusElevY, 'ELEVATION', 'K', 'locus-' + primeLabel(labelB), { kind: 'locus' })
     ];
@@ -228,10 +252,20 @@
       '6. Projector dx = sqrt(TL^2 - dh^2 - dd^2) = ' + dx + ' mm; B x = ' + bx + ' mm.',
       '7. Join AB plan and A-prime B-prime elevation Type A; projectors Type G hold elev.x == plan.x.'
     ];
+    if (physicallyImpossible) {
+      steps.push(steps.length + 1 + '. WARNING: theta + phi = ' + (thetaDeg + phiDeg) +
+        ' deg exceeds 90 deg; no real 3D line has these inclinations (dx clamped to 0).');
+    }
+    if (degenerateViews.length > 0) {
+      steps.push(steps.length + 1 + '. NOTE: collapsed ' + degenerateViews.join(', ') +
+        ' emitted as POINT (apparent length below 1e-6 mm).');
+    }
     var ok = checkProjector({ x: axMm, y: yaPlan }, { x: axMm, y: yaElev }) &&
       checkProjector({ x: bx, y: locusPlanY }, { x: bx, y: locusElevY });
     return {
       kind: 'straight-line', TL: TL, thetaDeg: thetaDeg, phiDeg: phiDeg,
+      physicallyImpossible: physicallyImpossible,
+      degenerateViews: degenerateViews,
       PL: PL, EL: EL, dh: dh, dd: dd, dx: dx,
       locusPlanY: locusPlanY, locusElevY: locusElevY,
       aPlan: { x: axMm, y: yaPlan }, bPlan: { x: bx, y: locusPlanY },
@@ -506,7 +540,7 @@
     quadrantSet: quadrantSet, quadrantPoints: quadrantSet, allQuadrants: quadrantSet,
     straightLine: straightLine, lineLesson: straightLine, mongeLine: straightLine,
     planeSurface: planeSurface, planeLesson: planeSurface, surfaceLesson: planeSurface,
-    regularSolid: regularSolid, solidLesson: regularSolid, solid: regularSolid,
+    regularSolid: regularSolid, solidLesson: regularSolid, solid: regularSolid, solid35mm: regularSolid,
     generateLesson: generateLesson, generate: generateLesson, buildLesson: generateLesson,
     generateCurriculum: generateCurriculum, buildCurriculum: generateCurriculum,
     curriculum: generateCurriculum, fullCurriculum: generateCurriculum,

@@ -18,7 +18,7 @@ var Instr = require('../mirror/files/www.geogebra.org/edugraphics-instruments.js
 var Curr = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
 var Serve = require('./serve.js');
 
-var TOTAL = 30;
+var TOTAL = 33;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -386,6 +386,76 @@ async function main() {
   ok(fs.statSync(cssPath).size > 100, 'css on disk');
   console.log('  raw total ' + rawTotal + ' B across ' + Boot.MODULE_FILES.length + ' js files');
   pass('phase7 bundle inventory');
+
+  // 31 hidpi buffer math + dpr-aware mount under mock DOM
+  var hb31 = Common.hidpiBufferSize(800, 600, 2);
+  eq(hb31.bufW, 1600);
+  eq(hb31.bufH, 1200);
+  eq(hb31.cssW, 800);
+  eq(Common.hidpiBufferSize(800, 600, 0).bufW, 800);
+  eq(Common.resolveDpr(3), 3);
+  eq(Common.resolveDpr(undefined), 1);
+  global.window = { devicePixelRatio: 2 };
+  eq(Common.resolveDpr(undefined), 2);
+  eq(Common.resolveDpr(1), 1);
+  delete global.window;
+  var seenTx = [];
+  function fakeNode() {
+    return {
+      className: '', children: [], attrs: {}, style: {}, textContent: '',
+      setAttribute: function (k, v) { this.attrs[k] = v; },
+      appendChild: function (c) { this.children.push(c); return c; },
+      getContext: function () {
+        return { setTransform: function (a, b, c, d, e, f) { seenTx.push([a, b, c, d, e, f]); } };
+      }
+    };
+  }
+  global.document = { createElement: function () { return fakeNode(); } };
+  try {
+    var m31 = Common.mountContainer(fakeNode(), { w: 400, h: 300, dpr: 2 });
+    eq(m31.headless, false);
+    eq(m31.layer1.width, 800);
+    eq(m31.layer1.height, 600);
+    eq(m31.layer1.style.width, '400px');
+    eq(m31.dpr, 2);
+    eq(seenTx.length, 2);
+    deep(seenTx[0], [2, 0, 0, 2, 0, 0]);
+  } finally {
+    delete global.document;
+  }
+  pass('phase7 hidpi mount');
+
+  // 32 port precedence: argv, then $PORT, then 8124
+  var oldPort = process.env.PORT;
+  process.env.PORT = '9011';
+  eq(Serve.resolvePort(undefined), 9011);
+  eq(Serve.resolvePort('9022'), 9022);
+  process.env.PORT = 'bogus';
+  eq(Serve.resolvePort(undefined), 8124);
+  eq(Serve.resolvePort('nope'), 8124);
+  if (oldPort === undefined) delete process.env.PORT;
+  else process.env.PORT = oldPort;
+  pass('phase7 port precedence');
+
+  // 33 EADDRINUSE falls forward to the next free port
+  var occ33 = Serve.start(0, '127.0.0.1');
+  await onceListening(occ33);
+  var pOcc33 = occ33.address().port;
+  var fb33 = await new Promise(function (resolve, reject) {
+    Serve.startNextAvailable(pOcc33, '127.0.0.1', Serve.ROOT, 5, function (err, srv, actual) {
+      if (err) reject(err);
+      else resolve({ srv: srv, actual: actual });
+    });
+  });
+  try {
+    ok(fb33.actual !== pOcc33, 'moved to ' + fb33.actual);
+    var r33 = await get(fb33.actual, '/');
+    eq(r33.status, 200);
+  } finally {
+    await closeServer(fb33.srv);
+    await closeServer(occ33);
+  }
+  pass('phase7 port fallback');
 
   assert.strictEqual(n, TOTAL);
   console.log('OK ' + TOTAL + '/' + TOTAL + ' phase7 tests passed');

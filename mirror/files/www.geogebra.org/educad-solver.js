@@ -147,6 +147,26 @@
     };
   }
 
+  // Physical feasibility: a real 3D line satisfies sin^2 theta +
+  // sin^2 phi <= 1 (equivalently theta + phi <= 90 deg for angles in
+  // [0, 90]). Beyond that, dx^2 = TL^2(1 - sin^2t - sin^2p) < 0 and the
+  // clamped dx = 0 silently describes an impossible line. Tolerance 1e-9
+  // keeps exact boundary cases (e.g. 45/45 deg) feasible under fp error.
+  var FEAS_TOL = 1e-9;
+
+  function lineFeasibility(o) {
+    o = o || {};
+    assertFinite(o.thetaDeg, o.phiDeg);
+    var st = Math.sin(o.thetaDeg * DEG), sp = Math.sin(o.phiDeg * DEG);
+    var sum = st * st + sp * sp;
+    var inRange = o.thetaDeg >= 0 && o.thetaDeg <= 90 && o.phiDeg >= 0 && o.phiDeg <= 90;
+    return {
+      possible: inRange && sum <= 1 + FEAS_TOL,
+      sin2sum: sum,
+      thetaPlusPhiDeg: o.thetaDeg + o.phiDeg
+    };
+  }
+
   // Projector dx consistency via sqrt.
   function projectorDxFromTL(o) {
     o = o || {};
@@ -203,7 +223,14 @@
   function lineXYIntersection(p, q) {
     assertFinite(p.x, p.y, q.x, q.y);
     var dy = q.y - p.y;
-    if (Math.abs(dy) < 1e-12) return null;
+    if (Math.abs(dy) < 1e-12) {
+      // Collinear with XY (line lies in the ground line): every point is
+      // an intersection; report the segment midpoint with a flag.
+      if (Math.abs(p.y) < 1e-12 && Math.abs(q.y) < 1e-12) {
+        return { x: (p.x + q.x) / 2, y: 0, collinear: true };
+      }
+      return null;
+    }
     var t = (0 - p.y) / dy;
     return { x: p.x + t * (q.x - p.x), y: 0 };
   }
@@ -224,6 +251,8 @@
       HTplan: HTplan, HTelev: HTelev,
       VTplan: VTplan, VTelev: VTelev,
       HT: HTplan, VT: VTelev,
+      HTcollinear: !!(hp && hp.collinear),
+      VTcollinear: !!(ve && ve.collinear),
       projectorOk: ok
     };
   }
@@ -512,6 +541,7 @@
     o = o || {};
     assertFinite(o.TL, o.thetaDeg, o.phiDeg, o.yaPlan, o.yaElev);
     if (o.TL <= 0) throw new Error('TL must be > 0');
+    var feas = lineFeasibility({ thetaDeg: o.thetaDeg, phiDeg: o.phiDeg });
     var rot = lineRotation({ TL: o.TL, thetaDeg: o.thetaDeg, phiDeg: o.phiDeg });
     var dh = o.TL * Math.sin(o.thetaDeg * DEG);
     var dd = o.TL * Math.sin(o.phiDeg * DEG);
@@ -522,6 +552,8 @@
     var phR = inclinationPhiDeg(o.TL, rot.EL);
     return {
       TL: o.TL, thetaDeg: o.thetaDeg, phiDeg: o.phiDeg,
+      physicallyImpossible: !feas.possible,
+      feasibility: feas,
       PL: rot.PL, EL: rot.EL,
       locusPlanY: locusBY(o.yaPlan, o.TL, o.phiDeg),
       locusElevY: locusBPrimeY(o.yaElev, o.TL, o.thetaDeg),
@@ -556,6 +588,7 @@
     locusElevationY: locusBPrimeY, locusPlanY: locusBY,
     inclinationThetaDeg: inclinationThetaDeg, inclinationPhiDeg: inclinationPhiDeg,
     alphaBeta: alphaBeta,
+    lineFeasibility: lineFeasibility, FEAS_TOL: FEAS_TOL,
     projectorDxFromTL: projectorDxFromTL, projectorDxFromViews: projectorDxFromViews,
     trueLengthFromPlan: trueLengthFromPlan, trueLengthFromElevation: trueLengthFromElevation,
     rabattement: rabattement,

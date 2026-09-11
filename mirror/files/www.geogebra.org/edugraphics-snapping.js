@@ -287,10 +287,36 @@
     return { x: a.x + t * rX, y: a.y + t * rY };
   }
 
+  // AABB proximity prefilter: an intersection within snap range of the
+  // cursor must lie on BOTH parents, so any parent whose geometry stays
+  // farther than the release radius from the cursor cannot contribute a
+  // lockable (or even releasable) candidate. Conservative: keeps every
+  // pair that could matter, skips the rest before the O(N^2) loop.
+  function segNearCursorMm(e, w, padMm) {
+    var minX = Math.min(e.x, e.x2) - padMm, maxX = Math.max(e.x, e.x2) + padMm;
+    var minY = Math.min(e.y, e.y2) - padMm, maxY = Math.max(e.y, e.y2) + padMm;
+    return w.x >= minX && w.x <= maxX && w.y >= minY && w.y <= maxY;
+  }
+
+  function lineNearCursorMm(e, w, padMm) {
+    // Infinite LINE: perpendicular distance, never the finite AABB.
+    var dx = e.x2 - e.x, dy = e.y2 - e.y;
+    var len2 = dx * dx + dy * dy;
+    if (!(len2 > 0)) {
+      return distMm({ x: e.x, y: e.y }, w) <= padMm;
+    }
+    var dist = Math.abs(dy * w.x - dx * w.y + e.x2 * e.y - e.y2 * e.x) / Math.sqrt(len2);
+    return dist <= padMm;
+  }
+
   function intersectionCandidates(entities, cursorPx, view) {
     var out = [];
+    var w = inverse(view, cursorPx);
+    var padMm = SNAP_RELEASE_PX / view.s;
     var segs = entities.filter(function (e) {
-      return e.type === 'SEGMENT' || e.type === 'LINE' || e.type === 'DIMENSION';
+      if (e.type !== 'SEGMENT' && e.type !== 'LINE' && e.type !== 'DIMENSION') return false;
+      if (e.type === 'LINE') return lineNearCursorMm(e, w, padMm);
+      return segNearCursorMm(e, w, padMm);
     });
     for (var i = 0; i < segs.length; i++) {
       for (var j = i + 1; j < segs.length; j++) {
@@ -384,6 +410,7 @@
     ringForSnap: ringForSnap, ringFor: ringForSnap,
     endpointCandidates: endpointCandidates, midpointCandidates: midpointCandidates,
     centerCandidates: centerCandidates, intersectionCandidates: intersectionCandidates,
+    segNearCursorMm: segNearCursorMm, lineNearCursorMm: lineNearCursorMm,
     projectorCandidates: projectorCandidates, locusCandidates: locusCandidates,
     collectCandidates: collectCandidates, snapAt: snapAt
   };

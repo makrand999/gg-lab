@@ -4,7 +4,7 @@ var fs = require('fs');
 var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
 var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
 
-var TOTAL = 20;
+var TOTAL = 23;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -209,6 +209,40 @@ deep(G20a, G20b);
 deep(C.straightLine({ TL: 60 }), C.straightLine({ TL: 60 }));
 noPxKeys(G20a.entities);
 pass('phase6 deterministic mm-only');
+// 21 impossible inclinations flagged, never silent
+var L21 = C.straightLine({ TL: 50, thetaDeg: 60, phiDeg: 60 });
+eq(L21.physicallyImpossible, true);
+eq(L21.dx, 0);
+ok(L21.steps.join(' ').indexOf('WARNING') !== -1, 'warn step');
+eq(C.straightLine({ TL: 50, thetaDeg: 30, phiDeg: 30 }).physicallyImpossible, false);
+pass('phase6 impossible flagged');
+// 22 perpendicular line: collapsed plan emitted as POINT
+var L22 = C.straightLine({ TL: 50, thetaDeg: 90, phiDeg: 0 });
+deep(L22.degenerateViews, ['PLAN']);
+var planViews = L22.entities.filter(function (e) {
+  return e.viewRole === 'PLAN' && (e.caption === 'ab');
+});
+eq(planViews.length, 1);
+eq(planViews[0].type, 'POINT');
+var zeroSegs = L22.entities.filter(function (e) {
+  if (e.type !== 'SEGMENT') return false;
+  var dx = e.x2 - e.x, dy = e.y2 - e.y;
+  return dx * dx + dy * dy < 1e-12;
+});
+eq(zeroSegs.length, 0);
+pass('phase6 degenerate point');
+// 23 Q2/Q4 close views get anti-collision label offsets
+var Q23 = C.quadrantPoint({ quadrant: 2, distHP: 20, distVP: 20 });
+var plan23 = Q23.entities.filter(function (e) { return e.viewRole === 'PLAN'; })[0];
+var elev23 = Q23.entities.filter(function (e) { return e.viewRole === 'ELEVATION'; })[0];
+eq(plan23.meta.labelDyMm, -3);
+eq(elev23.meta.labelDyMm, 3);
+eq(plan23.y, 20);
+eq(elev23.y, 20);
+var Q23b = C.quadrantPoint({ quadrant: 1, distHP: 20, distVP: 15 });
+var plan23b = Q23b.entities.filter(function (e) { return e.viewRole === 'PLAN'; })[0];
+eq(plan23b.meta.labelDyMm, undefined);
+pass('phase6 label offsets');
 
 assert.strictEqual(n, TOTAL);
 console.log('OK ' + TOTAL + '/' + TOTAL + ' phase6 tests passed');

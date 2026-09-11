@@ -5,7 +5,7 @@ var SN = require('../mirror/files/www.geogebra.org/edugraphics-snapping.js');
 var IN = require('../mirror/files/www.geogebra.org/edugraphics-instruments.js');
 var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
 
-var TOTAL = 30;
+var TOTAL = 32;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -331,6 +331,27 @@ eq(IN.LAYER, 'layer2');
 eq(SN.LAYER_DYNAMIC, 'layer2');
 eq(SN.RING_RADIUS_PX, 10);
 pass('phase5 states constants');
+// 31 AABB prefilter skips far segments, keeps near crossing
+E.resetIdCounter();
+var t31 = table2();
+t31.create('SEGMENT', { x: 200, y: 200, x2: 240, y2: 200 });
+t31.create('SEGMENT', { x: 220, y: 180, x2: 220, y2: 220 });
+var far31 = SN.intersectionCandidates(t31.list(), { x: 0, y: 600 }, v5);
+eq(far31.length, 0);
+var near31 = SN.intersectionCandidates(t31.list(), { x: cross.x + 2, y: cross.y + 1 }, v5);
+eq(near31.length, 1);
+near(near31[0].xMm, 20, 1e-9, 'ix');
+near(near31[0].yMm, 0, 1e-9, 'iy');
+var r31 = SN.snapAt({ x: cross.x + 2, y: cross.y + 1 }, v5, { entities: t31.list() });
+eq(r31.snap.tier, 'INTERSECTION');
+pass('phase5 intersection prefilter');
+// 32 infinite LINE uses point-line distance, not finite AABB
+var w32 = SN.inverse(v5, { x: 400, y: 300 });
+ok(SN.lineNearCursorMm({ x: -1000, y: 0, x2: -900, y2: 0 }, w32, 11), 'line on cursor row');
+ok(!SN.lineNearCursorMm({ x: -1000, y: 500, x2: -900, y2: 500 }, w32, 11), 'far line dropped');
+ok(!SN.segNearCursorMm({ x: 200, y: 200, x2: 240, y2: 200 }, w32, 11), 'far seg dropped');
+ok(SN.segNearCursorMm({ x: 0, y: 0, x2: 40, y2: 0 }, w32, 11), 'near seg kept');
+pass('phase5 line distance filter');
 
 assert.strictEqual(n, TOTAL);
 console.log('OK ' + TOTAL + '/' + TOTAL + ' phase5 tests passed');

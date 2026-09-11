@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EduCAD - 2D Engineering Graphics CAD</title>
+  <link rel="stylesheet" href="/files/www.geogebra.org/edugraphics-hud.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #app-container { width: 100vw; height: 100vh; position: relative; }
+    .status-hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      color: #1e293b;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      pointer-events: none;
+    }
+    .status-hud .coords { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 3px; }
+    .plane-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    .plane-vp { background: #e0e7ff; color: #3730a3; }
+    .plane-hp { background: #fef3c7; color: #92400e; }
+    .demo-bar {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+      display: flex;
+      gap: 6px;
+    }
+    .demo-btn {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #334155;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: all 0.15s ease;
+    }
+    .demo-btn:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
+    .demo-btn.active { background: #0284c7; color: #ffffff; border-color: #0284c7; }
+  </style>
+</head>
+<body>
+  <div id="app-container"></div>
+  
+  <div class="status-hud">
+    <div><strong>EduCAD 2D Engine</strong> &bull; 1st Angle Monge Projection &bull; <span id="plane-indicator" class="plane-tag plane-vp">VP (Elevation)</span></div>
+    <div class="coords" id="coords-display">X: 0.00 mm &bull; Y: 0.00 mm (Ground Line XY)</div>
+  </div>
+
+  <div class="demo-bar">
+    <button class="demo-btn active" id="btn-demo-line">Line Rotation (TL=80, θ=30°, φ=45°)</button>
+    <button class="demo-btn" id="btn-demo-points">Quadrant Points (1st & 3rd)</button>
+    <button class="demo-btn" id="btn-demo-prism">Hexagonal Prism (35mm)</button>
+    <button class="demo-btn" id="btn-clear">Clear Sheet</button>
+  </div>
+
+  <!-- Core Modules -->
+  <script src="/files/www.geogebra.org/educad-viewport.js"></script>
+  <script src="/files/www.geogebra.org/educad-canvas.js"></script>
+  <script src="/files/www.geogebra.org/educad-entities.js"></script>
+  <script src="/files/www.geogebra.org/educad-shim.js"></script>
+  <script src="/files/www.geogebra.org/educad-solver.js"></script>
+  <script src="/files/www.geogebra.org/edugraphics-snapping.js"></script>
+  <script src="/files/www.geogebra.org/edugraphics-instruments.js"></script>
+  <script src="/files/www.geogebra.org/educad-curriculum.js"></script>
+  <script src="/files/www.geogebra.org/edugraphics-common.js"></script>
+  <script src="/files/www.geogebra.org/educad-boot.js"></script>
+
+  <script>
+    (function () {
+      'use strict';
+      var container = document.getElementById('app-container');
+      var coordsDisp = document.getElementById('coords-display');
+      var planeInd = document.getElementById('plane-indicator');
+
+      // Initialize EduCAD Bootloader
+      var handle = EduCADBoot.init({
+        container: container,
+        w: window.innerWidth,
+        h: window.innerHeight
+      });
+
+      var mount = handle.mount;
+      var c1 = mount.layer1;
+      var c2 = mount.layer2;
+      var ctx1 = c1.getContext('2d');
+      var ctx2 = c2.getContext('2d');
+      var dpr = mount.dpr || window.devicePixelRatio || 1;
+
+      // Handle window resizing
+      window.addEventListener('resize', function () {
+        var w = window.innerWidth, h = window.innerHeight;
+        handle.view.w = w; handle.view.h = h;
+        handle.canvasState.view.w = w; handle.canvasState.view.h = h;
+        var sz = EduGraphicsCommon.hidpiBufferSize(w, h, dpr);
+        EduGraphicsCommon.sizeCanvasForDpr(c1, sz);
+        EduGraphicsCommon.sizeCanvasForDpr(c2, sz);
+        renderLayer1();
+      });
+
+      // Render Base Layer 1 (Static: Grid, Datum Ground Line XY, Committed CAD Entities)
+      function renderLayer1() {
+        ctx1.save();
+        ctx1.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx1.clearRect(0, 0, handle.view.w, handle.view.h);
+
+        var v = handle.view;
+        var s = v.s;
+
+        // 1. Grid (if enabled via context menu)
+        if (handle.canvasState.showGrid) {
+          ctx1.save();
+          var stepMm = s < 1.0 ? 50 : (s < 4.0 ? 10 : 5);
+          var minW = EduCADViewport.inverse(v, { x: 0, y: v.h });
+          var maxW = EduCADViewport.inverse(v, { x: v.w, y: 0 });
+
+          ctx1.lineWidth = 0.5;
+          ctx1.strokeStyle = '#e2e8f0';
+          ctx1.beginPath();
+          var startX = Math.floor(minW.x / stepMm) * stepMm;
+          for (var gx = startX; gx <= maxW.x; gx += stepMm) {
+            var sx = EduCADViewport.forward(v, { x: gx, y: 0 }).x;
+            ctx1.moveTo(Math.floor(sx) + 0.5, 0);
+            ctx1.lineTo(Math.floor(sx) + 0.5, v.h);
+          }
+          var startY = Math.floor(minW.y / stepMm) * stepMm;
+          for (var gy = startY; gy <= maxW.y; gy += stepMm) {
+            var sy = EduCADViewport.forward(v, { x: 0, y: gy }).y;
+            ctx1.moveTo(0, Math.floor(sy) + 0.5);
+            ctx1.lineTo(v.w, Math.floor(sy) + 0.5);
+          }
+          ctx1.stroke();
+          ctx1.restore();
+        }
+
+        // 2. Reference Datum Ground Line XY (y = 0 mm)
+        var xyScreen = EduCADViewport.forward(v, { x: 0, y: 0 });
+        var xyY = Math.floor(xyScreen.y) + 0.5;
+        if (xyY >= 0 && xyY <= v.h) {
+          ctx1.save();
+          ctx1.lineWidth = 1.5;
+          ctx1.strokeStyle = '#334155';
+          ctx1.beginPath();
+          ctx1.moveTo(0, xyY);
+          ctx1.lineTo(v.w, xyY);
+          ctx1.stroke();
+
+          // Labels X and Y
+          ctx1.font = 'bold 13px serif';
+          ctx1.fillStyle = '#0f172a';
+          ctx1.fillText('X', 16, xyY - 6);
+          ctx1.fillText('Y', v.w - 24, xyY - 6);
+
+          // VP & HP Watermark Labels
+          ctx1.font = '11px sans-serif';
+          ctx1.fillStyle = '#64748b';
+          ctx1.fillText('V.P. (Front View / Elevation)', 40, xyY - 8);
+          ctx1.fillText('H.P. (Top View / Plan)', 40, xyY + 16);
+          ctx1.restore();
+        }
+
+        // 3. Render Committed Entities from CadEntityTable
+        var entities = handle.table.list();
+        for (var i = 0; i < entities.length; i++) {
+          var ent = entities[i];
+          if (!ent.visible) continue;
+          renderEntity(ctx1, v, ent);
+        }
+
+        ctx1.restore();
+      }
+
+      // Render Single Entity on Canvas2D with BIS SP 46 Linestyle
+      function renderEntity(ctx, v, ent) {
+        var style = EduCADEntities.resolveStyle(ent);
+        var strokeColor = ent.color || '#0f172a';
+        if (ent.bisCode === 'B') strokeColor = '#475569';
+        if (ent.bisCode === 'G') strokeColor = '#64748b';
+        if (ent.bisCode === 'K') strokeColor = '#0284c7';
+
+        ctx.save();
+        ctx.strokeStyle = strokeColor;
+        ctx.fillStyle = strokeColor;
+        ctx.lineWidth = Math.max(1, EduCADEntities.widthToPx(style.widthMm, v.s));
+        var dash = EduCADEntities.dashToPx(style.dashMm, v.s);
+        if (dash.length > 0) ctx.setLineDash(dash);
+
+        if (ent.type === 'SEGMENT' || ent.type === 'LINE') {
+          var p1 = EduCADViewport.forward(v, { x: ent.x, y: ent.y });
+          var p2 = EduCADViewport.forward(v, { x: ent.x2, y: ent.y2 });
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+
+          // If dimension line, draw 3:1 arrowheads
+          if (ent.type === 'DIMENSION' || (ent.meta && ent.meta.dimension)) {
+            drawArrowhead(ctx, p1, p2);
+            drawArrowhead(ctx, p2, p1);
+          }
+        } else if (ent.type === 'POINT') {
+          var pt = EduCADViewport.forward(v, { x: ent.x, y: ent.y });
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 3, 0, 2 * Math.PI);
+          ctx.fill();
+        } else if (ent.type === 'CIRCLE' || ent.type === 'CIRCULAR_ARC') {
+          var center = EduCADViewport.forward(v, { x: ent.x, y: ent.y });
+          var rPx = ent.radius * v.s;
+          ctx.beginPath();
+          if (ent.type === 'CIRCLE') {
+            ctx.arc(center.x, center.y, rPx, 0, 2 * Math.PI);
+          } else {
+            // Y-flip angle inversion for Cartesian upward Y
+            var sa = -ent.endAngle;
+            var ea = -ent.startAngle;
+            ctx.arc(center.x, center.y, rPx, sa, ea, false);
+          }
+          ctx.stroke();
+        }
+
+        // Render Primed Typography / Labels
+        if (ent.caption || ent.showLabel) {
+          var labelText = ent.caption || ent.name;
+          var lp = EduCADViewport.forward(v, { x: ent.x, y: ent.y });
+          ctx.font = 'italic 13px "Cambria", "Times New Roman", serif';
+          ctx.fillStyle = '#0f172a';
+          ctx.setLineDash([]);
+          var ox = (ent.meta && ent.meta.labelOffset && ent.meta.labelOffset.x) || 8;
+          var oy = (ent.meta && ent.meta.labelOffset && ent.meta.labelOffset.y) || -8;
+          ctx.fillText(labelText, lp.x + ox, lp.y + oy);
+        }
+
+        ctx.restore();
+      }
+
+      function drawArrowhead(ctx, from, to) {
+        var dx = to.x - from.x, dy = to.y - from.y;
+        var len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 1e-6) return;
+        var ux = dx / len, uy = dy / len;
+        var aLen = 10;
+        var aWidth = 3.5;
+        var bx = to.x - aLen * ux, by = to.y - aLen * uy;
+        var nx = -uy, ny = ux;
+        ctx.beginPath();
+        ctx.moveTo(to.x, to.y);
+        ctx.lineTo(bx + nx * aWidth, by + ny * aWidth);
+        ctx.lineTo(bx - nx * aWidth, by - ny * aWidth);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Render Dynamic Layer 2 (Cursor Snapping, Rings, Instruments)
+      function renderLayer2(cursorPx, snapResult) {
+        ctx2.save();
+        ctx2.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx2.clearRect(0, 0, handle.view.w, handle.view.h);
+
+        if (snapResult && snapResult.snap) {
+          var sp = snapResult.snap;
+          // Animated Turquoise Snap Ring
+          ctx2.save();
+          ctx2.strokeStyle = '#06b6d4';
+          ctx2.lineWidth = 2;
+          ctx2.beginPath();
+          ctx2.arc(sp.xPx, sp.yPx, 7, 0, 2 * Math.PI);
+          ctx2.stroke();
+
+          // Snap Badge
+          ctx2.font = '11px sans-serif';
+          ctx2.fillStyle = '#0891b2';
+          var badgeText = sp.tier + (sp.id ? ' [' + sp.id + ']' : '');
+          ctx2.fillText(badgeText, sp.xPx + 10, sp.yPx - 6);
+          ctx2.restore();
+        }
+
+        ctx2.restore();
+      }
+
+      // Pointer & Mouse Interaction
+      var isPanning = false;
+      var panStart = { x: 0, y: 0 };
+      var viewStart = { tx: 0, ty: 0 };
+
+      window.addEventListener('pointerdown', function (e) {
+        if (e.target.closest('.edugraphics-hud') || e.target.closest('.demo-bar') || e.target.closest('.edugraphics-menu')) return;
+        if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle click or shift+left to pan
+          isPanning = true;
+          panStart = { x: e.clientX, y: e.clientY };
+          viewStart = { tx: handle.view.tx, ty: handle.view.ty };
+          c2.style.cursor = 'grabbing';
+          e.preventDefault();
+        }
+        // Dismiss menu
+        if (EduCADCanvas.shouldDismissMenu(e)) {
+          mount.menu.classList.remove('open');
+        }
+      });
+
+      window.addEventListener('pointermove', function (e) {
+        var cursor = { x: e.clientX, y: e.clientY };
+        var wPt = EduCADViewport.inverse(handle.view, cursor);
+
+        // Update HUD
+        coordsDisp.textContent = 'X: ' + wPt.x.toFixed(2) + ' mm • Y: ' + wPt.y.toFixed(2) + ' mm';
+        if (wPt.y >= 0) {
+          planeInd.textContent = 'V.P. (Elevation / Front)';
+          planeInd.className = 'plane-tag plane-vp';
+        } else {
+          planeInd.textContent = 'H.P. (Plan / Top)';
+          planeInd.className = 'plane-tag plane-hp';
+        }
+
+        if (isPanning) {
+          handle.view.tx = viewStart.tx + (e.clientX - panStart.x);
+          handle.view.ty = viewStart.ty + (e.clientY - panStart.y);
+          renderLayer1();
+          renderLayer2(null, null);
+          return;
+        }
+
+        // Snapping candidate check
+        var snapResult = EduCADSnapping.snapAt(cursor, handle.view, { entities: handle.table.list() }, handle.snapCurrent);
+        handle.snapCurrent = snapResult.snap;
+        renderLayer2(cursor, snapResult);
+      });
+
+      window.addEventListener('pointerup', function () {
+        if (isPanning) {
+          isPanning = false;
+          c2.style.cursor = 'default';
+        }
+      });
+
+      // Wheel Zoom anchored at cursor
+      window.addEventListener('wheel', function (e) {
+        if (e.target.closest('.demo-bar')) return;
+        e.preventDefault();
+        var cursor = { x: e.clientX, y: e.clientY };
+        var factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+        var nv = EduCADViewport.zoomAt(handle.view, cursor, factor);
+        handle.view.s = nv.s;
+        handle.view.tx = nv.tx;
+        handle.view.ty = nv.ty;
+        renderLayer1();
+        renderLayer2(cursor, null);
+      }, { passive: false });
+
+      // Right-Click Context Menu (Strictly 2 options: Plain vs Box Mesh)
+      c2.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        var cursor = { x: e.clientX, y: e.clientY };
+        var snap = EduCADSnapping.snapAt(cursor, handle.view, { entities: handle.table.list() });
+        var hitDist = snap && snap.snap ? snap.snap.distPx : 999;
+        var menuPos = EduCADCanvas.onEmptyRightClick(handle.canvasState, e.clientX, e.clientY, hitDist, { w: window.innerWidth, h: window.innerHeight });
+
+        if (menuPos.visible) {
+          mount.menu.style.left = menuPos.x + 'px';
+          mount.menu.style.top = menuPos.y + 'px';
+          EduGraphicsCommon.syncMenuChecked(mount, handle.canvasState.showGrid);
+          mount.menu.classList.add('open');
+        } else {
+          mount.menu.classList.remove('open');
+        }
+      });
+
+      // Context menu selection
+      mount.menu.addEventListener('click', function (e) {
+        var item = e.target.closest('.edugraphics-menu-item');
+        if (!item) return;
+        var optId = item.getAttribute('data-menu');
+        EduCADCanvas.applyMenuAction(handle.canvasState, optId);
+        EduGraphicsCommon.syncMenuChecked(mount, handle.canvasState.showGrid);
+        mount.menu.classList.remove('open');
+        renderLayer1();
+      });
+
+      // Zoom Buttons Click Handlers
+      mount.buttons['zoom-in'].addEventListener('click', function () {
+        var nv = EduCADCanvas.buttonAction(handle.view, 'zoom-in');
+        handle.view.s = nv.s; handle.view.tx = nv.tx; handle.view.ty = nv.ty;
+        renderLayer1();
+      });
+      mount.buttons['zoom-out'].addEventListener('click', function () {
+        var nv = EduCADCanvas.buttonAction(handle.view, 'zoom-out');
+        handle.view.s = nv.s; handle.view.tx = nv.tx; handle.view.ty = nv.ty;
+        renderLayer1();
+      });
+      mount.buttons['zoom-home'].addEventListener('click', function () {
+        var nv = EduCADCanvas.buttonAction(handle.view, 'zoom-home');
+        handle.view.s = nv.s; handle.view.tx = nv.tx; handle.view.ty = nv.ty;
+        renderLayer1();
+      });
+
+      // Demo Problem Loaders
+      function loadDemo(type) {
+        handle.table.clear();
+        document.querySelectorAll('.demo-btn').forEach(function(b) { b.classList.remove('active'); });
+
+        if (type === 'line') {
+          var btn = document.getElementById('btn-demo-line');
+          if (btn) btn.classList.add('active');
+          var prob = EduCADCurriculum.straightLine({
+            TL: 80, thetaDeg: 30, phiDeg: 45,
+            axMm: -30, yaPlan: -20, yaElev: 25
+          });
+          prob.entities.forEach(function (e) { handle.table.create(e.type, e); });
+        } else if (type === 'points') {
+          var btn = document.getElementById('btn-demo-points');
+          if (btn) btn.classList.add('active');
+          var p1 = EduCADCurriculum.quadrantPoint({ quadrant: 1, xMm: -50, distHP: 35, distVP: 25, label: 'a' });
+          var p3 = EduCADCurriculum.quadrantPoint({ quadrant: 3, xMm: 50, distHP: 30, distVP: 35, label: 'b' });
+          p1.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          p3.entities.forEach(function (e) { handle.table.create(e.type, e); });
+        } else if (type === 'prism') {
+          var btn = document.getElementById('btn-demo-prism');
+          if (btn) btn.classList.add('active');
+          var prism = EduCADCurriculum.regularSolid({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
+          prism.entities.forEach(function (e) { handle.table.create(e.type, e); });
+        }
+
+        renderLayer1();
+      }
+
+      document.getElementById('btn-demo-line').addEventListener('click', function () { loadDemo('line'); });
+      document.getElementById('btn-demo-points').addEventListener('click', function () { loadDemo('points'); });
+      document.getElementById('btn-demo-prism').addEventListener('click', function () { loadDemo('prism'); });
+      document.getElementById('btn-clear').addEventListener('click', function () { loadDemo('clear'); });
+
+      // Check URL hash
+      var hash = window.location.hash;
+      if (hash === '#points') {
+        loadDemo('points');
+      } else if (hash === '#prism') {
+        loadDemo('prism');
+      } else if (hash === '#mesh') {
+        loadDemo('line');
+        EduCADCanvas.applyMenuAction(handle.canvasState, 'mesh');
+        EduGraphicsCommon.syncMenuChecked(mount, handle.canvasState.showGrid);
+        mount.menu.style.left = '380px';
+        mount.menu.style.top = '220px';
+        mount.menu.classList.add('open');
+        renderLayer1();
+      } else {
+        loadDemo('line');
+      }
+      renderLayer1();
+      console.log('EduCAD Web App initialized successfully!');
+    })();
+  </script>
+</body>
+</html>

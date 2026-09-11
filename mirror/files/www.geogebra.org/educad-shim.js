@@ -48,7 +48,9 @@
   var VIEW_W = 800;
   var VIEW_H = 600;
   var UNDO_MAX = 50;
-  var NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
+  // Primed notation (a', b_1'', ...) is standard in descriptive geometry:
+  // names may carry trailing single-quote primes.
+  var NAME_RE = /^[A-Za-z][A-Za-z0-9_]*'*$/;
   var WORD_RE = /^[A-Za-z]+$/;
   var NUM_RE = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
   var HEX6_RE = /^#([0-9a-fA-F]{6})$/;
@@ -332,7 +334,9 @@
           } else if (ch === quote) {
             quote = null;
           }
-        } else if (ch === '"' || ch === "'") {
+        } else if ((ch === '"' || ch === "'") && cur.trim() === '') {
+          // A quote opens a string literal only at argument start, so
+          // primed identifiers (a', b_1'') inside args stay literal.
           quote = ch;
           cur += ch;
         } else if (ch === ',' || ch === ';') {
@@ -1049,6 +1053,27 @@
       return table.get(name);
     }
 
+    // Viewport corners in world mm, GeoGebra numbering counter-clockwise
+    // from bottom-left: 1 BL, 2 BR, 3 TR, 4 TL. Entity names can never
+    // collide with these (parens fail NAME_RE), so no shadowing is possible.
+    var CORNER_RE = /^\s*corner\s*\(\s*([1-4])\s*\)\s*$/i;
+    var CORNER_XY_RE = /^\s*([xy])\s*\(\s*corner\s*\(\s*([1-4])\s*\)\s*\)\s*$/i;
+
+    function parseCornerExpr(name) {
+      if (typeof name !== 'string') return null;
+      var m = CORNER_XY_RE.exec(name);
+      if (m) return { axis: m[1].toLowerCase(), corner: parseInt(m[2], 10) };
+      var b = CORNER_RE.exec(name);
+      if (b) return { axis: null, corner: parseInt(b[1], 10) };
+      return null;
+    }
+
+    function cornerPoint(i) {
+      var fx = (i === 2 || i === 3) ? view.w : 0;
+      var fy = (i === 1 || i === 2) ? view.h : 0;
+      return { x: (fx - view.tx) / view.s, y: (view.ty - fy) / view.s };
+    }
+
     var applet = {};
 
     // evalCommand(str): run one builder command. Returns the created object
@@ -1100,7 +1125,13 @@
       try {
         var e = needObj(name);
         if (e === null) {
-          warn('getValue unknown object "' + name + '"');
+          var c = parseCornerExpr(name);
+          if (c !== null && c.axis !== null) {
+            var p = cornerPoint(c.corner);
+            return c.axis === 'x' ? p.x : p.y;
+          }
+          if (c !== null) warn('getValue "' + name + '" has no numeric value');
+          else warn('getValue unknown object "' + name + '"');
           return null;
         }
         var m = e.meta || {};
@@ -1146,6 +1177,10 @@
       try {
         var e = needObj(name);
         if (e === null) {
+          var c = parseCornerExpr(name);
+          if (c !== null && (c.axis === null || c.axis === 'x')) {
+            return cornerPoint(c.corner).x;
+          }
           warn('getXcoord unknown object "' + name + '"');
           return null;
         }
@@ -1160,6 +1195,10 @@
       try {
         var e = needObj(name);
         if (e === null) {
+          var c = parseCornerExpr(name);
+          if (c !== null && (c.axis === null || c.axis === 'y')) {
+            return cornerPoint(c.corner).y;
+          }
           warn('getYcoord unknown object "' + name + '"');
           return null;
         }

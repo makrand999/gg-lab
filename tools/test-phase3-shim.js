@@ -5,7 +5,7 @@ var G = require('../mirror/files/www.geogebra.org/educad-shim.js');
 var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
 var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
 
-var TOTAL = 53;
+var TOTAL = 56;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -618,6 +618,37 @@ mute(function () {
 });
 eq(a53.ping(), 'pong');
 pass('shim isolation sweep');
+// 54 primed identifiers (elevation notation a', b_1'')
+var a54 = fresh();
+eq(a54.evalCommand("a' = Point(20, 30)"), "a'");
+eq(a54.evalCommand("b_1'' = Point(40, 10)"), "b_1''");
+eq(a54.evalCommand("Segment(a', b_1'')") !== null, true);
+eq(a54.getXcoord("a'"), 20);
+eq(a54.getYcoord("b_1''"), 10);
+eq(a54.renameObject("a'", "c'"), true);
+eq(a54.exists("c'"), true);
+eq(mute(function () { return a54.renameObject("c'", '9bad'); }), false);
+pass('shim primed identifiers');
+// 55 viewport Corner(1..4) queries in getValue/getXcoord/getYcoord
+var a55 = fresh();
+eq(a55.getXcoord('Corner(1)'), -200);
+eq(a55.getYcoord('Corner(1)'), -150);
+eq(a55.getXcoord('Corner(2)'), 200);
+eq(a55.getYcoord('Corner(2)'), -150);
+eq(a55.getXcoord('Corner(4)'), -200);
+eq(a55.getYcoord('Corner(4)'), 150);
+eq(a55.getValue('x(Corner(1))'), -200);
+eq(a55.getValue('y(Corner(2))'), -150);
+eq(a55.getValue('y(Corner(4))'), 150);
+eq(mute(function () { return a55.getValue('Corner(1)'); }), null);
+eq(mute(function () { return a55.getValue('Corner(5)'); }), null);
+pass('shim corner queries');
+// 56 quoted string args still parse after primed-name change
+var a56 = fresh();
+eq(a56.evalCommand('T1=Text(5,6,"hello")'), 'T1');
+eq(a56.evalCommand("T2=Text(1,2,'quoted')"), 'T2');
+eq(mute(function () { return a56.evalCommand('T3=Text(1,2,"oops)'); }), null);
+pass('shim string args intact');
 
 assert.strictEqual(n, TOTAL);
 console.log('OK ' + TOTAL + '/' + TOTAL + ' phase3 tests passed');

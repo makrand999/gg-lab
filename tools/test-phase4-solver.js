@@ -4,7 +4,7 @@ var fs = require('fs');
 var S = require('../mirror/files/www.geogebra.org/educad-solver.js');
 var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
 
-var TOTAL = 61;
+var TOTAL = 64;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -369,6 +369,39 @@ eq(rb61.steps.length, 3);
 var ok61 = S.solveAnalytic({ A: { x: 0, y: 0 } }, []);
 eq(ok61.ok, true);
 pass('solver degenerate sweep');
+// 62 physical feasibility: theta + phi > 90 deg is impossible
+var f62a = S.lineFeasibility({ thetaDeg: 30, phiDeg: 30 });
+eq(f62a.possible, true);
+var f62b = S.lineFeasibility({ thetaDeg: 60, phiDeg: 60 });
+eq(f62b.possible, false);
+near(f62b.sin2sum, 1.5, 1e-9, 'sin2');
+eq(f62b.thetaPlusPhiDeg, 120);
+eq(S.lineFeasibility({ thetaDeg: 45, phiDeg: 45 }).possible, true);
+var m62 = S.solveMongeLine({ TL: 50, thetaDeg: 60, phiDeg: 60, yaPlan: 0, yaElev: 0 });
+eq(m62.physicallyImpossible, true);
+eq(m62.dx, 0);
+var m62b = S.solveMongeLine({ TL: 50, thetaDeg: 30, phiDeg: 30, yaPlan: 0, yaElev: 0 });
+eq(m62b.physicallyImpossible, false);
+ok(m62b.dx > 0, 'dx positive');
+pass('solver feasibility flag');
+// 63 line on XY reports collinear midpoint instead of null
+var c63 = S.lineXYIntersection({ x: 10, y: 0 }, { x: 30, y: 0 });
+eq(c63.y, 0);
+near(c63.x, 20, 1e-12, 'colx');
+eq(c63.collinear, true);
+eq(S.lineXYIntersection({ x: 0, y: 5 }, { x: 10, y: 5 }), null);
+pass('solver collinear XY');
+// 64 traces propagate collinear flags, projector still exact
+var tr64 = S.traces({
+  planA: { x: 0, y: 0 }, planB: { x: 40, y: 0 },
+  elevA: { x: 10, y: 5 }, elevB: { x: 30, y: 15 }
+});
+eq(tr64.HTcollinear, true);
+eq(tr64.VTcollinear, false);
+eq(tr64.HTplan.y, 0);
+eq(tr64.projectorOk, true);
+eq(S.projectorExactMm(tr64.HTplan, tr64.HTelev), '0.000');
+pass('solver traces collinear');
 
 assert.strictEqual(n, TOTAL);
 console.log('OK ' + TOTAL + '/' + TOTAL + ' phase4 tests passed');

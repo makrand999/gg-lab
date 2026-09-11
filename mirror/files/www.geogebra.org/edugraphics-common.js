@@ -52,6 +52,55 @@
       (typeof document.createElement === 'function');
   }
 
+  // Device pixel ratio: explicit opt wins, else window.devicePixelRatio,
+  // else 1. Node-safe (no window reference unless present).
+  function resolveDpr(optsDpr) {
+    if (optsDpr !== undefined && optsDpr !== null) {
+      var o = Number(optsDpr);
+      if (isFinite(o) && o >= 1) return o;
+    }
+    if (typeof window !== 'undefined' && window &&
+        isFinite(Number(window.devicePixelRatio)) &&
+        Number(window.devicePixelRatio) >= 1) {
+      return Number(window.devicePixelRatio);
+    }
+    return 1;
+  }
+
+  // Backing-store size for crisp HiDPI linework: integer buffer scaled by
+  // dpr, CSS box kept at CSS px. Pure (headless-testable).
+  function hidpiBufferSize(w, h, dpr) {
+    var cw = toIntSize(w, 800);
+    var ch = toIntSize(h, 600);
+    var r = (dpr === undefined || dpr === null) ? 1 : Number(dpr);
+    if (!isFinite(r) || r < 1) r = 1;
+    return {
+      cssW: cw, cssH: ch, dpr: r,
+      bufW: Math.max(1, Math.round(cw * r)),
+      bufH: Math.max(1, Math.round(ch * r))
+    };
+  }
+
+  // Size one canvas element: buffer = css * dpr, style box = css px, and
+  // the 2d context pre-scaled so drawing code keeps using CSS px.
+  function sizeCanvasForDpr(c, size) {
+    c.width = size.bufW;
+    c.height = size.bufH;
+    if (c.style) {
+      c.style.width = size.cssW + 'px';
+      c.style.height = size.cssH + 'px';
+    }
+    try {
+      if (typeof c.getContext === 'function') {
+        var ctx = c.getContext('2d');
+        if (ctx && typeof ctx.setTransform === 'function') {
+          ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
+        }
+      }
+    } catch (e) { /* headless/mock DOM: sizing stands without ctx */ }
+    return c;
+  }
+
   function toIntSize(v, fallback) {
     if (v === undefined || v === null) v = fallback;
     if (typeof v !== 'number' || Number.isNaN(v) || !Number.isFinite(v)) {
@@ -86,13 +135,10 @@
       n.className = cls;
       return n;
     }
-    var c1 = mk('canvas', LAYER_CLASS + ' edugraphics-layer1');
-    c1.width = w;
-    c1.height = h;
+    var px = hidpiBufferSize(w, h, resolveDpr(opts.dpr));
+    var c1 = sizeCanvasForDpr(mk('canvas', LAYER_CLASS + ' edugraphics-layer1'), px);
     c1.setAttribute('data-layer', 'layer1');
-    var c2 = mk('canvas', LAYER_CLASS + ' edugraphics-layer2');
-    c2.width = w;
-    c2.height = h;
+    var c2 = sizeCanvasForDpr(mk('canvas', LAYER_CLASS + ' edugraphics-layer2'), px);
     c2.setAttribute('data-layer', 'layer2');
     container.appendChild(c1);
     container.appendChild(c2);
@@ -122,7 +168,8 @@
     return {
       headless: false, container: container,
       layer1: c1, layer2: c2, hud: hud, buttons: btnMap, menu: menu,
-      menuItems: menuMap, w: w, h: h, mounted: true
+      menuItems: menuMap, w: w, h: h, mounted: true,
+      dpr: px.dpr, bufW: px.bufW, bufH: px.bufH
     };
   }
 
@@ -161,6 +208,8 @@
     HUD_CLASS: HUD_CLASS, BTN_CLASS: BTN_CLASS,
     MENU_CLASS: MENU_CLASS, MENU_ITEM_CLASS: MENU_ITEM_CLASS,
     hasDOM: hasDOM,
+    resolveDpr: resolveDpr,
+    hidpiBufferSize: hidpiBufferSize,
     mountContainer: mountContainer,
     unmountContainer: unmountContainer,
     isMounted: isMounted

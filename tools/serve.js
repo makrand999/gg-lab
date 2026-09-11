@@ -39,6 +39,7 @@ function resolvePath(root, rawUrl) {
     return { err: 400 };
   }
   if (p.indexOf('\0') !== -1) return { err: 400 };
+  if (p === '/geometry' || p === '/geometry/') p = '/index.html';
   var norm = path.posix.normalize('/' + p);
   var rel = norm.replace(/^\/+/, '');
   var abs = path.join(root, rel);
@@ -93,8 +94,19 @@ function requestHandler(root, req, res) {
     return;
   }
   if (st.isDirectory()) {
-    listDir(root, r.abs, r.rel, res);
-    return;
+    var indexPath = path.join(r.abs, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      r.abs = indexPath;
+      try {
+        st = fs.statSync(r.abs);
+      } catch (e) {
+        listDir(root, r.abs, r.rel, res);
+        return;
+      }
+    } else {
+      listDir(root, r.abs, r.rel, res);
+      return;
+    }
   }
   if (!st.isFile()) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -133,14 +145,59 @@ function start(port, host, root, cb) {
   return srv;
 }
 
+function parsePort(v) {
+  if (v === undefined || v === null || v === '') return null;
+  var n = (typeof v === 'number') ? v : parseInt(String(v), 10);
+  if (!isFinite(n) || Math.floor(n) !== n || n < 1 || n > 65535) return null;
+  return n;
+}
+
+// Port precedence: CLI arg, then $PORT, then the 8124 default.
+function resolvePort(argvPort) {
+  var a = parsePort(argvPort);
+  if (a !== null) return a;
+  var e = parsePort(process.env.PORT);
+  if (e !== null) return e;
+  return PORT;
+}
+
+// Listen on port, retrying upward on EADDRINUSE (bounded by maxAttempts).
+// cb(err, srv, actualPort). Other errors fail fast with no retry.
+function startNextAvailable(port, host, root, maxAttempts, cb) {
+  var attempts = (maxAttempts === undefined || !(maxAttempts >= 1)) ? 10 : Math.floor(maxAttempts);
+  var p = port;
+  var tried = 0;
+  function attempt() {
+    var srv = createServer(root);
+    srv.once('error', function (err) {
+      if (err && err.code === 'EADDRINUSE' && tried + 1 < attempts && p < 65535) {
+        tried++;
+        p++;
+        try { srv.close(); } catch (e) { /* never listening: nothing to close */ }
+        attempt();
+      } else if (typeof cb === 'function') {
+        cb(err, srv, p);
+      }
+    });
+    srv.listen(p, host, function () {
+      if (typeof cb === 'function') cb(null, srv, p);
+    });
+  }
+  attempt();
+}
+
 if (require.main === module) {
-  var port = process.argv[2] === undefined ? PORT : parseInt(process.argv[2], 10);
-  var srv = start(port, HOST, ROOT, function () {
+  var port = resolvePort(process.argv[2]);
+  startNextAvailable(port, HOST, ROOT, 10, function (err, srv, actual) {
+    if (err) {
+      console.error('educad serve error: ' + err.message);
+      process.exit(1);
+      return;
+    }
+    if (actual !== port) {
+      console.error('educad serve: port ' + port + ' busy, using ' + actual);
+    }
     console.log('educad serve http://' + HOST + ':' + srv.address().port + '/ -> ' + ROOT);
-  });
-  srv.on('error', function (err) {
-    console.error('educad serve error: ' + err.message);
-    process.exit(1);
   });
 }
 
@@ -150,5 +207,7 @@ module.exports = {
   contentTypeFor: contentTypeFor,
   resolvePath: resolvePath,
   createServer: createServer,
-  start: start
+  start: start,
+  resolvePort: resolvePort,
+  startNextAvailable: startNextAvailable
 };

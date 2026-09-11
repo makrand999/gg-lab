@@ -249,6 +249,7 @@
     for (var i = 0; i < this._order.length; i++) out.push(this._map[this._order[i]]);
     return out;
   };
+  CadEntityTable.prototype.getAll = CadEntityTable.prototype.list;
 
   CadEntityTable.prototype.clear = function () {
     this._map = {};

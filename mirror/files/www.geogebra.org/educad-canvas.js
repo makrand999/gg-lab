@@ -249,6 +249,7 @@
   var SELECT_RING_WIDTH_PX = 2;
   var SELECT_RING_STYLE = '#f59e0b';
   var CARET_BLINK_MS = 500;
+  var AXIS_TOL_PX = 14;
 
   function createSelectionState() {
     return { selectedId: null, editing: null };
@@ -311,32 +312,93 @@
     if (!sel || !sel.editing) return 'noop';
     if (key === 'Enter') return 'commit';
     if (key === 'Escape') return 'cancel';
+    if (!isRenameInputKey(key)) return 'noop';
     if (key === 'Backspace') {
       sel.editing.buffer = sel.editing.buffer.slice(0, -1);
-      return 'input';
-    }
-    if (typeof key === 'string' && key.length === 1 && key >= ' ') {
+    } else {
       sel.editing.buffer += key;
-      return 'input';
     }
-    return 'noop';
+    return 'input';
   }
 
-  // Exit edit mode, returning the write {id, name} or null when there is
-  // nothing to commit (blank or unchanged). Trims accidental padding.
+  // Exit edit mode. Returns {id, name} to write, {id, delete: true} when
+  // the buffer was emptied (blank + Enter removes the point), or null
+  // when unchanged. Trims accidental padding before comparing.
   function commitRename(sel) {
     if (!sel || !sel.editing) return null;
     var ed = sel.editing;
     sel.editing = null;
     var name = ed.buffer.trim();
-    if (name === '' || name === ed.original) return null;
+    if (name === '') return { id: ed.id, delete: true };
+    if (name === ed.original) return null;
     return { id: ed.id, name: name };
+  }
+
+  // Next unused point letter: a..z, then a1..z1, a2.. Scans live POINT
+  // captions, so deleted letters are re-used automatically. Terminates:
+  // candidates are infinite, entities finite.
+  function nextPointName(entities) {
+    if (!Array.isArray(entities)) throw new Error('entities must be an array');
+    var used = {};
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (e && e.type === 'POINT' && typeof e.caption === 'string' && e.caption !== '') {
+        used[e.caption] = true;
+      }
+    }
+    for (var n = 0; ; n++) {
+      var suffix = (n === 0) ? '' : String(n);
+      for (var l = 0; l < 26; l++) {
+        var cand = String.fromCharCode(97 + l) + suffix;
+        if (!used[cand]) return cand;
+      }
+    }
   }
 
   // Blinking caret phase: on for 500 ms, off for 500 ms.
   function caretOn(nowMs) {
     assertFinite(nowMs);
     return Math.floor(nowMs / CARET_BLINK_MS) % 2 === 0;
+  }
+
+  // True for keys that feed the rename buffer (printables + Backspace).
+  // Enter/Escape/modifier words route elsewhere and must not start edits.
+  function isRenameInputKey(key) {
+    if (key === 'Backspace') return true;
+    return typeof key === 'string' && key.length === 1 && key >= ' ';
+  }
+
+  // Axis-locked placement against a reference point (world mm). Near the
+  // horizontal axis (|dy| <= tol) locks y to y_ref with a dX readout; near
+  // the vertical axis locks x to x_ref with a dY readout; near both takes
+  // the closer axis; far from both places freely with no readout.
+  // Returns {lock: 'x'|'y'|null, xMm, yMm, readout: string|null}.
+  function axisLockState(cursorPx, view, refMm, tolPx) {
+    assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty,
+      refMm.x, refMm.y);
+    var tol = (tolPx === undefined || tolPx === null) ? AXIS_TOL_PX : tolPx;
+    assertFinite(tol);
+    var wx = (cursorPx.x - view.tx) / view.s;
+    var wy = (view.ty - cursorPx.y) / view.s;
+    var refPxX = refMm.x * view.s + view.tx;
+    var refPxY = view.ty - refMm.y * view.s;
+    var dxPx = Math.abs(cursorPx.x - refPxX);
+    var dyPx = Math.abs(cursorPx.y - refPxY);
+    var xNear = dxPx <= tol;
+    var yNear = dyPx <= tol;
+    var lock = null;
+    if (xNear && yNear) lock = (dxPx <= dyPx) ? 'x' : 'y';
+    else if (xNear) lock = 'x';
+    else if (yNear) lock = 'y';
+    if (lock === 'x') {
+      return { lock: 'x', xMm: refMm.x, yMm: wy,
+        readout: 'ΔY: ' + Math.abs(wy - refMm.y).toFixed(2) + ' mm' };
+    }
+    if (lock === 'y') {
+      return { lock: 'y', xMm: wx, yMm: refMm.y,
+        readout: 'ΔX: ' + Math.abs(wx - refMm.x).toFixed(2) + ' mm' };
+    }
+    return { lock: null, xMm: wx, yMm: wy, readout: null };
   }
 
   // Amber selection halo (snap ring owns cyan). No-op without a 2d context.
@@ -423,6 +485,10 @@
     handleRenameKey: handleRenameKey,
     commitRename: commitRename,
     caretOn: caretOn,
+    isRenameInputKey: isRenameInputKey,
+    nextPointName: nextPointName,
+    axisLockState: axisLockState,
+    AXIS_TOL_PX: AXIS_TOL_PX,
     drawSelectionRing: drawSelectionRing,
     applyMenuAction: applyMenuAction
   };

@@ -4,7 +4,7 @@ var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
 var C = require('../mirror/files/www.geogebra.org/educad-canvas.js');
 
 var n = 0;
-function pass(name) { n++; console.log('PASS ' + n + '/57 ' + name); }
+function pass(name) { n++; console.log('PASS ' + n + '/60 ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
 function ok(v, msg) { assert.ok(v, msg); }
 function near(a, b, tol, msg) { assert.ok(Math.abs(a - b) <= tol, (msg || '') + ' |' + a + '-' + b + '|>' + tol); }
@@ -147,8 +147,12 @@ eq(C.isEditing(sel53), false);
 var sel53b = C.beginEdit(C.createSelectionState(), 'p1', 'a');
 eq(C.commitRename(sel53b), null);
 var sel53c = C.beginEdit(C.createSelectionState(), 'p1', 'a');
-sel53c.editing.buffer = '   ';
-eq(C.commitRename(sel53c), null);
+sel53c.editing.buffer = '';
+var w53c = C.commitRename(sel53c);
+eq(w53c.id, 'p1'); eq(w53c.delete, true);
+var sel53e = C.beginEdit(C.createSelectionState(), 'p1', 'a');
+sel53e.editing.buffer = '   ';
+eq(C.commitRename(sel53e).delete, true);
 var sel53d = C.beginEdit(C.createSelectionState(), 'p1', 'a');
 sel53d.editing.buffer = '  b  ';
 eq(C.commitRename(sel53d).name, 'b');
@@ -180,6 +184,54 @@ eq(m57.lineWidth, 2);
 assert.deepStrictEqual(m57.calls.filter(function (c) { return Array.isArray(c); })[0], ['arc', 50, 60, 7]);
 eq(C.drawSelectionRing(null, 0, 0), false);
 throws(function () { C.drawSelectionRing(m57, NaN, 0); }); pass('canvas select ring draw');
+eq(C.AXIS_TOL_PX, 14);
+var al = C.axisLockState({ x: 500, y: 346 }, sv, { x: -30, y: -20 });
+eq(al.lock, 'y');
+near(al.xMm, 50, 1e-9, 'free x');
+eq(al.yMm, -20);
+eq(al.readout, 'ΔX: 80.00 mm');
+var al2 = C.axisLockState({ x: 346, y: 500 }, sv, { x: -30, y: -20 });
+eq(al2.lock, 'x');
+eq(al2.xMm, -30);
+near(al2.yMm, -100, 1e-9, 'free y');
+eq(al2.readout, 'ΔY: 80.00 mm');
+var al3 = C.axisLockState({ x: 900, y: 100 }, sv, { x: -30, y: -20 });
+eq(al3.lock, null);
+eq(al3.readout, null);
+near(al3.xMm, 250, 1e-9, 'far x');
+near(al3.yMm, 100, 1e-9, 'far y');
+var al4 = C.axisLockState({ x: 400, y: 300 }, sv, { x: 0, y: 0 });
+eq(al4.lock, 'x');
+eq(al4.readout, 'ΔY: 0.00 mm');
+var al5 = C.axisLockState({ x: 414, y: 200 }, sv, { x: 0, y: 0 });
+eq(al5.lock, 'x');
+eq(al5.readout, 'ΔY: 50.00 mm');
+var al6 = C.axisLockState({ x: 415, y: 200 }, sv, { x: 0, y: 0 }, 14);
+eq(al6.lock, null);
+eq(al6.readout, null);
+throws(function () { C.axisLockState({ x: NaN, y: 0 }, sv, { x: 0, y: 0 }); }); pass('canvas axis lock');
+eq(C.isRenameInputKey('a'), true);
+eq(C.isRenameInputKey(' '), true);
+eq(C.isRenameInputKey("'"), true);
+eq(C.isRenameInputKey('Backspace'), true);
+eq(C.isRenameInputKey('Enter'), false);
+eq(C.isRenameInputKey('Escape'), false);
+eq(C.isRenameInputKey('Shift'), false);
+eq(C.isRenameInputKey(''), false);
+eq(C.isRenameInputKey(null), false); pass('canvas rename input keys');
+function ptn(cap) { return { id: 'x' + cap, type: 'POINT', caption: cap }; }
+eq(C.nextPointName([]), 'a');
+eq(C.nextPointName([ptn('a')]), 'b');
+eq(C.nextPointName([ptn('a'), ptn('c')]), 'b');
+eq(C.nextPointName([ptn(''), { id: 's', type: 'SEGMENT', caption: 'a' }]), 'a');
+var full = [];
+for (var li = 0; li < 26; li++) full.push(ptn(String.fromCharCode(97 + li)));
+eq(C.nextPointName(full), 'a1');
+full.push(ptn('a1'));
+eq(C.nextPointName(full), 'b1');
+var gap = full.filter(function (e) { return e.caption !== 'm'; });
+eq(C.nextPointName(gap), 'm');
+throws(function () { C.nextPointName(null); }); pass('canvas next point name');
 
-if (n !== 57) throw new Error('expected 57 tests, ran ' + n);
-console.log('OK 57/57 phase1 tests passed');
+if (n !== 60) throw new Error('expected 60 tests, ran ' + n);
+console.log('OK 60/60 phase1 tests passed');

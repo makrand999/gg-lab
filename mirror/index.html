@@ -104,9 +104,12 @@
       handle.sel = EduCADCanvas.createSelectionState();
       var lastLabelResult = { placements: [] };
       var caretTimer = null;
+      var lastCursor = null;
       function ensureCaretTimer() {
         if (caretTimer !== null) return;
-        caretTimer = setInterval(function () { renderLayer2(null, null); }, 500);
+        caretTimer = setInterval(function () {
+          renderLayer2(lastCursor, { snap: handle.snapCurrent });
+        }, 500);
       }
       function stopCaretTimer() {
         if (caretTimer !== null) { clearInterval(caretTimer); caretTimer = null; }
@@ -332,11 +335,15 @@
         }
 
         // Selection ring + on-site rename preview (amber; snap owns cyan).
+        var refMm = null;
+        var refPx = null;
         if (handle.sel.selectedId !== null) {
           var selEnt = handle.table.get(handle.sel.selectedId);
           if (selEnt && selEnt.type === 'POINT' && selEnt.visible !== false) {
             var selPx = EduCADViewport.forward(handle.view, { x: selEnt.x, y: selEnt.y });
+            refPx = selPx;
             EduCADCanvas.drawSelectionRing(ctx2, selPx.x, selPx.y);
+            refMm = { x: selEnt.x, y: selEnt.y };
             if (handle.sel.editing && handle.sel.editing.id === handle.sel.selectedId) {
               var pv = findPlacement(handle.sel.selectedId);
               var prevText = handle.sel.editing.buffer +
@@ -347,6 +354,20 @@
                 EduCADCanvas.drawKnockoutLabel(ctx2, prevText, selPx.x + 8, selPx.y - 8);
               }
             }
+          }
+        }
+
+        // Axis-lock distance readout at the cursor tip (no guidelines).
+        // Suppressed on the reference vertex itself (a click, not a place).
+        if (refMm && cursorPx && refPx) {
+          var rdx = cursorPx.x - refPx.x, rdy = cursorPx.y - refPx.y;
+          var onRef = (rdx * rdx + rdy * rdy) <
+            EduCADCanvas.SELECT_TOL_PX * EduCADCanvas.SELECT_TOL_PX;
+          var lock = onRef ? { readout: null } :
+            EduCADCanvas.axisLockState(cursorPx, handle.view, refMm);
+          if (lock.readout) {
+            EduCADCanvas.drawKnockoutLabel(ctx2, lock.readout, cursorPx.x + 14, cursorPx.y - 10,
+              { font: '12px sans-serif', fillStyle: '#0284c7' });
           }
         }
 
@@ -375,6 +396,7 @@
 
       window.addEventListener('pointermove', function (e) {
         var cursor = { x: e.clientX, y: e.clientY };
+        lastCursor = cursor;
         var wPt = EduCADViewport.inverse(handle.view, cursor);
 
         // Update HUD
@@ -422,9 +444,18 @@
         renderLayer2(cursor, null);
       }, { passive: false });
 
-      // Right-Click Context Menu (Strictly 2 options: Plain vs Box Mesh)
+      // Right-Click: with a selection, undo it (reference cleared, any
+      // rename buffer discarded, original kept); otherwise the 2-option menu.
       c2.addEventListener('contextmenu', function (e) {
         e.preventDefault();
+        if (handle.sel.editing !== null || handle.sel.selectedId !== null) {
+          EduCADCanvas.deselect(handle.sel);
+          stopCaretTimer();
+          mount.menu.classList.remove('open');
+          renderLayer1();
+          renderLayer2(null, null);
+          return;
+        }
         var cursor = { x: e.clientX, y: e.clientY };
         var snap = EduCADSnapping.snapAt(cursor, handle.view, { entities: handle.table.list() });
         var hitDist = snap && snap.snap ? snap.snap.distPx : 999;
@@ -451,21 +482,49 @@
         renderLayer1();
       });
 
-      // Point click: select + edit on vertex, cancel + deselect on empty.
-      // The buffer is discarded on cancel; the table is never touched.
+      // Left click: existing point becomes the reference; empty canvas
+      // places a new point (axis-locked when a reference is active).
       c2.addEventListener('click', function (e) {
         if (e.button !== 0 || e.shiftKey) return;
         var cursor = { x: e.clientX, y: e.clientY };
         var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
-        if (id === null) {
-          if (handle.sel.selectedId !== null || handle.sel.editing !== null) {
-            EduCADCanvas.deselect(handle.sel);
-            stopCaretTimer();
-            renderLayer1();
-            renderLayer2(cursor, null);
-          }
+        if (id !== null) {
+          if (handle.sel.editing && handle.sel.editing.id === id) return;
+          if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
+          EduCADCanvas.selectPoint(handle.sel, id);
+          stopCaretTimer();
+          renderLayer1();
+          renderLayer2(cursor, null);
           return;
         }
+        if (handle.sel.editing) {
+          EduCADCanvas.cancelEdit(handle.sel);
+          stopCaretTimer();
+        }
+        var wpt = EduCADViewport.inverse(handle.view, cursor);
+        var px = wpt.x, py = wpt.y;
+        var ref = handle.sel.selectedId !== null ?
+          handle.table.get(handle.sel.selectedId) : null;
+        if (ref && ref.type === 'POINT') {
+          var lock = EduCADCanvas.axisLockState(cursor, handle.view, { x: ref.x, y: ref.y });
+          px = lock.xMm;
+          py = lock.yMm;
+        }
+        var pname = EduCADCanvas.nextPointName(handle.table.list());
+        handle.table.create('POINT', {
+          x: px, y: py, name: pname, caption: pname, showLabel: true,
+          bisCode: 'B', viewRole: py >= 0 ? 'ELEVATION' : 'PLAN'
+        });
+        renderLayer1();
+        renderLayer2(cursor, null);
+      });
+
+      // Double-click a point starts on-site renaming (single click only
+      // selects). The two preceding clicks harmlessly re-select first.
+      c2.addEventListener('dblclick', function (e) {
+        var cursor = { x: e.clientX, y: e.clientY };
+        var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
+        if (id === null) return;
         if (handle.sel.editing && handle.sel.editing.id === id) return;
         if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
         var ent = handle.table.get(id);
@@ -489,14 +548,17 @@
           mount.menu.classList.remove('open');
           return;
         }
-        if (!handle.sel.editing) return;
         if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (!handle.sel.editing) return;
         var action = EduCADCanvas.handleRenameKey(handle.sel, e.key);
         if (action === 'commit') {
           e.preventDefault();
           var w = EduCADCanvas.commitRename(handle.sel);
           stopCaretTimer();
-          if (w && handle.table.get(w.id)) {
+          if (w && w.delete) {
+            handle.table.remove(w.id);
+            EduCADCanvas.deselect(handle.sel);
+          } else if (w && handle.table.get(w.id)) {
             handle.table.update(w.id, { name: w.name, caption: w.name });
           }
           renderLayer1();

@@ -4,7 +4,7 @@ var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
 var C = require('../mirror/files/www.geogebra.org/educad-canvas.js');
 
 var n = 0;
-function pass(name) { n++; console.log('PASS ' + n + '/60 ' + name); }
+function pass(name) { n++; console.log('PASS ' + n + '/63 ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
 function ok(v, msg) { assert.ok(v, msg); }
 function near(a, b, tol, msg) { assert.ok(Math.abs(a - b) <= tol, (msg || '') + ' |' + a + '-' + b + '|>' + tol); }
@@ -232,6 +232,51 @@ eq(C.nextPointName(full), 'b1');
 var gap = full.filter(function (e) { return e.caption !== 'm'; });
 eq(C.nextPointName(gap), 'm');
 throws(function () { C.nextPointName(null); }); pass('canvas next point name');
+assert.deepStrictEqual(C.LINE_TOOL_PHASES, ['idle', 'anchored', 'menu', 'animating']);
+assert.deepStrictEqual(C.LINE_BIS_CODES, ['A', 'B', 'E', 'G', 'K']);
+eq(C.LINE_STROKE_MS, 300);
+var lt61 = C.createLineToolState();
+eq(lt61.phase, 'idle');
+eq(C.isLineToolActive(lt61), false);
+eq(C.lockLineTarget(lt61, 'p2', 1, 1), false);
+C.anchorLineTool(lt61, 'p1', 0, 0);
+eq(lt61.phase, 'anchored');
+eq(C.isLineToolActive(lt61), true);
+eq(C.lockLineTarget(lt61, 'p1', 0, 0), false);
+eq(C.lockLineTarget(lt61, 'p2', 10, 5), true);
+eq(lt61.phase, 'menu');
+eq(C.retargetLineTool(lt61, 'p1', 0, 0), false);
+eq(C.retargetLineTool(lt61, 'p3', 20, 5), true);
+eq(lt61.p2Id, 'p3');
+eq(C.beginLineStroke(lt61, 'Z'), false);
+eq(C.beginLineStroke(lt61, 'G'), true);
+eq(lt61.phase, 'animating');
+var sp61 = C.finishLineStroke(lt61);
+assert.deepStrictEqual(sp61, { x1: 0, y1: 0, x2: 20, y2: 5, bisCode: 'G' });
+eq(lt61.phase, 'idle');
+eq(C.finishLineStroke(lt61), null); pass('canvas line tool lifecycle');
+['anchored', 'menu', 'animating'].forEach(function (ph) {
+  var a = C.createLineToolState();
+  a.phase = ph; a.p1Id = 'p1'; a.p1Mm = { x: 0, y: 0 };
+  a.p2Id = 'p2'; a.p2Mm = { x: 1, y: 1 }; a.bisCode = 'A';
+  C.abortLineTool(a);
+  eq(a.phase, 'idle');
+  eq(a.p1Id, null); eq(a.p1Mm, null);
+  eq(a.p2Id, null); eq(a.p2Mm, null); eq(a.bisCode, null);
+  eq(C.isLineToolActive(a), false);
+});
+C.abortLineTool(null); pass('canvas line tool abort');
+eq(C.lineToolProgress(1000, 1000), 0);
+eq(C.lineToolProgress(1000, 1150), 0.5);
+eq(C.lineToolProgress(1000, 1300), 1);
+eq(C.lineToolProgress(1000, 5000), 1);
+eq(C.lineToolProgress(1000, 500), 0);
+eq(C.lineToolProgress(1000, 1100, 0), 1);
+var lp63 = C.lerpPointMm({ x: 0, y: 0 }, { x: 10, y: 20 }, 0.5);
+assert.deepStrictEqual(lp63, { x: 5, y: 10 });
+assert.deepStrictEqual(C.lerpPointMm({ x: 0, y: 0 }, { x: 10, y: 20 }, 0), { x: 0, y: 0 });
+throws(function () { C.lineToolProgress(NaN, 0); });
+throws(function () { C.anchorLineTool(C.createLineToolState(), 'p', NaN, 0); }); pass('canvas line progress lerp');
 
-if (n !== 60) throw new Error('expected 60 tests, ran ' + n);
-console.log('OK 60/60 phase1 tests passed');
+if (n !== 63) throw new Error('expected 63 tests, ran ' + n);
+console.log('OK 63/63 phase1 tests passed');

@@ -250,6 +250,9 @@
   var SELECT_RING_STYLE = '#f59e0b';
   var CARET_BLINK_MS = 500;
   var AXIS_TOL_PX = 14;
+  var LINE_TOOL_PHASES = ['idle', 'anchored', 'menu', 'animating'];
+  var LINE_BIS_CODES = ['A', 'B', 'E', 'G', 'K'];
+  var LINE_STROKE_MS = 300;
 
   function createSelectionState() {
     return { selectedId: null, editing: null };
@@ -419,6 +422,98 @@
     return true;
   }
 
+  // Line construction task: idle -> anchored (Ctrl+click P1) -> menu
+  // (click P2, pick BIS type) -> animating (300 ms stroke) -> commit.
+  // Any empty click or Escape aborts back to idle with no creation.
+  function createLineToolState() {
+    return { phase: 'idle', p1Id: null, p1Mm: null,
+      p2Id: null, p2Mm: null, bisCode: null };
+  }
+
+  function isLineToolActive(ls) {
+    return !!ls && ls.phase !== 'idle';
+  }
+
+  function anchorLineTool(ls, id, xMm, yMm) {
+    assertFinite(xMm, yMm);
+    ls.phase = 'anchored';
+    ls.p1Id = id;
+    ls.p1Mm = { x: xMm, y: yMm };
+    ls.p2Id = null;
+    ls.p2Mm = null;
+    ls.bisCode = null;
+    return ls;
+  }
+
+  // Lock P2 (must differ from P1). False when not anchorable/selectable.
+  function lockLineTarget(ls, id, xMm, yMm) {
+    if (!ls || ls.phase !== 'anchored') return false;
+    if (id === ls.p1Id) return false;
+    assertFinite(xMm, yMm);
+    ls.phase = 'menu';
+    ls.p2Id = id;
+    ls.p2Mm = { x: xMm, y: yMm };
+    return true;
+  }
+
+  // Re-point P2 while the type menu is open. False unless in menu phase.
+  function retargetLineTool(ls, id, xMm, yMm) {
+    if (!ls || ls.phase !== 'menu') return false;
+    if (id === ls.p1Id) return false;
+    assertFinite(xMm, yMm);
+    ls.p2Id = id;
+    ls.p2Mm = { x: xMm, y: yMm };
+    return true;
+  }
+
+  // Pick the BIS type; starts the stroke animation on true.
+  function beginLineStroke(ls, bisCode) {
+    if (!ls || ls.phase !== 'menu') return false;
+    if (LINE_BIS_CODES.indexOf(bisCode) === -1) return false;
+    ls.phase = 'animating';
+    ls.bisCode = bisCode;
+    return true;
+  }
+
+  // Animation progress t in [0,1] for p(t) = P1 + t*(P2-P1).
+  function lineToolProgress(t0Ms, nowMs, durMs) {
+    assertFinite(t0Ms, nowMs);
+    var d = (durMs === undefined || durMs === null) ? LINE_STROKE_MS : durMs;
+    assertFinite(d);
+    if (!(d > 0)) return 1;
+    var t = (nowMs - t0Ms) / d;
+    if (t < 0) return 0;
+    if (t > 1) return 1;
+    return t;
+  }
+
+  function lerpPointMm(p1Mm, p2Mm, t) {
+    assertFinite(p1Mm.x, p1Mm.y, p2Mm.x, p2Mm.y, t);
+    return { x: p1Mm.x + (p2Mm.x - p1Mm.x) * t,
+      y: p1Mm.y + (p2Mm.y - p1Mm.y) * t };
+  }
+
+  // Take the commit spec and reset to idle. Null unless animating.
+  function finishLineStroke(ls) {
+    if (!ls || ls.phase !== 'animating') return null;
+    var spec = { x1: ls.p1Mm.x, y1: ls.p1Mm.y,
+      x2: ls.p2Mm.x, y2: ls.p2Mm.y, bisCode: ls.bisCode };
+    abortLineTool(ls);
+    return spec;
+  }
+
+  function abortLineTool(ls) {
+    if (ls) {
+      ls.phase = 'idle';
+      ls.p1Id = null;
+      ls.p1Mm = null;
+      ls.p2Id = null;
+      ls.p2Mm = null;
+      ls.bisCode = null;
+    }
+    return ls;
+  }
+
   // Checked state of the 2-option menu for a given showGrid flag:
   // Plain is checked by default (no mesh), Box Mesh is checked when set.
   function menuCheckedState(showGrid) {
@@ -489,6 +584,19 @@
     nextPointName: nextPointName,
     axisLockState: axisLockState,
     AXIS_TOL_PX: AXIS_TOL_PX,
+    LINE_TOOL_PHASES: LINE_TOOL_PHASES,
+    LINE_BIS_CODES: LINE_BIS_CODES,
+    LINE_STROKE_MS: LINE_STROKE_MS,
+    createLineToolState: createLineToolState,
+    isLineToolActive: isLineToolActive,
+    anchorLineTool: anchorLineTool,
+    lockLineTarget: lockLineTarget,
+    retargetLineTool: retargetLineTool,
+    beginLineStroke: beginLineStroke,
+    lineToolProgress: lineToolProgress,
+    lerpPointMm: lerpPointMm,
+    finishLineStroke: finishLineStroke,
+    abortLineTool: abortLineTool,
     drawSelectionRing: drawSelectionRing,
     applyMenuAction: applyMenuAction
   };

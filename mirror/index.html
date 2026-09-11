@@ -122,6 +122,127 @@
         return null;
       }
 
+      // Line construction task (Ctrl+click P1, click P2, pick BIS type).
+      handle.line = EduCADCanvas.createLineToolState();
+      var lineMenu = null;
+      var lineAnim = null;
+      var BIS_LINE_MENU = [
+        { code: 'A', name: 'Continuous Thick' },
+        { code: 'B', name: 'Continuous Thin' },
+        { code: 'E', name: 'Dashed Thin' },
+        { code: 'G', name: 'Chain Thin' },
+        { code: 'K', name: 'Double-Dash Chain' }
+      ];
+      function setLineCursor(on) {
+        c2.style.cursor = on ? 'crosshair' : '';
+      }
+      // Preview-only rows: each shows its rendered dash sample, no text.
+      function ensureLineMenu() {
+        if (lineMenu) return lineMenu;
+        var m = document.createElement('div');
+        m.className = 'edugraphics-menu';
+        BIS_LINE_MENU.forEach(function (item) {
+          var row = document.createElement('div');
+          row.className = 'edugraphics-menu-item';
+          row.setAttribute('data-bis', item.code);
+          row.setAttribute('title', item.name + ' — Type ' + item.code);
+          var cv = document.createElement('canvas');
+          var lw = 120, lh = 14;
+          cv.width = Math.max(1, Math.round(lw * dpr));
+          cv.height = Math.max(1, Math.round(lh * dpr));
+          cv.style.display = 'block';
+          cv.style.width = lw + 'px';
+          cv.style.height = lh + 'px';
+          row.appendChild(cv);
+          m.appendChild(row);
+          try {
+            var g = cv.getContext('2d');
+            if (g && typeof g.setTransform === 'function') {
+              var st = EduCADEntities.BIS_STYLES[item.code];
+              g.setTransform(dpr, 0, 0, dpr, 0, 0);
+              g.strokeStyle = '#0f172a';
+              g.lineWidth = EduCADEntities.cosmeticWidthPx(st.widthMm);
+              g.setLineDash(EduCADEntities.cosmeticDashPx(st.dashMm));
+              g.beginPath();
+              g.moveTo(4, 7);
+              g.lineTo(lw - 4, 7);
+              g.stroke();
+            }
+          } catch (err) { /* headless: row keeps data-bis, preview skipped */ }
+        });
+        m.addEventListener('click', function (e) {
+          var row = (e.target && typeof e.target.closest === 'function') ?
+            e.target.closest('[data-bis]') : null;
+          var code = row ? row.getAttribute('data-bis') : null;
+          if (code) startLineStroke(code);
+        });
+        document.getElementById('app-container').appendChild(m);
+        lineMenu = m;
+        return m;
+      }
+      function showLineMenu(px) {
+        var m = ensureLineMenu();
+        m.style.left = Math.max(4, Math.min(px.x + 10, window.innerWidth - 150)) + 'px';
+        m.style.top = Math.max(4, Math.min(px.y + 10, window.innerHeight - 170)) + 'px';
+        m.classList.add('open');
+      }
+      function hideLineMenu() {
+        if (lineMenu) lineMenu.classList.remove('open');
+      }
+      function abortLineTask() {
+        EduCADCanvas.abortLineTool(handle.line);
+        lineAnim = null;
+        hideLineMenu();
+        setLineCursor(false);
+      }
+      function startLineStroke(code) {
+        if (!EduCADCanvas.beginLineStroke(handle.line, code)) return;
+        hideLineMenu();
+        var st = EduCADEntities.BIS_STYLES[code];
+        var t0 = (window.performance && typeof window.performance.now === 'function') ?
+          window.performance.now() : Date.now();
+        lineAnim = {
+          t0: t0,
+          p1: EduCADViewport.forward(handle.view, handle.line.p1Mm),
+          p2: EduCADViewport.forward(handle.view, handle.line.p2Mm),
+          widthPx: EduCADEntities.cosmeticWidthPx(st.widthMm),
+          dash: EduCADEntities.cosmeticDashPx(st.dashMm)
+        };
+        window.requestAnimationFrame(lineAnimFrame);
+      }
+      function lineAnimFrame(ts) {
+        var anim = lineAnim;
+        if (!anim || handle.line.phase !== 'animating') return;
+        var t = EduCADCanvas.lineToolProgress(anim.t0, ts);
+        renderLayer2(lastCursor, { snap: handle.snapCurrent });
+        ctx2.save();
+        ctx2.strokeStyle = '#0f172a';
+        ctx2.lineWidth = anim.widthPx;
+        if (anim.dash.length > 0) ctx2.setLineDash(anim.dash);
+        ctx2.beginPath();
+        ctx2.moveTo(anim.p1.x, anim.p1.y);
+        ctx2.lineTo(anim.p1.x + (anim.p2.x - anim.p1.x) * t,
+          anim.p1.y + (anim.p2.y - anim.p1.y) * t);
+        ctx2.stroke();
+        ctx2.restore();
+        if (t >= 1) {
+          var spec = EduCADCanvas.finishLineStroke(handle.line);
+          lineAnim = null;
+          setLineCursor(false);
+          if (spec) {
+            handle.table.create('SEGMENT', {
+              x: spec.x1, y: spec.y1, x2: spec.x2, y2: spec.y2,
+              bisCode: spec.bisCode, caption: '', showLabel: false,
+              viewRole: 'BOTH', meta: { kind: 'user-line' }
+            });
+          }
+          renderLayer1();
+          renderLayer2(lastCursor, { snap: handle.snapCurrent });
+        } else {
+          window.requestAnimationFrame(lineAnimFrame);
+        }
+      }
+
       // Handle window resizing
       window.addEventListener('resize', function () {
         var w = window.innerWidth, h = window.innerHeight;
@@ -365,6 +486,28 @@
           }
         }
 
+        // Line tool: anchor ring + rubberband (dashed) or locked preview.
+        var lt = handle.line;
+        if (lt.phase === 'anchored' || lt.phase === 'menu') {
+          var ap1 = EduCADViewport.forward(handle.view, lt.p1Mm);
+          EduCADCanvas.drawSelectionRing(ctx2, ap1.x, ap1.y);
+          var other = (lt.phase === 'menu' && lt.p2Mm) ?
+            EduCADViewport.forward(handle.view, lt.p2Mm) : cursorPx;
+          if (other) {
+            ctx2.save();
+            ctx2.strokeStyle = '#64748b';
+            ctx2.lineWidth = 1;
+            if (lt.phase === 'anchored' && typeof ctx2.setLineDash === 'function') {
+              ctx2.setLineDash([6, 4]);
+            }
+            ctx2.beginPath();
+            ctx2.moveTo(ap1.x, ap1.y);
+            ctx2.lineTo(other.x, other.y);
+            ctx2.stroke();
+            ctx2.restore();
+          }
+        }
+
         ctx2.restore();
       }
 
@@ -443,11 +586,13 @@
       // this authoritative; the canvas menu below then sees idle clicks only.
       // The native menu never appears anywhere on the sheet.
       window.addEventListener('contextmenu', function (e) {
-        if (handle.sel.editing !== null || handle.sel.selectedId !== null) {
+        if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
+            EduCADCanvas.isLineToolActive(handle.line)) {
           e.preventDefault();
           if (typeof e.stopPropagation === 'function') e.stopPropagation();
           EduCADCanvas.deselect(handle.sel);
           stopCaretTimer();
+          abortLineTask();
           mount.menu.classList.remove('open');
           renderLayer1();
           renderLayer2(null, null);
@@ -460,9 +605,11 @@
       // rename buffer discarded, original kept); otherwise the 2-option menu.
       c2.addEventListener('contextmenu', function (e) {
         e.preventDefault();
-        if (handle.sel.editing !== null || handle.sel.selectedId !== null) {
+        if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
+            EduCADCanvas.isLineToolActive(handle.line)) {
           EduCADCanvas.deselect(handle.sel);
           stopCaretTimer();
+          abortLineTask();
           mount.menu.classList.remove('open');
           renderLayer1();
           renderLayer2(null, null);
@@ -499,7 +646,48 @@
       c2.addEventListener('click', function (e) {
         if (e.button !== 0 || e.shiftKey) return;
         var cursor = { x: e.clientX, y: e.clientY };
+        // Ctrl+click anchors (or re-anchors) the line tool on a point.
+        if (e.ctrlKey || e.metaKey) {
+          var cid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
+          if (cid === null) {
+            if (EduCADCanvas.isLineToolActive(handle.line)) {
+              abortLineTask();
+              renderLayer1();
+              renderLayer2(cursor, null);
+            }
+          } else {
+            var cent = handle.table.get(cid);
+            EduCADCanvas.anchorLineTool(handle.line, cid, cent.x, cent.y);
+            hideLineMenu();
+            setLineCursor(true);
+            renderLayer2(cursor, null);
+          }
+          return;
+        }
+        if (handle.line.phase === 'animating') return;
         var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
+        if (id === null) {
+          if (EduCADCanvas.isLineToolActive(handle.line)) {
+            abortLineTask();
+            renderLayer1();
+            renderLayer2(cursor, null);
+            return;
+          }
+        } else if (handle.line.phase === 'menu') {
+          var ment = handle.table.get(id);
+          if (EduCADCanvas.retargetLineTool(handle.line, id, ment.x, ment.y)) {
+            showLineMenu(cursor);
+            renderLayer2(cursor, null);
+          }
+          return;
+        } else if (handle.line.phase === 'anchored') {
+          var lent = handle.table.get(id);
+          if (EduCADCanvas.lockLineTarget(handle.line, id, lent.x, lent.y)) {
+            showLineMenu(cursor);
+            renderLayer2(cursor, null);
+          }
+          return;
+        }
         if (id !== null) {
           if (handle.sel.editing && handle.sel.editing.id === id) return;
           if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
@@ -534,6 +722,7 @@
       // Double-click a point starts on-site renaming (single click only
       // selects). The two preceding clicks harmlessly re-select first.
       c2.addEventListener('dblclick', function (e) {
+        if (EduCADCanvas.isLineToolActive(handle.line)) return;
         var cursor = { x: e.clientX, y: e.clientY };
         var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
         if (id === null) return;
@@ -550,9 +739,11 @@
       // keys are captured so Backspace/Space never leak to the browser.
       window.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
-          if (handle.sel.editing !== null || handle.sel.selectedId !== null) {
+          if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
+              EduCADCanvas.isLineToolActive(handle.line)) {
             EduCADCanvas.deselect(handle.sel);
             stopCaretTimer();
+            abortLineTask();
             renderLayer1();
             renderLayer2(null, null);
             e.preventDefault();
@@ -603,6 +794,7 @@
         handle.table.clear();
         EduCADCanvas.deselect(handle.sel);
         stopCaretTimer();
+        abortLineTask();
         document.querySelectorAll('.demo-btn').forEach(function(b) { b.classList.remove('active'); });
 
         if (type === 'line') {

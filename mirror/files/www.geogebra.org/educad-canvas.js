@@ -514,6 +514,300 @@
     return ls;
   }
 
+  // Polar point construction: idle -> awaitLine (Ctrl+click P0) ->
+  // angle (click a baseline through P0, sweep the protractor) ->
+  // distance (click locks the ray, sweep the scale) -> commit. A
+  // baseline that misses P0 parks in invalid: any click drops it.
+  var POLAR_TOOL_PHASES = ['idle', 'awaitLine', 'angle', 'distance', 'invalid'];
+  var POLAR_ON_LINE_TOL_MM = 0.5;
+  var POLAR_SNAP_DETENTS_DEG = [15, 30, 45, 60, 90];
+  var POLAR_SNAP_TOL_DEG = 2;
+  var POLAR_BASELINE_TYPES = ['SEGMENT', 'LINE', 'DIMENSION', 'DATUM_AXIS'];
+  var POLAR_RING_STYLE = '#06b6d4';
+
+  function createPolarToolState() {
+    return { phase: 'idle', p0Id: null, p0Mm: null, baseDir: null,
+      thetaDeg: 0, rayDir: null };
+  }
+
+  function isPolarToolActive(ps) {
+    return !!ps && ps.phase !== 'idle';
+  }
+
+  function anchorPolarTool(ps, id, xMm, yMm) {
+    assertFinite(xMm, yMm);
+    ps.phase = 'awaitLine';
+    ps.p0Id = id;
+    ps.p0Mm = { x: xMm, y: yMm };
+    ps.baseDir = null;
+    ps.thetaDeg = 0;
+    ps.rayDir = null;
+    return ps;
+  }
+
+  // Perpendicular distance from P0 to segment AB (world mm).
+  function polarDistPointSegmentMm(p0, ax, ay, bx, by) {
+    assertFinite(p0.x, p0.y, ax, ay, bx, by);
+    var abx = bx - ax, aby = by - ay;
+    var len2 = abx * abx + aby * aby;
+    if (!(len2 > 0)) {
+      var edx = p0.x - ax, edy = p0.y - ay;
+      return Math.sqrt(edx * edx + edy * edy);
+    }
+    var t = ((p0.x - ax) * abx + (p0.y - ay) * aby) / len2;
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    var cx = ax + abx * t - p0.x, cy = ay + aby * t - p0.y;
+    return Math.sqrt(cx * cx + cy * cy);
+  }
+
+  // Baseline guard: P0 coincides with an endpoint or lies on AB.
+  function polarOnBaseline(p0Mm, aMm, bMm, tolMm) {
+    var tol = (tolMm === undefined || tolMm === null) ? POLAR_ON_LINE_TOL_MM : tolMm;
+    assertFinite(tol);
+    if (p0Mm.x === aMm.x && p0Mm.y === aMm.y) return true;
+    if (p0Mm.x === bMm.x && p0Mm.y === bMm.y) return true;
+    return polarDistPointSegmentMm(p0Mm, aMm.x, aMm.y, bMm.x, bMm.y) <= tol;
+  }
+
+  // 0-degree baseline direction: from P0 toward the clicked side of AB
+  // (click projected onto the line). Falls back to the A->B direction
+  // when the click sits on P0. Null for a degenerate segment.
+  function polarBaseDir(p0Mm, aMm, bMm, clickMm) {
+    assertFinite(p0Mm.x, p0Mm.y, aMm.x, aMm.y, bMm.x, bMm.y,
+      clickMm.x, clickMm.y);
+    var abx = bMm.x - aMm.x, aby = bMm.y - aMm.y;
+    var m2 = abx * abx + aby * aby;
+    if (!(m2 > 0)) return null;
+    var t = ((clickMm.x - aMm.x) * abx + (clickMm.y - aMm.y) * aby) / m2;
+    var qx = aMm.x + abx * t - p0Mm.x;
+    var qy = aMm.y + aby * t - p0Mm.y;
+    if (!(qx * qx + qy * qy > 1e-18)) { qx = abx; qy = aby; }
+    var n = Math.sqrt(qx * qx + qy * qy);
+    return { x: qx / n, y: qy / n };
+  }
+
+  // Accept the clicked baseline: on-line moves to angle sweep with the
+  // 0-degree direction set; off-line (or degenerate) parks in invalid.
+  function acceptPolarBaseline(ps, aMm, bMm, clickMm) {
+    if (!ps || ps.phase !== 'awaitLine') return false;
+    if (!polarOnBaseline(ps.p0Mm, aMm, bMm)) {
+      ps.phase = 'invalid';
+      return false;
+    }
+    var dir = polarBaseDir(ps.p0Mm, aMm, bMm, clickMm);
+    if (!dir) {
+      ps.phase = 'invalid';
+      return false;
+    }
+    ps.phase = 'angle';
+    ps.baseDir = dir;
+    ps.thetaDeg = 0;
+    ps.rayDir = null;
+    return true;
+  }
+
+  // Unsigned sweep angle in [0,180] between the baseline and P0->cursor.
+  // A cursor on P0 keeps the fallback (no direction to measure).
+  function polarAngleDeg(baseDir, p0Mm, cursorMm, fallbackDeg) {
+    assertFinite(baseDir.x, baseDir.y, p0Mm.x, p0Mm.y,
+      cursorMm.x, cursorMm.y);
+    var fb = (fallbackDeg === undefined || fallbackDeg === null) ? 0 : fallbackDeg;
+    assertFinite(fb);
+    var vx = cursorMm.x - p0Mm.x, vy = cursorMm.y - p0Mm.y;
+    var m2 = vx * vx + vy * vy;
+    if (!(m2 > 1e-18)) return fb;
+    var n = Math.sqrt(m2);
+    var bn = Math.sqrt(baseDir.x * baseDir.x + baseDir.y * baseDir.y);
+    if (!(bn > 0)) return fb;
+    var cos = (baseDir.x * vx + baseDir.y * vy) / (bn * n);
+    if (cos > 1) cos = 1;
+    if (cos < -1) cos = -1;
+    return Math.acos(cos) * 180 / Math.PI;
+  }
+
+  // Soft detents at standard drafting angles.
+  function polarSnapDeg(rawDeg, tolDeg) {
+    assertFinite(rawDeg);
+    var tol = (tolDeg === undefined || tolDeg === null) ? POLAR_SNAP_TOL_DEG : tolDeg;
+    assertFinite(tol);
+    var best = rawDeg;
+    var bestD = tol;
+    var found = false;
+    for (var i = 0; i < POLAR_SNAP_DETENTS_DEG.length; i++) {
+      var dd = Math.abs(rawDeg - POLAR_SNAP_DETENTS_DEG[i]);
+      if (dd <= tol && (!found || dd < bestD)) {
+        best = POLAR_SNAP_DETENTS_DEG[i];
+        bestD = dd;
+        found = true;
+      }
+    }
+    return best;
+  }
+
+  // Locked ray: baseline rotated by theta toward the cursor side
+  // (cross >= 0 keeps +theta in y-up world). A degenerate cursor
+  // keeps the baseline direction.
+  function polarRayDir(baseDir, p0Mm, cursorMm, thetaDeg) {
+    assertFinite(baseDir.x, baseDir.y, p0Mm.x, p0Mm.y,
+      cursorMm.x, cursorMm.y, thetaDeg);
+    var bn = Math.sqrt(baseDir.x * baseDir.x + baseDir.y * baseDir.y);
+    var bx = bn > 0 ? baseDir.x / bn : 1;
+    var by = bn > 0 ? baseDir.y / bn : 0;
+    var vx = cursorMm.x - p0Mm.x, vy = cursorMm.y - p0Mm.y;
+    if (!(vx * vx + vy * vy > 1e-18)) return { x: bx, y: by };
+    var side = (bx * vy - by * vx) >= 0 ? 1 : -1;
+    var r = side * thetaDeg * Math.PI / 180;
+    var c = Math.cos(r), s = Math.sin(r);
+    return { x: bx * c - by * s, y: bx * s + by * c };
+  }
+
+  // Click #1: freeze the (snapped) sweep angle into the ray direction.
+  function lockPolarAngle(ps, cursorMm) {
+    if (!ps || ps.phase !== 'angle' || !ps.baseDir) return false;
+    var raw = polarAngleDeg(ps.baseDir, ps.p0Mm, cursorMm, ps.thetaDeg);
+    var th = polarSnapDeg(raw);
+    ps.thetaDeg = th;
+    ps.rayDir = polarRayDir(ps.baseDir, ps.p0Mm, cursorMm, th);
+    ps.phase = 'distance';
+    return true;
+  }
+
+  // Scale sweep: projection of P0->cursor on the locked ray, clamped
+  // at P0, plus the target point.
+  function polarTargetFor(p0Mm, rayDir, cursorMm) {
+    assertFinite(p0Mm.x, p0Mm.y, rayDir.x, rayDir.y,
+      cursorMm.x, cursorMm.y);
+    var r = (cursorMm.x - p0Mm.x) * rayDir.x +
+      (cursorMm.y - p0Mm.y) * rayDir.y;
+    if (!(r > 0)) r = 0;
+    return { rMm: r, xMm: p0Mm.x + rayDir.x * r,
+      yMm: p0Mm.y + rayDir.y * r };
+  }
+
+  // Click #2: take the commit spec and reset to idle. Null unless the
+  // ray is locked.
+  function commitPolarPoint(ps, cursorMm) {
+    if (!ps || ps.phase !== 'distance' || !ps.rayDir) return null;
+    var t = polarTargetFor(ps.p0Mm, ps.rayDir, cursorMm);
+    var spec = { xMm: t.xMm, yMm: t.yMm, rMm: t.rMm,
+      thetaDeg: ps.thetaDeg };
+    abortPolarTool(ps);
+    return spec;
+  }
+
+  function abortPolarTool(ps) {
+    if (ps) {
+      ps.phase = 'idle';
+      ps.p0Id = null;
+      ps.p0Mm = null;
+      ps.baseDir = null;
+      ps.thetaDeg = 0;
+      ps.rayDir = null;
+    }
+    return ps;
+  }
+
+  // Line-referenced point plotting: idle -> plotting (click a datum
+  // segment) -> commit (click places the clamped candidate). The foot
+  // slides along AB and sticks at the ends; the candidate keeps the
+  // cursor's perpendicular offset from the clamped foot.
+  var PLOT_TOOL_PHASES = ['idle', 'plotting'];
+
+  function createPlotToolState() {
+    return { phase: 'idle', aMm: null, bMm: null };
+  }
+
+  function isPlotToolActive(ps) {
+    return !!ps && ps.phase !== 'idle';
+  }
+
+  function beginPlotTool(ps, axMm, ayMm, bxMm, byMm) {
+    assertFinite(axMm, ayMm, bxMm, byMm);
+    ps.phase = 'plotting';
+    ps.aMm = { x: axMm, y: ayMm };
+    ps.bMm = { x: bxMm, y: byMm };
+    return ps;
+  }
+
+  // Clamped candidate: foot is the cursor projection on AB stuck to
+  // [A,B]; the point keeps the cursor's perpendicular offset from the
+  // clamped foot; dist is the perpendicular distance. Degenerate AB
+  // pins the foot at A.
+  function plotCandidateFor(aMm, bMm, cursorMm) {
+    assertFinite(aMm.x, aMm.y, bMm.x, bMm.y, cursorMm.x, cursorMm.y);
+    var abx = bMm.x - aMm.x, aby = bMm.y - aMm.y;
+    var len2 = abx * abx + aby * aby;
+    if (!(len2 > 0)) {
+      var dx0 = cursorMm.x - aMm.x, dy0 = cursorMm.y - aMm.y;
+      return { footMm: { x: aMm.x, y: aMm.y },
+        pointMm: { x: cursorMm.x, y: cursorMm.y },
+        distMm: Math.sqrt(dx0 * dx0 + dy0 * dy0) };
+    }
+    var t = ((cursorMm.x - aMm.x) * abx + (cursorMm.y - aMm.y) * aby) / len2;
+    var tc = t < 0 ? 0 : (t > 1 ? 1 : t);
+    var fx = aMm.x + abx * tc, fy = aMm.y + aby * tc;
+    var px = aMm.x + abx * t, py = aMm.y + aby * t;
+    var ox = cursorMm.x - px, oy = cursorMm.y - py;
+    return { footMm: { x: fx, y: fy },
+      pointMm: { x: fx + ox, y: fy + oy },
+      distMm: Math.sqrt(ox * ox + oy * oy) };
+  }
+
+  // Click #2: take the commit spec and reset to idle. Null unless
+  // plotting.
+  function commitPlotPoint(ps, cursorMm) {
+    if (!ps || ps.phase !== 'plotting') return null;
+    var c = plotCandidateFor(ps.aMm, ps.bMm, cursorMm);
+    var spec = { xMm: c.pointMm.x, yMm: c.pointMm.y, distMm: c.distMm };
+    abortPlotTool(ps);
+    return spec;
+  }
+
+  function abortPlotTool(ps) {
+    if (ps) {
+      ps.phase = 'idle';
+      ps.aMm = null;
+      ps.bMm = null;
+    }
+    return ps;
+  }
+
+  // Nearest baseline segment (SEGMENT/LINE/DIMENSION/DATUM_AXIS) within
+  // tolPx of the cursor. First wins ties.
+  function hitTestLine(entities, cursorPx, view, tolPx) {
+    assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty);
+    if (!Array.isArray(entities)) throw new Error('entities must be an array');
+    var tol = (tolPx === undefined || tolPx === null) ? SELECT_TOL_PX : tolPx;
+    assertFinite(tol);
+    var best = null;
+    var bestD2 = tol * tol;
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (!e || e.visible === false) continue;
+      if (POLAR_BASELINE_TYPES.indexOf(e.type) === -1) continue;
+      assertFinite(e.x, e.y, e.x2, e.y2);
+      var ax = e.x * view.s + view.tx, ay = view.ty - e.y * view.s;
+      var bx = e.x2 * view.s + view.tx, by = view.ty - e.y2 * view.s;
+      var abx = bx - ax, aby = by - ay;
+      var len2 = abx * abx + aby * aby;
+      var t = 0;
+      if (len2 > 0) {
+        t = ((cursorPx.x - ax) * abx + (cursorPx.y - ay) * aby) / len2;
+        if (t < 0) t = 0;
+        if (t > 1) t = 1;
+      }
+      var dx = ax + abx * t - cursorPx.x;
+      var dy = ay + aby * t - cursorPx.y;
+      var d2 = dx * dx + dy * dy;
+      if (d2 <= tol * tol && (best === null || d2 < bestD2)) {
+        best = e.id;
+        bestD2 = d2;
+      }
+    }
+    return best;
+  }
+
   // Checked state of the 2-option menu for a given showGrid flag:
   // Plain is checked by default (no mesh), Box Mesh is checked when set.
   function menuCheckedState(showGrid) {
@@ -598,6 +892,34 @@
     finishLineStroke: finishLineStroke,
     abortLineTool: abortLineTool,
     drawSelectionRing: drawSelectionRing,
-    applyMenuAction: applyMenuAction
+    applyMenuAction: applyMenuAction,
+    POLAR_TOOL_PHASES: POLAR_TOOL_PHASES,
+    POLAR_ON_LINE_TOL_MM: POLAR_ON_LINE_TOL_MM,
+    POLAR_SNAP_DETENTS_DEG: POLAR_SNAP_DETENTS_DEG,
+    POLAR_SNAP_TOL_DEG: POLAR_SNAP_TOL_DEG,
+    POLAR_BASELINE_TYPES: POLAR_BASELINE_TYPES,
+    POLAR_RING_STYLE: POLAR_RING_STYLE,
+    createPolarToolState: createPolarToolState,
+    isPolarToolActive: isPolarToolActive,
+    anchorPolarTool: anchorPolarTool,
+    polarDistPointSegmentMm: polarDistPointSegmentMm,
+    polarOnBaseline: polarOnBaseline,
+    polarBaseDir: polarBaseDir,
+    acceptPolarBaseline: acceptPolarBaseline,
+    polarAngleDeg: polarAngleDeg,
+    polarSnapDeg: polarSnapDeg,
+    polarRayDir: polarRayDir,
+    lockPolarAngle: lockPolarAngle,
+    polarTargetFor: polarTargetFor,
+    commitPolarPoint: commitPolarPoint,
+    abortPolarTool: abortPolarTool,
+    hitTestLine: hitTestLine,
+    PLOT_TOOL_PHASES: PLOT_TOOL_PHASES,
+    createPlotToolState: createPlotToolState,
+    isPlotToolActive: isPlotToolActive,
+    beginPlotTool: beginPlotTool,
+    plotCandidateFor: plotCandidateFor,
+    commitPlotPoint: commitPlotPoint,
+    abortPlotTool: abortPlotTool
   };
 });

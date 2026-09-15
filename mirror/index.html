@@ -195,6 +195,47 @@
         hideLineMenu();
         setLineCursor(false);
       }
+      // Polar point construction shares the Ctrl+click anchor with the
+      // line tool; a line-click resolves the anchor to the polar task.
+      handle.polar = EduCADCanvas.createPolarToolState();
+      var POLAR_ARC_R_PX = 28;
+      function abortPolarTask() {
+        EduCADCanvas.abortPolarTool(handle.polar);
+        if (!EduCADCanvas.isLineToolActive(handle.line)) setLineCursor(false);
+      }
+      function commitPolarAt(cursorPx) {
+        var wpt = EduCADViewport.inverse(handle.view, cursorPx);
+        var spec = EduCADCanvas.commitPolarPoint(handle.polar, wpt);
+        if (spec) {
+          var pname = EduCADCanvas.nextPointName(handle.table.list());
+          handle.table.create('POINT', {
+            x: spec.xMm, y: spec.yMm, name: pname, caption: pname, showLabel: true,
+            bisCode: 'B', viewRole: spec.yMm >= 0 ? 'ELEVATION' : 'PLAN'
+          });
+        }
+        setLineCursor(false);
+        renderLayer1();
+        renderLayer2(cursorPx, null);
+      }
+      // Line-referenced plotting: first click on a datum segment arms
+      // the perpendicular preview, second click commits the candidate.
+      handle.plot = EduCADCanvas.createPlotToolState();
+      function abortPlotTask() {
+        EduCADCanvas.abortPlotTool(handle.plot);
+      }
+      function commitPlotAt(cursorPx) {
+        var wpt = EduCADViewport.inverse(handle.view, cursorPx);
+        var spec = EduCADCanvas.commitPlotPoint(handle.plot, wpt);
+        if (spec) {
+          var pname = EduCADCanvas.nextPointName(handle.table.list());
+          handle.table.create('POINT', {
+            x: spec.xMm, y: spec.yMm, name: pname, caption: pname, showLabel: true,
+            bisCode: 'B', viewRole: spec.yMm >= 0 ? 'ELEVATION' : 'PLAN'
+          });
+        }
+        renderLayer1();
+        renderLayer2(cursorPx, null);
+      }
       function startLineStroke(code) {
         if (!EduCADCanvas.beginLineStroke(handle.line, code)) return;
         hideLineMenu();
@@ -486,26 +527,97 @@
           }
         }
 
-        // Line tool: anchor ring + rubberband (dashed) or locked preview.
+        // Line tool: anchor ring always; locked P1-P2 preview once P2
+        // is picked (no cursor-following rubberband by design).
         var lt = handle.line;
         if (lt.phase === 'anchored' || lt.phase === 'menu') {
           var ap1 = EduCADViewport.forward(handle.view, lt.p1Mm);
           EduCADCanvas.drawSelectionRing(ctx2, ap1.x, ap1.y);
-          var other = (lt.phase === 'menu' && lt.p2Mm) ?
-            EduCADViewport.forward(handle.view, lt.p2Mm) : cursorPx;
-          if (other) {
+          if (lt.phase === 'menu' && lt.p2Mm) {
+            var ap2 = EduCADViewport.forward(handle.view, lt.p2Mm);
             ctx2.save();
             ctx2.strokeStyle = '#64748b';
             ctx2.lineWidth = 1;
-            if (lt.phase === 'anchored' && typeof ctx2.setLineDash === 'function') {
-              ctx2.setLineDash([6, 4]);
-            }
             ctx2.beginPath();
             ctx2.moveTo(ap1.x, ap1.y);
-            ctx2.lineTo(other.x, other.y);
+            ctx2.lineTo(ap2.x, ap2.y);
             ctx2.stroke();
             ctx2.restore();
           }
+        }
+
+        // Polar tool: cyan ring once a baseline resolves the shared
+        // anchor; protractor arc + badge on angle sweep; locked-ray
+        // guideline + badge on distance sweep.
+        var pl = handle.polar;
+        if (pl.phase === 'angle' || pl.phase === 'distance' || pl.phase === 'invalid') {
+          var pp0 = EduCADViewport.forward(handle.view, pl.p0Mm);
+          EduCADCanvas.drawSelectionRing(ctx2, pp0.x, pp0.y,
+            { color: EduCADCanvas.POLAR_RING_STYLE });
+          if (cursorPx && pl.phase === 'angle' && pl.baseDir) {
+            var wc = EduCADViewport.inverse(handle.view, cursorPx);
+            var rawTh = EduCADCanvas.polarAngleDeg(pl.baseDir, pl.p0Mm, wc, pl.thetaDeg);
+            var showTh = EduCADCanvas.polarSnapDeg(rawTh);
+            var bPx = EduCADViewport.forward(handle.view,
+              { x: pl.p0Mm.x + pl.baseDir.x, y: pl.p0Mm.y + pl.baseDir.y });
+            var a0 = Math.atan2(bPx.y - pp0.y, bPx.x - pp0.x);
+            var a1 = Math.atan2(cursorPx.y - pp0.y, cursorPx.x - pp0.x);
+            var pdx = cursorPx.x - pp0.x, pdy = cursorPx.y - pp0.y;
+            if (pdx * pdx + pdy * pdy > 4) {
+              var delta = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
+              ctx2.save();
+              ctx2.strokeStyle = '#64748b';
+              ctx2.lineWidth = 1;
+              ctx2.beginPath();
+              ctx2.arc(pp0.x, pp0.y, POLAR_ARC_R_PX, a0, a0 + delta, delta < 0);
+              ctx2.stroke();
+              ctx2.restore();
+            }
+            EduCADCanvas.drawKnockoutLabel(ctx2, '∠ ' + showTh.toFixed(1) + '°',
+              cursorPx.x + 14, cursorPx.y - 10,
+              { font: '12px sans-serif', fillStyle: '#0284c7' });
+          } else if (cursorPx && pl.phase === 'distance' && pl.rayDir) {
+            var wd = EduCADViewport.inverse(handle.view, cursorPx);
+            var tgt = EduCADCanvas.polarTargetFor(pl.p0Mm, pl.rayDir, wd);
+            var tp = EduCADViewport.forward(handle.view, { x: tgt.xMm, y: tgt.yMm });
+            ctx2.save();
+            ctx2.strokeStyle = '#64748b';
+            ctx2.fillStyle = '#64748b';
+            ctx2.lineWidth = 1;
+            ctx2.beginPath();
+            ctx2.moveTo(pp0.x, pp0.y);
+            ctx2.lineTo(tp.x, tp.y);
+            ctx2.stroke();
+            ctx2.beginPath();
+            ctx2.arc(tp.x, tp.y, 2.5, 0, 2 * Math.PI);
+            ctx2.fill();
+            ctx2.restore();
+            EduCADCanvas.drawKnockoutLabel(ctx2,
+              tgt.rMm.toFixed(2) + ' mm (∠ ' + pl.thetaDeg.toFixed(1) + '° locked)',
+              cursorPx.x + 14, cursorPx.y - 10,
+              { font: '12px sans-serif', fillStyle: '#0284c7' });
+          }
+        }
+
+        // Line-referenced plotting: thin perpendicular foot->candidate
+        // plus distance badge. The datum segment itself is never marked.
+        var pt = handle.plot;
+        if (pt.phase === 'plotting' && cursorPx) {
+          var pw = EduCADViewport.inverse(handle.view, cursorPx);
+          var cand = EduCADCanvas.plotCandidateFor(pt.aMm, pt.bMm, pw);
+          var fp = EduCADViewport.forward(handle.view, cand.footMm);
+          var cp = EduCADViewport.forward(handle.view, cand.pointMm);
+          ctx2.save();
+          ctx2.strokeStyle = '#64748b';
+          ctx2.lineWidth = 1;
+          ctx2.beginPath();
+          ctx2.moveTo(fp.x, fp.y);
+          ctx2.lineTo(cp.x, cp.y);
+          ctx2.stroke();
+          ctx2.restore();
+          EduCADCanvas.drawKnockoutLabel(ctx2, '⊥ Dist: ' + cand.distMm.toFixed(2) + ' mm',
+            cursorPx.x + 14, cursorPx.y - 10,
+            { font: '12px sans-serif', fillStyle: '#0284c7' });
         }
 
         ctx2.restore();
@@ -587,12 +699,16 @@
       // The native menu never appears anywhere on the sheet.
       window.addEventListener('contextmenu', function (e) {
         if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
-            EduCADCanvas.isLineToolActive(handle.line)) {
+            EduCADCanvas.isLineToolActive(handle.line) ||
+            EduCADCanvas.isPolarToolActive(handle.polar) ||
+            EduCADCanvas.isPlotToolActive(handle.plot)) {
           e.preventDefault();
           if (typeof e.stopPropagation === 'function') e.stopPropagation();
           EduCADCanvas.deselect(handle.sel);
           stopCaretTimer();
           abortLineTask();
+          abortPolarTask();
+          abortPlotTask();
           mount.menu.classList.remove('open');
           renderLayer1();
           renderLayer2(null, null);
@@ -606,10 +722,14 @@
       c2.addEventListener('contextmenu', function (e) {
         e.preventDefault();
         if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
-            EduCADCanvas.isLineToolActive(handle.line)) {
+            EduCADCanvas.isLineToolActive(handle.line) ||
+            EduCADCanvas.isPolarToolActive(handle.polar) ||
+            EduCADCanvas.isPlotToolActive(handle.plot)) {
           EduCADCanvas.deselect(handle.sel);
           stopCaretTimer();
           abortLineTask();
+          abortPolarTask();
+          abortPlotTask();
           mount.menu.classList.remove('open');
           renderLayer1();
           renderLayer2(null, null);
@@ -646,18 +766,25 @@
       c2.addEventListener('click', function (e) {
         if (e.button !== 0 || e.shiftKey) return;
         var cursor = { x: e.clientX, y: e.clientY };
-        // Ctrl+click anchors (or re-anchors) the line tool on a point.
+        // Ctrl+click anchors (or re-anchors) both construction tools
+        // on a point; the next click resolves the shared anchor.
         if (e.ctrlKey || e.metaKey) {
           var cid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
           if (cid === null) {
-            if (EduCADCanvas.isLineToolActive(handle.line)) {
+            if (EduCADCanvas.isLineToolActive(handle.line) ||
+                EduCADCanvas.isPolarToolActive(handle.polar) ||
+                EduCADCanvas.isPlotToolActive(handle.plot)) {
               abortLineTask();
+              abortPolarTask();
+              abortPlotTask();
               renderLayer1();
               renderLayer2(cursor, null);
             }
           } else {
             var cent = handle.table.get(cid);
+            abortPlotTask();
             EduCADCanvas.anchorLineTool(handle.line, cid, cent.x, cent.y);
+            EduCADCanvas.anchorPolarTool(handle.polar, cid, cent.x, cent.y);
             hideLineMenu();
             setLineCursor(true);
             renderLayer2(cursor, null);
@@ -666,10 +793,56 @@
         }
         if (handle.line.phase === 'animating') return;
         var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
-        if (id === null) {
-          if (EduCADCanvas.isLineToolActive(handle.line)) {
-            abortLineTask();
+        // Polar task owns the click once the shared anchor resolves to it:
+        // invalid drops on any click, distance commits anywhere, angle
+        // locks on any left-click (right-click / Escape aborts).
+        if (handle.polar.phase === 'invalid' || handle.polar.phase === 'distance') {
+          if (handle.polar.phase === 'distance') {
+            commitPolarAt(cursor);
+          } else {
+            abortPolarTask();
             renderLayer1();
+            renderLayer2(cursor, null);
+          }
+          return;
+        }
+        if (handle.polar.phase === 'angle') {
+          var wlock = EduCADViewport.inverse(handle.view, cursor);
+          EduCADCanvas.lockPolarAngle(handle.polar, wlock);
+          renderLayer2(cursor, null);
+          return;
+        }
+        if (handle.plot.phase === 'plotting') {
+          commitPlotAt(cursor);
+          return;
+        }
+        if (id === null && handle.polar.phase === 'awaitLine') {
+          var lid = EduCADCanvas.hitTestLine(handle.table.list(), cursor, handle.view);
+          if (lid !== null) {
+            var blEnt = handle.table.get(lid);
+            abortLineTask();
+            hideLineMenu();
+            var wcl = EduCADViewport.inverse(handle.view, cursor);
+            EduCADCanvas.acceptPolarBaseline(handle.polar,
+              { x: blEnt.x, y: blEnt.y }, { x: blEnt.x2, y: blEnt.y2 }, wcl);
+            renderLayer2(cursor, null);
+            return;
+          }
+        }
+        if (id === null) {
+          if (EduCADCanvas.isLineToolActive(handle.line) ||
+              EduCADCanvas.isPolarToolActive(handle.polar)) {
+            abortLineTask();
+            abortPolarTask();
+            renderLayer1();
+            renderLayer2(cursor, null);
+            return;
+          }
+          var plid = EduCADCanvas.hitTestLine(handle.table.list(), cursor, handle.view);
+          if (plid !== null) {
+            var plEnt = handle.table.get(plid);
+            EduCADCanvas.beginPlotTool(handle.plot,
+              plEnt.x, plEnt.y, plEnt.x2, plEnt.y2);
             renderLayer2(cursor, null);
             return;
           }
@@ -683,6 +856,7 @@
         } else if (handle.line.phase === 'anchored') {
           var lent = handle.table.get(id);
           if (EduCADCanvas.lockLineTarget(handle.line, id, lent.x, lent.y)) {
+            abortPolarTask();
             showLineMenu(cursor);
             renderLayer2(cursor, null);
           }
@@ -722,7 +896,8 @@
       // Double-click a point starts on-site renaming (single click only
       // selects). The two preceding clicks harmlessly re-select first.
       c2.addEventListener('dblclick', function (e) {
-        if (EduCADCanvas.isLineToolActive(handle.line)) return;
+        if (EduCADCanvas.isLineToolActive(handle.line) ||
+            EduCADCanvas.isPolarToolActive(handle.polar)) return;
         var cursor = { x: e.clientX, y: e.clientY };
         var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
         if (id === null) return;
@@ -740,10 +915,14 @@
       window.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
           if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
-              EduCADCanvas.isLineToolActive(handle.line)) {
+              EduCADCanvas.isLineToolActive(handle.line) ||
+              EduCADCanvas.isPolarToolActive(handle.polar) ||
+              EduCADCanvas.isPlotToolActive(handle.plot)) {
             EduCADCanvas.deselect(handle.sel);
             stopCaretTimer();
             abortLineTask();
+            abortPolarTask();
+            abortPlotTask();
             renderLayer1();
             renderLayer2(null, null);
             e.preventDefault();
@@ -795,6 +974,8 @@
         EduCADCanvas.deselect(handle.sel);
         stopCaretTimer();
         abortLineTask();
+        abortPolarTask();
+        abortPlotTask();
         document.querySelectorAll('.demo-btn').forEach(function(b) { b.classList.remove('active'); });
 
         if (type === 'line') {

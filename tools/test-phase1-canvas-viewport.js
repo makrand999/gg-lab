@@ -4,7 +4,7 @@ var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
 var C = require('../mirror/files/www.geogebra.org/educad-canvas.js');
 
 var n = 0;
-function pass(name) { n++; console.log('PASS ' + n + '/63 ' + name); }
+function pass(name) { n++; console.log('PASS ' + n + '/71 ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
 function ok(v, msg) { assert.ok(v, msg); }
 function near(a, b, tol, msg) { assert.ok(Math.abs(a - b) <= tol, (msg || '') + ' |' + a + '-' + b + '|>' + tol); }
@@ -278,5 +278,178 @@ assert.deepStrictEqual(C.lerpPointMm({ x: 0, y: 0 }, { x: 10, y: 20 }, 0), { x: 
 throws(function () { C.lineToolProgress(NaN, 0); });
 throws(function () { C.anchorLineTool(C.createLineToolState(), 'p', NaN, 0); }); pass('canvas line progress lerp');
 
-if (n !== 63) throw new Error('expected 63 tests, ran ' + n);
-console.log('OK 63/63 phase1 tests passed');
+// --- Polar point construction (6) ---
+assert.deepStrictEqual(C.POLAR_TOOL_PHASES, ['idle', 'awaitLine', 'angle', 'distance', 'invalid']);
+assert.deepStrictEqual(C.POLAR_SNAP_DETENTS_DEG, [15, 30, 45, 60, 90]);
+eq(C.POLAR_ON_LINE_TOL_MM, 0.5);
+eq(C.POLAR_SNAP_TOL_DEG, 2);
+var pp1 = C.createPolarToolState();
+eq(pp1.phase, 'idle');
+eq(C.isPolarToolActive(pp1), false);
+C.anchorPolarTool(pp1, 'p0', 10, 20);
+eq(pp1.phase, 'awaitLine');
+eq(C.isPolarToolActive(pp1), true);
+assert.deepStrictEqual(pp1.p0Mm, { x: 10, y: 20 });
+ok(C.polarOnBaseline({ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 10, y: 0 }));
+ok(C.polarOnBaseline({ x: 10, y: 0 }, { x: 0, y: 0 }, { x: 10, y: 0 }));
+ok(C.polarOnBaseline({ x: 5, y: 0 }, { x: 0, y: 0 }, { x: 10, y: 0 }));
+ok(C.polarOnBaseline({ x: 5, y: 0.5 }, { x: 0, y: 0 }, { x: 10, y: 0 }));
+ok(!C.polarOnBaseline({ x: 5, y: 0.51 }, { x: 0, y: 0 }, { x: 10, y: 0 }));
+ok(!C.polarOnBaseline({ x: 15, y: 0 }, { x: 0, y: 0 }, { x: 10, y: 0 }));
+near(C.polarDistPointSegmentMm({ x: 5, y: 3 }, 0, 0, 10, 0), 3, 1e-12, 'perp dist');
+near(C.polarDistPointSegmentMm({ x: 15, y: 0 }, 0, 0, 10, 0), 5, 1e-12, 'clamped end');
+near(C.polarDistPointSegmentMm({ x: 3, y: 4 }, 0, 0, 0, 0), 5, 1e-12, 'degenerate point');
+throws(function () { C.anchorPolarTool(C.createPolarToolState(), 'p', NaN, 0); }); pass('canvas polar anchor + baseline guard');
+
+var pp2 = C.createPolarToolState();
+C.anchorPolarTool(pp2, 'p0', 0, 0);
+ok(C.acceptPolarBaseline(pp2, { x: 0, y: 0 }, { x: 10, y: 0 }, { x: 7, y: 1 }));
+eq(pp2.phase, 'angle');
+near(pp2.baseDir.x, 1, 1e-12, 'base +x'); near(pp2.baseDir.y, 0, 1e-12, 'base y');
+var pp2b = C.createPolarToolState();
+C.anchorPolarTool(pp2b, 'p0', 5, 0);
+ok(C.acceptPolarBaseline(pp2b, { x: 0, y: 0 }, { x: 10, y: 0 }, { x: 2, y: 0 }));
+eq(pp2b.phase, 'angle');
+near(pp2b.baseDir.x, -1, 1e-12, 'base -x'); near(pp2b.baseDir.y, 0, 1e-12, 'base y0');
+var pp2c = C.createPolarToolState();
+C.anchorPolarTool(pp2c, 'p0', 0, 0);
+ok(C.acceptPolarBaseline(pp2c, { x: 0, y: 0 }, { x: 0, y: 10 }, { x: 0, y: 0 }));
+near(pp2c.baseDir.x, 0, 1e-12, 'fb x'); near(pp2c.baseDir.y, 1, 1e-12, 'fb y');
+var pp2d = C.createPolarToolState();
+C.anchorPolarTool(pp2d, 'p0', 0, 5);
+eq(C.acceptPolarBaseline(pp2d, { x: 0, y: 0 }, { x: 10, y: 0 }, { x: 5, y: 0 }), false);
+eq(pp2d.phase, 'invalid');
+var pp2e = C.createPolarToolState();
+C.anchorPolarTool(pp2e, 'p0', 1, 1);
+eq(C.acceptPolarBaseline(pp2e, { x: 1, y: 1 }, { x: 1, y: 1 }, { x: 1, y: 1 }), false);
+eq(pp2e.phase, 'invalid');
+eq(C.acceptPolarBaseline(C.createPolarToolState(), { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0 }), false); pass('canvas polar baseline accept');
+
+var pbd = { x: 1, y: 0 }, ppo = { x: 0, y: 0 };
+near(C.polarAngleDeg(pbd, ppo, { x: 10, y: 0 }), 0, 1e-9, 'ang 0');
+near(C.polarAngleDeg(pbd, ppo, { x: 0, y: 10 }), 90, 1e-9, 'ang 90');
+near(C.polarAngleDeg(pbd, ppo, { x: -10, y: 0 }), 180, 1e-9, 'ang 180');
+near(C.polarAngleDeg(pbd, ppo, { x: 1, y: 1 }), 45, 1e-9, 'ang 45');
+near(C.polarAngleDeg(pbd, ppo, { x: 1, y: -1 }), 45, 1e-9, 'ang unsigned');
+eq(C.polarAngleDeg(pbd, ppo, { x: 0, y: 0 }, 12.5), 12.5);
+eq(C.polarAngleDeg(pbd, ppo, { x: 0, y: 0 }), 0);
+eq(C.polarSnapDeg(30), 30);
+eq(C.polarSnapDeg(29), 30);
+eq(C.polarSnapDeg(31.5), 30);
+eq(C.polarSnapDeg(32.5), 32.5);
+eq(C.polarSnapDeg(44), 45);
+eq(C.polarSnapDeg(10), 10);
+eq(C.polarSnapDeg(89.2), 90);
+eq(C.polarSnapDeg(90), 90);
+eq(C.polarSnapDeg(0.5), 0.5); pass('canvas polar angle + snap');
+
+var rd1 = C.polarRayDir({ x: 1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 1 }, 30);
+near(rd1.x, Math.cos(Math.PI / 6), 1e-12, 'ray +x');
+near(rd1.y, Math.sin(Math.PI / 6), 1e-12, 'ray +y');
+var rd2 = C.polarRayDir({ x: 1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: -1 }, 30);
+near(rd2.x, Math.cos(Math.PI / 6), 1e-12, 'ray2 x');
+near(rd2.y, -Math.sin(Math.PI / 6), 1e-12, 'ray2 y');
+assert.deepStrictEqual(C.polarRayDir({ x: 1, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, 30), { x: 1, y: 0 });
+var tg1 = C.polarTargetFor({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 30, y: 40 });
+near(tg1.rMm, 30, 1e-12, 'proj r'); near(tg1.xMm, 30, 1e-12, 'proj x'); near(tg1.yMm, 0, 1e-12, 'proj y');
+var tg2 = C.polarTargetFor({ x: 5, y: 5 }, { x: 0, y: 1 }, { x: 5, y: -100 });
+eq(tg2.rMm, 0); eq(tg2.xMm, 5); eq(tg2.yMm, 5); pass('canvas polar ray + target');
+
+var pp5 = C.createPolarToolState();
+eq(C.lockPolarAngle(pp5, { x: 1, y: 0 }), false);
+eq(C.commitPolarPoint(pp5, { x: 1, y: 0 }), null);
+C.anchorPolarTool(pp5, 'p0', 0, 0);
+eq(C.lockPolarAngle(pp5, { x: 1, y: 0 }), false);
+ok(C.acceptPolarBaseline(pp5, { x: 0, y: 0 }, { x: 10, y: 0 }, { x: 9, y: 0 }));
+ok(C.lockPolarAngle(pp5, { x: Math.cos(0.5), y: Math.sin(0.5) }));
+eq(pp5.phase, 'distance');
+eq(pp5.thetaDeg, 30);
+near(pp5.rayDir.x, Math.cos(Math.PI / 6), 1e-9, 'lock ray x');
+near(pp5.rayDir.y, Math.sin(Math.PI / 6), 1e-9, 'lock ray y');
+var sp5 = C.commitPolarPoint(pp5, { x: 80, y: 0 });
+eq(pp5.phase, 'idle');
+near(sp5.rMm, 80 * Math.cos(Math.PI / 6), 1e-9, 'commit r');
+near(sp5.xMm, 80 * Math.cos(Math.PI / 6) * Math.cos(Math.PI / 6), 1e-9, 'commit x');
+near(sp5.yMm, 80 * Math.cos(Math.PI / 6) * Math.sin(Math.PI / 6), 1e-9, 'commit y');
+eq(sp5.thetaDeg, 30);
+eq(C.commitPolarPoint(pp5, { x: 1, y: 0 }), null);
+['awaitLine', 'angle', 'distance', 'invalid'].forEach(function (ph) {
+  var a = C.createPolarToolState();
+  a.phase = ph; a.p0Id = 'p0'; a.p0Mm = { x: 0, y: 0 };
+  a.baseDir = { x: 1, y: 0 }; a.thetaDeg = 30; a.rayDir = { x: 1, y: 0 };
+  C.abortPolarTool(a);
+  eq(a.phase, 'idle');
+  eq(a.p0Id, null); eq(a.p0Mm, null); eq(a.baseDir, null);
+  eq(a.thetaDeg, 0); eq(a.rayDir, null);
+  eq(C.isPolarToolActive(a), false);
+});
+C.abortPolarTool(null); pass('canvas polar lock commit abort');
+
+var hv = V.createViewport({ s: 2, tx: 0, ty: 0 });
+function pseg(id, type, x, y, x2, y2, vis) {
+  return { id: id, type: type, x: x, y: y, x2: x2, y2: y2, visible: vis !== false };
+}
+var hl = [pseg('s1', 'SEGMENT', 0, 0, 10, 0), pseg('p9', 'POINT', 5, 5, 0, 0)];
+eq(C.hitTestLine(hl, { x: 10, y: 0 }, hv), 's1');
+eq(C.hitTestLine(hl, { x: 0, y: 0 }, hv), 's1');
+eq(C.hitTestLine(hl, { x: 20, y: 0 }, hv), 's1');
+eq(C.hitTestLine(hl, { x: 10, y: 100 }, hv), null);
+eq(C.hitTestLine([pseg('s2', 'SEGMENT', 0, 0, 10, 0, false)], { x: 10, y: 0 }, hv), null);
+eq(C.hitTestLine([pseg('c1', 'CIRCLE', 0, 0, 10, 0)], { x: 10, y: 0 }, hv), null);
+eq(C.hitTestLine([pseg('d1', 'DATUM_AXIS', 0, 0, 10, 0)], { x: 10, y: 0 }, hv), 'd1');
+var tie = [pseg('t1', 'SEGMENT', 0, 0, 10, 0), pseg('t2', 'LINE', 0, 0, 10, 0)];
+eq(C.hitTestLine(tie, { x: 10, y: 0 }, hv), 't1');
+eq(C.hitTestLine([pseg('z1', 'SEGMENT', 5, 5, 5, 5)], { x: 10, y: -10 }, hv), 'z1');
+throws(function () { C.hitTestLine(null, { x: 0, y: 0 }, hv); });
+throws(function () { C.hitTestLine([], { x: NaN, y: 0 }, hv); }); pass('canvas hitTestLine');
+
+// --- Line-referenced plotting (2) ---
+assert.deepStrictEqual(C.PLOT_TOOL_PHASES, ['idle', 'plotting']);
+var pc1 = C.plotCandidateFor({ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 4, y: 3 });
+assert.deepStrictEqual(pc1.footMm, { x: 4, y: 0 });
+assert.deepStrictEqual(pc1.pointMm, { x: 4, y: 3 });
+eq(pc1.distMm, 3);
+var pc2 = C.plotCandidateFor({ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 14, y: 3 });
+assert.deepStrictEqual(pc2.footMm, { x: 10, y: 0 });
+assert.deepStrictEqual(pc2.pointMm, { x: 10, y: 3 });
+eq(pc2.distMm, 3);
+var pc3 = C.plotCandidateFor({ x: 0, y: 0 }, { x: 10, y: 0 }, { x: -5, y: 4 });
+assert.deepStrictEqual(pc3.footMm, { x: 0, y: 0 });
+assert.deepStrictEqual(pc3.pointMm, { x: 0, y: 4 });
+eq(pc3.distMm, 4);
+var pc4 = C.plotCandidateFor({ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 6, y: 0 });
+assert.deepStrictEqual(pc4.pointMm, { x: 6, y: 0 });
+eq(pc4.distMm, 0);
+var pc5 = C.plotCandidateFor({ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 });
+assert.deepStrictEqual(pc5.footMm, { x: 5, y: 5 });
+assert.deepStrictEqual(pc5.pointMm, { x: 0, y: 10 });
+near(pc5.distMm, Math.sqrt(50), 1e-12, 'diag dist');
+var pc6 = C.plotCandidateFor({ x: 2, y: 2 }, { x: 2, y: 2 }, { x: 5, y: 6 });
+assert.deepStrictEqual(pc6.footMm, { x: 2, y: 2 });
+assert.deepStrictEqual(pc6.pointMm, { x: 5, y: 6 });
+eq(pc6.distMm, 5);
+throws(function () { C.plotCandidateFor({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: NaN, y: 0 }); }); pass('canvas plot candidate');
+
+var pl7 = C.createPlotToolState();
+eq(pl7.phase, 'idle');
+eq(C.isPlotToolActive(pl7), false);
+eq(C.commitPlotPoint(pl7, { x: 1, y: 1 }), null);
+C.beginPlotTool(pl7, 0, 0, 10, 0);
+eq(pl7.phase, 'plotting');
+eq(C.isPlotToolActive(pl7), true);
+assert.deepStrictEqual(pl7.aMm, { x: 0, y: 0 });
+assert.deepStrictEqual(pl7.bMm, { x: 10, y: 0 });
+var sp7 = C.commitPlotPoint(pl7, { x: 14, y: 3 });
+assert.deepStrictEqual(sp7, { xMm: 10, yMm: 3, distMm: 3 });
+eq(pl7.phase, 'idle');
+eq(C.commitPlotPoint(pl7, { x: 1, y: 1 }), null);
+C.beginPlotTool(pl7, 0, 0, 10, 0);
+C.abortPlotTool(pl7);
+eq(pl7.phase, 'idle');
+eq(pl7.aMm, null); eq(pl7.bMm, null);
+eq(C.isPlotToolActive(pl7), false);
+C.abortPlotTool(null);
+throws(function () { C.beginPlotTool(C.createPlotToolState(), 0, NaN, 1, 0); }); pass('canvas plot lifecycle');
+
+if (n !== 71) throw new Error('expected 71 tests, ran ' + n);
+console.log('OK 71/71 phase1 tests passed');

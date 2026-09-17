@@ -41,3 +41,40 @@
   cursor: pointer;
 }
 .edugraphics-menu-item:hover { background: #eef; }
+/* EduCAD floating 3D wireframe cube: transparent stage sketched on the sheet. */
+.educad-solid {
+  position: absolute;
+  z-index: 5;
+  background: transparent;
+  touch-action: none;
+}
+.educad-solid-canvas {
+  display: block;
+  background: transparent;
+  cursor: grab;
+}
+.educad-solid-handle {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  font: 11px/1.6 sans-serif;
+  letter-spacing: 0.02em;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 1px 10px;
+  white-space: nowrap;
+  cursor: move;
+  user-select: none;
+  -webkit-user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: auto;
+}
+.educad-solid:hover .educad-solid-handle,
+.educad-solid-handle:active {
+  opacity: 1;
+}

@@ -76,6 +76,7 @@
   <script src="/files/www.geogebra.org/edugraphics-instruments.js"></script>
   <script src="/files/www.geogebra.org/educad-curriculum.js"></script>
   <script src="/files/www.geogebra.org/educad-labels.js"></script>
+  <script src="/files/www.geogebra.org/educad-solid.js"></script>
   <script src="/files/www.geogebra.org/edugraphics-common.js"></script>
   <script src="/files/www.geogebra.org/educad-boot.js"></script>
 
@@ -1026,6 +1027,14 @@
         loadDemo('line');
       }
       renderLayer1();
+
+      // Floating 3D wireframe cube: transparent stage in the top-right
+      // drafting quadrant. All of its pointer/wheel input is isolated
+      // inside the widget so sheet pan/zoom and drawing tools never fire.
+      if (typeof EduCADSolid !== 'undefined') {
+        handle.solid = EduCADSolid.mountSolidWidget(container, { size: 260 });
+      }
+
       console.log('EduCAD Web App initialized successfully!');
     })();
   </script>

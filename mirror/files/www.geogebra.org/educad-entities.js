@@ -234,7 +234,31 @@
   function CadEntityTable() {
     this._map = {};
     this._order = [];
+    this._rev = 0;
+    this._listeners = [];
   }
+
+  // Monotonic change counter: every add/remove/update/move/clear bumps it.
+  CadEntityTable.prototype.revision = function () { return this._rev; };
+
+  // Change subscription for live derived views (3D rebuild). fn(op, entity,
+  // table) fires after the mutation with op in add/remove/update/move/clear
+  // (entity is null for clear). Returns an unsubscribe function.
+  CadEntityTable.prototype.subscribe = function (fn) {
+    if (typeof fn !== 'function') throw new Error('listener must be a function');
+    this._listeners.push(fn);
+    var self = this;
+    return function () {
+      var i = self._listeners.indexOf(fn);
+      if (i !== -1) self._listeners.splice(i, 1);
+    };
+  };
+
+  CadEntityTable.prototype._emit = function (op, entity) {
+    this._rev++;
+    var ls = this._listeners.slice();
+    for (var i = 0; i < ls.length; i++) ls[i](op, entity || null, this);
+  };
 
   CadEntityTable.prototype.add = function (entity) {
     if (!entity || typeof entity.id !== 'string' || entity.id === '') {
@@ -244,6 +268,7 @@
     if (!isValidType(entity.type)) throw new Error('unknown entity type: ' + String(entity.type));
     this._map[entity.id] = entity;
     this._order.push(entity.id);
+    this._emit('add', entity);
     return entity;
   };
 
@@ -260,9 +285,11 @@
 
   CadEntityTable.prototype.remove = function (id) {
     if (this._map[id] === undefined) return false;
+    var gone = this._map[id];
     delete this._map[id];
     var idx = this._order.indexOf(id);
     if (idx !== -1) this._order.splice(idx, 1);
+    this._emit('remove', gone);
     return true;
   };
 
@@ -278,6 +305,7 @@
   CadEntityTable.prototype.clear = function () {
     this._map = {};
     this._order = [];
+    this._emit('clear', null);
   };
 
   // Locked XY datum: locked entities reject x/y/x2/y2 changes.
@@ -306,6 +334,7 @@
       }
     }
     if (patch.radius !== undefined && e.radius !== 0) e.radius = clampRadius(e.radius);
+    this._emit('update', e);
     return e;
   };
 
@@ -315,6 +344,7 @@
     assertFinite(dxMm, dyMm);
     if (e.locked) throw new Error('entity is locked (XY datum): ' + id);
     e.x += dxMm; e.y += dyMm; e.x2 += dxMm; e.y2 += dyMm;
+    this._emit('move', e);
     return e;
   };
 

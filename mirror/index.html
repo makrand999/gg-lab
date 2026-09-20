@@ -77,6 +77,7 @@
   <script src="/files/www.geogebra.org/educad-curriculum.js"></script>
   <script src="/files/www.geogebra.org/educad-labels.js"></script>
   <script src="/files/www.geogebra.org/educad-solid.js"></script>
+  <script src="/files/www.geogebra.org/educad-reconstruct.js"></script>
   <script src="/files/www.geogebra.org/edugraphics-common.js"></script>
   <script src="/files/www.geogebra.org/educad-boot.js"></script>
 
@@ -1033,6 +1034,34 @@
       // inside the widget so sheet pan/zoom and drawing tools never fire.
       if (typeof EduCADSolid !== 'undefined') {
         handle.solid = EduCADSolid.mountSolidWidget(container, { size: 260 });
+      }
+
+      // Live 2D -> 3D bridge: every table change rebuilds the widget from
+      // the current visible drawing, coalesced to one frame. 3D truth is
+      // derived and ephemeral; nothing is stored on entities.
+      if (handle.solid && typeof EduCADReconstruct !== 'undefined' &&
+          typeof EduCADSolid.setGeometry === 'function') {
+        (function () {
+          var solid3d = handle.solid;
+          var rebuildQueued = false;
+          function rebuildSolid() {
+            rebuildQueued = false;
+            var res = EduCADReconstruct.reconstruct(
+              handle.table.visibleEntities());
+            if (res.status === 'ok') {
+              EduCADSolid.setGeometry(solid3d, res.geometry);
+            } else {
+              EduCADSolid.setUnavailable(solid3d, res.reason, res.label);
+            }
+          }
+          handle.rebuildSolid = rebuildSolid;
+          handle.table.subscribe(function () {
+            if (rebuildQueued) return;
+            rebuildQueued = true;
+            window.requestAnimationFrame(rebuildSolid);
+          });
+          rebuildSolid();
+        })();
       }
 
       console.log('EduCAD Web App initialized successfully!');

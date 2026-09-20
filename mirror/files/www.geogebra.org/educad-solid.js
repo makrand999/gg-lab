@@ -66,6 +66,16 @@
     [0, 4], [1, 4], [0, 5], [1, 5],
     [0, 2], [1, 2], [0, 3], [1, 3]
   ];
+  // Cube faces as index loops into VERTICES, wound so Newell normals come
+  // out as FACE_NORMALS (-X/+X/-Y/+Y/-Z/+Z). Faces are never drawn; they
+  // only decide which edges read as hidden (dashed).
+  var CUBE_FACES = [
+    [0, 4, 6, 2], [1, 3, 7, 5],
+    [0, 1, 5, 4], [2, 6, 7, 3],
+    [0, 2, 3, 1], [4, 5, 7, 6]
+  ];
+  var STATUS_FONT = '600 12px system-ui, -apple-system, sans-serif';
+  var STATUS_SUB_FONT = '12px system-ui, -apple-system, sans-serif';
 
   function assertFinite() {
     for (var i = 0; i < arguments.length; i++) {
@@ -87,6 +97,144 @@
     return clamp(Math.round(v), SIZE_MIN, SIZE_MAX);
   }
 
+  function assertIndex(v, hi, what) {
+    if (typeof v !== 'number' || Math.floor(v) !== v || v < 0 || v >= hi) {
+      throw new Error('bad ' + what + ': ' + String(v));
+    }
+  }
+
+  // Newell normal (unit length) for one index loop. Degenerate loops keep
+  // a zero normal and always read as facing away.
+  function newellNormal(verts, loop) {
+    var nx = 0, ny = 0, nz = 0;
+    for (var i = 0; i < loop.length; i++) {
+      var a = verts[loop[i]], b = verts[loop[(i + 1) % loop.length]];
+      nx += (a.y - b.y) * (a.z + b.z);
+      ny += (a.z - b.z) * (a.x + b.x);
+      nz += (a.x - b.x) * (a.y + b.y);
+    }
+    var len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (!(len > 1e-12)) return { x: 0, y: 0, z: 0 };
+    return { x: nx / len, y: ny / len, z: nz / len };
+  }
+
+  function edgeKey(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
+
+  // Generic 3D geometry container: vertices [{x,y,z}], edges [[a,b]],
+  // faces [[idx...]...] (optional; wireframes pass []). Validates indices,
+  // derives unit face normals + edge adjacency. Returned object is a fresh
+  // copy the caller owns.
+  function createGeometry(spec) {
+    spec = spec || {};
+    var vs = spec.vertices || spec.VERTICES;
+    var es = spec.edges || spec.EDGES || [];
+    var fs = spec.faces || spec.FACES || [];
+    if (!Array.isArray(vs) || vs.length < 1) {
+      throw new Error('geometry needs >= 1 vertex');
+    }
+    var verts = [];
+    for (var i = 0; i < vs.length; i++) {
+      assertFinite(vs[i].x, vs[i].y, vs[i].z);
+      verts.push({ x: vs[i].x, y: vs[i].y, z: vs[i].z });
+    }
+    var edges = [];
+    for (var j = 0; j < es.length; j++) {
+      assertIndex(es[j][0], verts.length, 'edge a');
+      assertIndex(es[j][1], verts.length, 'edge b');
+      if (es[j][0] === es[j][1]) throw new Error('edge loop on ' + es[j][0]);
+      edges.push([es[j][0], es[j][1]]);
+    }
+    var faces = [];
+    for (var k = 0; k < fs.length; k++) {
+      if (!Array.isArray(fs[k]) || fs[k].length < 3) {
+        throw new Error('face ' + k + ' needs >= 3 indices');
+      }
+      var loop = [];
+      for (var m = 0; m < fs[k].length; m++) {
+        assertIndex(fs[k][m], verts.length, 'face index');
+        loop.push(fs[k][m]);
+      }
+      faces.push(loop);
+    }
+    var normals = [];
+    for (var f = 0; f < faces.length; f++) {
+      normals.push(newellNormal(verts, faces[f]));
+    }
+    var adj = {};
+    for (var g = 0; g < faces.length; g++) {
+      var lp = faces[g];
+      for (var h = 0; h < lp.length; h++) {
+        var key = edgeKey(lp[h], lp[(h + 1) % lp.length]);
+        if (!adj[key]) adj[key] = [];
+        adj[key].push(g);
+      }
+    }
+    var edgeFaces = [];
+    for (var e = 0; e < edges.length; e++) {
+      var ek = edgeKey(edges[e][0], edges[e][1]);
+      edgeFaces.push(adj[ek] ? adj[ek].slice() : []);
+    }
+    return {
+      name: String(spec.name === undefined ? 'custom' : spec.name),
+      vertices: verts, edges: edges, faces: faces,
+      faceNormals: normals, edgeFaces: edgeFaces
+    };
+  }
+
+  var CUBE_GEOMETRY = createGeometry({
+    name: 'cube', vertices: VERTICES, edges: EDGES, faces: CUBE_FACES
+  });
+
+  function defaultGeometry() { return CUBE_GEOMETRY; }
+
+  function geometryOf(st) {
+    return (st && st.geometry) ? st.geometry : CUBE_GEOMETRY;
+  }
+
+  // Center a geometry's bounding box on the origin and uniformly scale it
+  // so the largest half-extent is 1 (cube stage space). Aspect preserved.
+  // Returns {geometry, transform:{cx,cy,cz,scale}}. Single-point inputs
+  // center to the origin with scale 1.
+  function normalizeGeometry(geometry) {
+    if (!geometry || !Array.isArray(geometry.vertices) ||
+        geometry.vertices.length < 1) {
+      throw new Error('cannot normalize empty geometry');
+    }
+    var vs = geometry.vertices;
+    var minX = vs[0].x, maxX = vs[0].x;
+    var minY = vs[0].y, maxY = vs[0].y;
+    var minZ = vs[0].z, maxZ = vs[0].z;
+    for (var i = 1; i < vs.length; i++) {
+      assertFinite(vs[i].x, vs[i].y, vs[i].z);
+      if (vs[i].x < minX) minX = vs[i].x;
+      if (vs[i].x > maxX) maxX = vs[i].x;
+      if (vs[i].y < minY) minY = vs[i].y;
+      if (vs[i].y > maxY) maxY = vs[i].y;
+      if (vs[i].z < minZ) minZ = vs[i].z;
+      if (vs[i].z > maxZ) maxZ = vs[i].z;
+    }
+    var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+    var half = Math.max(maxX - minX, maxY - minY, maxZ - minZ) / 2;
+    var scale = half > 1e-12 ? 1 / half : 1;
+    var out = [];
+    for (var j = 0; j < vs.length; j++) {
+      out.push({
+        x: (vs[j].x - cx) * scale,
+        y: (vs[j].y - cy) * scale,
+        z: (vs[j].z - cz) * scale
+      });
+    }
+    return {
+      geometry: createGeometry({
+        name: geometry.name || 'custom',
+        vertices: out,
+        edges: geometry.edges || [],
+        faces: geometry.faces || []
+      }),
+      transform: { cx: cx, cy: cy, cz: cz, scale: scale }
+    };
+  }
+
   function createSolidState(opts) {
     opts = opts || {};
     var size = (opts.size === undefined || opts.size === null) ?
@@ -102,8 +250,60 @@
       yaw: yaw,
       pitch: clamp(pitch, -PITCH_LIMIT_RAD, PITCH_LIMIT_RAD),
       scale: clamp(scale, ZOOM_MIN, ZOOM_MAX),
-      size: size
+      size: size,
+      geometry: (opts.geometry === undefined || opts.geometry === null) ?
+        CUBE_GEOMETRY : opts.geometry,
+      status: { available: true, reason: '', label: '' }
     };
+  }
+
+  function statusOf(st) {
+    return (st && st.status) ? st.status : { available: true, reason: '', label: '' };
+  }
+
+  // Push a reconstructed geometry into a state or a mounted widget. The
+  // geometry is normalized into stage space (uniform scale, aspect kept)
+  // unless opts.normalize === false. A null geometry restores the default
+  // cube. Widget targets redraw immediately and return the widget; state
+  // targets return the state.
+  function setGeometry(target, geometry, opts) {
+    var st = (target && target.state) ? target.state : target;
+    if (!st) throw new Error('setGeometry needs a state or widget');
+    opts = opts || {};
+    if (geometry === undefined || geometry === null) {
+      st.geometry = CUBE_GEOMETRY;
+    } else if (opts.normalize === false) {
+      st.geometry = geometry;
+    } else {
+      st.geometry = normalizeGeometry(geometry).geometry;
+    }
+    st.status = { available: true, reason: '', label: '' };
+    if (target && target.state && target.el &&
+        typeof target.el.setAttribute === 'function') {
+      target.el.setAttribute('data-solid', st.geometry.name || 'custom');
+    }
+    if (target && target.state && typeof target.draw === 'function') {
+      target.draw();
+      return target;
+    }
+    return st;
+  }
+
+  // Named "3D unavailable" state: render() draws the reason instead of
+  // geometry until setGeometry restores an available geometry.
+  function setUnavailable(target, reason, label) {
+    var st = (target && target.state) ? target.state : target;
+    if (!st) throw new Error('setUnavailable needs a state or widget');
+    st.status = {
+      available: false,
+      reason: String(reason === undefined ? 'unknown' : reason),
+      label: String(label === undefined ? '' : label)
+    };
+    if (target && target.state && typeof target.draw === 'function') {
+      target.draw();
+      return target;
+    }
+    return st;
   }
 
   // Rest pose: exact isometric projection.
@@ -137,13 +337,15 @@
 
   // Orthographic projector. Yaw spins about world Y, pitch tilts about the
   // viewer X axis; screen y grows downward. Depth z grows toward the viewer
-  // (larger z renders in front). Returns 8 {x, y, z} points in CSS px.
+  // (larger z renders in front). Projects the state's geometry (default
+  // cube: 8 {x, y, z} points in CSS px).
   function project(st, cxPx, cyPx) {
     assertFinite(st.yaw, st.pitch, st.scale, cxPx, cyPx);
+    var verts = geometryOf(st).vertices;
     var r = projectionRadius(st);
     var out = [];
-    for (var i = 0; i < VERTICES.length; i++) {
-      var v = VERTICES[i];
+    for (var i = 0; i < verts.length; i++) {
+      var v = verts[i];
       var q = rotateDir(v.x, v.y, v.z, st.yaw, st.pitch);
       out.push({ x: cxPx + q.x * r, y: cyPx - q.y * r, z: q.z });
     }
@@ -160,40 +362,77 @@
     return { x: x1, y: y * cp - z1 * sp, z: y * sp + z1 * cp };
   }
 
-  // Front/back verdict per face: a face turns toward the viewer when its
-  // rotated outward normal has positive depth. Returns 6 booleans.
-  function faceVisibility(yaw, pitch) {
+  // Front/back verdict per normal: a face turns toward the viewer when
+  // its rotated outward normal has positive depth.
+  function faceVisibilityFor(normals, yaw, pitch) {
     assertFinite(yaw, pitch);
     var out = [];
-    for (var i = 0; i < FACE_NORMALS.length; i++) {
-      var n = FACE_NORMALS[i];
+    for (var i = 0; i < normals.length; i++) {
+      var n = normals[i];
       out.push(rotateDir(n.x, n.y, n.z, yaw, pitch).z > 0);
     }
     return out;
   }
 
-  // Split the 12 edges into solid front strokes and dashed hidden strokes.
-  // An edge reads as hidden only when both adjacent faces turn away, so a
-  // generic view shows 9 solid + 3 dashed edges (exactly 3 hidden at the
-  // isometric rest pose). Returns [{a, b, hidden} x 12].
+  // Front/back verdict per face: a face turns toward the viewer when its
+  // rotated outward normal has positive depth. Returns 6 booleans.
+  function faceVisibility(yaw, pitch) {
+    return faceVisibilityFor(FACE_NORMALS, yaw, pitch);
+  }
+
+  // Split the state's edges into solid front strokes and dashed hidden
+  // strokes. An edge reads as hidden only when it has adjacent faces and
+  // every adjacent face turns away, so the default cube shows 9 solid + 3
+  // dashed edges (exactly 3 hidden at the isometric rest pose). Faceless
+  // wireframe edges always read as solid. Returns [{a, b, hidden}].
   function classifyEdges(st) {
     assertFinite(st.yaw, st.pitch);
-    var vis = faceVisibility(st.yaw, st.pitch);
+    var g = geometryOf(st);
+    var vis = faceVisibilityFor(g.faceNormals, st.yaw, st.pitch);
     var out = [];
-    for (var i = 0; i < EDGES.length; i++) {
-      var f = EDGE_FACES[i];
-      out.push({
-        a: EDGES[i][0], b: EDGES[i][1],
-        hidden: !vis[f[0]] && !vis[f[1]]
-      });
+    for (var i = 0; i < g.edges.length; i++) {
+      var f = g.edgeFaces[i] || [];
+      var hidden = false;
+      if (f.length > 0) {
+        hidden = true;
+        for (var j = 0; j < f.length; j++) {
+          if (vis[f[j]]) { hidden = false; break; }
+        }
+      }
+      out.push({ a: g.edges[i][0], b: g.edges[i][1], hidden: hidden });
     }
     return out;
+  }
+
+  // Named "3D unavailable" stage: two centered ink lines, no geometry.
+  // Returns {front:0, hidden:0, vertices:0, unavailable:reason}.
+  function renderUnavailable(ctx, status, cx, cy) {
+    var msg = status.label || status.reason || 'unavailable';
+    ctx.save();
+    try {
+      ctx.fillStyle = LINE_COLOR;
+      ctx.globalAlpha = 1;
+      if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'center';
+      if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'middle';
+      if (typeof ctx.fillText === 'function') {
+        ctx.font = STATUS_FONT;
+        ctx.fillText('3D unavailable', cx, cy - 9);
+        ctx.font = STATUS_SUB_FONT;
+        ctx.globalAlpha = 0.75;
+        ctx.fillText(String(msg), cx, cy + 9);
+      }
+    } finally {
+      if (typeof ctx.restore === 'function') ctx.restore();
+    }
+    return { front: 0, hidden: 0, vertices: 0, unavailable: status.reason };
   }
 
   // Pen-style draw: hidden edges first (dashed, faint), then front edges
   // (solid ink), then filled vertex dots. Never fills a background: the
   // stage stays fully transparent so the cube sits on the sheet paper.
   // Returns {front, hidden, vertices} counts. No-op (null) without ctx.
+  // When the state is unavailable, draws the named reason instead and
+  // returns {front:0, hidden:0, vertices:0, unavailable}.
   function render(ctx, st, o) {
     if (!ctx || typeof ctx.beginPath !== 'function') return null;
     o = o || {};
@@ -201,6 +440,8 @@
     var cx = (o.cxPx === undefined || o.cxPx === null) ? size / 2 : o.cxPx;
     var cy = (o.cyPx === undefined || o.cyPx === null) ? size / 2 : o.cyPx;
     assertFinite(cx, cy);
+    var status = statusOf(st);
+    if (!status.available) return renderUnavailable(ctx, status, cx, cy);
     var pts = project(st, cx, cy);
     var edges = classifyEdges(st);
     var counts = { front: 0, hidden: 0, vertices: pts.length };
@@ -287,7 +528,7 @@
 
     var el = document.createElement('div');
     el.className = WIDGET_CLASS;
-    el.setAttribute('data-solid', 'cube');
+    el.setAttribute('data-solid', geometryOf(st).name || 'cube');
     el.style.width = st.size + 'px';
     el.style.height = st.size + 'px';
     if (opts.x !== undefined && opts.x !== null &&
@@ -492,8 +733,14 @@
     HANDLE_CLASS: HANDLE_CLASS, HANDLE_TEXT: HANDLE_TEXT,
     VERTICES: VERTICES, EDGES: EDGES,
     FACE_NORMALS: FACE_NORMALS, EDGE_FACES: EDGE_FACES,
+    CUBE_FACES: CUBE_FACES,
     rotateDir: rotateDir, faceVisibility: faceVisibility,
+    faceVisibilityFor: faceVisibilityFor,
     createSolidState: createSolidState,
+    createGeometry: createGeometry, defaultGeometry: defaultGeometry,
+    normalizeGeometry: normalizeGeometry,
+    setGeometry: setGeometry, setUnavailable: setUnavailable,
+    statusOf: statusOf,
     resetView: resetView,
     rotateBy: rotateBy, zoomBy: zoomBy,
     projectionRadius: projectionRadius,

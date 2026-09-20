@@ -346,28 +346,46 @@
       loci.push(locusRec('ELEVATION', y, cap));
     }
     if (solid === 'PRISM') {
-      var py1 = planYc - h, py2 = planYc + h;
-      entities.push(segSpec(xL, py1, xR, py1, 'PLAN', 'A', 'p1p2', meta));
-      entities.push(segSpec(xR, py1, xR, py2, 'PLAN', 'A', 'p2p3', meta));
-      entities.push(segSpec(xR, py2, xL, py2, 'PLAN', 'A', 'p3p4', meta));
-      entities.push(segSpec(xL, py2, xL, py1, 'PLAN', 'A', 'p4p1', meta));
-      entities.push(segSpec(xL, 0, xR, 0, 'ELEVATION', 'A', "p1'p2'", meta));
-      entities.push(segSpec(xR, 0, xR, heightMm, 'ELEVATION', 'A', "p2'p3'", meta));
-      entities.push(segSpec(xR, heightMm, xL, heightMm, 'ELEVATION', 'A', "p3'p4'", meta));
-      entities.push(segSpec(xL, heightMm, xL, 0, 'ELEVATION', 'A', "p4'p1'", meta));
+      // True hexagonal prism: regular flat-top hexagon in plan, sizeMm
+      // across corners (R = sizeMm/2), extruded to heightMm.
+      var hexR = sizeMm / 2;
+      var hexDy = hexR * Math.sqrt(3) / 2;
+      var hx = [hexR, hexR / 2, -hexR / 2, -hexR, -hexR / 2, hexR / 2];
+      var hy = [0, hexDy, hexDy, 0, -hexDy, -hexDy];
+      var hi, hj;
+      for (hi = 0; hi < 6; hi++) {
+        hj = (hi + 1) % 6;
+        entities.push(segSpec(xMm + hx[hi], planYc + hy[hi],
+          xMm + hx[hj], planYc + hy[hj], 'PLAN', 'A',
+          'h' + (hi + 1) + 'h' + (hj + 1), meta));
+      }
+      var hexTop = planYc + hexDy, hexBot = planYc - hexDy;
+      // Elevation: outer rectangle over the corner-to-corner width plus
+      // interior verticals at the inner stations (each stands for a
+      // coincident front/back edge pair of the hexagon).
+      entities.push(segSpec(xL, 0, xR, 0, 'ELEVATION', 'A', "b1'b2'", meta));
+      entities.push(segSpec(xR, 0, xR, heightMm, 'ELEVATION', 'A', "e-R", meta));
+      entities.push(segSpec(xR, heightMm, xL, heightMm, 'ELEVATION', 'A', "t1't2'", meta));
+      entities.push(segSpec(xL, heightMm, xL, 0, 'ELEVATION', 'A', "e-L", meta));
+      entities.push(segSpec(xMm - hexR / 2, 0, xMm - hexR / 2, heightMm,
+        'ELEVATION', 'A', 'facet-L', meta));
+      entities.push(segSpec(xMm + hexR / 2, 0, xMm + hexR / 2, heightMm,
+        'ELEVATION', 'A', 'facet-R', meta));
       entities.push(segSpec(xL, heightMm / 2, xR, heightMm / 2, 'ELEVATION', 'E', 'hidden-seam', { kind: 'hidden' }));
-      axis(xMm, py1 - 6, py2 + 6, 'PLAN');
+      axis(xMm, hexBot - 6, hexTop + 6, 'PLAN');
       axis(xMm, -6, heightMm + 6, 'ELEVATION');
-      proj(xL, py2, heightMm, 'proj-L');
-      proj(xR, py2, heightMm, 'proj-R');
+      proj(xL, hexTop, heightMm, 'proj-L');
+      proj(xR, hexTop, heightMm, 'proj-R');
+      proj(xMm - hexR / 2, hexTop, heightMm, 'proj-inner-L');
+      proj(xMm + hexR / 2, hexTop, heightMm, 'proj-inner-R');
       locusH(0, 'ELEVATION', 'locus-base');
       locusH(heightMm, 'ELEVATION', 'locus-top');
       steps = [
-        '1. Draw XY; 35 mm square prism base centred at x=' + xMm + ' mm.',
-        '2. Plan: 35x35 mm square Type A visible below XY.',
-        '3. Elevation: 35x' + heightMm + ' mm rectangle Type A above XY; hidden seam Type E.',
-        '4. Centre axes Type G; projectors hold elev.x == plan.x at left/right edges.',
-        "5. Loci Type K through base y=0 and top y=" + heightMm + " mm; prime labels (p1') in elevation."
+        '1. Draw XY; ' + sizeMm + ' mm hex prism base centred at x=' + xMm + ' mm.',
+        '2. Plan: regular hexagon across corners Type A visible below XY.',
+        '3. Elevation: ' + sizeMm + 'x' + heightMm + ' mm rectangle + facet verticals Type A above XY; hidden seam Type E.',
+        '4. Centre axes Type G; projectors hold elev.x == plan.x at outer/inner stations.',
+        "5. Loci Type K through base y=0 and top y=" + heightMm + " mm; prime labels (h1') in elevation."
       ];
     } else if (solid === 'PYRAMID') {
       var qy1 = planYc - h, qy2 = planYc + h;

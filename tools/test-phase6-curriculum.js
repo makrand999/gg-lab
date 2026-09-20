@@ -149,8 +149,21 @@ var cyl = C.regularSolid({ solid: 'CYLINDER' });
 var rim = cyl.entities.filter(function (e) { return e.type === 'CIRCLE'; })[0];
 eq(rim.radius, 17.5);
 var prism = C.regularSolid({ solid: 'PRISM' });
-var edge = prism.entities.filter(function (e) { return e.viewRole === 'PLAN' && e.bisCode === 'A'; })[0];
-near(Math.abs(edge.x2 - edge.x), 35, 1e-9, 'prism edge 35');
+// Hexagonal prism truth (locked 2D/3D decision 3): 6 plan outline edges
+// spanning 35 mm across corners; elevation 35 mm wide.
+var hexPlan = prism.entities.filter(function (e) {
+  return e.viewRole === 'PLAN' && e.type === 'SEGMENT' && e.bisCode === 'A';
+});
+eq(hexPlan.length, 6, 'hex plan 6 edges');
+var hexXs = [];
+hexPlan.forEach(function (e) { hexXs.push(e.x, e.x2); });
+near(Math.max.apply(null, hexXs) - Math.min.apply(null, hexXs), 35, 1e-9, 'hex across corners 35');
+var hexElev = prism.entities.filter(function (e) {
+  return e.viewRole === 'ELEVATION' && e.type === 'SEGMENT' && e.bisCode === 'A';
+});
+var hexEx = [];
+hexElev.forEach(function (e) { hexEx.push(e.x, e.x2); });
+near(Math.max.apply(null, hexEx) - Math.min.apply(null, hexEx), 35, 1e-9, 'hex elev width 35');
 pass('phase6 solids 35mm');
 // 16 solids hidden E + axis G + visible A
 ['PRISM', 'PYRAMID', 'CYLINDER', 'CONE'].forEach(function (s) {

@@ -1,0 +1,2105 @@
+<!DOCTYPE html>
+<html lang="en" data-paper="white">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="files/fonts/handwriting.css">
+  <title>EduCAD • Master Engineering Drawing Sheet (Infinite Drafting Surface)</title>
+  <style>
+    /* ==========================================================================
+       INFINITE DRAFTSMAN SURFACE: GRAPHITE PENCIL ON ENDLESS VELLUM
+       - No finite sheet borders, no margin rules, no page drop shadows
+       - Seamless infinite paper surface with pan/zoom-synced grid
+       - Minimalist hairlines & generous whitespace
+       - Four red accents: 01-05 numerals, index 1-5, fig captions, APPROVED stamp
+       ========================================================================== */
+    :root[data-paper="white"] {
+      --sheet: #fdfcf8;
+      --sheet-tint: #f6f3ea;
+
+      --pencil: #33363b;
+      --pencil-mid: #5b6068;
+      --pencil-light: #969ba3;
+      --pencil-hairline: rgba(51, 54, 59, 0.2);
+      --pencil-wash: rgba(51, 54, 59, 0.04);
+      --pencil-wash-2: rgba(51, 54, 59, 0.08);
+
+      --red-pencil: #b3352c;
+    }
+
+    :root[data-paper="ivory"] {
+      --sheet: #f6efdd;
+      --sheet-tint: #ede3cc;
+
+      --pencil: #33363b;
+      --pencil-mid: #5b6068;
+      --pencil-light: #969ba3;
+      --pencil-hairline: rgba(51, 54, 59, 0.22);
+      --pencil-wash: rgba(51, 54, 59, 0.04);
+      --pencil-wash-2: rgba(51, 54, 59, 0.08);
+
+      --red-pencil: #b3352c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ENDLESS FULL-SCREEN STAGE — VIEWPORT ITSELF IS THE INFINITE PAPER SURFACE */
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      position: fixed;
+      inset: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    /* THE INFINITE VIEWPORT STAGE: Background grid scales and pans with custom properties */
+    #viewport-stage {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      cursor: grab;
+      overflow: hidden;
+      background: var(--sheet);
+    }
+    #viewport-stage.is-dragging {
+      cursor: grabbing !important;
+    }
+
+    /* CONTENT WRAPPER ON THE INFINITE SURFACE (NO SHEET BORDER, NO SHADOW) */
+    #sheet-content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3400px;
+      height: 2400px;
+      transform-origin: 0 0;
+      pointer-events: auto;
+      color: var(--pencil);
+      font-family: "Patrick Hand", cursive, sans-serif;
+      font-size: 18px;
+      line-height: 1.65;
+    }
+
+    /* TOP SHEET HEADER BAND (Clean, Sits directly on paper, Hairline Divider) */
+    .sheet-top-band {
+      position: absolute;
+      top: 80px;
+      left: 95px;
+      width: 3210px;
+      height: 215px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 10px 18px;
+      border-bottom: 1px solid var(--pencil-hairline);
+      z-index: 10;
+    }
+    .top-band-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-width: 1550px;
+    }
+    .top-meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-family: "Architects Daughter", cursive;
+      font-size: 15px;
+      color: var(--pencil-mid);
+      letter-spacing: 0.08em;
+    }
+    .sheet-master-title {
+      font-family: "Permanent Marker", cursive, sans-serif;
+      font-size: 48px;
+      line-height: 1.1;
+      color: var(--pencil);
+      letter-spacing: 0.02em;
+    }
+    .sheet-master-subtitle {
+      font-family: "Caveat Brush", cursive;
+      font-size: 24px;
+      color: var(--pencil-mid);
+      letter-spacing: 0.03em;
+    }
+    .top-credit-line {
+      font-family: "Architects Daughter", cursive;
+      font-size: 14px;
+      color: var(--pencil-light);
+      margin-top: 2px;
+    }
+
+    /* Header Key Figure */
+    .top-band-keyfigure {
+      width: 360px;
+      height: 170px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .keyfigure-caption {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      font-family: "Architects Daughter", cursive;
+      font-size: 11.5px;
+      color: var(--pencil-light);
+      border-top: 1px solid var(--pencil-hairline);
+      margin-top: 4px;
+      padding-top: 2px;
+    }
+
+    /* Header Tools */
+    .top-band-tools {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .tools-btn-row {
+      display: flex;
+      gap: 28px;
+      align-items: baseline;
+    }
+    .text-action-link {
+      font-family: "Caveat", cursive;
+      font-size: 21px;
+      font-weight: 700;
+      color: var(--pencil-mid);
+      text-decoration: none;
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--pencil-hairline);
+      cursor: pointer;
+      padding: 2px 4px;
+      transition: all 0.15s ease;
+    }
+    .text-action-link:hover {
+      color: var(--pencil);
+      border-bottom: 1.5px solid var(--pencil);
+      transform: translateY(-1px);
+    }
+    .text-action-primary {
+      color: var(--pencil);
+      font-size: 22px;
+      border-bottom: 2px solid var(--pencil);
+    }
+
+    /* 3-COLUMN x 2-ROW PLATES: FLOATING DIRECTLY ON INFINITE SURFACE */
+    .plate-cell {
+      position: absolute;
+      width: 1020px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 10;
+      transition: transform 0.25s ease;
+    }
+    .plate-cell.zone-focused .zone-heading {
+      color: var(--pencil) !important;
+      text-shadow: 0 0 1px rgba(51,54,59,0.3);
+    }
+
+    /* ROW 1: top = 325px */
+    #zone-a { top: 325px; left: 95px; }
+    #zone-b { top: 325px; left: 1190px; }
+    #zone-c { top: 325px; left: 2285px; }
+
+    /* ROW 2: top = 1320px */
+    #zone-d { top: 1320px; left: 95px; }
+    #zone-e { top: 1320px; left: 1190px; }
+    #cell-legend { top: 1320px; left: 2285px; width: 1020px; }
+
+    /* Plain tracked-out zone label */
+    .zone-meta-label {
+      font-family: "Architects Daughter", cursive;
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--pencil-mid);
+      margin-bottom: -6px;
+    }
+
+    .zone-header-line {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .zone-num-callout {
+      width: 44px;
+      height: 38px;
+      flex-shrink: 0;
+    }
+    .zone-heading {
+      font-family: "Caveat Brush", cursive;
+      font-size: 28px;
+      color: var(--pencil);
+      line-height: 1.15;
+      padding-bottom: 4px;
+      background-image: url("data:image/svg+xml,%3Csvg width='20' height='6' viewBox='0 0 20 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,3 Q5,0 10,3 T20,3' fill='none' stroke='%2333363b' stroke-width='1.2'/%3E%3C/svg%3E");
+      background-position: bottom left;
+      background-repeat: repeat-x;
+      flex-grow: 1;
+    }
+
+    /* Figure Stage */
+    .drafting-viewport-area {
+      display: flex;
+      flex-direction: column;
+      margin-top: 4px;
+    }
+    .plate-caption-bar {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid var(--pencil-hairline);
+      padding-bottom: 3px;
+      margin-bottom: 6px;
+    }
+    .viewport-meta-tag {
+      font-family: "Caveat", cursive;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--pencil-mid);
+      letter-spacing: 0.04em;
+    }
+    .viewport-scale-tag {
+      font-family: "Architects Daughter", cursive;
+      font-size: 13px;
+      color: var(--pencil-light);
+    }
+    .interactive-stage-box {
+      width: 100%;
+      max-width: 880px;
+      height: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .interactive-stage-box svg {
+      width: 100%;
+      max-width: 880px;
+      height: 100%;
+      display: block;
+    }
+    .interactive-stage-box svg g,
+    .interactive-stage-box svg rect,
+    .interactive-stage-box svg line,
+    .interactive-stage-box svg path,
+    .interactive-stage-box svg polyline,
+    .interactive-stage-box svg circle {
+      filter: url(#wobble);
+    }
+    .interactive-stage-box svg text {
+      font-family: "Architects Daughter", cursive !important;
+    }
+
+    /* Red Accent 3: fig. A1 caption */
+    .plate-red-caption {
+      width: 100%;
+      margin-top: 4px;
+      font-family: "Caveat", cursive;
+      font-size: 15.5px;
+      font-weight: 700;
+      color: var(--red-pencil);
+    }
+
+    /* Minimalist slider */
+    .slider-container {
+      width: 100%;
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-top: 1px solid var(--pencil-hairline);
+      padding-top: 6px;
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-family: "Caveat", cursive;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--pencil-mid);
+    }
+    .drafting-slider {
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 2px;
+      background: var(--pencil-hairline);
+      outline: none;
+      margin: 6px 0;
+      cursor: pointer;
+    }
+    .drafting-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--pencil);
+      border: 1.5px solid var(--sheet);
+      box-shadow: 0 0 0 1px var(--pencil);
+      cursor: ew-resize;
+    }
+
+    .zone-desc {
+      font-size: 17px;
+      color: var(--pencil-mid);
+      line-height: 1.6;
+    }
+
+    /* Note rows */
+    .spec-notes {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .spec-item {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .spec-title {
+      font-family: "Patrick Hand", cursive;
+      font-size: 16.5px;
+      font-weight: bold;
+      color: var(--pencil);
+    }
+    .spec-body-text {
+      font-family: "Patrick Hand", cursive;
+      font-size: 15.5px;
+      color: var(--pencil-mid);
+      line-height: 1.45;
+    }
+
+    /* Student Handwritten Margin Tip */
+    .margin-tip-note {
+      font-family: "Kalam", cursive;
+      font-size: 15.5px;
+      line-height: 1.4;
+      color: var(--pencil);
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .margin-tip-bullet {
+      color: var(--pencil-mid);
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .zone-foot-bar {
+      border-top: 1px solid var(--pencil-hairline);
+      padding-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: "Caveat", cursive;
+      font-size: 16.5px;
+      color: var(--pencil-light);
+    }
+    .canvas-launch-link {
+      color: var(--pencil);
+      text-decoration: none;
+      border-bottom: 1px solid var(--pencil);
+      font-weight: 700;
+    }
+    .canvas-launch-link:hover {
+      color: var(--pencil-mid);
+    }
+
+    kbd {
+      font-family: "Architects Daughter", cursive;
+      font-size: 13.5px;
+      padding: 0 4px;
+      border-bottom: 1px solid var(--pencil-mid);
+      color: var(--pencil);
+    }
+
+    /* NOTES & NAVIGATION LEGEND (Cell 6 Upper) */
+    .legend-steps-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      border-top: 1px solid var(--pencil-hairline);
+      border-bottom: 1px solid var(--pencil-hairline);
+      padding: 10px 0;
+      margin-top: 4px;
+    }
+    .legend-step-col strong {
+      font-family: "Caveat", cursive;
+      font-size: 18px;
+      color: var(--pencil);
+      display: block;
+    }
+    .legend-step-col p {
+      font-size: 14px;
+      line-height: 1.35;
+      color: var(--pencil-mid);
+    }
+
+    .legend-contents-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .legend-zone-btn {
+      display: flex;
+      align-items: center;
+      background: none;
+      border: none;
+      padding: 3px 0;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      font-family: "Caveat", cursive;
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--pencil);
+      gap: 10px;
+      transition: transform 0.15s ease, color 0.15s ease;
+    }
+    .legend-zone-btn:hover, .legend-zone-btn.active-zone {
+      transform: translateX(4px);
+      color: var(--pencil);
+      font-weight: bold;
+    }
+    .legend-zone-btn.active-zone .legend-title-text {
+      border-bottom: 1px solid var(--pencil);
+    }
+    .legend-numeral {
+      width: 30px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .legend-leader {
+      flex-grow: 1;
+      border-bottom: 1px dotted var(--pencil-hairline);
+      margin: 0 6px;
+      height: 1px;
+    }
+    .legend-page {
+      font-family: "Architects Daughter", cursive;
+      font-size: 14px;
+      color: var(--pencil-light);
+      flex-shrink: 0;
+    }
+
+    /* CELL 6 LOWER: ISO 7200 TITLE BLOCK */
+    #cell-signoff-block {
+      position: absolute;
+      top: 1940px;
+      left: 2285px;
+      width: 1020px;
+      border-top: 1.5px solid var(--pencil);
+      padding-top: 14px;
+      z-index: 10;
+    }
+    .signoff-inner-layout {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr 140px;
+      gap: 20px;
+      align-items: center;
+    }
+    .so-cell-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .so-box {
+      border-bottom: 1px solid var(--pencil-hairline);
+      padding-bottom: 3px;
+    }
+    .so-box-label {
+      font-family: "Caveat", cursive;
+      font-size: 12px;
+      color: var(--pencil-light);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .so-box-val {
+      font-family: "Architects Daughter", cursive;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--pencil);
+    }
+    .so-sig-box {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .sig-line-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .sig-script-text {
+      font-family: "Caveat", cursive;
+      font-size: 25px;
+      font-weight: 700;
+      color: var(--pencil);
+      line-height: 1;
+      margin-bottom: -3px;
+    }
+    .sig-ruled-line {
+      width: 100%;
+      height: 1px;
+      background: var(--pencil-hairline);
+    }
+    .sig-label-under {
+      font-family: "Architects Daughter", cursive;
+      font-size: 10.5px;
+      color: var(--pencil-light);
+      letter-spacing: 0.04em;
+      margin-top: 2px;
+    }
+
+    /* MINIMALIST FLOATING HUD (NO BOX, BARE GLYPHS, TOUR & LIVE TOPIC STATUS) */
+    .cad-panzoom-hud {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 1000;
+      font-family: "Architects Daughter", cursive;
+      opacity: 0.45;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .cad-panzoom-hud:hover,
+    .cad-panzoom-hud:focus-within {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+    .hud-topic-tag {
+      font-family: "Caveat", cursive;
+      font-size: 17px;
+      font-weight: bold;
+      color: var(--pencil);
+      letter-spacing: 0.04em;
+      margin-right: 4px;
+      white-space: nowrap;
+    }
+    .hud-btn {
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--pencil-mid);
+      padding: 2px 6px;
+      font-family: "Permanent Marker", cursive;
+      font-size: 15px;
+      cursor: pointer;
+      color: var(--pencil);
+      transition: all 0.12s ease;
+    }
+    .hud-btn:hover {
+      color: var(--pencil);
+      border-bottom-color: var(--pencil);
+      transform: translateY(-1px);
+    }
+    .hud-zoom-readout {
+      font-weight: bold;
+      font-size: 15px;
+      min-width: 44px;
+      text-align: center;
+      color: var(--pencil);
+    }
+
+    /* MINIMAP OVERVIEW (Pencil Hairline, Faint at Rest) */
+    #minimap {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      width: 180px;
+      height: 120px;
+      border: 1px solid var(--pencil-hairline);
+      background: var(--sheet);
+      opacity: 0.4;
+      z-index: 1000;
+      cursor: crosshair;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    #minimap:hover {
+      opacity: 0.95;
+      transform: translateY(-2px);
+    }
+    .minimap-plate {
+      position: absolute;
+      border: 1px solid var(--pencil-hairline);
+      background: var(--pencil-wash);
+      pointer-events: none;
+    }
+    .minimap-viewport {
+      position: absolute;
+      border: 1.5px solid var(--pencil);
+      background: rgba(51, 54, 59, 0.08);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SHARED SVG WOBBLE FILTER (NO TEXTURES, NO GRAIN) -->
+  <svg class="svg-defs" style="position:absolute;width:0;height:0;overflow:hidden;" aria-hidden="true">
+    <filter id="wobble">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2"/>
+    </filter>
+  </svg>
+
+  <!-- FIXED FULL-SCREEN CAD PLOT VIEWPORT: TILED INFINITE SURFACE -->
+  <div id="viewport-stage">
+
+    <!-- FLOATING CONTENT ON THE INFINITE SURFACE -->
+    <main id="sheet-content">
+
+      <!-- ==================================================================
+           TOP HEADER BAND: MINIMALIST (NO BOX, FINE HAIRLINE DIVIDER)
+           ================================================================== -->
+      <header class="sheet-top-band">
+        <div class="top-band-left">
+          <div class="top-meta-chip">
+            <span>ISO 128 / BIS SP 46 &bull; FIRST-ANGLE MONGE PROJECTION METHOD</span>
+          </div>
+          <h1 class="sheet-master-title">EduCAD Master Graphics Sheet</h1>
+          <p class="sheet-master-subtitle">Interactive Student Workbook &bull; Descriptive Geometry, Dihedral Hinge &amp; Axonometric Wireframe</p>
+          <div class="top-credit-line">
+            DRAWN BY: Alex Chen (MechEng '26) &nbsp;&bull;&nbsp; CHECKED: Prof. G. Monge &nbsp;&bull;&nbsp; SHEET: 01 / 01 &nbsp;&bull;&nbsp; REVISION: C
+          </div>
+        </div>
+
+        <!-- Header Key Figure -->
+        <div class="top-band-keyfigure">
+          <svg width="340" height="140" viewBox="0 0 340 140">
+            <g filter="url(#wobble)">
+              <rect x="20" y="15" width="42" height="42" fill="var(--pencil-wash)" stroke="var(--pencil)" stroke-width="1.6" />
+              <text x="41" y="40" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil)" text-anchor="middle">FRONT (a')</text>
+              <line x1="10" y1="68" x2="80" y2="68" stroke="var(--pencil)" stroke-width="1.8" />
+              <text x="14" y="64" font-family="'Architects Daughter', cursive" font-size="9" font-weight="bold" fill="var(--pencil)">XY</text>
+              <rect x="20" y="76" width="42" height="42" fill="var(--pencil-wash)" stroke="var(--pencil-mid)" stroke-width="1.6" />
+              <text x="41" y="101" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-mid)" text-anchor="middle">TOP (a)</text>
+
+              <path d="M 85,68 C 115,55 135,62 165,68" fill="none" stroke="var(--pencil)" stroke-width="2" />
+              <polygon points="160,63 172,70 160,75" fill="var(--pencil)" />
+              <text x="125" y="52" font-family="'Caveat', cursive" font-size="14" font-weight="bold" fill="var(--pencil)" text-anchor="middle">3D Synthesis</text>
+
+              <polygon points="230,110 195,90 230,70 265,90" fill="var(--pencil-wash)" />
+              <polygon points="195,90 230,70 230,20 195,40" fill="var(--pencil-wash)" />
+              <polygon points="265,90 230,70 230,20 265,40" fill="var(--pencil-wash-2)" />
+
+              <line x1="230" y1="110" x2="195" y2="90" stroke="var(--pencil)" stroke-width="2" />
+              <line x1="230" y1="110" x2="265" y2="90" stroke="var(--pencil)" stroke-width="2" />
+              <line x1="230" y1="110" x2="230" y2="55" stroke="var(--pencil)" stroke-width="2" />
+              <line x1="195" y1="90" x2="195" y2="35" stroke="var(--pencil)" stroke-width="1.8" />
+              <line x1="265" y1="90" x2="265" y2="35" stroke="var(--pencil)" stroke-width="1.8" />
+              <line x1="195" y1="35" x2="230" y2="15" stroke="var(--pencil)" stroke-width="1.8" />
+              <line x1="265" y1="35" x2="230" y2="15" stroke="var(--pencil)" stroke-width="1.8" />
+              <line x1="195" y1="35" x2="230" y2="55" stroke="var(--pencil)" stroke-width="1.8" />
+              <line x1="265" y1="35" x2="230" y2="55" stroke="var(--pencil)" stroke-width="1.8" />
+
+              <circle cx="230" cy="110" r="3" fill="var(--pencil)" />
+              <circle cx="195" cy="90" r="2.5" fill="var(--pencil-mid)" />
+              <circle cx="265" cy="90" r="2.5" fill="var(--pencil-mid)" />
+              <circle cx="230" cy="15" r="2.5" fill="var(--pencil-mid)" />
+            </g>
+          </svg>
+          <div class="keyfigure-caption">
+            <span>FIG. 0.1 &bull; 2D PROJECTIONS &rarr; 3D WIREFRAME</span>
+            <span>PROJ: 1:1</span>
+          </div>
+        </div>
+
+        <!-- Plain text action links -->
+        <div class="top-band-tools">
+          <div class="tools-btn-row">
+            <button class="text-action-link" id="theme-stamp" onclick="togglePaperTheme()">
+              PAPER: <strong id="paper-mode-name">WHITE</strong>
+            </button>
+            <a href="manual.html" class="text-action-link" target="_blank">
+              &equiv; SPEC MANUAL
+            </a>
+            <a href="index.html" class="text-action-link text-action-primary">
+              &#11042; OPEN CAD CANVAS &rarr;
+            </a>
+          </div>
+          <span style="font-family:'Architects Daughter', cursive; font-size:13.5px; color:var(--pencil-light);">
+            Drag blank sheet to Pan &bull; Wheel to Zoom &bull; 1-5 / Arrows to Navigate
+          </span>
+        </div>
+      </header>
+
+
+      <!-- ====================================================================
+           ROW 1, COL 1: ZONE A (DIHEDRAL PROJECTION PLANES)
+           ==================================================================== -->
+      <section class="plate-cell" id="zone-a">
+        <span class="zone-meta-label">Zone A &bull; Coordinate Datum &bull; Ground Line XY</span>
+        <div class="zone-header-line">
+          <!-- Red Accent 2: Hand-circled numeral -->
+          <svg class="zone-num-callout" viewBox="0 0 44 38">
+            <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
+            <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">01</text>
+          </svg>
+          <h2 class="zone-heading">Monge Ground Line &amp; Dihedral Hinge Unfolding</h2>
+        </div>
+
+        <!-- Figure Plate Area -->
+        <div class="drafting-viewport-area">
+          <div class="plate-caption-bar">
+            <span class="viewport-meta-tag">PLATE A-1 &bull; DIHEDRAL HINGE</span>
+            <span class="viewport-scale-tag">PROJ: 1:1</span>
+          </div>
+          <div class="interactive-stage-box">
+            <svg width="360" height="200" viewBox="0 0 360 200" id="svg-hinge-sheet">
+
+
+              <rect x="18" y="14" width="324" height="76" fill="var(--pencil-wash)" stroke="var(--pencil)" stroke-width="1.8" />
+              <text x="28" y="36" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil)">VERTICAL PLANE [VP]</text>
+              <text x="28" y="52" font-family="'Architects Daughter', cursive" font-size="10" fill="var(--pencil-mid)">ELEVATION / FRONT VIEW &bull; HEIGHT (Z)</text>
+              <text x="28" y="67" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-light)">Points carry primes: a', b', c'</text>
+
+              <circle cx="260" cy="50" r="4" fill="var(--pencil)" />
+              <text x="268" y="54" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">a'</text>
+              <line x1="260" y1="50" x2="260" y2="95" stroke="var(--pencil-mid)" stroke-width="1" stroke-dasharray="2 2" />
+              <text x="266" y="76" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-mid)">z=45</text>
+
+              <line x1="10" y1="95" x2="350" y2="95" stroke="var(--pencil)" stroke-width="2.6" />
+              <circle cx="18" cy="95" r="4" fill="var(--pencil)" />
+              <circle cx="342" cy="95" r="4" fill="var(--pencil)" />
+              <text x="22" y="90" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil)">X (Ground Line Datum)</text>
+              <text x="325" y="90" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil)">Y</text>
+
+              <g id="sheet-hp-group">
+                <rect id="sheet-hp-rect" x="18" y="95" width="324" height="76" fill="var(--pencil-wash)" stroke="var(--pencil-mid)" stroke-width="1.6" />
+                <text id="sheet-hp-txt1" x="28" y="122" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil)">HORIZONTAL PLANE [HP]</text>
+                <text id="sheet-hp-txt2" x="28" y="138" font-family="'Architects Daughter', cursive" font-size="10" fill="var(--pencil-mid)">PLAN / TOP VIEW &bull; DEPTH (Y)</text>
+                <circle cx="260" cy="140" r="4" fill="var(--pencil-mid)" />
+                <text x="268" y="144" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil-mid)">a</text>
+                <line x1="260" y1="95" x2="260" y2="140" stroke="var(--pencil-mid)" stroke-width="1" stroke-dasharray="2 2" />
+                <text x="266" y="120" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-mid)">y=45</text>
+              </g>
+            </svg>
+          </div>
+          <!-- Red Accent 3: fig. A1 caption -->
+          <p class="plate-red-caption">fig. A1 &mdash; unfolding the dihedral angle into a coplanar Monge sheet</p>
+          <div class="slider-container">
+            <div class="slider-labels">
+              <span>90&deg; FOLDED</span>
+              <strong id="sheet-hinge-readout" style="color:var(--pencil);">180&deg; FLAT MONGE SHEET</strong>
+            </div>
+            <input type="range" class="drafting-slider" id="sheet-hinge-ctrl" min="0" max="100" value="100" oninput="scrubSheetHinge(this.value)">
+          </div>
+        </div>
+
+        <p class="zone-desc">
+          In first-angle projection, space is framed by the <strong>Vertical Plane (VP)</strong> and <strong>Horizontal Plane (HP)</strong> intersecting at the <strong>Ground Line XY</strong> (<span class="var">Y</span> = 0). To produce a 2D sheet, the 3D horizontal plane is hinged downward by 90&deg;.
+        </p>
+
+        <div class="spec-notes">
+          <div class="spec-item">
+            <span class="spec-title">Above XY &mdash; Vertical Plane (VP / Elevation)</span>
+            <span class="spec-body-text">Contains height (Z) and width (X). Points carry prime ticks (a', b').</span>
+          </div>
+          <div class="spec-item">
+            <span class="spec-title">Below XY &mdash; Horizontal Plane (HP / Plan View)</span>
+            <span class="spec-body-text">Contains depth (Y) and width (X). Points are lowercase plain (a, b).</span>
+          </div>
+        </div>
+
+        <div class="margin-tip-note">
+          <span class="margin-tip-bullet">&bull;</span>
+          <span>Alex's note: Elevation looks forward (Z + X), while Plan looks straight down (Y + X). XY line is the physical hinge axis.</span>
+        </div>
+
+        <div class="zone-foot-bar">
+          <span>HUD in CAD reflects exact coordinates relative to XY.</span>
+          <a href="index.html" class="canvas-launch-link">LAUNCH CAD CANVAS &rarr;</a>
+        </div>
+      </section>
+
+
+      <!-- ====================================================================
+           ROW 1, COL 2: ZONE B (PROJECTORS & VERTICAL CORRESPONDENCE)
+           ==================================================================== -->
+      <section class="plate-cell" id="zone-b">
+        <span class="zone-meta-label">Zone B &bull; Projector Invariant &bull; Snapping Detent</span>
+        <div class="zone-header-line">
+          <!-- Red Accent 2: Hand-circled numeral -->
+          <svg class="zone-num-callout" viewBox="0 0 44 38">
+            <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
+            <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">02</text>
+          </svg>
+          <h2 class="zone-heading">Vertical Projector Rays &amp; Coordinate Snapping</h2>
+        </div>
+
+        <!-- Figure Plate Area -->
+        <div class="drafting-viewport-area">
+          <div class="plate-caption-bar">
+            <span class="viewport-meta-tag">PLATE B-1 &bull; MAGNETIC DETENT SIMULATOR</span>
+            <span class="viewport-scale-tag">DETENT: 14PX</span>
+          </div>
+          <div class="interactive-stage-box" id="sheet-snap-stage" style="cursor:crosshair;">
+            <svg width="360" height="200" viewBox="0 0 360 200" id="svg-sheet-proj">
+
+
+              <rect x="166" y="18" width="28" height="164" fill="var(--pencil-wash)" stroke="rgba(51,54,59,0.25)" stroke-width="1" stroke-dasharray="2 2" />
+              <text x="180" y="192" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-mid)" text-anchor="middle">DETENT CAPTURE &plusmn;14PX</text>
+
+              <line x1="12" y1="100" x2="348" y2="100" stroke="var(--pencil)" stroke-width="1.8" />
+              <line x1="60" y1="96" x2="60" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
+              <line x1="100" y1="96" x2="100" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
+              <line x1="140" y1="96" x2="140" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
+              <line x1="180" y1="94" x2="180" y2="106" stroke="var(--pencil)" stroke-width="1.5" />
+              <line x1="220" y1="96" x2="220" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
+              <line x1="260" y1="96" x2="260" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
+              <line x1="300" y1="96" x2="300" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
+              <text x="18" y="95" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">XY</text>
+
+              <circle cx="180" cy="45" r="5" fill="var(--pencil)" stroke="var(--sheet)" stroke-width="1.5" />
+              <text x="194" y="49" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil)">a' (Elevation Datum)</text>
+
+              <line id="sheet-ray" x1="180" y1="20" x2="180" y2="180" stroke="var(--pencil-mid)" stroke-width="1.8" stroke-dasharray="4 3" />
+              <circle id="sheet-pt-hp" cx="180" cy="150" r="5.5" fill="var(--pencil-mid)" stroke="var(--sheet)" stroke-width="1.5" />
+              <text id="sheet-hp-txt" x="194" y="154" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil-mid)">a (Plan Follower)</text>
+              <circle id="sheet-halo" cx="180" cy="150" r="14" fill="none" stroke="var(--pencil)" stroke-width="1.8" stroke-dasharray="2 2" />
+            </svg>
+          </div>
+          <!-- Red Accent 3: fig. B1 caption -->
+          <p class="plate-red-caption">fig. B1 &mdash; vertical projector ray and magnetic capture detent</p>
+          <div class="slider-labels" style="width:100%; text-align:center; margin-top:8px;">
+            <span>[MOVE CURSOR OVER PLATE TO TEST MAGNETIC LOCK]</span>
+          </div>
+        </div>
+
+        <p class="zone-desc">
+          In Monge geometry, an elevation point (<span class="var">a</span>') and its corresponding plan point (<span class="var">a</span>) <strong>must share the same horizontal coordinate</strong> (<span class="var">X</span>). EduCAD contains a built-in magnetic snap solver that enforces this geometric constraint.
+        </p>
+
+        <div class="spec-notes">
+          <div class="spec-item">
+            <span class="spec-title">Projector Invariant: X(a') &equiv; X(a)</span>
+            <span class="spec-body-text">Moving down from the VP activates a dashed alignment ray (BIS Type B/G).</span>
+          </div>
+          <div class="spec-item">
+            <span class="spec-title">Hysteresis Detent Threshold</span>
+            <span class="spec-body-text">When within 14px of the ray, the cursor locks magnetically to guarantee zero coordinate drift.</span>
+          </div>
+        </div>
+
+        <div class="margin-tip-note">
+          <span class="margin-tip-bullet">&bull;</span>
+          <span>Snapping Invariant: If X(a') != X(a), the drawing violates Euclidean orthographic projection! Always snap to the projector ray.</span>
+        </div>
+
+        <div class="zone-foot-bar">
+          <span>Hold <kbd>Shift</kbd> in CAD to lock 0&deg;/90&deg; axes.</span>
+          <a href="index.html" class="canvas-launch-link">TEST MAGNETIC SNAPPING &rarr;</a>
+        </div>
+      </section>
+
+
+      <!-- ====================================================================
+           ROW 1, COL 3: ZONE C (TRUE LENGTH & RABATTEMENT)
+           ==================================================================== -->
+      <section class="plate-cell" id="zone-c">
+        <span class="zone-meta-label">Zone C &bull; Line Rotation &bull; True Length</span>
+        <div class="zone-header-line">
+          <!-- Red Accent 2: Hand-circled numeral -->
+          <svg class="zone-num-callout" viewBox="0 0 44 38">
+            <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
+            <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">03</text>
+          </svg>
+          <h2 class="zone-heading">The Rotating Line Solver &amp; Horizontal Loci</h2>
+        </div>
+
+        <!-- Figure Plate Area -->
+        <div class="drafting-viewport-area">
+          <div class="plate-caption-bar">
+            <span class="viewport-meta-tag">PLATE C-1 &bull; ROTATING LINE SOLVER</span>
+            <span class="viewport-scale-tag">TL=80MM</span>
+          </div>
+          <div class="interactive-stage-box">
+            <svg width="360" height="200" viewBox="0 0 360 200" id="svg-sheet-rot">
+
+
+              <line x1="12" y1="100" x2="348" y2="100" stroke="var(--pencil)" stroke-width="1.8" />
+              <text x="16" y="95" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">XY</text>
+
+              <line x1="20" y1="35" x2="340" y2="35" stroke="var(--pencil-mid)" stroke-width="1.2" stroke-dasharray="4 3" />
+              <text x="278" y="28" font-family="'Architects Daughter', cursive" font-size="10" font-weight="bold" fill="var(--pencil-mid)">LOCUS B' (z=65)</text>
+
+              <line x1="30" y1="75" x2="330" y2="75" stroke="var(--pencil-light)" stroke-width="1" stroke-dasharray="3 2" />
+              <text x="280" y="71" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-light)">HORIZON a'</text>
+
+              <line id="sheet-app-line" x1="60" y1="75" x2="160" y2="35" stroke="var(--pencil)" stroke-width="2.6" stroke-linecap="round" />
+              <circle cx="60" cy="75" r="4.5" fill="var(--pencil)" />
+              <text x="44" y="80" font-family="'Architects Daughter', cursive" font-size="13" font-weight="bold" fill="var(--pencil)">a'</text>
+
+              <line id="sheet-tl-line" x1="60" y1="75" x2="220" y2="35" stroke="var(--pencil-mid)" stroke-width="2" stroke-dasharray="4 2" />
+              <circle id="sheet-b1-pt" cx="220" cy="35" r="4.5" fill="var(--pencil-mid)" />
+              <text id="sheet-b1-lbl" x="228" y="39" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil-mid)">b₁' (TL)</text>
+
+              <path id="sheet-rot-arc" d="M 160,35 A 80,80 0 0,1 220,35" fill="none" stroke="var(--pencil)" stroke-width="1.8" stroke-dasharray="3 3" />
+              <text x="92" y="70" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil-mid)">&theta;</text>
+
+              <line x1="60" y1="18" x2="220" y2="18" stroke="var(--pencil-mid)" stroke-width="1.2" />
+              <line x1="60" y1="14" x2="60" y2="24" stroke="var(--pencil-mid)" stroke-width="1.2" />
+              <line x1="220" y1="14" x2="220" y2="24" stroke="var(--pencil-mid)" stroke-width="1.2" />
+              <text x="140" y="14" font-family="'Architects Daughter', cursive" font-size="10.5" font-weight="bold" fill="var(--pencil)" text-anchor="middle">TL = 80 mm</text>
+            </svg>
+          </div>
+          <!-- Red Accent 3: fig. C1 caption -->
+          <p class="plate-red-caption">fig. C1 &mdash; rabattement rotation solver revealing true geometric length</p>
+          <div class="slider-container">
+            <div class="slider-labels">
+              <span>INCLINATION &theta;</span>
+              <strong id="sheet-theta-readout" style="color:var(--pencil);">30&deg;</strong>
+            </div>
+            <input type="range" class="drafting-slider" min="10" max="65" value="30" oninput="scrubSheetRotation(this.value)">
+          </div>
+        </div>
+
+        <p class="zone-desc">
+          An inclined line exhibits foreshortening in both views: its elevation length is TL&thinsp;&middot;&thinsp;cos&thinsp;&phi; and its plan length is TL&thinsp;&middot;&thinsp;cos&thinsp;&theta;. To find True Length without trigonometry, Monge rotated the line into a principal plane.
+        </p>
+
+        <div class="spec-notes">
+          <div class="spec-item">
+            <span class="spec-title">Rabattement Arc</span>
+            <span class="spec-body-text">Swinging endpoint b' onto the horizon of a' produces a projection whose conjugate view displays pure True Length (TL).</span>
+          </div>
+          <div class="spec-item">
+            <span class="spec-title">Invariant Loci</span>
+            <span class="spec-body-text">Horizontal dashed lines define constant boundary loci that endpoints cannot exceed.</span>
+          </div>
+        </div>
+
+        <div class="margin-tip-note">
+          <span class="margin-tip-bullet">&bull;</span>
+          <span>Rabattement Secret: Swing B until it reaches the horizontal level of A. The line is now parallel to VP, so elevation displays pure True Length directly!</span>
+        </div>
+
+        <div class="zone-foot-bar">
+          <span>Click "Line Rotation" on CAD top bar.</span>
+          <a href="index.html" class="canvas-launch-link">LOAD PRELOADED ROTATION DEMO &rarr;</a>
+        </div>
+      </section>
+
+
+      <!-- ====================================================================
+           ROW 2, COL 1: ZONE D (3-VIEW ORTHOGRAPHIC PROJECTION & 45 MITER)
+           ==================================================================== -->
+      <section class="plate-cell" id="zone-d">
+        <span class="zone-meta-label">Zone D &bull; Multi-View &bull; 45&deg; Miter Depth Transfer</span>
+        <div class="zone-header-line">
+          <!-- Red Accent 2: Hand-circled numeral -->
+          <svg class="zone-num-callout" viewBox="0 0 44 38">
+            <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
+            <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">04</text>
+          </svg>
+          <h2 class="zone-heading">Multi-View Projection &amp; 45&deg; Depth Transfer</h2>
+        </div>
+
+        <!-- Figure Plate Area -->
+        <div class="drafting-viewport-area">
+          <div class="plate-caption-bar">
+            <span class="viewport-meta-tag">PLATE D-1 &bull; THREE-VIEW ALIGNMENT</span>
+            <span class="viewport-scale-tag">FIRST ANGLE &bull; 1:1</span>
+          </div>
+          <div class="interactive-stage-box">
+            <svg width="360" height="200" viewBox="0 0 360 200">
+
+
+              <line x1="10" y1="100" x2="350" y2="100" stroke="var(--pencil)" stroke-width="2" />
+              <line x1="180" y1="10" x2="180" y2="190" stroke="var(--pencil)" stroke-width="2" />
+              <text x="14" y="95" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">X</text>
+              <text x="340" y="95" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">Y</text>
+              <text x="185" y="24" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">Z (Height)</text>
+              <text x="185" y="195" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">Y (Depth)</text>
+
+              <line x1="180" y1="100" x2="275" y2="195" stroke="var(--pencil)" stroke-width="2.2" />
+              <text x="240" y="150" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil-mid)">45&deg; MITER</text>
+
+              <rect x="60" y="30" width="95" height="55" fill="var(--pencil-wash)" stroke="var(--pencil)" stroke-width="2" />
+              <text x="107" y="58" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)" text-anchor="middle">FRONT VIEW (VP)</text>
+              <text x="107" y="73" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-mid)" text-anchor="middle">X &bull; Z Elevation</text>
+
+              <rect x="60" y="118" width="95" height="50" fill="var(--pencil-wash)" stroke="var(--pencil-mid)" stroke-width="2" />
+              <text x="107" y="145" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)" text-anchor="middle">TOP VIEW (HP)</text>
+
+              <rect x="205" y="30" width="84" height="55" fill="var(--pencil-wash)" stroke="var(--pencil-mid)" stroke-width="2" />
+              <text x="247" y="52" font-family="'Architects Daughter', cursive" font-size="10.5" font-weight="bold" fill="var(--pencil)" text-anchor="middle">SIDE VIEW</text>
+              <text x="247" y="66" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-mid)" text-anchor="middle">(LPP &bull; Y-Z)</text>
+
+              <polyline points="155,143 223,143 223,85" fill="none" stroke="var(--pencil-mid)" stroke-width="1.8" stroke-dasharray="4 3">
+                <animate attributeName="stroke-dashoffset" values="14;0" dur="1.2s" repeatCount="indefinite" />
+              </polyline>
+              <polyline points="155,168 248,168 248,85" fill="none" stroke="var(--pencil-mid)" stroke-width="1.8" stroke-dasharray="4 3">
+                <animate attributeName="stroke-dashoffset" values="14;0" dur="1.2s" repeatCount="indefinite" />
+              </polyline>
+              <circle cx="223" cy="143" r="3" fill="var(--pencil)" />
+              <circle cx="248" cy="168" r="3" fill="var(--pencil)" />
+            </svg>
+          </div>
+          <!-- Red Accent 3: fig. D1 caption -->
+          <p class="plate-red-caption">fig. D1 &mdash; orthographic 3-view correspondence with 45&deg; depth transfer</p>
+          <div class="slider-labels" style="width:100%; text-align:center; margin-top:8px;">
+            <span>[ANIMATED RAYS REFLECT PLAN DEPTH AUTOMATICALLY TO PROFILE]</span>
+          </div>
+        </div>
+
+        <p class="zone-desc">
+          To define 3D solids unambiguously, first-angle projection lays out three views: <strong>Elevation</strong> (Front), <strong>Plan</strong> (Top), and <strong>Profile</strong> (Side). Depths from the plan view transfer to the profile view using a <strong>45&deg; miter reflection line</strong>.
+        </p>
+
+        <div class="spec-notes">
+          <div class="spec-item">
+            <span class="spec-title">45&deg; Miter Reflection Line</span>
+            <span class="spec-body-text">Turns horizontal plan projectors into vertical profile projectors instantly in the fourth quadrant.</span>
+          </div>
+          <div class="spec-item">
+            <span class="spec-title">Line Type Standards</span>
+            <span class="spec-body-text">Visible outlines: Continuous thick (Code A). Hidden internal edges: Dashed medium (Code E).</span>
+          </div>
+        </div>
+
+        <div class="margin-tip-note">
+          <span class="margin-tip-bullet">&bull;</span>
+          <span>Draftsman's Miter Shortcut: No compass needed! Draw a 45° line from the origin (XY/YZ). Any plan depth shot rightward reflects upward at 90°.</span>
+        </div>
+
+        <div class="zone-foot-bar">
+          <span>Click "Hexagonal Prism" to view complete 3-view geometry.</span>
+          <a href="index.html" class="canvas-launch-link">LOAD PRISM 3-VIEW &rarr;</a>
+        </div>
+      </section>
+
+
+      <!-- ====================================================================
+           ROW 2, COL 2: ZONE E (ISOMETRIC AXONOMETRIC 3D GLASS BOX)
+           ==================================================================== -->
+      <section class="plate-cell" id="zone-e">
+        <span class="zone-meta-label">Zone E &bull; Axonometric &bull; 3D Glass Box Turntable</span>
+        <div class="zone-header-line">
+          <!-- Red Accent 2: Hand-circled numeral -->
+          <svg class="zone-num-callout" viewBox="0 0 44 38">
+            <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
+            <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">05</text>
+          </svg>
+          <h2 class="zone-heading">The Real-Time 3D Glass Box Turntable Widget</h2>
+        </div>
+
+        <!-- Figure Plate Area -->
+        <div class="drafting-viewport-area">
+          <div class="plate-caption-bar">
+            <span class="viewport-meta-tag">PLATE E-1 &bull; LIVE AXONOMETRIC STAGE</span>
+            <span class="viewport-scale-tag">AXONOMETRIC &bull; 30&deg;/30&deg;</span>
+          </div>
+          <div class="interactive-stage-box" style="height: 420px;">
+            <canvas id="sheet-turntable" width="800" height="460" style="cursor:grab; width:100%; max-width:880px; height:auto; aspect-ratio:800/460;"></canvas>
+          </div>
+          <!-- Red Accent 3: fig. E1 caption -->
+          <p class="plate-red-caption">fig. E1 &mdash; interactive turntable axonometric wireframe model</p>
+          <div class="slider-labels" style="width:100%; text-align:center; margin-top:8px;">
+            <span>[CLICK &amp; DRAG WIREFRAME ABOVE TO ORBIT 3D MODEL LIVE]</span>
+          </div>
+        </div>
+
+        <p class="zone-desc">
+          EduCAD continuously reconciles your 2D projections into an interactive 3D solid via the Phase 10 &amp; 14 reconstruction engines. The wireframe model is rendered in the floating Glass Box widget right on your sheet.
+        </p>
+
+        <div class="spec-notes">
+          <div class="spec-item">
+            <span class="spec-title"><kbd>Left-Click + Drag</kbd> &rarr; Orbit 3D Solid</span>
+            <span class="spec-body-text">Smooth turntable rotation lets you inspect hidden dashed edges and vertex connectivity.</span>
+          </div>
+          <div class="spec-item">
+            <span class="spec-title"><kbd>Double-Click</kbd> &rarr; Reset Isometric Pose</span>
+            <span class="spec-body-text">Instantly restores standard isometric orientation (Yaw 45&deg;, Pitch 35.26&deg;).</span>
+          </div>
+        </div>
+
+        <div class="margin-tip-note">
+          <span class="margin-tip-bullet">&bull;</span>
+          <span>Glass Box Principle: Imagine the object suspended inside a transparent glass box. Projecting rays onto all 6 walls gives the multi-view drawing!</span>
+        </div>
+
+        <div class="zone-foot-bar">
+          <span>Drag the pill handle atop the 3D widget in EduCAD to reposition it.</span>
+          <a href="index.html" class="canvas-launch-link">LAUNCH CAD SHEET &amp; 3D WIDGET &rarr;</a>
+        </div>
+      </section>
+
+
+      <!-- ====================================================================
+           ROW 2, COL 3 (UPPER): NOTES & NAVIGATION LEGEND (CLEAN LIST, NO BOX)
+           ==================================================================== -->
+      <section class="plate-cell" id="cell-legend">
+        <span class="zone-meta-label">Reference &bull; Sheet Instructions &bull; Contents</span>
+        <div class="zone-header-line">
+          <svg class="zone-num-callout" viewBox="0 0 44 38">
+            <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--pencil)" stroke-width="2" filter="url(#wobble)" />
+            <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--pencil)" text-anchor="middle">&bull;</text>
+          </svg>
+          <h2 class="zone-heading">How To Use This Sheet &amp; Zone Index</h2>
+        </div>
+
+        <!-- 3-Step Strip -->
+        <div class="legend-steps-row">
+          <div class="legend-step-col">
+            <strong>1. Pan &amp; Zoom</strong>
+            <p>Drag infinite paper to pan; scroll wheel to zoom.</p>
+          </div>
+          <div class="legend-step-col">
+            <strong>2. Drag Sliders</strong>
+            <p>Fold planes, snap rays, &amp; rotate 3D wireframe.</p>
+          </div>
+          <div class="legend-step-col">
+            <strong>3. Click Index</strong>
+            <p>Click below or use keys 1-5 to fly to any zone.</p>
+          </div>
+        </div>
+
+        <!-- Clean list of 5 zones with Red Accent 2 circled numbers -->
+        <ul class="legend-contents-list">
+          <li>
+            <button class="legend-zone-btn" id="btn-index-zone-a" onclick="flyToZone('zone-a')">
+              <span class="legend-numeral">
+                <svg width="28" height="24" viewBox="0 0 34 28">
+                  <ellipse cx="17" cy="14" rx="14" ry="11" fill="none" stroke="var(--red-pencil)" stroke-width="1.6" />
+                  <text x="17" y="18" font-family="'Caveat', cursive" font-size="16" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">1</text>
+                </svg>
+              </span>
+              <span class="legend-title-text">Zone A: Dihedral Projection Planes &amp; Hinge Unfolding</span>
+              <span class="legend-leader"></span>
+              <span class="legend-page">plate a-1 &bull; fly &rarr;</span>
+            </button>
+          </li>
+          <li>
+            <button class="legend-zone-btn" id="btn-index-zone-b" onclick="flyToZone('zone-b')">
+              <span class="legend-numeral">
+                <svg width="28" height="24" viewBox="0 0 34 28">
+                  <ellipse cx="17" cy="14" rx="14" ry="11" fill="none" stroke="var(--red-pencil)" stroke-width="1.6" />
+                  <text x="17" y="18" font-family="'Caveat', cursive" font-size="16" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">2</text>
+                </svg>
+              </span>
+              <span class="legend-title-text">Zone B: Vertical Projectors &amp; Magnetic Detent Snapping</span>
+              <span class="legend-leader"></span>
+              <span class="legend-page">plate b-1 &bull; fly &rarr;</span>
+            </button>
+          </li>
+          <li>
+            <button class="legend-zone-btn" id="btn-index-zone-c" onclick="flyToZone('zone-c')">
+              <span class="legend-numeral">
+                <svg width="28" height="24" viewBox="0 0 34 28">
+                  <ellipse cx="17" cy="14" rx="14" ry="11" fill="none" stroke="var(--red-pencil)" stroke-width="1.6" />
+                  <text x="17" y="18" font-family="'Caveat', cursive" font-size="16" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">3</text>
+                </svg>
+              </span>
+              <span class="legend-title-text">Zone C: Rabattement Arc &amp; True Length of Inclined Lines</span>
+              <span class="legend-leader"></span>
+              <span class="legend-page">plate c-1 &bull; fly &rarr;</span>
+            </button>
+          </li>
+          <li>
+            <button class="legend-zone-btn" id="btn-index-zone-d" onclick="flyToZone('zone-d')">
+              <span class="legend-numeral">
+                <svg width="28" height="24" viewBox="0 0 34 28">
+                  <ellipse cx="17" cy="14" rx="14" ry="11" fill="none" stroke="var(--red-pencil)" stroke-width="1.6" />
+                  <text x="17" y="18" font-family="'Caveat', cursive" font-size="16" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">4</text>
+                </svg>
+              </span>
+              <span class="legend-title-text">Zone D: Three-View Orthographics &amp; 45&deg; Miter Depth Transfer</span>
+              <span class="legend-leader"></span>
+              <span class="legend-page">plate d-1 &bull; fly &rarr;</span>
+            </button>
+          </li>
+          <li>
+            <button class="legend-zone-btn" id="btn-index-zone-e" onclick="flyToZone('zone-e')">
+              <span class="legend-numeral">
+                <svg width="28" height="24" viewBox="0 0 34 28">
+                  <ellipse cx="17" cy="14" rx="14" ry="11" fill="none" stroke="var(--red-pencil)" stroke-width="1.6" />
+                  <text x="17" y="18" font-family="'Caveat', cursive" font-size="16" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">5</text>
+                </svg>
+              </span>
+              <span class="legend-title-text">Zone E: Isometric Axonometric Glass Box Turntable Widget</span>
+              <span class="legend-leader"></span>
+              <span class="legend-page">plate e-1 &bull; fly &rarr;</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+
+      <!-- ====================================================================
+           ROW 2, COL 3 (LOWER): ISO 7200 TITLE BLOCK (FINE HAIRLINES)
+           ==================================================================== -->
+      <footer id="cell-signoff-block" aria-label="Sheet Title Block and Sign-off">
+        <div class="signoff-inner-layout">
+          <!-- Institutional Cells -->
+          <div class="so-cell-group">
+            <div class="so-box">
+              <div class="so-box-label">ORGANIZATION / INSTITUTION</div>
+              <div class="so-box-val">EduCAD GRAPHICS LAB &bull; MONGE ENGINE</div>
+            </div>
+            <div class="so-box">
+              <div class="so-box-label">DRAWING TITLE</div>
+              <div class="so-box-val">FIRST ANGLE PROJECTIONS</div>
+            </div>
+            <div style="display:flex; gap:16px;">
+              <div class="so-box" style="flex:1;">
+                <div class="so-box-label">RATIO SCALE &bull; PROJECTION</div>
+                <div class="so-box-val" style="color:var(--pencil); font-size:15px;">SCALE 1 : 1 &bull; 1st ANGLE (O-X-Y)</div>
+              </div>
+              <div class="so-box" style="flex:1;">
+                <div class="so-box-label">SHEET NO. &bull; REV</div>
+                <div class="so-box-val">01 / 01 &bull; REV C</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Signatures Column -->
+          <div class="so-sig-box">
+            <div class="sig-line-item">
+              <span class="sig-script-text">Alex Chen</span>
+              <div class="sig-ruled-line"></div>
+              <span class="sig-label-under">DRAWN BY &bull; ALEX CHEN (MECHENG '26)</span>
+            </div>
+            <div class="sig-line-item">
+              <span class="sig-script-text">Prof. G. Monge <span style="font-size:18px;">&#10003;</span></span>
+              <div class="sig-ruled-line"></div>
+              <span class="sig-label-under">CHECKED BY &bull; PROF. G. MONGE</span>
+            </div>
+          </div>
+
+          <!-- Red Accent 4: Red Hand-Drawn APPROVED Stamp -->
+          <div class="stamp-container-col">
+            <svg width="135" height="85" viewBox="0 0 150 90">
+              <g filter="url(#wobble)" transform="rotate(-8 75 45)">
+                <ellipse cx="75" cy="45" rx="68" ry="38" fill="none" stroke="var(--red-pencil)" stroke-width="2.6" stroke-opacity="0.8" />
+                <ellipse cx="75" cy="45" rx="63" ry="33" fill="none" stroke="var(--red-pencil)" stroke-width="1.4" stroke-opacity="0.7" stroke-dasharray="14 2 24 3" />
+                <text x="75" y="46" font-family="'Permanent Marker', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" fill-opacity="0.85" text-anchor="middle" letter-spacing="2">APPROVED</text>
+                <text x="75" y="63" font-family="'Architects Daughter', cursive" font-size="9.5" font-weight="bold" fill="var(--red-pencil)" fill-opacity="0.8" text-anchor="middle" letter-spacing="1">REV C &bull; 21 SEP 2026</text>
+                <text x="75" y="27" font-family="'Caveat', cursive" font-size="11" font-weight="bold" fill="var(--red-pencil)" fill-opacity="0.7" text-anchor="middle">FACULTY OF ENGG</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </footer>
+
+    </main>
+  </div>
+
+  <!-- MINIMAP OVERVIEW (PENCIL HAIRLINE, INTERACTIVE) -->
+  <aside id="minimap" aria-label="Sheet Overview Minimap" title="Minimap (Click to fly to location)">
+    <div class="minimap-plate" id="mm-zone-a" style="left:5px; top:16px; width:54px; height:48px;"></div>
+    <div class="minimap-plate" id="mm-zone-b" style="left:63px; top:16px; width:54px; height:48px;"></div>
+    <div class="minimap-plate" id="mm-zone-c" style="left:121px; top:16px; width:54px; height:48px;"></div>
+    <div class="minimap-plate" id="mm-zone-d" style="left:5px; top:66px; width:54px; height:50px;"></div>
+    <div class="minimap-plate" id="mm-zone-e" style="left:63px; top:66px; width:54px; height:50px;"></div>
+    <div class="minimap-plate" id="mm-cell-legend" style="left:121px; top:66px; width:54px; height:50px;"></div>
+    <div class="minimap-viewport" id="minimap-view-rect"></div>
+  </aside>
+
+  <!-- MINIMALIST FLOATING CAD HUD (LIVE TOPIC, TOUR, FIT, ZOOM) -->
+  <aside class="cad-panzoom-hud" aria-label="CAD Viewport Controls">
+    <span class="hud-topic-tag" id="hud-topic-name">SHEET OVERVIEW</span>
+    <button class="hud-btn" onclick="stepTour(-1)" title="Previous Topic (Tour)">&#9664;</button>
+    <button class="hud-btn" onclick="stepTour(1)" title="Next Topic (Tour)">&#9654;</button>
+    <button class="hud-btn" onclick="zoomStep(1.25)" title="Zoom In (+)">+</button>
+    <button class="hud-btn" onclick="zoomStep(0.8)" title="Zoom Out (&minus;)">&minus;</button>
+    <button class="hud-btn" onclick="fitContent()" title="Fit All Content (F or 0)">FIT</button>
+    <span class="hud-zoom-readout" id="hud-scale-readout">100%</span>
+  </aside>
+
+  <!-- ====================================================================
+       INTERACTIVE JAVASCRIPT: PAN-ZOOM ENGINE, INERTIA, MINIMAP & NAVIGATION
+       ==================================================================== -->
+  <script>
+    var panX = 0, panY = 0, scale = 1.0;
+    window.currentDraftingScale = 1.0;
+
+    var viewport = document.getElementById('viewport-stage');
+    var sheetContent = document.getElementById('sheet-content');
+    var hudScale = document.getElementById('hud-scale-readout');
+    var hudTopic = document.getElementById('hud-topic-name');
+    var mmRect = document.getElementById('minimap-view-rect');
+
+    // List of sequential zones for tour
+    var tourZones = ['zone-a', 'zone-b', 'zone-c', 'zone-d', 'zone-e', 'cell-legend'];
+    var currentTourIndex = 0;
+
+    // Apply transform to content AND update infinite tiled grid properties
+    function applyTransform() {
+      sheetContent.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+      window.currentDraftingScale = scale;
+      hudScale.textContent = Math.round(scale * 100) + '%';
+      updateActiveTopicAndMinimap();
+    }
+
+    // Unified smooth flyTo helper (Pure rAF, zero intervals)
+    var currentAnimFrame = null;
+    function flyTo(targetX, targetY, targetScale, duration, callback) {
+      if (currentAnimFrame) {
+        cancelAnimationFrame(currentAnimFrame);
+        currentAnimFrame = null;
+      }
+      duration = duration || 500;
+
+      var startPanX = panX, startPanY = panY, startScale = scale;
+      var startTime = null;
+
+      function step(now) {
+        if (!startTime) startTime = now;
+        var elapsed = now - startTime;
+        var progress = Math.min(1, elapsed / duration);
+        // Quintic easeInOut for ultra-smooth natural flight
+        var ease = progress < 0.5 ? 16 * Math.pow(progress, 5) : 1 - Math.pow(-2 * progress + 2, 5) / 2;
+
+        panX = startPanX + (targetX - startPanX) * ease;
+        panY = startPanY + (targetY - startPanY) * ease;
+        scale = startScale + (targetScale - startScale) * ease;
+        applyTransform();
+
+        if (progress < 1) {
+          currentAnimFrame = requestAnimationFrame(step);
+        } else {
+          currentAnimFrame = null;
+          if (typeof callback === 'function') callback();
+        }
+      }
+      currentAnimFrame = requestAnimationFrame(step);
+    }
+
+    // Fit all content within window with comfortable padding
+    function fitContent(smooth) {
+      var vw = window.innerWidth;
+      var vh = window.innerHeight;
+      var pad = 60;
+      var contentW = 3400;
+      var contentH = 2400;
+
+      var s = Math.min((vw - pad) / contentW, (vh - pad) / contentH);
+      s = Math.max(0.15, Math.min(1.0, s));
+      var tx = (vw - contentW * s) / 2;
+      var ty = (vh - contentH * s) / 2;
+
+      if (smooth) {
+        flyTo(tx, ty, s, 500);
+      } else {
+        scale = s;
+        panX = tx;
+        panY = ty;
+        applyTransform();
+      }
+    }
+
+    // Auto-fit a specific zone and emphasize it
+    function flyToZone(zoneId) {
+      var el = document.getElementById(zoneId);
+      if (!el) return;
+
+      var idx = tourZones.indexOf(zoneId);
+      if (idx !== -1) currentTourIndex = idx;
+
+      var vw = window.innerWidth;
+      var vh = window.innerHeight;
+      var pad = 50;
+
+      // Element coordinate space inside content (width 1020, height approx 960-980)
+      var elX = el.offsetLeft;
+      var elY = el.offsetTop;
+      var elW = el.offsetWidth || 1020;
+      var elH = el.offsetHeight || 960;
+
+      var s = Math.min(1.0, Math.min((vw - pad) / elW, (vh - pad) / elH));
+      var tx = (vw - elW * s) / 2 - elX * s;
+      var ty = (vh - elH * s) / 2 - elY * s;
+
+      flyTo(tx, ty, s, 550, function() {
+        el.classList.add('zone-focused');
+        setTimeout(function() { el.classList.remove('zone-focused'); }, 1200);
+      });
+    }
+
+    // Step Tour (Previous / Next)
+    function stepTour(direction) {
+      currentTourIndex = (currentTourIndex + direction + tourZones.length) % tourZones.length;
+      flyToZone(tourZones[currentTourIndex]);
+    }
+
+    // Zoom step (+ / -) toward viewport center
+    function zoomStep(factor) {
+      var cx = window.innerWidth / 2;
+      var cy = window.innerHeight / 2;
+      var sheetX = (cx - panX) / scale;
+      var sheetY = (cy - panY) / scale;
+
+      var nextScale = Math.max(0.15, Math.min(3.0, scale * factor));
+      var targetPanX = cx - sheetX * nextScale;
+      var targetPanY = cy - sheetY * nextScale;
+
+      flyTo(targetPanX, targetPanY, nextScale, 280);
+    }
+
+    // Update Live Topic in HUD and Minimap Viewport Indicator
+    var zoneTitles = {
+      'zone-a': 'ZONE A &bull; DIHEDRAL HINGE',
+      'zone-b': 'ZONE B &bull; PROJECTOR DETENT',
+      'zone-c': 'ZONE C &bull; LINE RABATTEMENT',
+      'zone-d': 'ZONE D &bull; 45&deg; MITER 3-VIEW',
+      'zone-e': 'ZONE E &bull; 3D GLASS BOX',
+      'cell-legend': 'SHEET LEGEND &bull; INDEX'
+    };
+
+    function updateActiveTopicAndMinimap() {
+      var vw = window.innerWidth;
+      var vh = window.innerHeight;
+      var vCenterX = vw / 2;
+      var vCenterY = vh / 2;
+
+      // Unproject viewport center to content coordinates
+      var contentCenterX = (vCenterX - panX) / scale;
+      var contentCenterY = (vCenterY - panY) / scale;
+
+      var closestZone = null;
+      var minDistance = Infinity;
+
+      tourZones.forEach(function(zid) {
+        var el = document.getElementById(zid);
+        if (!el) return;
+        var zCenterX = el.offsetLeft + el.offsetWidth / 2;
+        var zCenterY = el.offsetTop + el.offsetHeight / 2;
+        var dist = Math.hypot(contentCenterX - zCenterX, contentCenterY - zCenterY);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestZone = zid;
+        }
+      });
+
+      if (scale < 0.42 || minDistance > 1100) {
+        hudTopic.innerHTML = 'SHEET OVERVIEW';
+        document.querySelectorAll('.legend-zone-btn').forEach(function(b) { b.classList.remove('active-zone'); });
+      } else if (closestZone && zoneTitles[closestZone]) {
+        hudTopic.innerHTML = zoneTitles[closestZone];
+        document.querySelectorAll('.legend-zone-btn').forEach(function(b) { b.classList.remove('active-zone'); });
+        var activeBtn = document.getElementById('btn-index-' + closestZone);
+        if (activeBtn) activeBtn.classList.add('active-zone');
+      }
+
+      // Update minimap viewport indicator
+      if (mmRect) {
+        var mmW = 180, mmH = 120;
+        var sheetW = 3400, sheetH = 2400;
+        var ratioX = mmW / sheetW;
+        var ratioY = mmH / sheetH;
+
+        var viewContentX = -panX / scale;
+        var viewContentY = -panY / scale;
+        var viewContentW = vw / scale;
+        var viewContentH = vh / scale;
+
+        var rx = Math.max(0, Math.min(mmW, viewContentX * ratioX));
+        var ry = Math.max(0, Math.min(mmH, viewContentY * ratioY));
+        var rw = Math.max(10, Math.min(mmW, viewContentW * ratioX));
+        var rh = Math.max(8, Math.min(mmH, viewContentH * ratioY));
+
+        mmRect.style.left = rx + 'px';
+        mmRect.style.top = ry + 'px';
+        mmRect.style.width = rw + 'px';
+        mmRect.style.height = rh + 'px';
+      }
+    }
+
+    // Pointer-driven Pan with Friction/Inertia & Gesture Safety
+    (function() {
+      var isPanning = false;
+      var startX = 0, startY = 0;
+      var lastPointerX = 0, lastPointerY = 0;
+      var lastPointerTime = 0;
+      var vx = 0, vy = 0;
+      var inertiaFrame = null;
+
+      viewport.addEventListener('pointerdown', function(e) {
+        // GESTURE SAFETY: Ignore when starting on interactive controls, sliders, canvas, minimap
+        if (e.target.closest('input, a, button, .interactive-stage-box, canvas, #sheet-turntable, #svg-sheet-proj, #sheet-snap-stage, .cad-panzoom-hud, #minimap')) {
+          return;
+        }
+
+        if (inertiaFrame) cancelAnimationFrame(inertiaFrame);
+        if (currentAnimFrame) cancelAnimationFrame(currentAnimFrame);
+
+        isPanning = true;
+        viewport.classList.add('is-dragging');
+        startX = e.clientX - panX;
+        startY = e.clientY - panY;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        lastPointerTime = performance.now();
+        vx = 0;
+        vy = 0;
+
+        viewport.setPointerCapture(e.pointerId);
+      });
+
+      viewport.addEventListener('pointermove', function(e) {
+        if (!isPanning) return;
+        var now = performance.now();
+        var dt = now - lastPointerTime || 16;
+        var dx = e.clientX - lastPointerX;
+        var dy = e.clientY - lastPointerY;
+
+        // Moving average velocity
+        vx = vx * 0.35 + (dx / dt) * 16 * 0.65;
+        vy = vy * 0.35 + (dy / dt) * 16 * 0.65;
+
+        // Cap maximum velocity to roughly 24px/frame (~400px total glide)
+        var speed = Math.hypot(vx, vy);
+        if (speed > 24) {
+          vx = (vx / speed) * 24;
+          vy = (vy / speed) * 24;
+        }
+
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        lastPointerTime = now;
+
+        panX = e.clientX - startX;
+        panY = e.clientY - startY;
+        applyTransform();
+      });
+
+      function endPan(e) {
+        if (!isPanning) return;
+        isPanning = false;
+        viewport.classList.remove('is-dragging');
+
+        // Apply brief controlled inertia coasting with friction (settles within 600ms)
+        if (Math.hypot(vx, vy) > 1.2) {
+          var startTime = performance.now();
+          function coast(now) {
+            vx *= 0.88;
+            vy *= 0.88;
+            panX += vx;
+            panY += vy;
+            applyTransform();
+
+            if (Math.hypot(vx, vy) > 0.3 && (now - startTime) < 650) {
+              inertiaFrame = requestAnimationFrame(coast);
+            } else {
+              inertiaFrame = null;
+            }
+          }
+          inertiaFrame = requestAnimationFrame(coast);
+        }
+      }
+
+      viewport.addEventListener('pointerup', endPan);
+      viewport.addEventListener('pointercancel', endPan);
+
+      // Wheel Zoom toward mouse point
+      viewport.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        if (currentAnimFrame) cancelAnimationFrame(currentAnimFrame);
+        if (inertiaFrame) cancelAnimationFrame(inertiaFrame);
+
+        var zoomFactor = e.deltaY < 0 ? 1.14 : 1 / 1.14;
+        var mouseX = e.clientX;
+        var mouseY = e.clientY;
+
+        var sheetX = (mouseX - panX) / scale;
+        var sheetY = (mouseY - panY) / scale;
+
+        var nextScale = Math.max(0.15, Math.min(3.0, scale * zoomFactor));
+        panX = mouseX - sheetX * nextScale;
+        panY = mouseY - sheetY * nextScale;
+        scale = nextScale;
+        applyTransform();
+      }, { passive: false });
+
+      // Double-Click Handling (Zoom in or Auto-Fit Plate)
+      viewport.addEventListener('dblclick', function(e) {
+        // EXCEPTION: Never hijack double-click inside canvas or interactive widgets
+        if (e.target.closest('canvas, #sheet-turntable, input, button, a, #sheet-snap-stage, .cad-panzoom-hud, #minimap')) {
+          return;
+        }
+
+        var plate = e.target.closest('.plate-cell');
+        if (plate) {
+          flyToZone(plate.id);
+        } else {
+          // Double-click on empty paper: zoom in one step toward cursor
+          var mouseX = e.clientX;
+          var mouseY = e.clientY;
+          var sheetX = (mouseX - panX) / scale;
+          var sheetY = (mouseY - panY) / scale;
+
+          var nextScale = Math.min(1.5, scale * 1.5);
+          var tx = mouseX - sheetX * nextScale;
+          var ty = mouseY - sheetY * nextScale;
+          flyTo(tx, ty, nextScale, 400);
+        }
+      });
+
+      // Window Resize: Maintain exact center point
+      var lastVw = window.innerWidth;
+      var lastVh = window.innerHeight;
+      window.addEventListener('resize', function() {
+        var newVw = window.innerWidth;
+        var newVh = window.innerHeight;
+
+        var centerSheetX = (lastVw / 2 - panX) / scale;
+        var centerSheetY = (lastVh / 2 - panY) / scale;
+
+        panX = newVw / 2 - centerSheetX * scale;
+        panY = newVh / 2 - centerSheetY * scale;
+
+        lastVw = newVw;
+        lastVh = newVh;
+        applyTransform();
+      });
+
+      // Initial fit to screen on load
+      window.addEventListener('DOMContentLoaded', function() { fitContent(false); });
+      fitContent(false);
+    })();
+
+    // Keyboard Shortcuts (1-5, 0, F, Esc, Arrows, +/-)
+    window.addEventListener('keydown', function(e) {
+      // Do NOT fire when user is typing in a field
+      if (e.target && e.target.nodeType === 1) {
+        if (e.target.matches('input, textarea, select') || e.target.isContentEditable) return;
+      }
+
+      if (e.key === '1') { flyToZone('zone-a'); }
+      else if (e.key === '2') { flyToZone('zone-b'); }
+      else if (e.key === '3') { flyToZone('zone-c'); }
+      else if (e.key === '4') { flyToZone('zone-d'); }
+      else if (e.key === '5') { flyToZone('zone-e'); }
+      else if (e.key === '0' || e.key.toLowerCase() === 'f' || e.key === 'Escape') { fitContent(true); }
+      else if (e.key === '+' || e.key === '=') { zoomStep(1.25); }
+      else if (e.key === '-' || e.key === '_') { zoomStep(0.8); }
+      else if (e.key === 'ArrowRight') { flyTo(panX - 160, panY, scale, 200); }
+      else if (e.key === 'ArrowLeft') { flyTo(panX + 160, panY, scale, 200); }
+      else if (e.key === 'ArrowUp') { flyTo(panX, panY + 160, scale, 200); }
+      else if (e.key === 'ArrowDown') { flyTo(panX, panY - 160, scale, 200); }
+    });
+
+    // Minimap Click / Drag to navigate
+    (function() {
+      var mm = document.getElementById('minimap');
+      if (!mm) return;
+
+      function jumpMinimap(e) {
+        var rect = mm.getBoundingClientRect();
+        var mx = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        var my = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+
+        var targetContentX = (mx / rect.width) * 3400;
+        var targetContentY = (my / rect.height) * 2400;
+
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var tx = vw / 2 - targetContentX * scale;
+        var ty = vh / 2 - targetContentY * scale;
+
+        flyTo(tx, ty, scale, 350);
+      }
+
+      mm.addEventListener('click', jumpMinimap);
+    })();
+
+    // ==========================================================================
+    // THEME SWITCHER & INTERACTIVE ZONE SOLVERS
+    // ==========================================================================
+    function togglePaperTheme() {
+      var root = document.documentElement;
+      var cur = root.getAttribute('data-paper') || 'white';
+      var next = cur === 'white' ? 'ivory' : 'white';
+      root.setAttribute('data-paper', next);
+      document.getElementById('paper-mode-name').textContent = next.toUpperCase();
+      drawSheetCube();
+    }
+
+    function scrubSheetHinge(val) {
+      var pct = val / 100;
+      var rect = document.getElementById('sheet-hp-rect');
+      var txt1 = document.getElementById('sheet-hp-txt1');
+      var txt2 = document.getElementById('sheet-hp-txt2');
+      var readout = document.getElementById('sheet-hinge-readout');
+
+      var angle = Math.round(90 + 90 * pct);
+      readout.textContent = pct === 1 ? '180° FLAT MONGE SHEET' : (angle + '° DIHEDRAL ANGLE');
+
+      var h = 76 * (0.15 + 0.85 * pct);
+      rect.setAttribute('height', h.toString());
+      rect.style.opacity = (0.3 + 0.7 * pct).toString();
+
+      var show = pct > 0.45;
+      txt1.style.display = show ? 'block' : 'none';
+      txt2.style.display = show ? 'block' : 'none';
+    }
+
+    function scrubSheetProjector(e) {
+      var stage = document.getElementById('sheet-snap-stage');
+      var rect = stage.getBoundingClientRect();
+      var relX = (e.clientX - rect.left) * (360 / rect.width);
+      var relY = (e.clientY - rect.top) * (200 / rect.height);
+
+      var snapX = 180;
+      var isLocked = Math.abs(relX - snapX) < 35;
+      var x = isLocked ? snapX : relX;
+
+      var ray = document.getElementById('sheet-ray');
+      var pt = document.getElementById('sheet-pt-hp');
+      var txt = document.getElementById('sheet-hp-txt');
+      var halo = document.getElementById('sheet-halo');
+
+      ray.setAttribute('x1', x);
+      ray.setAttribute('x2', x);
+      pt.setAttribute('cx', x);
+      pt.setAttribute('cy', Math.max(115, Math.min(185, relY)));
+      txt.setAttribute('x', x + 12);
+      txt.setAttribute('y', Math.max(115, Math.min(185, relY)) + 4);
+
+      if (isLocked) {
+        halo.style.display = 'block';
+        halo.setAttribute('cx', x);
+        halo.setAttribute('cy', pt.getAttribute('cy'));
+        ray.setAttribute('stroke', 'var(--pencil)');
+      } else {
+        halo.style.display = 'none';
+        ray.setAttribute('stroke', 'var(--pencil-hairline)');
+      }
+    }
+
+    function scrubSheetRotation(thetaDeg) {
+      document.getElementById('sheet-theta-readout').textContent = thetaDeg + '°';
+      var r = 160;
+      var rad = (thetaDeg * Math.PI) / 180;
+      
+      var startX = 60, startY = 75;
+      var appLength = r * Math.cos(rad) * 0.75;
+      var endX = startX + appLength;
+
+      document.getElementById('sheet-app-line').setAttribute('x2', endX);
+
+      var tlEndX = startX + r * 0.95;
+      document.getElementById('sheet-tl-line').setAttribute('x2', tlEndX);
+      
+      var b1 = document.getElementById('sheet-b1-pt');
+      var b1Lbl = document.getElementById('sheet-b1-lbl');
+      b1.setAttribute('cx', tlEndX);
+      b1Lbl.setAttribute('x', tlEndX + 8);
+
+      var arc = document.getElementById('sheet-rot-arc');
+      arc.setAttribute('d', 'M ' + endX + ',35 A ' + (tlEndX - endX) + ',' + (tlEndX - endX) + ' 0 0,1 ' + tlEndX + ',35');
+    }
+
+    (function() {
+      var canvas = document.getElementById('sheet-turntable');
+      if (!canvas) return;
+      var ctx = canvas.getContext('2d');
+      var yaw = 45 * Math.PI / 180;
+      var pitch = 35.26 * Math.PI / 180;
+      var dragging = false;
+      var lastX = 0, lastY = 0;
+
+      var sz = 145;
+      var vertices = [
+        [-sz, -sz, -sz], [sz, -sz, -sz], [sz, sz, -sz], [-sz, sz, -sz],
+        [-sz, -sz,  sz], [sz, -sz,  sz], [sz, sz,  sz], [-sz, sz,  sz]
+      ];
+      var edges = [
+        [0,1],[1,2],[2,3],[3,0],
+        [4,5],[5,6],[6,7],[7,4],
+        [0,4],[1,5],[2,6],[3,7]
+      ];
+
+      function project(p) {
+        var x1 = p[0] * Math.cos(yaw) + p[2] * Math.sin(yaw);
+        var y1 = p[1];
+        var z1 = -p[0] * Math.sin(yaw) + p[2] * Math.cos(yaw);
+
+        var x2 = x1;
+        var y2 = y1 * Math.cos(pitch) - z1 * Math.sin(pitch);
+        var z2 = y1 * Math.sin(pitch) + z1 * Math.cos(pitch);
+
+        var cx = canvas.width / 2;
+        var cy = canvas.height / 2;
+        return { x: cx + x2, y: cy - y2, z: z2 };
+      }
+
+      window.drawSheetCube = function() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var cs = getComputedStyle(document.documentElement);
+        var mainStroke = cs.getPropertyValue('--pencil').trim() || '#33363b';
+        var hiddenStroke = cs.getPropertyValue('--pencil-light').trim() || '#969ba3';
+        var nodeFill = cs.getPropertyValue('--pencil').trim() || '#33363b';
+        var proj = vertices.map(project);
+
+        ctx.save();
+        ctx.strokeStyle = cs.getPropertyValue('--pencil-mid').trim() || '#5b6068';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(60, 390);
+        ctx.lineTo(120, 390);
+        ctx.moveTo(60, 390);
+        ctx.lineTo(60, 330);
+        ctx.moveTo(60, 390);
+        ctx.lineTo(25, 425);
+        ctx.stroke();
+        ctx.font = '20px "Architects Daughter", cursive';
+        ctx.fillStyle = cs.getPropertyValue('--pencil-mid').trim() || '#5b6068';
+        ctx.fillText('X', 130, 396);
+        ctx.fillText('Z', 54, 320);
+        ctx.fillText('Y', 10, 440);
+        ctx.restore();
+
+        edges.forEach(function(e) {
+          var p1 = proj[e[0]];
+          var p2 = proj[e[1]];
+          var isHidden = (p1.z + p2.z) < -25;
+
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          
+          if (isHidden) {
+            ctx.strokeStyle = hiddenStroke;
+            ctx.globalAlpha = 0.45;
+            ctx.setLineDash([8, 6]);
+            ctx.lineWidth = 2.2;
+          } else {
+            ctx.strokeStyle = mainStroke;
+            ctx.globalAlpha = 1.0;
+            ctx.setLineDash([]);
+            ctx.lineWidth = 4.2;
+          }
+          ctx.stroke();
+        });
+        ctx.globalAlpha = 1.0;
+
+        proj.forEach(function(pt) {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 7, 0, Math.PI * 2);
+          ctx.fillStyle = nodeFill;
+          ctx.fill();
+        });
+      };
+
+      drawSheetCube();
+
+      canvas.addEventListener('mousedown', function(e) {
+        dragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        canvas.style.cursor = 'grabbing';
+      });
+
+      window.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        var curScale = window.currentDraftingScale || 1.0;
+        var dx = (e.clientX - lastX) / curScale;
+        var dy = (e.clientY - lastY) / curScale;
+        lastX = e.clientX;
+        lastY = e.clientY;
+
+        yaw += dx * 0.015;
+        pitch = Math.max(-1.4, Math.min(1.4, pitch + dy * 0.015));
+        drawSheetCube();
+      });
+
+      window.addEventListener('mouseup', function() {
+        if (dragging) {
+          dragging = false;
+          canvas.style.cursor = 'grab';
+        }
+      });
+
+      canvas.addEventListener('dblclick', function() {
+        yaw = 45 * Math.PI / 180;
+        pitch = 35.26 * Math.PI / 180;
+        drawSheetCube();
+      });
+    })();
+
+    (function() {
+      var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (prefersReduced) return;
+
+      var figureSvgs = document.querySelectorAll('.interactive-stage-box svg, .top-band-keyfigure svg');
+      figureSvgs.forEach(function(svg) {
+        var candidates = svg.querySelectorAll('path, line, circle, rect, polyline, ellipse');
+        var drawElements = [];
+
+        candidates.forEach(function(el) {
+          if (el.hasAttribute('stroke-dasharray')) return;
+          if (el.querySelector('animate')) return;
+          var style = window.getComputedStyle(el);
+          if (!style.stroke || style.stroke === 'none' || style.stroke === 'transparent') return;
+          if (typeof el.getTotalLength === 'function') {
+            try {
+              var len = el.getTotalLength();
+              if (len > 3) drawElements.push({ el: el, len: len });
+            } catch (e) {}
+          }
+        });
+
+        drawElements.forEach(function(item, idx) {
+          var el = item.el;
+          var len = Math.ceil(item.len);
+          var stagger = idx * 30;
+          var duration = Math.min(800, Math.max(450, len * 2.2));
+
+          el.style.strokeDasharray = len;
+          el.style.strokeDashoffset = len;
+
+          function clearDash() {
+            el.style.strokeDasharray = '';
+            el.style.strokeDashoffset = '';
+          }
+
+          if (typeof el.animate === 'function') {
+            var anim = el.animate([
+              { strokeDashoffset: len },
+              { strokeDashoffset: 0 }
+            ], {
+              duration: duration,
+              delay: stagger,
+              easing: 'cubic-bezier(0.2, 0.8, 0.4, 1)',
+              fill: 'forwards'
+            });
+            anim.onfinish = clearDash;
+          } else {
+            setTimeout(clearDash, stagger + duration + 50);
+          }
+          setTimeout(clearDash, stagger + duration + 100);
+        });
+      });
+    })();
+  </script>
+
+  <div id="probe-results" style="display:none;"></div>
+  <script>
+    window.__errors = [];
+    window.onerror = function(msg, url, line, col, err) {
+      window.__errors.push({ msg: String(msg), line: line, col: col });
+    };
+
+    // Drive frames smoothly in test environment
+    function driveFlight(callback) {
+      var start = performance.now();
+      function check(now) {
+        if (!currentAnimFrame || (now - start) > 700) {
+          callback();
+        } else {
+          // If in virtual-time rAF needs manual poke
+          requestAnimationFrame(check);
+        }
+      }
+      requestAnimationFrame(check);
+    }
+
+    function testKey(keyName, targetZone, isFit) {
+      return new Promise(function(resolve) {
+        var before = { s: Number(scale.toFixed(2)), x: Math.round(panX), y: Math.round(panY) };
+        
+        // Dispatch keydown
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: keyName, bubbles: true }));
+
+        // Wait for flight animation to complete
+        setTimeout(function() {
+          var after = { s: Number(scale.toFixed(2)), x: Math.round(panX), y: Math.round(panY) };
+          var isVisible = false;
+
+          if (targetZone) {
+            var el = document.getElementById(targetZone);
+            if (el) {
+              var rect = el.getBoundingClientRect();
+              isVisible = (rect.left < 1600 && rect.right > 0 && rect.top < 1000 && rect.bottom > 0);
+            }
+          } else if (isFit) {
+            var za = document.getElementById('zone-a').getBoundingClientRect();
+            var ze = document.getElementById('zone-e').getBoundingClientRect();
+            isVisible = (za.left >= 0 && ze.right <= 1600);
+          }
+
+          resolve({
+            keyName: keyName,
+            target: targetZone || 'fit',
+            before: before,
+            after: after,
+            visible: isVisible,
+            moved: (before.x !== after.x || before.y !== after.y || before.s !== after.s)
+          });
+        }, 650);
+      });
+    }
+
+    async function runTest() {
+      // Ensure initial fit
+      fitContent(false);
+      await new Promise(r => setTimeout(r, 100));
+
+      var seq = [];
+      seq.push(await testKey('1', 'zone-a', false));
+      seq.push(await testKey('2', 'zone-b', false));
+      seq.push(await testKey('3', 'zone-c', false));
+      seq.push(await testKey('4', 'zone-d', false));
+      seq.push(await testKey('5', 'zone-e', false));
+      seq.push(await testKey('0', null, true));
+      seq.push(await testKey('Escape', null, true));
+      seq.push(await testKey('f', null, true));
+
+      var stage = document.getElementById('viewport-stage');
+      var bgImg = window.getComputedStyle(stage).backgroundImage;
+
+      // Invariants check
+      scrubSheetHinge(50);
+      var hpRectH = document.getElementById('sheet-hp-rect').getAttribute('height');
+      
+      var stageBox = document.getElementById('sheet-snap-stage');
+      var sRect = stageBox.getBoundingClientRect();
+      scrubSheetProjector({ clientX: sRect.left + sRect.width / 2, clientY: sRect.top + 50 });
+      var ptHp = document.getElementById('sheet-pt-hp');
+      var ptCx = Number(ptHp.getAttribute('cx'));
+
+      var candidates = document.querySelectorAll('svg path, svg line, svg circle, svg rect, svg polyline, svg ellipse');
+      var dashResidueCount = 0;
+      candidates.forEach(function(el) {
+        if (!el.hasAttribute('stroke-dasharray') && el.style.strokeDasharray) {
+          dashResidueCount++;
+        }
+      });
+
+      var report = {
+        keySequence: seq,
+        stageBackgroundImage: bgImg,
+        jsErrors: window.__errors,
+        hpRectHeightScrubbed: hpRectH,
+        snapLockedAtCx180: (ptCx === 180),
+        dashResidueCount: dashResidueCount
+      };
+
+      document.getElementById('probe-results').textContent = JSON.stringify(report, null, 2);
+    }
+
+    window.addEventListener('load', runTest);
+  </script>
+
+</body>
+</html>

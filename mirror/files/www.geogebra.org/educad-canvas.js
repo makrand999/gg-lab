@@ -773,6 +773,95 @@
     return ps;
   }
 
+  // Three-point circle gesture (M3 curves): Ctrl+click toggles points
+  // into an ordered pick list; the third pick auto-commits the circle.
+  // No tool to arm; while line/polar is active, Ctrl+click keeps its
+  // legacy anchor behavior and picks do not grow.
+  var CIRCLE_PICK_MAX = 3;
+
+  function createCirclePickState() {
+    return { picks: [] };
+  }
+
+  function toggleCirclePick(state, id, xMm, yMm) {
+    if (!state) throw new Error('pick state required');
+    assertFinite(xMm, yMm);
+    var sid = String(id);
+    for (var i = 0; i < state.picks.length; i++) {
+      if (state.picks[i].id === sid) {
+        state.picks.splice(i, 1);
+        return state;
+      }
+    }
+    state.picks.push({ id: sid, x: xMm, y: yMm });
+    return state;
+  }
+
+  function clearCirclePicks(state) {
+    if (state) state.picks = [];
+    return state;
+  }
+
+  // Pure circle through three points (mm). Returns {ok, x, y, r, kind}
+  // for the circumcircle (non-collinear) or the centered fallback
+  // (collinear middle equidistant within max(0.5, 2% span)), else a
+  // named rejection {ok:false, reason, message}. NaN-guarded.
+  function circleFromThreePoints(p1, p2, p3) {
+    assertFinite(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+    var minX = Math.min(p1.x, p2.x, p3.x);
+    var maxX = Math.max(p1.x, p2.x, p3.x);
+    var minY = Math.min(p1.y, p2.y, p3.y);
+    var maxY = Math.max(p1.y, p2.y, p3.y);
+    var diag = Math.sqrt((maxX - minX) * (maxX - minX) +
+      (maxY - minY) * (maxY - minY));
+    var tol = diag * 1e-4;
+    if (tol < 1e-6) tol = 1e-6;
+    if (tol > 0.5) tol = 0.5;
+    var area = Math.abs((p2.x - p1.x) * (p3.y - p1.y) -
+      (p3.x - p1.x) * (p2.y - p1.y)) / 2;
+    if (area > tol) {
+      var d = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) +
+        p3.x * (p1.y - p2.y));
+      var sq1 = p1.x * p1.x + p1.y * p1.y;
+      var sq2 = p2.x * p2.x + p2.y * p2.y;
+      var sq3 = p3.x * p3.x + p3.y * p3.y;
+      var ux = (sq1 * (p2.y - p3.y) + sq2 * (p3.y - p1.y) +
+        sq3 * (p1.y - p2.y)) / d;
+      var uy = (sq1 * (p3.x - p2.x) + sq2 * (p1.x - p3.x) +
+        sq3 * (p2.x - p1.x)) / d;
+      var rr = Math.sqrt((ux - p1.x) * (ux - p1.x) +
+        (uy - p1.y) * (uy - p1.y));
+      if (!isFinite(ux) || !isFinite(uy) || !isFinite(rr)) {
+        return { ok: false, reason: 'degenerate',
+          message: 'circle through picks is not finite' };
+      }
+      return { ok: true, x: ux, y: uy, r: rr, kind: 'circumcircle' };
+    }
+    function dist(a, b) {
+      var dx = a.x - b.x, dy = a.y - b.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    var d12 = dist(p1, p2), d23 = dist(p2, p3), d31 = dist(p3, p1);
+    var span = Math.max(d12, d23, d31);
+    if (!(span > 1e-9)) {
+      return { ok: false, reason: 'degenerate',
+        message: 'three coincident picks define no circle' };
+    }
+    var middle, o1, o2;
+    if (d12 >= d23 && d12 >= d31) { o1 = p1; o2 = p2; middle = p3; }
+    else if (d23 >= d12 && d23 >= d31) { o1 = p2; o2 = p3; middle = p1; }
+    else { o1 = p3; o2 = p1; middle = p2; }
+    var m1 = dist(middle, o1), m2 = dist(middle, o2);
+    var allow = Math.max(0.5, 0.02 * span);
+    if (Math.abs(m1 - m2) <= allow) {
+      return { ok: true, x: middle.x, y: middle.y, r: span / 2,
+        kind: 'centered' };
+    }
+    return { ok: false, reason: 'collinear',
+      message: 'picks are collinear (area ' + area.toFixed(6) +
+        ' within weld ' + tol.toFixed(6) + '); middle not equidistant' };
+  }
+
   // Nearest baseline segment (SEGMENT/LINE/DIMENSION/DATUM_AXIS) within
   // tolPx of the cursor. First wins ties.
   function hitTestLine(entities, cursorPx, view, tolPx) {
@@ -920,6 +1009,11 @@
     beginPlotTool: beginPlotTool,
     plotCandidateFor: plotCandidateFor,
     commitPlotPoint: commitPlotPoint,
-    abortPlotTool: abortPlotTool
+    abortPlotTool: abortPlotTool,
+    CIRCLE_PICK_MAX: CIRCLE_PICK_MAX,
+    createCirclePickState: createCirclePickState,
+    toggleCirclePick: toggleCirclePick,
+    clearCirclePicks: clearCirclePicks,
+    circleFromThreePoints: circleFromThreePoints
   };
 });

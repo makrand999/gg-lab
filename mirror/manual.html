@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EduCAD User Manual</title>
+<style>
+body{margin:0;background:#f8fafc;color:#1e293b;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+line-height:1.6;font-size:16px}
+.topbar{max-width:900px;margin:0 auto;padding:16px 20px 0}
+.topbar a{display:inline-block;background:#fff;border:1px solid #cbd5e1;border-radius:6px;
+padding:6px 12px;font-size:13px;font-weight:500;color:#334155;text-decoration:none}
+.topbar a:hover{background:#f1f5f9;border-color:#94a3b8;color:#0f172a}
+main{max-width:900px;margin:16px auto 0;padding:8px 20px 40px}
+h1{font-size:30px;margin:8px 0 16px}
+h2{font-size:24px;margin:36px 0 12px;padding-bottom:6px;border-bottom:1px solid #e2e8f0}
+h3{font-size:19px;margin:28px 0 10px}
+h4{font-size:16px;margin:22px 0 8px}
+p{margin:10px 0}
+a{color:#0284c7;text-decoration:none}
+a:hover{text-decoration:underline}
+ul,ol{margin:10px 0;padding-left:28px}
+li{margin:4px 0}
+li>p{margin:6px 0}
+table{border-collapse:collapse;margin:12px 0;max-width:100%;font-size:14px}
+th,td{border:1px solid #cbd5e1;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#f1f5f9;color:#0f172a}
+tbody tr:nth-child(even){background:#f8fafc}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px;
+background:#f1f5f9;border:1px solid #e2e8f0;border-radius:3px;padding:0 4px}
+pre{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;
+padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.5}
+pre code{background:none;border:none;border-radius:0;padding:0;font-size:inherit}
+blockquote{margin:12px 0;padding:8px 16px;background:#f0f9ff;
+border-left:3px solid #0284c7;color:#334155}
+blockquote p{margin:6px 0}
+hr{border:none;border-top:1px solid #cbd5e1;margin:28px 0}
+footer{max-width:900px;margin:0 auto;padding:16px 20px 32px;font-size:13px;color:#64748b}
+footer p{margin:6px 0;border-top:1px solid #e2e8f0;padding-top:12px}
+li li{margin:2px 0}
+blockquote code{background:#e0f2fe;border-color:#bae6fd}
+:focus-visible{outline:2px solid #0284c7;outline-offset:2px}
+@media (max-width:640px){main{padding:8px 14px 32px}.topbar{padding:12px 14px 0}
+h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
+</style>
+</head>
+<body>
+<p class="topbar"><a href="index.html">← Back to EduCAD</a></p>
+<main>
+<h1 id="educad-user-manual">EduCAD User Manual</h1>
+<p>Complete user manual for EduCAD, the first-angle Monge-projection teaching CAD. Written for students, teachers, and self-learners of engineering drawing. No prior CAD knowledge is assumed. Developers should read the main manual first, then the <a href="#13-appendix-developer-reference">Appendix</a>.</p>
+<blockquote>
+<p>Scope: every label, key, number, and behavior below was traced to the app source or its tests. Anything that could not be verified is marked <code>[unverified]</code> with an explanation. There are no invented features here: things the app does <em>not</em> do are listed in <a href="#12-limitations--not-implemented">Limitations</a>.</p>
+</blockquote>
+<h2 id="contents">Contents</h2>
+<ol>
+<li><a href="#1-what-educad-is">What EduCAD is</a></li>
+<li><a href="#2-quick-start-your-first-drawing-in-5-minutes">Quick start: your first drawing in 5 minutes</a></li>
+<li><a href="#3-interface-tour">Interface tour</a></li>
+<li><a href="#4-drawing-tool-by-tool">Drawing, tool by tool</a></li>
+<li><a href="#5-editing-and-housekeeping">Editing and housekeeping</a></li>
+<li><a href="#6-precision-snapping-axis-lock-zoom-line-weights">Precision: snapping, axis lock, zoom, line weights</a></li>
+<li><a href="#7-views-and-planes">Views and planes</a></li>
+<li><a href="#8-the-3d-view">The 3D view</a></li>
+<li><a href="#9-demos-and-lessons">Demos and lessons</a></li>
+<li><a href="#10-reference-tables">Reference tables</a></li>
+<li><a href="#11-troubleshooting">Troubleshooting</a></li>
+<li><a href="#12-limitations--not-implemented">Limitations / not implemented</a></li>
+<li><a href="#13-appendix-developer-reference">Appendix (developer reference)</a></li>
+</ol>
+<h3 id="how-do-i--goal-index">How do I …? (goal index)</h3>
+<table>
+<thead>
+<tr><th>Goal</th><th>Go to</th></tr>
+</thead>
+<tbody>
+<tr><td>Draw a point</td><td><a href="#41-place-point-click-empty-sheet">§4.1 place point</a></td></tr>
+<tr><td>Draw a line between two points</td><td><a href="#43-line--segment-ctrlclick-p1-click-p2-pick-bis-type">§4.3 line tool</a></td></tr>
+<tr><td>Delete a point</td><td><a href="#55-deleting">§5.5 deleting</a></td></tr>
+<tr><td>Draw a box from scratch</td><td><a href="#48-recipes-draw-a-box-and-a-pyramid-by-hand">§4.8 box recipe</a></td></tr>
+<tr><td>Draw a pyramid from scratch</td><td><a href="#48-recipes-draw-a-box-and-a-pyramid-by-hand">§4.8 pyramid recipe</a></td></tr>
+<tr><td>Make the 3D view work</td><td><a href="#86-supported-drawing-classes-user-language">§8.6 drawing classes</a></td></tr>
+<tr><td>Read a 3D failure message</td><td><a href="#88-failure-and-empty-state-messages-complete-list">§8.8 failure messages</a></td></tr>
+<tr><td>Move or zoom the sheet view</td><td><a href="#64-zoom-behavior">§6.4 zoom</a></td></tr>
+<tr><td>Show the grid</td><td><a href="#34-the-sheet-itself">§3.4 sheet</a></td></tr>
+<tr><td>Rename a label</td><td><a href="#53-rename-double-click-then-keys">§5.3 rename</a></td></tr>
+<tr><td>Cancel a tool or selection</td><td><a href="#52-deselect-right-click--escape">§5.2 deselect</a></td></tr>
+<tr><td>Draw at an angle and distance</td><td><a href="#45-polar-point-angle--distance-from-an-anchor">§4.5 polar point</a></td></tr>
+<tr><td>Place a point measured off a line</td><td><a href="#46-line-referenced-plotting-perpendicular-offset-point">§4.6 plotting</a></td></tr>
+<tr><td>Load a demo lesson</td><td><a href="#91-demo-buttons-guided-walkthroughs">§9.1 demos</a></td></tr>
+</tbody>
+</table>
+<h3 id="words-you-need-jargon-defined-once">Words you need (jargon, defined once)</h3>
+<table>
+<thead>
+<tr><th>Term</th><th>Meaning in this manual</th></tr>
+</thead>
+<tbody>
+<tr><td>VP</td><td>Vertical plane. The plane you face. Its drawing is the <strong>elevation</strong> (front view), normally drawn <strong>above</strong> the XY line.</td></tr>
+<tr><td>HP</td><td>Horizontal plane. The floor. Its drawing is the <strong>plan</strong> (top view), normally drawn <strong>below</strong> the XY line.</td></tr>
+<tr><td>XY (ground line)</td><td>The horizontal line across the sheet at <code>y = 0 mm</code> where VP meets HP. Everything is measured from it.</td></tr>
+<tr><td>Elevation</td><td>Front view: a point <code>(x, h)</code> where <code>h</code> is height above HP.</td></tr>
+<tr><td>Plan</td><td>Top view: a point <code>(x, -d)</code> where <code>d</code> is depth in front of VP.</td></tr>
+<tr><td>Projector</td><td>A vertical line joining the plan and elevation of the <em>same</em> 3D point. It is vertical because of the invariant below.</td></tr>
+<tr><td>Locus</td><td>A horizontal line on which a point is known to lie (e.g. "locus of b").</td></tr>
+<tr><td>TL</td><td>True length: the real 3D length of a line, as opposed to its shorter plan/elevation appearances.</td></tr>
+<tr><td>First angle</td><td>The layout rule: the object sits between you and the planes, so the <strong>plan goes below XY</strong> and the <strong>elevation goes above XY</strong>. EduCAD always uses first angle.</td></tr>
+<tr><td>BIS SP 46</td><td>The Indian drafting standard for line types (continuous thick/thin, dashed, chain, …). EduCAD styles sheet lines with it.</td></tr>
+<tr><td>Sheet</td><td>The whole drawing canvas. One millimetre on the sheet model is one <code>mm</code> in the app, at any zoom.</td></tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1-what-educad-is">1. What EduCAD is</h2>
+<p>EduCAD is a small teaching CAD for <strong>first-angle Monge projection</strong> — the classic two-view engineering-drawing sheet with a front view (elevation) and a top view (plan) of the same object, drawn together so you can read 3D shape off 2D views.</p>
+<ul>
+<li><strong>One sheet, two views.</strong> The upper half of the sheet (above the XY ground line) is the VP elevation; the lower half (below XY) is the HP plan.</li>
+<li><strong>Millimetre world.</strong> Every coordinate is stored in <strong>mm</strong>. Zooming never changes the stored geometry; screen pixels are only a temporary rendering.</li>
+<li><strong>The projector invariant.</strong> The elevation and plan of the same point always share the same x-coordinate: <strong>elevation.x == plan.x</strong>. On the sheet this is why projectors are exactly vertical. The app checks this invariant with a tolerance of <code>1e-9</code> mm.</li>
+<li><strong>A live 3D sketch.</strong> A transparent full-window 3D layer reconstructs a wireframe from your two views every time the drawing changes, or tells you plainly why it cannot (see <a href="#8-the-3d-view">The 3D view</a>).</li>
+<li><strong>Zero dependencies, plain Node + browser.</strong> No build step for the app, no frameworks. (The in-app manual page is the one generated file: <code>mirror/manual.html</code> is built from <code>docs/MANUAL.md</code> with <code>npm run build:manual</code>.)</li>
+</ul>
+<h3 id="how-to-run-the-app">How to run the app</h3>
+<ol>
+<li>Open a terminal in the repository root.</li>
+<li>Start the server: <code>npm start</code>.</li>
+<li>Open <strong>http://127.0.0.1:8124/</strong> in your browser.</li>
+</ol>
+<p>What to expect:</p>
+<ul>
+<li>The server prints <code>educad serve http://127.0.0.1:8124/ -&gt; &lt;repo&gt;/mirror</code>.</li>
+<li>If port 8124 is busy, the server picks the next free port (up to 10 tries) and prints <code>educad serve: port 8124 busy, using &lt;port&gt;</code> — open the URL it prints instead. You can also force a port: <code>npm start -- &lt;port&gt;</code> or <code>PORT=&lt;port&gt; npm start</code>.</li>
+<li>The server binds to localhost only; it is a static file server for the <code>mirror/</code> folder. Stop it with <code>Ctrl+C</code> when you are done.</li>
+<li>The <strong>Manual</strong> button in the demo bar (top-right) opens this guide in a new tab at <code>manual.html</code>.</li>
+</ul>
+<h3 id="browser-requirements">Browser requirements</h3>
+<p><code>[unverified]</code> — the repository states no browser requirements and the automated suite never drives a real browser. From the code, the page needs JavaScript, Canvas 2D, Pointer Events, and <code>requestAnimationFrame</code>; any recent desktop browser provides these. Touch/pen input, small screens, and specific browser versions were not tested, so they are not claimed here.</p>
+<hr>
+<h2 id="2-quick-start-your-first-drawing-in-5-minutes">2. Quick start: your first drawing in 5 minutes</h2>
+<p>The app opens with the <strong>Line Rotation</strong> demo already loaded (or with a demo chosen by the page address — see <a href="#9-demos-and-lessons">Demos</a>). Do this:</p>
+<ol>
+<li><strong>Look at the sheet.</strong> The horizontal line across the middle is the XY ground line (<code>y = 0 mm</code>). Labels above it read <code>V.P. (Front View / Elevation)</code>; below it, <code>H.P. (Top View / Plan)</code>.</li>
+<li><strong>Clear the sheet.</strong> Click <strong>Clear Sheet</strong> (top-right demo bar). The sheet, the labels, and the 3D view all empty together.</li>
+<li><strong>Draw a point.</strong> Left-click anywhere on the empty sheet. A dot appears with the label <code>a</code>. Click again a little to the right (farther than 14 px from <code>a</code>, or the click just re-selects <code>a</code>): a second dot labelled <code>b</code>. Each click places one point, named automatically.</li>
+<li><strong>Join them with a line.</strong> Hold <strong>Ctrl</strong> and left-click point <code>a</code> (the cursor turns into a crosshair). Release <strong>Ctrl</strong>, then left-click point <code>b</code>. A small popup appears showing line-style previews. Click the first (solid thick) preview. A short animation draws the segment <code>a–b</code>.</li>
+<li><strong>Rename a point.</strong> Once the animation finishes, double-click point <code>a</code>, type <code>P1</code>, and press <strong>Enter</strong>. The label updates on the sheet.</li>
+<li><strong>See it in 3D.</strong> Look at the 3D wireframe floating over the sheet (it rests in the top-right). What it shows depends on where your two free clicks landed (placing a point never selects it, so neither click was locked):
+<ul>
+<li>Both dots on the same side of XY → <code>3D unavailable</code> with <code>no plan view drawn</code> (both above) or <code>no elevation view drawn</code> (both below).</li>
+<li>One above and one below at (nearly) the same x → the pair already shows as one 3D point. Within 0.5 mm counts as "same", but freehand clicks rarely manage it.</li>
+<li>One above and one below at clearly different x → <code>3D unavailable</code> with a <code>… has no mate</code> detail naming the unmatched side.</li>
+</ul>
+<p>For the guaranteed demo, click <strong>Clear Sheet</strong>, place one point above XY, click it to select it (amber ring), then move straight below it until the vertical axis-lock badge <code>ΔY: … mm</code> appears — the new point's x is now locked to the selection (<code>index.html:885-893</code>) — and click. The 3D view shows the pair as one 3D point. Drag on the ink to orbit it.</p></li>
+<li><strong>Pan and zoom.</strong> Drag with the <strong>middle mouse button</strong> (or <strong>Shift + left-drag</strong>) to pan. With the cursor over the sheet, roll the <strong>mouse wheel</strong> to zoom at the cursor (on 3D ink the wheel zooms the solid instead; middle-drag on ink slides the solid around). Click <strong>Home</strong> (bottom-right) to reset the 2D view.</li>
+</ol>
+<p>You now know the whole loop: click to place, Ctrl+click to connect, double-click to rename, right-click or <strong>Escape</strong> to cancel anything.</p>
+<hr>
+<h2 id="3-interface-tour">3. Interface tour</h2>
+<p>There is <strong>no toolbar or tool palette</strong> — every drawing action is a mouse gesture directly on the sheet (see <a href="#4-drawing-tool-by-tool">Drawing</a>). The visible chrome is: one status box, one demo bar, three zoom buttons, two popups, sheet watermarks, and the floating 3D wireframe.</p>
+<h3 id="31-status-hud-top-left">3.1 Status HUD (top-left)</h3>
+<p>A white rounded box showing, on two lines:</p>
+<ul>
+<li>Line 1: <strong>EduCAD 2D Engine</strong> • <strong>1st Angle Monge Projection</strong> • a plane pill.</li>
+<li>Line 2: the live cursor coordinates, e.g. <code>X: 12.34 mm • Y: -56.78 mm</code>.</li>
+</ul>
+<p>The pill starts as <code>VP (Elevation)</code> and the coordinates start as <code>X: 0.00 mm • Y: 0.00 mm (Ground Line XY)</code>. As soon as you move the mouse, they switch to live values: the pill reads <strong><code>V.P. (Elevation / Front)</code></strong> when the cursor is at or above XY (<code>y &gt;= 0</code>) and <strong><code>H.P. (Plan / Top)</code></strong> when it is below XY, with matching indigo/amber pill colors. The box ignores mouse clicks (it never steals a drawing click).</p>
+<h3 id="32-demo-bar-top-right">3.2 Demo bar (top-right)</h3>
+<p>Five buttons:</p>
+<table>
+<thead>
+<tr><th>Button (exact label)</th><th>What it does</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Line Rotation (TL=80, θ=30°, φ=45°)</code></td><td>Loads the inclined-line lesson. Active (blue) on first load.</td></tr>
+<tr><td><code>Quadrant Points (1st &amp; 3rd)</code></td><td>Loads two quadrant-point lessons (Q1 + Q3).</td></tr>
+<tr><td><code>Hexagonal Prism (35mm)</code></td><td>Loads the hexagonal-prism solid lesson.</td></tr>
+<tr><td><code>Clear Sheet</code></td><td>Deletes every entity, cancels every tool, empties the 3D view. Never stays highlighted.</td></tr>
+<tr><td><code>Manual</code></td><td>Opens this guide in a new tab at <code>manual.html</code>.</td></tr>
+</tbody>
+</table>
+<p>Clicking a demo also clears whatever you drew before it. See <a href="#9-demos-and-lessons">Demos</a> for guided walkthroughs. (<code>Manual</code> is a plain link, not a demo: it never highlights and never clears the sheet.)</p>
+<h3 id="33-zoom-hud-bottom-right">3.3 Zoom HUD (bottom-right)</h3>
+<p>Three small buttons pinned to the bottom-right corner of the sheet:</p>
+<table>
+<thead>
+<tr><th>Button</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>+</code></td><td>Zoom in ×1.25 about the sheet center.</td></tr>
+<tr><td><code>-</code></td><td>Zoom out ÷1.25 about the sheet center.</td></tr>
+<tr><td><code>Home</code></td><td>Reset to scale 2.0 px/mm centered on the sheet.</td></tr>
+</tbody>
+</table>
+<h3 id="34-the-sheet-itself">3.4 The sheet itself</h3>
+<ul>
+<li><strong>XY ground line.</strong> A dark horizontal line at <code>y = 0 mm</code>, with a knockout <code>X</code> at the left edge and <code>Y</code> at the right edge.</li>
+<li><strong>Watermarks.</strong> Dim grey text on the sheet: <code>V.P. (Front View / Elevation)</code> just above XY (starting 40 px from the left edge) and <code>H.P. (Top View / Plan)</code> just below XY.</li>
+<li><strong>Grid (optional, off by default).</strong> Right-click empty sheet and choose <code>Box Mesh</code> to show a light grid; choose <code>Plain (No Mesh)</code> to hide it again.</li>
+<li><strong>Points</strong> are filled dots (3 px) with italic serif labels (<code>a</code>, <code>a'</code>, …).</li>
+<li><strong>Segments/lines</strong> draw in their BIS style; points also show a live snap ring and an amber selection ring — see <a href="#6-precision-snapping-axis-lock-zoom-line-weights">Precision</a> and <a href="#5-editing-and-housekeeping">Editing</a>.</li>
+</ul>
+<h3 id="35-popups">3.5 Popups</h3>
+<ol>
+<li><strong>Sheet menu.</strong> Right-click empty sheet space (no selection, no active tool, cursor farther than 14 px from any snap target — endpoint, crossing, midpoint, or center): a two-option menu with <code>Plain (No Mesh)</code> and <code>Box Mesh</code>. The chosen option is recorded in the menu markup; the stylesheet draws no visible checkmark, so use the grid on the sheet itself as your confirmation. (Right-clicking near a bare edge mid-span, with no snap target within 14 px, still opens the menu.)</li>
+<li><strong>Line-type popup.</strong> After Ctrl+clicking point P1 and clicking point P2, a popup shows five rendered dash previews (no text in the rows). Hovering a row shows its tooltip: <code>Continuous Thick — Type A</code>, <code>Continuous Thin — Type B</code>, <code>Dashed Thin — Type E</code>, <code>Chain Thin — Type G</code>, <code>Double-Dash Chain — Type K</code>. Click a preview to draw that BIS line type. (Type H is not offered here.)</li>
+</ol>
+<h3 id="36-the-3d-view-floating-ink-on-glass">3.6 The 3D view (floating ink on glass)</h3>
+<p>A transparent sheet over the whole window carries your drawing as a pen-style 3D wireframe (resting in the top-right), or a two-line <code>3D unavailable</code> message explains what to fix. There is no widget box: the model only listens to the mouse in an <em>aura</em> hugging the drawn lines — everywhere else the sheet works as if the 3D layer were not there. Full details in <a href="#8-the-3d-view">The 3D view</a>.</p>
+<h3 id="37-layout-diagram-from-the-real-domcss">3.7 Layout diagram (from the real DOM/CSS)</h3>
+<pre><code>┌────────────────────────────────────────────────────────────────┐
+│ Status HUD (top-left, above all)        Demo bar (top-right)   │
+│ ┌────────────────────────────────────┐  ┌────────────────────┐  │
+│ │ EduCAD 2D Engine • 1st Angle ...   │  │ Line Rotation ...  │  │
+│ │ [V.P. (Elevation / Front)]         │  │ Quadrant Points... │  │
+│ │ X: 12.34 mm • Y: -56.78 mm         │  │ Hexagonal Prism... │  │
+│ └────────────────────────────────────┘  │ Clear Sheet        │  │
+│                                         │ Manual             │  │
+│                                         └────────────────────┘  │
+│  Sheet canvas (full window, two stacked layers)                 │
+│   V.P. (Front View / Elevation)  ← watermark above XY          │
+│  X────────────────────────────────────────────────────────Y    │
+│   H.P. (Top View / Plan)  ← watermark below XY                 │
+│                                                                │
+│   entities · snap/selection rings · previews · labels          │
+│                                                                │
+│   3D Solid glass (full window, above sheet, below chrome):      │
+│   floating wireframe / 3D unavailable, aura-only input         │
+│                                                                │
+│   right-click menu (at cursor):          Zoom HUD (bottom-right)│
+│   ┌───────────────────┐                   ┌───────────────┐    │
+│   │ Plain (No Mesh)   │                   │  +  │  -  │Home│    │
+│   │ Box Mesh          │                   └───────────────┘    │
+│   └───────────────────┘                                        │
+└────────────────────────────────────────────────────────────────┘</code></pre>
+<p>Positions: status HUD <code>top:12px left:12px</code>; demo bar <code>top:12px right:12px</code>; zoom HUD <code>right:8px bottom:8px</code>; 3D glass covers the window (z-index 2, above the sheet layers, below HUD chrome; <code>pointer-events:none</code> except the wireframe aura); both popups open near the cursor and are clamped inside the window.</p>
+<hr>
+<h2 id="4-drawing-tool-by-tool">4. Drawing, tool by tool</h2>
+<p>Tools have no buttons: each one is a click sequence on the sheet. The tools that exist in the UI are: <strong>place point</strong>, <strong>select</strong>, <strong>line/segment</strong>, <strong>BIS line-type popup</strong>, <strong>polar point</strong>, <strong>line-referenced plotting</strong>, and <strong>three-point circle</strong>. Everything else in this section is marked <strong>not reachable from the UI</strong> where that is the case — read those notes before hunting for a button that does not exist.</p>
+<p>Conventions: "click" = left-click; "Ctrl+click" also works with Cmd on macOS; a "point" is a sheet dot with a letter label.</p>
+<h3 id="41-place-point-click-empty-sheet">4.1 Place point (click empty sheet)</h3>
+<p>Creates: one <code>POINT</code> entity (thin style, auto-named <code>a</code>…<code>z</code>, then <code>a1</code>…).</p>
+<ol>
+<li>Make sure no tool is armed (right-click or <strong>Escape</strong> cancels everything).</li>
+<li>Left-click empty sheet space (farther than 14 px from any point).</li>
+<li>A dot appears with the next free letter. If another point is selected (amber ring), the new point is <strong>axis-locked</strong> to it — see <a href="#6-precision-snapping-axis-lock-zoom-line-weights">Precision</a>.</li>
+</ol>
+<p>Placing a point never selects it and never clears an existing selection: the amber ring stays exactly as it was.</p>
+<p>Worked example (on a cleared sheet, nothing selected): click at sheet position <code>X: -40.00 mm • Y: 20.00 mm</code> (above XY, so the point belongs to the elevation), then at <code>X: 30.00 mm • Y: 20.00 mm</code>. You get points <code>a</code> and <code>b</code> on one horizontal line in the VP half. (On a non-empty sheet the same clicks land in the same places but take the next free letters.)</p>
+<h3 id="42-select-click-a-point">4.2 Select (click a point)</h3>
+<p>Creates nothing; it arms a reference used by placement, renaming, and the axis lock.</p>
+<ol>
+<li>Left-click within 14 px of a point.</li>
+<li>An amber ring appears around it. Clicking another point moves the ring; clicking empty sheet places a new point (axis-locked to the ring); right-click or <strong>Escape</strong> clears the ring.</li>
+</ol>
+<p>Selecting never moves, edits, or deletes anything by itself.</p>
+<h3 id="43-line--segment-ctrlclick-p1-click-p2-pick-bis-type">4.3 Line / segment (Ctrl+click P1, click P2, pick BIS type)</h3>
+<p>Creates: one <code>SEGMENT</code> entity spanning both views, drawn with a short stroke animation.</p>
+<ol>
+<li><strong>Ctrl+click</strong> an existing point P1. The cursor becomes a crosshair and an anchor ring appears on P1. (Ctrl+clicking another point re-anchors. Ctrl+clicking empty space aborts.)</li>
+<li><strong>Click</strong> a <em>different</em> point P2. A grey P1–P2 preview appears and the line-type popup opens at the cursor.</li>
+<li>While the popup is open you may click a different P2 to re-aim (clicking P1 itself just selects it; the tool stays armed).</li>
+<li><strong>Click a dash preview</strong> in the popup. A 300 ms animation draws the stroke, then the segment is committed.</li>
+<li>Right-click, <strong>Escape</strong>, or clicking empty sheet at any earlier step aborts with nothing created.</li>
+</ol>
+<p>Worked example: with <code>a = (-40, 20)</code> and <code>b = (30, 20)</code> from §4.1, Ctrl+click <code>a</code>, release Ctrl, click <code>b</code>, choose <code>Continuous Thick — Type A</code>. The sheet gains a thick visible-outline segment from <code>(-40, 20)</code> to <code>(30, 20)</code> — a 70 mm horizontal line in the elevation.</p>
+<p>Notes:</p>
+<ul>
+<li>P1 and P2 must be different points; the tool refuses P1 == P2.</li>
+<li>There is no cursor-following rubber band by design: the preview appears only after P2 is picked.</li>
+<li>New segments are visible in both views (<code>BOTH</code>) with no label.</li>
+</ul>
+<h3 id="44-line-type-bis-sp-46-popup">4.4 Line-type (BIS SP 46) popup</h3>
+<p>Reached only from the line tool after P2 is picked (step 2). Five rows, each showing only its rendered dash sample; hover for the tooltip:</p>
+<table>
+<thead>
+<tr><th>Tooltip (exact)</th><th>Code</th><th>Renders as</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Continuous Thick — Type A</code></td><td>A</td><td>Solid, thick (visible outlines)</td></tr>
+<tr><td><code>Continuous Thin — Type B</code></td><td>B</td><td>Solid, thin (construction, labels)</td></tr>
+<tr><td><code>Dashed Thin — Type E</code></td><td>E</td><td>Dashed, thin (hidden edges)</td></tr>
+<tr><td><code>Chain Thin — Type G</code></td><td>G</td><td>Chain thin (center lines, projectors)</td></tr>
+<tr><td><code>Double-Dash Chain — Type K</code></td><td>K</td><td>Double-dash chain (loci, alternate positions)</td></tr>
+</tbody>
+</table>
+<p>Type H (chain with thick ends, for cutting planes) exists in the styling engine but is <strong>not offered in this popup</strong>.</p>
+<h3 id="45-polar-point-angle--distance-from-an-anchor">4.5 Polar point (angle + distance from an anchor)</h3>
+<p>Creates: one <code>POINT</code> placed at a chosen angle off an existing line and a chosen distance along the locked ray. This is the protractor-and-scale tool.</p>
+<ol>
+<li><strong>Ctrl+click</strong> an existing point P0 (same anchor gesture as the line tool; the anchor is shared).</li>
+<li><strong>Click a baseline segment</strong> that passes through P0 (within 0.5 mm). A cyan ring marks P0 and the angle sweep begins.
+<ul>
+<li>If the clicked line misses P0, the tool parks in an invalid state and the next click drops it (nothing created).</li>
+</ul></li>
+<li><strong>Sweep the angle</strong>: move the mouse. A protractor arc and a badge <code>∠ 30.0°</code> follow the cursor, showing the unsigned 0–180° angle between the baseline and P0→cursor. Angles snap softly to 15°/30°/45°/60°/90° within ±2°.</li>
+<li><strong>Click</strong> to lock the angle. The badge changes to the distance sweep: a guideline ray plus <code>r mm (∠ θ° locked)</code>, e.g. <code>25.00 mm (∠ 30.0° locked)</code>.</li>
+<li><strong>Move</strong> to sweep the distance (the target point slides along the locked ray, clamped at P0) and <strong>click</strong> to commit the new point.</li>
+<li>Right-click or <strong>Escape</strong> aborts at any step with nothing created.</li>
+</ol>
+<p>Worked example: first place a point at <code>(0, 0)</code> and draw an X-axis segment through it (place <code>(40, 0)</code> with the <code>ΔX</code> badge, join them). Anchor P0 = <code>a = (0, 0)</code>, baseline = that X-axis segment. Sweep to the <code>∠ 30.0°</code> detent with the cursor above the baseline, click, sweep the ray out to <code>25.00 mm (∠ 30.0° locked)</code>, click. The new point lands at <code>(21.65, 12.50)</code> mm (25·cos30°, 25·sin30°), auto-named. (Below the baseline the same sweep lands at <code>(21.65, -12.50)</code>.)</p>
+<h3 id="46-line-referenced-plotting-perpendicular-offset-point">4.6 Line-referenced plotting (perpendicular offset point)</h3>
+<p>Creates: one <code>POINT</code> at your cursor's perpendicular offset from a datum segment. This is the set-square tool: pick a line, then place a point measured off it.</p>
+<ol>
+<li>With no tool armed, <strong>click a segment</strong> (not a point). Plotting mode begins; the datum segment itself is never marked.</li>
+<li><strong>Move</strong> the mouse. A thin perpendicular guideline runs from the sliding foot on the datum to the candidate point, with a badge <code>⊥ Dist: 12.34 mm</code> showing the perpendicular distance. The foot sticks to the segment ends when you slide past them.</li>
+<li><strong>Click</strong> to commit the candidate as a new auto-named point.</li>
+<li>Right-click or <strong>Escape</strong> aborts with nothing created.</li>
+</ol>
+<p>Worked example: first draw a datum segment from <code>(0, 0)</code> to <code>(40, 0)</code> (place the two points, join them). With no tool armed, click the segment's middle — away from its endpoint dots, or the click selects a dot instead — then move the cursor above the datum until the badge reads <code>⊥ Dist: 10.00 mm</code>, and click. The new point lands at <code>(x, 10.00)</code> where <code>x</code> is the cursor's projection clamped to <code>[0, 40]</code>. (Below the datum the same badge reading lands at <code>(x, -10.00)</code>.)</p>
+<h3 id="47-not-reachable-from-the-ui-read-before-searching">4.7 Not reachable from the UI (read before searching)</h3>
+<p>Each item below exists somewhere in the code (demos, file format, or developer API) but <strong>no mouse or keyboard gesture in the app creates, edits, or toggles it</strong>. They are listed here so you do not hunt for them.</p>
+<table>
+<thead>
+<tr><th>Capability</th><th>Status</th><th>Where it actually lives</th></tr>
+</thead>
+<tbody>
+<tr><td>Ray</td><td>Not reachable</td><td>Entity type exists; nothing draws or creates it in the app.</td></tr>
+<tr><td>Circle</td><td>Ctrl+click three points (§4.9)</td><td>Ordered pick list with numerals; third pick auto-commits a Type A <code>CIRCLE</code>.</td></tr>
+<tr><td>Arc</td><td>Not reachable</td><td>No creation gesture; arcs stay deferred in 3D.</td></tr>
+<tr><td>Dimension</td><td>Not reachable</td><td>No dimension gesture; dimension geometry is not drawn by the sheet renderer even if present.</td></tr>
+<tr><td>Text / free label</td><td>Not reachable</td><td>Labels come only from point captions (rename) and demo data.</td></tr>
+<tr><td>Axis / datum line</td><td>Not reachable</td><td>Demos include datum/projector/axis lines; you cannot draw your own.</td></tr>
+<tr><td>Projector lines</td><td>Not reachable</td><td>Demo-generated only (Type G verticals).</td></tr>
+<tr><td>Virtual ruler</td><td>Not reachable</td><td>State machine exists in code but no gesture drives it.</td></tr>
+<tr><td>Virtual compass</td><td>Not reachable</td><td>Same as ruler.</td></tr>
+<tr><td>Constraint solver</td><td>Not reachable</td><td>Powers nothing on screen; demo geometry is computed by the lesson builders, not the solver.</td></tr>
+<tr><td>Command line (<code>Point(…)</code>, …)</td><td>Not reachable</td><td>Developer API only; there is no input box.</td></tr>
+<tr><td>Undo / redo buttons or keys</td><td>Not reachable</td><td>API-only history; the UI has no undo.</td></tr>
+<tr><td>Save / export / print</td><td>Not reachable</td><td>Nothing persists or exports; reloading loses the sheet.</td></tr>
+<tr><td>Line thickness picker</td><td>Not reachable</td><td>Weights are fixed cosmetic 1 px / 2 px.</td></tr>
+<tr><td>BIS Type H in popup</td><td>Not reachable</td><td>Engine supports it; the popup offers A/B/E/G/K only.</td></tr>
+<tr><td>Snap on/off toggles</td><td>Not reachable</td><td>Snapping is always on; see §6.</td></tr>
+<tr><td>Snap badge text</td><td>Not shown</td><td>Tier names exist in code but the sheet draws only the snap ring.</td></tr>
+<tr><td>Pan by dragging empty sheet</td><td>Not reachable</td><td>Pan needs middle-drag or Shift+left-drag.</td></tr>
+<tr><td>Drag-move of entities</td><td>Not reachable</td><td>Points cannot be moved after placement.</td></tr>
+<tr><td>Delete key / erase tool</td><td>Not reachable</td><td>Only blank-rename delete and Clear Sheet (see §5).</td></tr>
+</tbody>
+</table>
+<h3 id="48-recipes-draw-a-box-and-a-pyramid-by-hand">4.8 Recipes: draw a box and a pyramid by hand</h3>
+<p>Two copy-exact recipes for real solids. Both start from <strong>Clear Sheet</strong>, use only place-point (§4.1) and the line tool (§4.3) with the <code>Continuous Thick — Type A</code> style, and satisfy the class-A/B rules in §8.6. Read every target coordinate from the status HUD (§3.1) before you click: shared x-stations must agree within 0.5 mm, so place each mate with the axis lock (§6.2) — click the reference point to select it (amber ring), move until the <code>ΔX</code>/<code>ΔY</code> badge appears, check the HUD, click. (Placing never selects, so re-select the reference before each locked mate.) Both recipes were validated against the reconstruction engine: each reports <code>ok</code> with full coverage and no warnings.</p>
+<h4 id="box-class-a-prism-8-vertices-12-edges">Box (class-A prism): 8 vertices, 12 edges</h4>
+<p>Closed plan rectangle below XY plus closed elevation rectangle above XY spanning the same x-stations — the class-A row of §8.6:</p>
+<ul>
+<li>Plan corners: <code>(-30, -40)</code>, <code>(30, -40)</code>, <code>(30, -10)</code>, <code>(-30, -10)</code>.</li>
+<li>Elevation corners: <code>(-30, 10)</code>, <code>(30, 10)</code>, <code>(30, 50)</code>, <code>(-30, 50)</code>.</li>
+</ul>
+<ol>
+<li>Click <strong>Clear Sheet</strong>.</li>
+<li>Place the four plan corners, watching the HUD. Lock each edge with the <code>ΔX</code>/<code>ΔY</code> badge so the rectangle stays square to the axes.</li>
+<li>Join the four plan sides with Type A: Ctrl+click a corner, release Ctrl, click the next corner, pick the first (solid thick) preview — four times, until the loop is closed.</li>
+<li>Place the four elevation corners, each vertically locked (the <code>ΔY</code> badge) to an already-placed point sharing its x — e.g. select <code>(-30, -10)</code> and click straight above it at <code>(-30, 10)</code> — until the HUD shows all four targets placed.</li>
+<li>Join the four elevation sides with Type A, as in step 3.</li>
+<li>The 3D view shows a box: 8 vertices, 12 edges. Orbit it. If it shows <code>3D unavailable</code> instead, read the second line (§8.8): a <code>… misses its mate beyond eps</code> detail means one corner drifted in x (blank-delete it and re-place with the lock); a <code>… is not drawn</code> detail means one side is still open.</li>
+</ol>
+<h4 id="square-pyramid-class-b-5-vertices-8-edges">Square pyramid (class B): 5 vertices, 8 edges</h4>
+<p>Closed plan square plus centre apex below XY; base line, apex, and two slants above XY — the class-B row of §8.6:</p>
+<ul>
+<li>Plan corners: <code>(-20, -50)</code>, <code>(20, -50)</code>, <code>(20, -10)</code>, <code>(-20, -10)</code>; plan apex <code>(0, -30)</code> (strictly inside the square; the centre is easiest).</li>
+<li>Elevation base ends: <code>(-20, 10)</code>, <code>(20, 10)</code>; elevation apex <code>(0, 50)</code>.</li>
+</ul>
+<ol>
+<li>Click <strong>Clear Sheet</strong>.</li>
+<li>Place the four plan corners as in the box recipe, then the plan apex at <code>(0, -30)</code> (watch the HUD — no axis lock reaches the centre).</li>
+<li>Join the four plan sides with Type A. Leave the apex unjoined: no apex-to-corner edges are needed.</li>
+<li>Place the three elevation points, each vertically locked (the <code>ΔY</code> badge) to its plan partner: the base ends off the plan corners, the apex <code>(0, 50)</code> off the plan apex <code>(0, -30)</code>.</li>
+<li>Join three elevation lines with Type A: the base <code>(-20, 10)–(20, 10)</code>, the left slant <code>(-20, 10)–(0, 50)</code>, and the right slant <code>(20, 10)–(0, 50)</code>. A pyramid has no top line.</li>
+<li>The 3D view shows a square pyramid: 5 vertices, 8 edges. If it shows <code>3D unavailable</code>, read the second line (§8.8): <code>plan apex has no mate on the elevation top line</code> means the elevation apex drifted off <code>(0, 50)</code>; <code>apex plan x=… vs elevation x=… beyond eps</code> means the two apexes disagree in x.</li>
+</ol>
+<h3 id="49-circle-from-three-points-ctrlclick-3">4.9 Circle from three points (Ctrl+click ×3)</h3>
+<p>Creates: one <code>CIRCLE</code> (Type A) through three picked points. No tool to arm.</p>
+<ol>
+<li>With line/polar idle, <strong>Ctrl+click</strong> a point (an existing dot, or empty sheet which places-and-adds). The pick joins an ordered list, shown with the amber ring plus a numeral (1/2/3). Re-clicking a picked point removes it.</li>
+<li>Pick two more the same way. The third pick auto-commits: non-collinear triples give the circumcircle; collinear triples with an equidistant middle give the centered circle (middle as center, half the outer span); other collinear triples are rejected with a message and nothing is committed.</li>
+<li>The committed circle takes <code>ELEVATION</code> at/above XY and <code>PLAN</code> below it, <code>bisCode A</code>, radius at least 0.01 mm. The pick list clears on commit, Escape, right-click, or any plain point-select click. While line/polar is armed, Ctrl+click keeps its anchor behavior and picks do not grow.</li>
+</ol>
+<hr>
+<h2 id="5-editing-and-housekeeping">5. Editing and housekeeping</h2>
+<h3 id="51-selection">5.1 Selection</h3>
+<ul>
+<li>Click a point to select it (amber ring, 7 px). Only points are selectable; segments are never selected — clicking a segment starts plotting (§4.6) or feeds the polar tool (§4.5) instead.</li>
+<li>Only one point is selected at a time; there is no multi-select.</li>
+<li>The selection is a <em>reference</em>: it drives the axis lock for the next placed point and marks which point a double-click will rename.</li>
+</ul>
+<h3 id="52-deselect-right-click--escape">5.2 Deselect (right-click / Escape)</h3>
+<p>Right-click or <strong>Escape</strong> cancels, in one gesture, the selection, any rename in progress (buffer discarded, original kept), the line tool, the polar tool, the plot tool, and any open menu. Right-click is handled before the sheet menu, so with anything active, right-click always means "cancel", never "menu". The browser's native right-click menu never appears anywhere on the sheet.</p>
+<h3 id="53-rename-double-click-then-keys">5.3 Rename (double-click, then keys)</h3>
+<ol>
+<li><strong>Double-click</strong> a point. (The two clicks of the double-click harmlessly re-select it first.) A blinking caret preview (500 ms on/off) appears at the point's label position, and the point's own label hides while you type.</li>
+<li>Type the new name. Exactly these keys reach the buffer:
+<ul>
+<li>printable characters, <strong>including Space</strong>;</li>
+<li><strong>Backspace</strong> (deletes one character). Backspace and Space are captured so the browser never sees them.</li>
+<li>Anything else (arrows, Shift/Ctrl/Alt words, function keys) is ignored.</li>
+</ul></li>
+<li><strong>Enter</strong> commits: leading/trailing spaces are trimmed first. If the trimmed name equals the original, nothing is written. If it is empty, the point is <strong>deleted</strong> (see §5.5).</li>
+<li><strong>Escape</strong> or right-click cancels: the buffer is discarded and the original name is kept. Clicking empty sheet while editing also cancels (and then places a point — beware).</li>
+<li>While the line or polar tool is armed, double-click is ignored (this includes the 300 ms stroke animation after picking a line type — wait for the segment to finish drawing).</li>
+</ol>
+<h3 id="54-auto-naming-rules">5.4 Auto-naming rules</h3>
+<p>New points take the first free name in the sequence <code>a</code>…<code>z</code>, then <code>a1</code>…<code>z1</code>, <code>a2</code>…, scanning the captions of points currently on the sheet. Consequences:</p>
+<ul>
+<li>Deleting a point frees its letter for reuse.</li>
+<li>Demo labels (<code>a'</code>, <code>b'</code>, …) occupy their names too, so a fresh point after loading a demo may skip to a later letter. (Only <em>point</em> captions count; segment captions such as <code>h1h2</code> do not.)</li>
+<li>Renaming to an already-used name is allowed (no uniqueness check); the next auto-name still skips used captions.</li>
+</ul>
+<h3 id="55-deleting">5.5 Deleting</h3>
+<p>There is no erase tool and no Delete key. Exactly two deletions exist:</p>
+<ol>
+<li><strong>Blank delete</strong>: double-click a point, erase the whole name with Backspace (or leave only spaces), press <strong>Enter</strong>. The point is removed. Segments attached to nothing remain — segments reference positions, not points, so deleting a point never deletes a segment.</li>
+<li><strong>Clear Sheet</strong> button: removes every entity, cancels every tool, closes menus, and empties the 3D view (which then shows <code>empty sheet</code>).</li>
+</ol>
+<h3 id="56-hover-behavior">5.6 Hover behavior</h3>
+<p>Moving the mouse (no buttons) updates the coordinates readout, the plane pill, the turquoise snap ring, and any active tool preview. Hovering never selects anything and never changes the cursor, except:</p>
+<ul>
+<li>crosshair while the line/polar anchor is armed;</li>
+<li>grabbing hand while panning.</li>
+</ul>
+<h3 id="57-what-you-cannot-do-recap">5.7 What you cannot do (recap)</h3>
+<p>No drag-move, no multi-select, no segment editing (endpoints are fixed once drawn), no undo. If you misplace a point, delete it (§5.5) and place it again; if you misdraw a segment, <strong>Clear Sheet</strong> and redraw, or reload a demo. See <a href="#12-limitations--not-implemented">Limitations</a>.</p>
+<hr>
+<h2 id="6-precision-snapping-axis-lock-zoom-line-weights">6. Precision: snapping, axis lock, zoom, line weights</h2>
+<h3 id="61-object-snapping-always-on-no-toggles">6.1 Object snapping (always on, no toggles)</h3>
+<p>A turquoise ring (7 px) follows the best snap target near the cursor on every mouse move. There are no snap mode switches: every wired tier is always active, with fixed priority:</p>
+<table>
+<thead>
+<tr><th>Priority</th><th>Tier</th><th>Snaps to</th></tr>
+</thead>
+<tbody>
+<tr><td>1 (highest)</td><td>ENDPOINT</td><td>Point dots; segment/arc ends; ray origins</td></tr>
+<tr><td>2</td><td>INTERSECTION</td><td>Segment/line crossings near the cursor</td></tr>
+<tr><td>3</td><td>MIDPOINT</td><td>Segment midpoints</td></tr>
+<tr><td>4 (lowest, wired)</td><td>CENTER</td><td>Circle/arc centers</td></tr>
+<tr><td>— (not wired)</td><td>PROJECTOR</td><td>Needs a plan-x list the page never sends: never fires</td></tr>
+<tr><td>— (not wired)</td><td>LOCUS</td><td>Needs a locus-y list the page never sends: never fires</td></tr>
+</tbody>
+</table>
+<p>Rules that matter to your hand:</p>
+<ul>
+<li>A target <strong>locks</strong> when the cursor comes within <strong>14 px</strong> of it and <strong>releases</strong> only past <strong>22 px</strong> (hysteresis: the ring feels sticky on purpose).</li>
+<li>A strictly higher tier within 14 px steals the lock from a lower tier.</li>
+<li>Angle detents of 15° steps (majors 15°/30°/45°, ±2°) exist in the snapping engine, but the sheet's click-to-place path does not apply them; only the polar tool snaps angles (§4.5).</li>
+<li>Tier names (<code>Endpoint</code>, <code>Midpoint</code>, …) exist in code but are <strong>never drawn</strong> on the sheet — the ring is the only snap feedback.</li>
+</ul>
+<h3 id="62-axis-locked-placement">6.2 Axis-locked placement</h3>
+<p>With a point selected (amber ring), clicking empty sheet places the new point axis-locked to the selection:</p>
+<ul>
+<li>Within 14 px of the selection's horizontal axis: <code>y</code> locks to the selection's <code>y</code>, badge reads <code>ΔX: 80.00 mm</code> (the x distance).</li>
+<li>Within 14 px of the vertical axis: <code>x</code> locks, badge reads <code>ΔY: 80.00 mm</code>.</li>
+<li>Within 14 px of both: the nearer axis wins.</li>
+<li>Far from both: free placement, no badge.</li>
+<li>Clicking on the selection itself is treated as a re-select, not a place.</li>
+</ul>
+<p>The same <code>ΔX</code>/<code>ΔY</code> badge follows your cursor live whenever a selection is active, so you can read the distance before you click.</p>
+<h3 id="63-tolerances-that-matter">6.3 Tolerances that matter</h3>
+<table>
+<thead>
+<tr><th>#</th><th>Tolerance</th><th>Value</th><th>Effect you feel</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>Point/segment click radius</td><td>14 px</td><td>How close a click must land to hit</td></tr>
+<tr><td>2</td><td>Snap lock / release</td><td>14 px / 22 px</td><td>Ring stickiness</td></tr>
+<tr><td>3</td><td>Axis-lock grab</td><td>14 px</td><td>How close to an axis to lock</td></tr>
+<tr><td>4</td><td>Sheet-menu suppression</td><td>14 px</td><td>Right-click nearer a snap target than this never opens the menu</td></tr>
+<tr><td>5</td><td>Polar baseline fit</td><td>0.5 mm</td><td>Clicked line must pass this close to the anchor</td></tr>
+<tr><td>6</td><td>Polar angle detents</td><td>15/30/45/60/90° ±2°</td><td>Soft protractor clicks</td></tr>
+<tr><td>7</td><td>3D x-station pairing</td><td>0.5 mm (loose 2.5 mm)</td><td>How exactly plan/elevation x must agree for 3D</td></tr>
+<tr><td>8</td><td>Projector invariant</td><td>1e-9 mm</td><td>Code-level exactness of elev.x == plan.x</td></tr>
+</tbody>
+</table>
+<h3 id="64-zoom-behavior">6.4 Zoom behavior</h3>
+<table>
+<thead>
+<tr><th>Gesture</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td>Mouse wheel</td><td>Zoom ×1.15 per notch <strong>about the cursor</strong> (the mm point under the cursor stays put)</td></tr>
+<tr><td><code>+</code> / <code>-</code> buttons</td><td>Zoom ×1.25 / ÷1.25 <strong>about the sheet center</strong></td></tr>
+<tr><td><code>Home</code> button</td><td>Reset to scale 2.0 px/mm, sheet centered</td></tr>
+<tr><td>Middle-drag, or Shift+left-drag</td><td>Pan (view follows the pointer 1:1)</td></tr>
+</tbody>
+</table>
+<p>Scale clamps to <strong>0.05…50 px/mm</strong>. Resizing the browser window keeps the scale and re-centers nothing (the view origin stays fixed). The sheet grid (step 50 mm below scale 1.0, 10 mm below 4.0, else 5 mm) redraws for the new zoom automatically.</p>
+<h3 id="65-cosmetic-zoom-invariant-line-weights">6.5 Cosmetic zoom-invariant line weights</h3>
+<p>On screen, line weight does <strong>not</strong> grow when you zoom in: thin BIS styles (B, G, H, K — 0.20 mm) always draw <strong>1 px</strong>, thick/medium styles (A at 0.50 mm, E at 0.35 mm) always draw <strong>2 px</strong>, with dash cadences likewise fixed on screen. This keeps nearby vertices readable at any zoom. The true mm widths exist only for print/export-style scaling, which the app does not currently offer.</p>
+<hr>
+<h2 id="7-views-and-planes">7. Views and planes</h2>
+<h3 id="71-the-sheet-is-two-views-glued-at-xy">7.1 The sheet is two views glued at XY</h3>
+<ul>
+<li><strong>Above XY (<code>y &gt; 0</code>)</strong>: the VP elevation (front view). Height <code>h</code> reads directly as sheet <code>y</code>.</li>
+<li><strong>Below XY (<code>y &lt; 0</code>)</strong>: the HP plan (top view). Depth <code>d</code> reads as sheet <code>y = -d</code> (so deeper points sit lower).</li>
+<li><strong>On XY (<code>y = 0</code>)</strong>: the ground line itself — the edge where VP meets HP.</li>
+</ul>
+<p>The plane pill (§3.1) reports position only: <code>y &gt;= 0</code> shows <code>V.P. (Elevation / Front)</code>, <code>y &lt; 0</code> shows <code>H.P. (Plan / Top)</code>.</p>
+<h3 id="72-the-invariant-for-beginners">7.2 The invariant, for beginners</h3>
+<p>Take any real point in front of the planes. Its front view and its top view are drawn by dropping perpendiculars to VP and HP — and both perpendiculars share the same left-right position. So on the sheet, <strong>the elevation dot and the plan dot of one 3D point always sit on one vertical line</strong> (one projector): <code>elevation.x == plan.x</code>, checked to <code>1e-9</code> mm. If two dots you meant as a pair do not share x, they are not a pair — the 3D view will say so (see <code>x-mismatch</code> in §8.8).</p>
+<h3 id="73-quadrant-behavior-including-q3q4-negatives">7.3 Quadrant behavior (including Q3/Q4 negatives)</h3>
+<p>Points can live in any of the four dihedral quadrants, and the signs in the table below are exactly what the Quadrant Points demo draws:</p>
+<table>
+<thead>
+<tr><th>Quadrant</th><th>Space position</th><th>Elevation y</th><th>Plan y</th><th>Demo example</th></tr>
+</thead>
+<tbody>
+<tr><td>Q1</td><td>above HP, in front of VP</td><td><code>+distHP</code> (above XY)</td><td><code>-distVP</code> (below XY)</td><td><code>a=(-50,-25)</code>, <code>a'=(-50,+35)</code></td></tr>
+<tr><td>Q2</td><td>above HP, behind VP</td><td><code>+distHP</code> (above XY)</td><td><code>+distVP</code> (above XY)</td><td>both dots above XY</td></tr>
+<tr><td>Q3</td><td>below HP, behind VP</td><td><code>-distHP</code> (below XY)</td><td><code>+distVP</code> (above XY)</td><td><code>b=(+50,+35)</code>, <code>b'=(+50,-30)</code></td></tr>
+<tr><td>Q4</td><td>below HP, in front of VP</td><td><code>-distHP</code> (below XY)</td><td><code>-distVP</code> (below XY)</td><td>both dots below XY</td></tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li>Q2/Q4 place both views on one side of XY; the app handles this (labels get small anti-collision offsets when the pair sits within 6 mm).</li>
+<li>Negative heights/depths are legitimate everywhere, including the 3D mapping — nothing is clamped to positive.</li>
+<li>The plane pill stays purely positional: a Q2 plan dot above XY still lights the <code>V.P.</code> pill. Trust the dot's role (prime = elevation), not the pill, in Q2–Q4.</li>
+</ul>
+<h3 id="74-what-first-angle-means-on-this-sheet">7.4 What "first angle" means on this sheet</h3>
+<p>First angle = the object is imagined between the observer and the planes, which unfolds to <strong>plan below, elevation above</strong>. That is the only layout EduCAD draws: the watermarks, the pill rule, the demo generator, and the 3D mapping all assume it. A third-angle marker exists in the lesson code, but the app never switches layouts — see <a href="#12-limitations--not-implemented">Limitations</a>.</p>
+<h3 id="75-view-roles-under-the-hood-one-paragraph">7.5 View roles under the hood (one paragraph)</h3>
+<p>Every entity carries a view role (<code>PLAN</code>, <code>ELEVATION</code>, <code>BOTH</code>, or <code>PROFILE</code>). Points you place get <code>ELEVATION</code> at/above XY and <code>PLAN</code> below it; line-tool segments are <code>BOTH</code>; demo entities carry the role their lesson assigns. The label layout uses roles to keep labels on the correct side of XY; the 3D classifier trusts explicit roles (including <code>PROFILE</code> for a side view) and falls back to geometry for <code>BOTH</code>: the y-sign rule first, then — when an upper cluster sits clear of the plan's x-range with matching depth and height — a side/profile split (§8.6).</p>
+<hr>
+<h2 id="8-the-3d-view">8. The 3D view</h2>
+<h3 id="81-where-it-is">8.1 Where it is</h3>
+<p>The 3D view is a transparent sheet covering the whole window, with the model resting in the top-right drafting quadrant. The sheet is fully transparent: the wireframe sits on the sheet paper like ink on glass, with no background, floor, shadow, or frame. (The built-in default geometry is a unit cube, but the app replaces it with your live reconstruction — or the <code>3D unavailable</code> message — synchronously at startup, so the bare cube is never visible in normal use.)</p>
+<h3 id="82-orbit-zoom-pan-reset">8.2 Orbit, zoom, pan, reset</h3>
+<p>All gestures below work <strong>on the 3D ink only</strong> — on or within a few pixels of a drawn line (§8.4 explains the aura) — and never touch the sheet. Any gesture that starts off the ink belongs to the sheet.</p>
+<table>
+<thead>
+<tr><th>Gesture</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td>Left-drag on the ink</td><td>Orbit (turntable): horizontal drag spins yaw, vertical drag tilts pitch, 0.008 rad/px. Pitch clamps at ±1.45 rad so the solid never flips inside-out.</td></tr>
+<tr><td>Mouse wheel on the ink</td><td>Smooth zoom (continuous exponential step, trackpad-friendly) anchored at the cursor, 0.08×…60×. The window edge is the only bound — zoom never hits a box wall.</td></tr>
+<tr><td>Middle-drag on the ink</td><td>Pan: slide the model around the window (middle-drag off the ink pans the sheet instead). Clamped so the model always overlaps the screen: it can never get lost.</td></tr>
+<tr><td>Double-click the ink</td><td>Reset to the isometric rest pose (yaw 45°, pitch ≈35.26°, scale 1×) at the rest center.</td></tr>
+</tbody>
+</table>
+<p>Escape hatches: <strong>Shift+left-drag</strong> always pans the sheet, <strong>Alt+click</strong> always clicks through to the sheet, and while a 2D construction gesture is armed (line, polar, plot, circle picks, rename), clicks and wheel go to the sheet even on ink — so points stay clickable through the glass mid-task. Right-click and <strong>Escape</strong> always belong to the sheet.</p>
+<p>The rest pose is an exact isometric projection, so the default cube reads as a textbook 2D sketch until you orbit it.</p>
+<h3 id="83-pen-sketch-look-and-hidden-edges">8.3 Pen-sketch look and hidden edges</h3>
+<ul>
+<li>Ink strokes only: solid edges draw 1.75 px in <code>#1e293b</code> with round caps; vertices draw as filled 3 px dots in <code>#0f172a</code>. No fills, shading, lights, or colors.</li>
+<li><strong>Hidden edges</strong> (edges whose every adjacent face turns away from you) draw dashed <code>[4, 4]</code> at 45% opacity, underneath the solid edges. On the default cube geometry this yields exactly 9 solid + 3 dashed edges at the isometric rest pose, the dashed three meeting at the far corner.</li>
+<li>Faceless wireframes (class C, §8.6) have no faces to hide behind, so all their edges draw solid.</li>
+</ul>
+<h3 id="84-the-aura-pointer-routing">8.4 The aura (pointer routing)</h3>
+<p>There is no rectangular hit box. The model owns the mouse only inside its <em>aura</em>: on or within 12 px of a drawn wireframe stroke (hidden dashed edges count as ink), or near a vertex dot when the geometry is points. The aura is the silhouette plus a margin, so it reshapes itself automatically as you orbit, zoom, and pan — it grows when the model grows and follows it wherever it slides.</p>
+<p>On the ink: drag orbits, wheel zooms, middle-drag pans, double-click resets — none of these reach the sheet, and presses that start on ink never place points or open sheet menus. Off the ink, the glass is fully transparent to input: drawing, selecting, sheet pan/zoom, and menus work exactly as if the 3D layer were not there. While the view shows <code>3D unavailable</code> there is no ink, hence no aura: the whole sheet is clickable.</p>
+<h3 id="85-live-update-behavior">8.5 Live update behavior</h3>
+<p>The 3D view rebuilds from the <em>current visible drawing</em> on <strong>every table change</strong> (place, rename-commit, delete, demo load, clear), coalesced to one rebuild per animation frame. There is no refresh button and no stale state: what you see is always the latest drawing. Clearing the sheet immediately shows <code>empty sheet</code>. Nothing 3D is ever stored on your drawing — the geometry is derived fresh each time and discarded.</p>
+<p>Derived geometry is centered and uniformly scaled into model space with proportions preserved, so a 35×70 mm prism and a 350×700 mm one look identical on the glass (only proportions survive; absolute mm do not show).</p>
+<h3 id="86-supported-drawing-classes-user-language">8.6 Supported drawing classes (user language)</h3>
+<p>The reconstructor tries four interpretations, in a fixed recognize-then- verify pipeline, and keeps the best one that fully explains the drawing:</p>
+<table>
+<thead>
+<tr><th>Class</th><th>Shape it fits</th><th>What you must draw</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>A — prismatic</strong></td><td>Boxes, hexagonal prisms: a flat outline swept straight up</td><td>A <strong>closed convex outline</strong> (all edges drawn) in the plan + an elevation rectangle spanning the same x-range with drawn base, top, and one vertical per outline x-station</td></tr>
+<tr><td><strong>B — pyramidal</strong></td><td>Pyramids: outline + one apex</td><td>A closed convex plan outline + one interior plan point (apex) with a matching point on the elevation top line at the same x + drawn base and two slants</td></tr>
+<tr><td><strong>C — wireframe</strong></td><td>Points and line lessons</td><td>Paired plan/elevation vertices (x agreeing within 0.5 mm) with matching edges in both views; lone point-vs-segment pairs at one x read as vertical/depth edges</td></tr>
+<tr><td><strong>D — revolved</strong></td><td>Cylinders, cones: plan circle swept or tapered</td><td>One plan <code>CIRCLE</code> (no polygon loop) + elevation silhouette (rectangle with base/top/sides for cylinders; base/slants/apex for cones), center and radius agreeing within 0.5 mm</td></tr>
+</tbody>
+</table>
+<p>Rules shared by all classes:</p>
+<ul>
+<li>Pairing tolerance is <strong>0.5 mm</strong> in x. The wireframe class and the pyramid/cone apex checks distinguish near misses up to 2.5 mm (reported as <code>x-mismatch</code>) from worse misses (reported as unmatched mates); the prism/cylinder range checks use 0.5 mm flat.</li>
+<li>Every drawn edge and point must be explained; anything left over fails the interpretation with a named reason instead of rendering garbage.</li>
+<li>Ties break deterministically: highest round-trip coverage wins, then shortest total edge length. Genuine ties report <code>ambiguous-pairing</code> rather than guessing.</li>
+<li>The acceptance gate is <strong>round-trip projection</strong>: the 3D result must project back onto every drawn edge within tolerance (coverage ≥ 0.999), or the 3D view says why not.</li>
+</ul>
+<p>An optional first-angle <strong>side (profile) view</strong> takes part in every class when it is present: draw it clear of the other two views (beside the elevation is conventional) with the same heights as the elevation and a width equal to the plan's depth span. Each plan depth <code>d</code> (plan <code>y = -d</code>) reads in the profile at <code>x' = xRef ± (d − d0)</code>, with the reference edge <code>xRef</code> and the sign inferred from the drawing — both orientations are tried and the drawing picks the winner, so left- and right-side profiles both work. The solid must then explain the profile too (coverage ≥ 0.999 in all three views); anything the side view adds that fits no class fails with the same named reasons below. Conventional construction — horizontal front↔side projectors, the 45° miter line, the X1Y1 reference axis — is recognized geometrically and left out (a <code>helpers-ignored</code> warning the page does not display). Side views drawn with outline segments are recognized automatically; a side view of bare points needs explicit <code>PROFILE</code> roles (console lessons, §9.2).</p>
+<h3 id="87-curve-limitation-user-language">8.7 Curve limitation (user language)</h3>
+<p>Full circles reconstruct: a plan <code>CIRCLE</code> with a matching elevation silhouette renders as a cylinder or cone (Class D, §8.6), tessellated to a 24-gon rim. Only vertical-axis solids work (plan circle plus rectangle or triangle); tilted axes, ellipses, and partial rims are not supported. Arcs stay deferred: a drawing whose plan has no polygonal outline and no usable circle because it relies on arcs reports <code>curves not supported yet</code>. If a drawing succeeds <em>despite</em> containing arcs (or extra circles), they are left out of the 3D result (the engine notes a <code>curves-ignored</code> warning that the page does not display).</p>
+<h3 id="88-failure-and-empty-state-messages-complete-list">8.8 Failure and empty-state messages (complete list)</h3>
+<p>When reconstruction fails, the 3D view clears the geometry and shows two centered ink lines: the title <strong><code>3D unavailable</code></strong> and, beneath it, the reason subtitle. Every failure carries one of ten reason codes; in practice the 3D view shows a <strong>detail subtitle</strong> naming the exact entity or coordinate (templates listed below), not the code's canonical text. The one canonical text shown verbatim is <code>curves not supported yet</code>. (Basis: all 132 <code>fail(</code> call sites in <code>educad-reconstruct.js</code> pass an explicit detail label; only the <code>unsupported-curves</code> site passes its canonical text. Side-view checks reuse the same ten codes.) The table lists all ten codes with their canonical labels, causes, and fixes; the detail templates after it are what you actually read on screen.</p>
+<table>
+<thead>
+<tr><th>#</th><th>Reason code → canonical label</th><th>Cause</th><th>What to fix</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>missing-view → <code>needs both plan and elevation views</code></td><td>Drawing lives on one side of XY only</td><td>Draw the missing view: something below XY <em>and</em> something above XY (on screen this always appears as one of the three empty-state wordings below)</td></tr>
+<tr><td>2</td><td>no-closed-profile → <code>no closed profile found in either view</code></td><td>No class•A/B loop, no class•C pairing, and no class•D circle explain the drawing</td><td>Close the plan outline fully, pair every vertex across views, or draw a plan circle with silhouette</td></tr>
+<tr><td>3</td><td>unsupported-curves → <code>curves not supported yet</code></td><td>Only arcs (or unusable circles) drawn; no plan loop/circle explains the drawing</td><td>Draw a polygonal outline or a full plan circle with silhouette (§8.6–§8.7); arcs never render</td></tr>
+<tr><td>4</td><td>x-mismatch → <code>plan/elevation x stations differ beyond eps</code></td><td>Same station differs across views beyond tolerance</td><td>Re-place the offending vertex at the same x (axis lock helps, §6.2)</td></tr>
+<tr><td>5</td><td>ambiguous-pairing → <code>ambiguous pairing across views</code></td><td>Two vertices/edges/solids compete for one mate</td><td>Separate coincident x stations; delete a duplicate point via blank-rename, or Clear Sheet and redraw</td></tr>
+<tr><td>6</td><td>non-convex-profile → <code>non-convex profile (M1 covers convex only)</code></td><td>A plan outline edge is not drawn (concave/L-shaped profile)</td><td>Draw only convex outlines for solids; L-profiles are not supported</td></tr>
+<tr><td>7</td><td>unmatched-edge → <code>a drawn edge fits no interpretation</code></td><td>A stray edge belongs to no class•A/B/C/D reading</td><td>Complete the stray edge into the drawing, or Clear Sheet and redraw (segments cannot be deleted individually)</td></tr>
+<tr><td>8</td><td>unmatched-point → <code>a drawn point fits no interpretation</code></td><td>A stray point sits off every interpretation</td><td>Blank-rename-delete the stray point, or pair it across views</td></tr>
+<tr><td>9</td><td>non-manifold → <code>degenerate solid (zero height or area)</code></td><td>Elevation extent has zero height (flat solid)</td><td>Give the elevation real height (base ≠ top)</td></tr>
+<tr><td>10</td><td>coverage-failed → <code>round-trip coverage below gate</code></td><td>Best 3D guess covers &lt; 99.9% of drawn length</td><td>Look for the nearly-missed edge the detail names</td></tr>
+</tbody>
+</table>
+<p>Empty states (exact wordings):</p>
+<table>
+<thead>
+<tr><th>Subtitle</th><th>When</th></tr>
+</thead>
+<tbody>
+<tr><td><code>empty sheet</code></td><td>No geometry at all (fresh Clear Sheet)</td></tr>
+<tr><td><code>no plan view drawn</code></td><td>Geometry exists only above XY</td></tr>
+<tr><td><code>no elevation view drawn</code></td><td>Geometry exists only below XY</td></tr>
+</tbody>
+</table>
+<p>Dynamic detail labels (templates; <code>&lt;…&gt;</code> is filled per drawing):</p>
+<p>Prism (class A) and pyramid (class B) details:</p>
+<ul>
+<li><code>plan loop edge &lt;n&gt; is not drawn (non-convex?)</code></li>
+<li><code>elevation shows no prism extent</code> / <code>elevation shows no pyramid extent</code></li>
+<li><code>elevation x-range [&lt;a&gt;, &lt;b&gt;] vs plan [&lt;c&gt;, &lt;d&gt;] beyond eps</code></li>
+<li><code>elevation extent has zero height</code></li>
+<li><code>plan &lt;TYPE&gt; &lt;id&gt; leaves the loop</code> / <code>fits no pyramid line</code></li>
+<li><code>elevation &lt;TYPE&gt; &lt;id&gt; fits no prism line</code> / <code>fits no pyramid line</code></li>
+<li><code>elevation misses the base line at y=&lt;z&gt;</code> / <code>the top line at y=&lt;z&gt;</code></li>
+<li><code>elevation misses the vertical at x=&lt;s&gt;</code> (prism)</li>
+<li><code>elevation misses the left slant</code> / <code>the right slant</code> (pyramid)</li>
+<li><code>elevation hidden &lt;TYPE&gt; &lt;id&gt; escapes the outline</code></li>
+<li><code>plan hidden &lt;TYPE&gt; &lt;id&gt; escapes the loop</code></li>
+<li><code>plan point &lt;TYPE&gt; &lt;id&gt; sits off the loop</code> (or <code>off the pyramid lines</code>)</li>
+<li><code>elevation point &lt;TYPE&gt; &lt;id&gt; sits off the prism lines</code> (or <code>pyramid lines</code>)</li>
+<li><code>prism round-trip coverage &lt;0.000–0.999&gt;</code> / <code>pyramid round-trip coverage &lt;0.000–0.999&gt;</code></li>
+<li><code>&lt;n&gt; interior plan points compete for the apex</code></li>
+<li><code>two points share the elevation top line</code></li>
+<li><code>plan apex has no mate on the elevation top line</code></li>
+<li><code>apex plan x=&lt;a&gt; vs elevation x=&lt;b&gt; beyond eps</code></li>
+<li><code>elevation top point matches no plan apex</code></li>
+</ul>
+<p>Prism/pyramid side-view (profile) details:</p>
+<ul>
+<li><code>profile x-range [&lt;a&gt;, &lt;b&gt;] vs mapped depth [&lt;c&gt;, &lt;d&gt;] beyond eps</code></li>
+<li><code>profile shows no prism extent</code> / <code>shows no pyramid extent</code></li>
+<li><code>profile &lt;TYPE&gt; &lt;id&gt; fits no prism line</code> / <code>fits no pyramid line</code></li>
+<li><code>profile misses the base line at y=&lt;z&gt;</code> / <code>the top line at y=&lt;z&gt;</code></li>
+<li><code>profile misses the vertical at x=&lt;s&gt;</code> (prism)</li>
+<li><code>profile misses the left slant</code> / <code>the right slant</code> (pyramid)</li>
+<li><code>profile hidden &lt;TYPE&gt; &lt;id&gt; escapes the outline</code></li>
+<li><code>profile point &lt;TYPE&gt; &lt;id&gt; sits off the prism lines</code> (or <code>pyramid lines</code>)</li>
+<li><code>two points share the profile top line</code></li>
+<li><code>plan apex has no mate on the profile top line</code></li>
+<li><code>apex mapped x=&lt;a&gt; vs profile x=&lt;b&gt; beyond eps</code></li>
+<li><code>profile top point matches no plan apex</code></li>
+</ul>
+<p>Cylinder/cone (class D) details:</p>
+<ul>
+<li><code>&lt;n&gt; plan circles compete (no guess)</code></li>
+<li><code>plan circle has zero radius</code></li>
+<li><code>plan &lt;TYPE&gt; &lt;id&gt; fits no cylinder circle</code> / <code>fits no cone circle</code></li>
+<li><code>plan hidden &lt;TYPE&gt; &lt;id&gt; escapes the circle</code></li>
+<li><code>&lt;n&gt; plan points compete for the cylinder center</code> / <code>for the cone apex</code></li>
+<li><code>plan point &lt;TYPE&gt; &lt;id&gt; sits off the circle center</code></li>
+<li><code>elevation shows no cylinder extent</code> / <code>shows no cone extent</code></li>
+<li><code>cylinder center plan x=&lt;a&gt; vs elevation x=&lt;b&gt; beyond eps</code> (and <code>cone …</code>)</li>
+<li><code>cylinder radius r=&lt;r&gt; vs elevation half-width &lt;w&gt; beyond eps</code> (and <code>cone …</code>)</li>
+<li><code>elevation &lt;TYPE&gt; &lt;id&gt; fits no cylinder line</code> / <code>fits no cone line</code></li>
+<li><code>elevation point &lt;TYPE&gt; &lt;id&gt; sits off the cylinder lines</code> (or <code>cone lines</code>)</li>
+<li><code>cylinder round-trip coverage &lt;0.000–0.999&gt;</code> / <code>cone …</code></li>
+<li><code>profile shows no cylinder extent</code> / <code>shows no cone extent</code></li>
+<li><code>profile &lt;TYPE&gt; &lt;id&gt; fits no cylinder line</code> / <code>fits no cone line</code></li>
+<li><code>profile point &lt;TYPE&gt; &lt;id&gt; sits off the cylinder lines</code> (or <code>cone lines</code>)</li>
+<li>Shared with A/B: base/top/vertical/slant misses, apex-mate, x-range vs mapped depth, hidden escapes, and top-line twins read identically.</li>
+</ul>
+<p>Wireframe (class C) details:</p>
+<ul>
+<li><code>plan vertex near x=&lt;x&gt; misses its mate beyond eps</code> (and <code>elevation …</code>)</li>
+<li><code>plan point near x=&lt;x&gt; has no mate</code> (and <code>elevation …</code>)</li>
+<li><code>plan vertex near x=&lt;x&gt; has no mate</code> (edge-vertex flavor; and <code>elevation …</code>)</li>
+<li><code>plan &lt;TYPE&gt; &lt;id&gt; lacks an elevation mate</code></li>
+<li><code>elevation &lt;TYPE&gt; &lt;id&gt; lacks a plan mate</code></li>
+<li><code>plan vertex pairs twice</code> / <code>elevation vertex pairs twice</code></li>
+<li><code>two edges share one station span</code></li>
+<li><code>one point pins two same-station edges</code></li>
+<li><code>plan vertex has several elevation mates</code> / <code>elevation vertex has several plan mates</code></li>
+<li><code>plan hidden &lt;TYPE&gt; &lt;id&gt; matches no projected edge</code> (and <code>elevation …</code>)</li>
+<li><code>profile &lt;TYPE&gt; &lt;id&gt; matches no projected edge</code></li>
+<li><code>profile point &lt;TYPE&gt; &lt;id&gt; matches no projected vertex</code></li>
+<li><code>profile omits the projection of a wireframe edge</code> (or <code>… vertex</code>)</li>
+<li><code>profile hidden &lt;TYPE&gt; &lt;id&gt; matches no projected edge</code></li>
+<li><code>profile shows no wireframe extent</code></li>
+<li><code>wireframe round-trip coverage &lt;0.000–0.999&gt;</code></li>
+</ul>
+<p>Cross-class details:</p>
+<ul>
+<li><code>two classes explain the drawing equally well</code></li>
+<li><code>the XY entities admit two different solids</code> (entities exactly on <code>y = 0</code> are tried as plan and as elevation; both readings passed but disagree)</li>
+</ul>
+<p>How to read them: the subtitle always names the failing check and usually the entity or coordinate. Fix the named item on the sheet; the 3D view rebuilds within one frame and either renders or names the next problem.</p>
+<hr>
+<h2 id="9-demos-and-lessons">9. Demos and lessons</h2>
+<h3 id="91-demo-buttons-guided-walkthroughs">9.1 Demo buttons (guided walkthroughs)</h3>
+<p>Each demo button clears the sheet first, then loads its lesson. The app opens on the Line Rotation demo unless the page address ends with <code>#points</code> (loads Quadrant Points), <code>#prism</code> (loads Hexagonal Prism), or <code>#mesh</code> (loads Line Rotation with the grid on and the sheet menu open).</p>
+<h4 id="line-rotation-tl80-θ30-φ45--the-inclined-line"><code>Line Rotation (TL=80, θ=30°, φ=45°)</code> — the inclined line</h4>
+<p>Loads a straight-line lesson: true length 80 mm, inclined 30° to HP and 45° to VP, with end A fixed at plan <code>(-30, -20)</code> / elevation <code>(-30, 25)</code>.</p>
+<ul>
+<li><strong>What it loads.</strong> A datum span on XY; points <code>a</code>, <code>b</code> (plan) and <code>a'</code>, <code>b'</code> (elevation); thick plan/elevation views <code>ab</code> / <code>a'b'</code>; two Type G projectors; two Type K locus lines (<code>locus of b</code>, <code>locus of b'</code>).</li>
+<li><strong>What to look at.</strong> End B lands at x = 10 mm in both views (projector shift dx = 40 mm): plan <code>b = (10, -76.57)</code>, elevation <code>b' = (10, 65.00)</code>. Appearances: plan length 80·cos30° ≈ 69.28 mm, elevation length 80·cos45° ≈ 56.57 mm, both shorter than TL = 80 mm.</li>
+<li><strong>What it teaches.</strong> The rotation method: apparent lengths are TL·cos of each inclination; B's loci sit TL·sin away from A's; the projector shift completes the right triangle TL² = dx² + dh² + dd². Angles here are feasible (sin²30° + sin²45° = 0.75 ≤ 1).</li>
+<li><strong>In 3D.</strong> Renders as a class-C wireframe edge at true 80 mm proportions. Orbit it and compare against the two foreshortened sheet views.</li>
+</ul>
+<h4 id="quadrant-points-1st--3rd--projectors-and-signs"><code>Quadrant Points (1st &amp; 3rd)</code> — projectors and signs</h4>
+<p>Loads two point lessons: Q1 (<code>a</code> at x = -50, 35 mm above HP, 25 mm in front of VP) and Q3 (<code>b</code> at x = +50, 30 mm below HP, 35 mm behind VP).</p>
+<ul>
+<li><strong>What it loads.</strong> Per lesson: a datum span; plan/elevation dots (<code>a</code> / <code>a'</code>, <code>b</code> / <code>b'</code>); one Type G projector joining each pair.</li>
+<li><strong>What to look at.</strong> Q1: <code>a = (-50, -25)</code> below XY, <code>a' = (-50, +35)</code> above XY. Q3 (the surprise): <code>b = (50, +35)</code> <em>above</em> XY, <code>b' = (50, -30)</code> <em>below</em> XY — the views swap sides. Both projectors are exactly vertical (elev.x == plan.x).</li>
+<li><strong>What it teaches.</strong> One 3D point = two sheet dots + one vertical projector; the four sign patterns (§7.3); prime notation (<code>a'</code> reads "a-prime", the elevation).</li>
+<li><strong>In 3D.</strong> Renders as two class-C wireframe points, one with positive height/depth, one negative.</li>
+</ul>
+<h4 id="hexagonal-prism-35mm--a-true-solid"><code>Hexagonal Prism (35mm)</code> — a true solid</h4>
+<p>Loads a regular-solid lesson: hexagonal prism, 35 mm across corners, 70 mm tall, centered at x = 0.</p>
+<ul>
+<li><strong>What it loads.</strong> Datum span; six plan edges forming a regular hexagon (corners at R = 17.5 mm about <code>(0, -25.5)</code>); elevation outline (35×70 mm rectangle over x ∈ [-17.5, 17.5]) with two interior facet verticals at x = ±8.75 and a hidden Type E seam at mid-height y = 35; Type G center axes in both views; four projectors; Type K loci through base (y = 0) and top (y = 70).</li>
+<li><strong>What to look at.</strong> Each interior facet vertical stands for a coincident front/back edge pair of the hexagon; the dashed seam is the one hidden edge. Projectors at all four x-stations hold elev.x == plan.x.</li>
+<li><strong>What it teaches.</strong> Reading a solid off two views: hexagon below + rectangle above = prism; hidden vs visible edges (Type E vs Type A); center axes (Type G); loci marking levels.</li>
+<li><strong>In 3D.</strong> Renders as a class-A prism: 12 vertices, 18 edges, drawn 35:70 proportions. Orbit to check the dashed hidden edges move correctly.</li>
+</ul>
+<h4 id="clear-sheet"><code>Clear Sheet</code></h4>
+<p>Removes everything and shows <code>empty sheet</code> in the 3D view. Use it before freehand exercises so no demo geometry interferes (stray demo edges would fail 3D interpretations — §8.8 #7).</p>
+<h3 id="92-curriculum-lessons-the-full-set">9.2 Curriculum lessons (the full set)</h3>
+<p>Beyond the three demo buttons, the lesson engine contains more lessons. They have <strong>no buttons</strong>: a teacher triggers them from the browser's JavaScript console while the app is open (they are plain data builders on the global <code>EduCADCurriculum</code> — call them as <code>EduCADCurriculum.quadrantPoint({...})</code> and so on). Each returns <code>{ entities, steps, loci, projectors, projectorOk }</code>; <code>steps</code> is a printable construction script and <code>projectorOk</code> confirms the invariant.</p>
+<table>
+<thead>
+<tr><th>Lesson (call)</th><th>Objective</th><th>Key parameters</th></tr>
+</thead>
+<tbody>
+<tr><td><code>quadrantPoint({quadrant, xMm, distHP, distVP, label})</code></td><td>One point in Q1–Q4: signs, projector, prime notation</td><td><code>quadrant</code> 1–4; <code>distHP</code>/<code>distVP</code> ≥ 0; <code>projection</code> first/third-angle marker</td></tr>
+<tr><td><code>quadrantSet({labels, xs, …})</code></td><td>All four quadrants side by side</td><td>default labels a–d at x = -30/-10/10/30</td></tr>
+<tr><td><code>straightLine({TL, thetaDeg, phiDeg, axMm, yaPlan, yaElev})</code></td><td>Rotation method, loci, feasibility</td><td>TL &gt; 0; warns when θ+φ &gt; 90° (impossible); collapses 90° views to points</td></tr>
+<tr><td><code>planeSurface({xMm, sizeMm, tiltDeg})</code></td><td>HT/VT traces meeting on XY plus tilt angle</td><td>default 40 mm, 30°</td></tr>
+<tr><td><code>regularSolid({solid:'PRISM', sizeMm, heightMm, xMm})</code></td><td>Hexagonal prism (the demo)</td><td>35 mm default</td></tr>
+<tr><td><code>regularSolid({solid:'PYRAMID', …})</code></td><td>Square pyramid with apex <code>s</code>/<code>s'</code> and one hidden slant</td><td>base 35 mm</td></tr>
+<tr><td><code>regularSolid({solid:'CYLINDER', …})</code></td><td>Cylinder: plan circle d = 35 mm + elevation rectangle</td><td>circle defers 3D (§8.7)</td></tr>
+<tr><td><code>regularSolid({solid:'CONE', …})</code></td><td>Cone: plan base circle + apex at center, elevation triangle</td><td>circle defers 3D (§8.7)</td></tr>
+<tr><td><code>threeViewSheet({solid, sizeMm, heightMm, xMm, side, xRefMm})</code></td><td>Prism/pyramid plan + elevation + <code>PROFILE</code> side view with projectors, 45° miter, X1Y1 axis</td><td><code>solid</code> PRISM/PYRAMID only; <code>side</code> +1 (right) / −1 (left)</td></tr>
+<tr><td><code>generateLesson(kind, opts)</code></td><td>Dispatcher: <code>POINT</code>/<code>LINE</code>/<code>PLANE</code>/<code>SOLID</code> (+ aliases)</td><td>same options as above</td></tr>
+<tr><td><code>generateCurriculum(opts)</code></td><td>Whole bundle: 4 quadrants + line + plane + 4 solids</td><td>teaching-ordered <code>steps</code> with <code>[Q1]</code>… tags</td></tr>
+</tbody>
+</table>
+<p>Loading console-built lessons onto the sheet needs a few lines of glue (create each returned spec in the app table) — a developer task; see the appendix. The <code>steps</code> arrays work stand-alone as blackboard scripts.</p>
+<h3 id="93-teaching-scripts-follow-verbatim">9.3 Teaching scripts (follow verbatim)</h3>
+<p><strong>Script A — Projectors (10 min, needs: Quadrant Points demo).</strong></p>
+<ol>
+<li>"Every 3D point becomes two dots. Find <code>a</code> below XY and <code>a'</code> above XY."</li>
+<li>"The vertical join is the projector. Cover one dot: the other must sit at the same left-right position. That is elevation.x == plan.x."</li>
+<li>"Now find <code>b</code> and <code>b'</code>. Which is above XY? Why?" (Q3 swaps the sides.)</li>
+<li>Exercise: students place their own pair at one x and check a third dot appears in the 3D view; then blank-rename-delete the new elevation dot (dots cannot be dragged, §5.7), re-place it 2 mm off in x, and read the <code>… misses its mate beyond eps</code> detail in the 3D view.</li>
+</ol>
+<p><strong>Script B — True length (15 min, needs: Line Rotation demo).</strong></p>
+<ol>
+<li>"The sheet shows 69.28 mm and 56.57 mm, but the line is 80 mm. Both views lie; the 3D view shows the truth. Orbit it."</li>
+<li>"Plan length = TL·cos θ, elevation = TL·cos φ. Verify with a calculator."</li>
+<li>"Find the loci: B can only sit on its two horizontals. The projector shift dx = 40 mm completes TL² = dx² + dh² + dd²."</li>
+<li>Exercise: predict EL for TL = 100, φ = 60° (answer: 50 mm), then check with <code>EduCADCurriculum.straightLine({TL:100, thetaDeg:0, phiDeg:60})</code> in the console and read back its <code>EL</code> field.</li>
+</ol>
+<p><strong>Script C — Reading solids (15 min, needs: Hexagonal Prism demo).</strong></p>
+<ol>
+<li>"Cover the bottom half: what 3D shape could the rectangle be? (Anything flat.) Now uncover the hexagon: only a hex prism fits both."</li>
+<li>"Count hidden edges on the sheet (one dashed seam) vs in 3D while orbiting (they move). Hidden depends on viewpoint; the sheet picks one."</li>
+<li>"Trace each projector from a hexagon corner to its elevation vertical."</li>
+<li>Exercise: students Clear the sheet, hand-draw plan+elevation rectangles at shared x-stations (axis lock, §6.2) leaving one plan edge open, and read the failure message; then they draw the missing edge and watch the box appear in 3D.</li>
+</ol>
+<p><strong>Script D — Planes and traces (10 min, console lesson).</strong></p>
+<ol>
+<li>Build <code>EduCADCurriculum.planeSurface({tiltDeg:30})</code> and read its <code>steps</code> aloud.</li>
+<li>"HT and VT meet on XY — a plane's traces always meet on the ground line. The tilt angle lives only in the elevation."</li>
+<li>Exercise: change <code>tiltDeg</code> to 45 and 60; predict the VT tip (<code>x + size·cos tilt</code>, <code>size·sin tilt</code>) before rebuilding.</li>
+</ol>
+<p><strong>Script E — Why 3D sometimes refuses (10 min, any drawing).</strong></p>
+<ol>
+<li>Clear the sheet, place two points above XY, join them with any line type: read <code>no plan view drawn</code>.</li>
+<li>Clear, then place all eight rectangle corners at shared x-stations (axis lock, §6.2) and join the full elevation rectangle but only three of the four plan sides: read <code>plan loop edge &lt;n&gt; is not drawn (non-convex?)</code>.</li>
+<li>Draw the missing edge: the box appears. "The 3D view never guesses — every refusal names the exact missing piece. Read the second line."</li>
+</ol>
+<hr>
+<h2 id="10-reference-tables">10. Reference tables</h2>
+<h3 id="101-mouse-actions">10.1 Mouse actions</h3>
+<table>
+<thead>
+<tr><th>Action</th><th>Context</th><th>Result</th></tr>
+</thead>
+<tbody>
+<tr><td>Left-click empty sheet</td><td>No tool armed</td><td>Place point (axis-locked if a selection exists)</td></tr>
+<tr><td>Left-click a point</td><td>No tool armed</td><td>Select it (amber ring)</td></tr>
+<tr><td>Left-click empty sheet</td><td>Line/polar armed</td><td>Abort the tool, nothing created</td></tr>
+<tr><td>Left-click a point P2 ≠ P1</td><td>Line anchored</td><td>Lock P2, open line-type popup</td></tr>
+<tr><td>Left-click P1 again</td><td>Line anchored/menu</td><td>Re-select P1; tool stays armed</td></tr>
+<tr><td>Ctrl/Cmd+click a point</td><td>Any</td><td>Anchor (or re-anchor) line + polar tools; aborts plotting</td></tr>
+<tr><td>Ctrl/Cmd+click empty sheet</td><td>Tool armed</td><td>Abort all construction tools</td></tr>
+<tr><td>Left-click a segment</td><td>Polar awaiting baseline</td><td>Accept/reject baseline (must pass through anchor)</td></tr>
+<tr><td>Left-click anywhere</td><td>Polar angle sweep</td><td>Lock the angle</td></tr>
+<tr><td>Left-click anywhere</td><td>Polar distance sweep</td><td>Commit the polar point</td></tr>
+<tr><td>Left-click anywhere</td><td>Polar invalid</td><td>Drop the tool</td></tr>
+<tr><td>Left-click a segment</td><td>Nothing armed</td><td>Begin line-referenced plotting</td></tr>
+<tr><td>Left-click anywhere</td><td>Plotting</td><td>Commit the plotted point</td></tr>
+<tr><td>Left-click</td><td>During 300 ms line animation</td><td>Ignored</td></tr>
+<tr><td>Double-click a point</td><td>Line/polar not armed</td><td>Begin rename</td></tr>
+<tr><td>Double-click a point</td><td>Line/polar armed</td><td>Ignored</td></tr>
+<tr><td>Double-click on 3D ink</td><td>—</td><td>Reset 3D to isometric rest pose</td></tr>
+<tr><td>Right-click</td><td>Anything active/selected</td><td>Cancel all (never opens menu)</td></tr>
+<tr><td>Right-click empty sheet (≥14 px from snap targets)</td><td>Idle</td><td>Open <code>Plain (No Mesh)</code> / <code>Box Mesh</code> menu</td></tr>
+<tr><td>Right-click near snap target (&lt;14 px)</td><td>Idle</td><td>Nothing (menu suppressed)</td></tr>
+<tr><td>Wheel</td><td>Over sheet</td><td>Zoom ×1.15 about cursor</td></tr>
+<tr><td>Wheel</td><td>On 3D ink</td><td>Zoom 3D, smooth, cursor-anchored (sheet untouched)</td></tr>
+<tr><td>Middle-drag</td><td>On 3D ink</td><td>Pan 3D model (clamped: never lost)</td></tr>
+<tr><td>Middle-drag, or Shift+left-drag</td><td>Off 3D ink</td><td>Pan sheet</td></tr>
+<tr><td>Left-drag</td><td>On 3D ink</td><td>Orbit (Shift/Ctrl/Cmd/Alt held, or 2D tool armed: sheet instead)</td></tr>
+</tbody>
+</table>
+<h3 id="102-keyboard-shortcuts">10.2 Keyboard shortcuts</h3>
+<table>
+<thead>
+<tr><th>Key</th><th>Context</th><th>Result</th></tr>
+</thead>
+<tbody>
+<tr><td>Printable character, Space</td><td>Renaming</td><td>Append to name buffer</td></tr>
+<tr><td>Backspace</td><td>Renaming</td><td>Delete last buffer character</td></tr>
+<tr><td>Enter</td><td>Renaming</td><td>Commit (trim; blank deletes the point; unchanged writes nothing)</td></tr>
+<tr><td>Escape</td><td>Any</td><td>Cancel selection/rename/tools/menus (rename buffer discarded)</td></tr>
+<tr><td>Any other key (arrows, Delete, Tab, …)</td><td>Renaming</td><td>Ignored</td></tr>
+<tr><td>Ctrl/Cmd/Alt + any key</td><td>Renaming</td><td>Ignored (modifier combos never edit)</td></tr>
+<tr><td>Any key</td><td>Not renaming (except Escape)</td><td>Nothing</td></tr>
+</tbody>
+</table>
+<p>There are no tool hotkeys, no Delete shortcut, no undo shortcut, no zoom keys. All drawing is mouse-driven.</p>
+<h3 id="103-tool-summary">10.3 Tool summary</h3>
+<table>
+<thead>
+<tr><th>Tool</th><th>Reach</th><th>Creates</th><th>Cancel</th></tr>
+</thead>
+<tbody>
+<tr><td>Place point</td><td>Click empty sheet</td><td><code>POINT</code> (auto-named, role by y-sign)</td><td>—</td></tr>
+<tr><td>Select</td><td>Click point</td><td>Reference only</td><td>Right-click / Escape</td></tr>
+<tr><td>Line/segment + BIS popup</td><td>Ctrl+click P1, click P2, pick style</td><td><code>SEGMENT</code> (<code>BOTH</code>, unlabeled)</td><td>Right-click / Escape / empty click</td></tr>
+<tr><td>Polar point</td><td>Ctrl+click P0, click baseline, click angle, click distance</td><td><code>POINT</code> at polar target</td><td>Right-click / Escape / invalid-click</td></tr>
+<tr><td>Line-referenced plotting</td><td>Click segment, click candidate</td><td><code>POINT</code> at perpendicular offset</td><td>Right-click / Escape</td></tr>
+<tr><td>Sheet menu</td><td>Right-click empty sheet</td><td>Grid on/off only</td><td>Click option / right-click / Escape / pointer-down</td></tr>
+<tr><td>Pan / zoom / Home</td><td>Middle- or Shift-drag / wheel / buttons</td><td>View only</td><td>—</td></tr>
+<tr><td>3D orbit / zoom / pan / reset</td><td>On-ink gestures (§8.2)</td><td>View only</td><td>—</td></tr>
+<tr><td>Ray, circle, arc, dimension, text, datum, projector, ruler, compass, solver, commands, undo, save</td><td><strong>Not in UI</strong></td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+<h3 id="104-entity-types">10.4 Entity types</h3>
+<p>Nine types exist in the data model; the sheet renderer draws five.</p>
+<table>
+<thead>
+<tr><th>Type</th><th>Drawn on sheet?</th><th>Created in UI?</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>POINT</code></td><td>Yes (3 px dot + label)</td><td>Yes</td><td>Auto-named; only selectable type</td></tr>
+<tr><td><code>SEGMENT</code></td><td>Yes (BIS style)</td><td>Yes (line tool)</td><td>Unlabeled; spans <code>BOTH</code> views</td></tr>
+<tr><td><code>LINE</code></td><td>Yes (BIS style, finite p1→p2 stroke)</td><td>No</td><td>Demo loci/axes only</td></tr>
+<tr><td><code>CIRCLE</code></td><td>Yes (if present)</td><td>No</td><td>No creation gesture; defers 3D</td></tr>
+<tr><td><code>CIRCULAR_ARC</code></td><td>Yes (if present, y-flip angle mapping)</td><td>No</td><td>No creation gesture; defers 3D</td></tr>
+<tr><td><code>DIMENSION</code></td><td><strong>No</strong> (renderer skips it)</td><td>No</td><td>No gesture; API-only</td></tr>
+<tr><td><code>TEXT</code></td><td><strong>No</strong> (label pass only)</td><td>No</td><td>No gesture; API-only</td></tr>
+<tr><td><code>RAY</code></td><td><strong>No</strong></td><td>No</td><td>Nothing draws or creates it</td></tr>
+<tr><td><code>DATUM_AXIS</code></td><td><strong>No</strong> (only its X/Y end labels)</td><td>No</td><td>Demos only; locked against moves by default</td></tr>
+</tbody>
+</table>
+<p>BIS styles: A solid 0.50 thick · B solid 0.20 thin · E dash <code>[8, 4]</code> 0.35 thin · G chain <code>[12, 3, 2, 3]</code> 0.20 thin · H same dashes as G with 0.50 thick ends · K double-dash <code>[12, 3, 2, 3, 2, 3]</code> 0.20 thin. Dimension arrowheads are specified 3.5 × 1.167 mm (3:1) with outward flip under 30 px, but no drawn dimension reaches that code from the UI.</p>
+<h3 id="105-status-and-message-strings">10.5 Status and message strings</h3>
+<p>Sheet strings:</p>
+<table>
+<thead>
+<tr><th>String (exact)</th><th>Where</th></tr>
+</thead>
+<tbody>
+<tr><td><code>EduCAD 2D Engine</code> • <code>1st Angle Monge Projection</code></td><td>Status HUD line 1 (static)</td></tr>
+<tr><td><code>VP (Elevation)</code></td><td>Plane pill before first mouse move</td></tr>
+<tr><td><code>V.P. (Elevation / Front)</code> / <code>H.P. (Plan / Top)</code></td><td>Plane pill live (<code>y &gt;= 0</code> / <code>y &lt; 0</code>)</td></tr>
+<tr><td><code>X: 0.00 mm • Y: 0.00 mm (Ground Line XY)</code></td><td>Coordinates before first mouse move</td></tr>
+<tr><td><code>X: &lt;n&gt; mm • Y: &lt;n&gt; mm</code> (2 decimals)</td><td>Coordinates live</td></tr>
+<tr><td><code>V.P. (Front View / Elevation)</code> / <code>H.P. (Top View / Plan)</code></td><td>Sheet watermarks</td></tr>
+<tr><td><code>X</code> / <code>Y</code></td><td>XY end marks (sheet, or datum end labels when demos load)</td></tr>
+<tr><td><code>Plain (No Mesh)</code> / <code>Box Mesh</code></td><td>Sheet right-click menu</td></tr>
+<tr><td><code>Continuous Thick — Type A</code> … <code>Double-Dash Chain — Type K</code></td><td>Line-type popup tooltips (5 rows)</td></tr>
+<tr><td><code>+</code> / <code>-</code> / <code>Home</code></td><td>Zoom HUD</td></tr>
+<tr><td><code>Line Rotation (TL=80, θ=30°, φ=45°)</code> etc.</td><td>Demo bar (5 buttons, §3.2)</td></tr>
+<tr><td><code>Manual</code></td><td>Demo bar link: opens this guide in a new tab (<code>manual.html</code>)</td></tr>
+<tr><td><code>ΔX: &lt;n&gt; mm</code> / <code>ΔY: &lt;n&gt; mm</code></td><td>Axis-lock badges</td></tr>
+<tr><td><code>∠ &lt;n&gt;°</code> / <code>&lt;r&gt; mm (∠ &lt;θ&gt;° locked)</code> / <code>⊥ Dist: &lt;n&gt; mm</code></td><td>Polar / plot badges</td></tr>
+<tr><td><code>locus of &lt;name&gt;</code></td><td>Locus line labels (<code>locus-</code> captions rewritten)</td></tr>
+<tr><td><code>3D unavailable</code> + reason subtitle</td><td>3D failure state (§8.8)</td></tr>
+</tbody>
+</table>
+<p>3D reason subtitles: see the complete list in §8.8 (10 reason codes + 3 empty-state wordings + detail templates — the 3D view shows details, not canonical text, except <code>curves not supported yet</code>). No other error dialogs, toasts, or status strings exist in the app.</p>
+<h3 id="106-snappable-geometry">10.6 Snappable geometry</h3>
+<p>Effective snap sources on the sheet (all tiers always on; first match in priority order within 14 px wins):</p>
+<table>
+<thead>
+<tr><th>Tier</th><th>Source geometry on a default demo sheet</th></tr>
+</thead>
+<tbody>
+<tr><td>ENDPOINT</td><td>Every point dot; every segment end</td></tr>
+<tr><td>INTERSECTION</td><td>Segment/line crossings (e.g. projector × locus in the prism demo)</td></tr>
+<tr><td>MIDPOINT</td><td>Every segment midpoint</td></tr>
+<tr><td>CENTER</td><td>Nothing on the three demo sheets (no circles)</td></tr>
+<tr><td>PROJECTOR / LOCUS</td><td>Never fire (page sends no station lists)</td></tr>
+</tbody>
+</table>
+<hr>
+<h2 id="11-troubleshooting">11. Troubleshooting</h2>
+<table>
+<thead>
+<tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+</thead>
+<tbody>
+<tr><td>Click does nothing / no point appears</td><td>A tool is armed (clicks feed it), or you clicked within 14 px of a point (re-select), or during the 300 ms line animation (ignored)</td><td>Right-click or Escape to disarm, then click clearly empty sheet</td></tr>
+<tr><td>Line-type popup never opens</td><td>You clicked empty sheet (aborts), clicked P1 itself (re-selects), or never Ctrl+clicked an anchor</td><td>Ctrl+click P1 (crosshair appears), then click a <em>different</em> point</td></tr>
+<tr><td>Popup shows dash samples but no text</td><td>By design: rows are preview-only</td><td>Hover a row for its <code>… — Type X</code> tooltip</td></tr>
+<tr><td>Polar tool dies after baseline click</td><td>Clicked line misses P0 by &gt; 0.5 mm → invalid state; next click drops it</td><td>Re-anchor (Ctrl+click P0) and click a segment through P0</td></tr>
+<tr><td><code>∠</code> badge stuck / no distance sweep</td><td>You have not locked the angle yet</td><td>Left-click once to lock the angle, then sweep distance</td></tr>
+<tr><td>Plotted point lands at segment end</td><td>Foot clamps to [A, B] past the ends; offset is kept from the clamped foot</td><td>Aim the cursor between the ends for interior feet</td></tr>
+<tr><td>Right-click opens no menu</td><td>Something is active (right-click cancels first), or cursor is within 14 px of a snap target</td><td>Right-click once to cancel, move to clearly empty sheet (away from dots, ends, midpoints, crossings), right-click again</td></tr>
+<tr><td>Rename typing does nothing</td><td>Not in rename mode (double-click first), or line/polar tool armed (dblclick ignored), or key is non-printable</td><td>Disarm tools, double-click the point, type letters/digits/Space</td></tr>
+<tr><td>Enter does nothing visible</td><td>Name unchanged (no write by design)</td><td>Change at least one character, or Escape out</td></tr>
+<tr><td>Point vanished after rename</td><td>You committed a blank/whitespace-only name: that deletes the point</td><td>Re-place the point; there is no undo</td></tr>
+<tr><td>Segment stays after deleting its points</td><td>Segments store positions, not point references</td><td>Nothing to fix: redraw, or Clear Sheet and start over</td></tr>
+<tr><td>Grid won't show / won't hide</td><td>Wrong menu option, or menu dismissed by pointer-down elsewhere</td><td>Right-click empty sheet → <code>Box Mesh</code> (show) / <code>Plain (No Mesh)</code> (hide); confirm on the sheet (no checkmark is drawn)</td></tr>
+<tr><td>Sheet looks empty after demo click</td><td>Demo always clears first, then loads; a failed load would leave it empty</td><td>Click the demo button again; check the 3D message</td></tr>
+<tr><td>3D shows <code>empty sheet</code></td><td>No geometry (after Clear Sheet)</td><td>Draw or load a demo</td></tr>
+<tr><td>3D shows <code>no plan view drawn</code> / <code>no elevation view drawn</code></td><td>All geometry on one side of XY</td><td>Draw the missing view on the other side</td></tr>
+<tr><td>3D shows <code>curves not supported yet</code></td><td>Curves-only or curve-dependent plan</td><td>Trace a polygonal outline; see §8.7</td></tr>
+<tr><td>3D shows an <code>x-mismatch…</code> detail</td><td>Plan/elevation x differ beyond 0.5 mm</td><td>Re-place at shared x (axis-lock to the mate)</td></tr>
+<tr><td>3D shows <code>ambiguous…</code></td><td>Duplicate x stations or double readings</td><td>Separate stations; delete duplicates</td></tr>
+<tr><td>3D shows <code>…leaves the loop</code> / <code>misses the…</code></td><td>Outline open or elevation incomplete</td><td>Close the outline; draw the named base/top/vertical/slant</td></tr>
+<tr><td>3D never updates / looks stale</td><td><code>[unverified]</code> in normal use — rebuilds run every frame on change; a frozen 3D view suggests a script error</td><td>Reload the page (sheet is lost — there is no save)</td></tr>
+<tr><td>Page address <code>#…</code> loads wrong demo</td><td>Only <code>#points</code>, <code>#prism</code>, <code>#mesh</code> are recognized; anything else loads Line Rotation</td><td>Fix the hash or click the demo button</td></tr>
+<tr><td>Server prints <code>port 8124 busy, using N</code></td><td>Port occupied (another server or runaway process)</td><td>Open the printed port; stop the other server if it is yours</td></tr>
+<tr><td><code>npm start</code> fails immediately</td><td>Node missing or port range exhausted</td><td>Install Node; free ports 8124–8133</td></tr>
+</tbody>
+</table>
+<hr>
+<h2 id="12-limitations--not-implemented">12. Limitations / not implemented</h2>
+<p>Each item was verified absent: no gesture, button, key, or menu triggers it, and (unless noted) no remnant wires it to the screen.</p>
+<p><strong>Drawing &amp; editing.</strong></p>
+<ol>
+<li>No undo/redo in the UI (history exists only in the developer API).</li>
+<li>No save, open, export, print, or persistence of any kind; reload loses the sheet. (An SVG exporter exists only in the developer API.)</li>
+<li>No drag-move of points or segments; misplaced geometry must be deleted (points) or abandoned (segments) and redrawn.</li>
+<li>No erase/delete tool and no Delete key; only blank-rename delete and Clear Sheet.</li>
+<li>No multi-select; no segment selection at all.</li>
+<li>No arc, ray, dimension, text, axis, datum, or projector creation gestures (circles use Ctrl+click ×3, §4.9). No virtual ruler/compass gestures (engines exist, unwired).</li>
+<li>No line-thickness picker; on-screen weights are fixed 1 px / 2 px.</li>
+<li>BIS Type H is not offered in the line-type popup.</li>
+<li>No rubber-band preview before P2; no segment editing after commit.</li>
+<li>No snap toggles, no snap badge text, no PROJECTOR/LOCUS snap tiers (engine supports six tiers; the page wires four and draws only the ring).</li>
+</ol>
+<p><strong>Views, sheet, 3D.</strong></p>
+<ol>
+<li>First angle only; no third-angle layout (a marker constant exists in lesson code and is never applied by the app).</li>
+<li>No sections, perspectives, shading, 3D dimensions, or 3D export; hidden-line rendering is the only 3D analysis. (A first-angle side/profile view is supported — §8.6.)</li>
+<li>Arcs never reconstruct in 3D (<code>curves not supported yet</code> for arc-only sheets); full-circle cylinders and cones do (Class D, §8.6–§8.7). Tilted axes, ellipses, and partial rims are not supported.</li>
+<li>Only convex prism/pyramid outlines reconstruct; concave/L profiles, general ambiguous drawings, and zero-height solids report named failures.</li>
+<li>Absolute mm do not survive into the 3D stage (uniform re-scaling); only proportions do.</li>
+<li>3D warnings (<code>curves-ignored</code>, <code>on-datum-placed</code>, <code>helpers-ignored</code>) are computed but never displayed.</li>
+<li>No grid customization (fixed steps, fixed style); no layers panel; no background/paper options.</li>
+</ol>
+<p><strong>Platform &amp; workflow.</strong></p>
+<ol>
+<li>No touch/pen, mobile-layout, or accessibility claims — untested (<code>[unverified]</code> if you need them: try before teaching with them).</li>
+<li>No stated browser requirements; no browser-driven tests (<code>[unverified]</code> beyond "recent desktop browser with Canvas 2D + Pointer Events").</li>
+<li>No user accounts, sharing, printing pipeline, or print-accurate (mm-true) output; print/export scaling helpers exist only as code functions.</li>
+</ol>
+<hr>
+<h2 id="13-appendix-developer-reference">13. Appendix (developer reference)</h2>
+<h3 id="131-module-map">13.1 Module map</h3>
+<p>App shell: <a href="index.html"><code>mirror/index.html</code></a> (all UI wiring, rendering, and event handling). Library modules in <a href="files/www.geogebra.org/"><code>mirror/files/www.geogebra.org/</code></a>:</p>
+<table>
+<thead>
+<tr><th>File</th><th>Role</th><th>Wired to UI?</th></tr>
+</thead>
+<tbody>
+<tr><td><code>educad-viewport.js</code></td><td>mm↔px math, cursor-anchored zoom, projector check</td><td>Yes</td></tr>
+<tr><td><code>educad-canvas.js</code></td><td>Menus, selection/rename, line/polar/plot/circle-pick state machines, label drawing primitives</td><td>Yes</td></tr>
+<tr><td><code>educad-entities.js</code></td><td>Entity model, table, BIS styles, cosmetic weights</td><td>Yes</td></tr>
+<tr><td><code>educad-shim.js</code></td><td>GeoGebra-compatible command API (39 methods, 14 commands)</td><td><strong>No</strong> (applet created, never called by page)</td></tr>
+<tr><td><code>educad-solver.js</code></td><td>Line rotation, loci, LM constraint solver</td><td><strong>No</strong> (handle created, never used by page)</td></tr>
+<tr><td><code>edugraphics-snapping.js</code></td><td>6-tier snap engine</td><td>Partial (4 tiers; ring only, no badges)</td></tr>
+<tr><td><code>edugraphics-instruments.js</code></td><td>Virtual ruler + compass state machines</td><td><strong>No</strong> (created, never driven)</td></tr>
+<tr><td><code>educad-curriculum.js</code></td><td>Lesson data builders (quadrant/line/plane/solids)</td><td>Partial (3 lessons via demo buttons; rest console-only)</td></tr>
+<tr><td><code>educad-labels.js</code></td><td>3-tier label layout + leader fallback</td><td>Yes</td></tr>
+<tr><td><code>educad-solid.js</code></td><td>Full-screen 3D glass (orbit/zoom/pan/aura/render)</td><td>Yes</td></tr>
+<tr><td><code>educad-reconstruct.js</code></td><td>Two/three-view → 3D reconstruction, classes A/B/C/D, named failures</td><td>Yes</td></tr>
+<tr><td><code>edugraphics-common.js</code></td><td>Dual-layer mount, zoom HUD, 2-option menu</td><td>Yes</td></tr>
+<tr><td><code>educad-boot.js</code></td><td>Cold-boot wiring of all modules</td><td>Yes</td></tr>
+<tr><td><code>edugraphics-hud.css</code></td><td>HUD/menu/glass positioning</td><td>Yes</td></tr>
+</tbody>
+</table>
+<p>Server: <code>tools/serve.js</code> (<code>npm start</code>, 127.0.0.1:8124). Manual page: <code>tools/build-manual.js</code> (<code>npm run build:manual</code> renders <code>docs/MANUAL.md</code> → <code>mirror/manual.html</code>, opened from the demo bar). Tests: <code>tools/test-*.js</code> (574 checks, all green at writing time — see the repo README for the per-phase list), including <code>tools/test-phase11-manual.js</code> (manual build, in-app link, freshness), <code>tools/test-phase12-reconstruct-3view.js</code> (side-view reconstruction), and <code>tools/test-phase13-curves.js</code> (Class D cylinders/cones, circle gesture).</p>
+<h3 id="132-behavior-anchors-fileline">13.2 Behavior anchors (file:line)</h3>
+<p>Key behaviors and where they live (line numbers at writing time). All <code>index.html</code> anchors below were re-verified after the in-app Manual link was added, so they match the current file.</p>
+<ul>
+<li>HUD DOM + demo buttons: <code>mirror/index.html:61-72</code></li>
+<li>Boot + module wiring: <code>index.html:97-101</code>, <code>educad-boot.js:80-136</code></li>
+<li>XY ground line + watermarks + X/Y marks: <code>index.html:351-378</code></li>
+<li>Grid: <code>index.html:326-349</code> (steps), <code>educad-canvas.js:817-831</code> (toggle)</li>
+<li>Entity rendering (5 drawn types): <code>index.html:409-463</code></li>
+<li>Snap ring draw: <code>index.html:488-498</code>; snap compute: <code>index.html:677-678</code></li>
+<li>Selection ring + rename preview: <code>index.html:500-521</code></li>
+<li>Axis-lock badge: <code>index.html:523-535</code>; math: <code>educad-canvas.js:379-405</code></li>
+<li>Line preview: <code>index.html:537-554</code>; state machine: <code>educad-canvas.js:428-515</code></li>
+<li>Polar previews + badges: <code>index.html:556-607</code>; math: <code>educad-canvas.js:517-709</code></li>
+<li>Plot preview + badge: <code>index.html:609-628</code>; math: <code>educad-canvas.js:711-774</code></li>
+<li>Pan / hover-HUD / wheel: <code>index.html:638-701</code></li>
+<li>Right-click cancel + sheet menu: <code>index.html:703-769</code></li>
+<li>Click dispatch (place/select/tools): <code>index.html:771-901</code></li>
+<li>Double-click rename + keys: <code>index.html:903-959</code>; buffer rules: <code>educad-canvas.js:312-372</code></li>
+<li>Auto-naming: <code>educad-canvas.js:340-359</code></li>
+<li>Zoom buttons: <code>index.html:962-976</code>; HUD mount: <code>edugraphics-common.js:121-174</code></li>
+<li>Demo loaders + hashes: <code>index.html:979-1035</code>; lessons: <code>educad-curriculum.js:130-470</code></li>
+<li>3D mount + live bridge: <code>index.html:1259-1300</code>; glass: <code>educad-solid.js:1080-1233</code>; render: <code>educad-solid.js:1005-1071</code></li>
+<li>Reconstruction + reasons: <code>educad-reconstruct.js:37-48</code> (labels), <code>:72-132</code> (filter/classify), <code>:555-1339</code> (classes A/B/C/D), <code>:1374-1535</code> (top level)</li>
+<li>Label layout: <code>educad-labels.js:86-102</code> (filter), <code>:479-514</code> (resolve)</li>
+<li>BIS styles + cosmetic weights: <code>educad-entities.js:24-31</code>, <code>:157-175</code></li>
+</ul>
+<p>Console glue for loading a lesson onto the sheet (developer task):</p>
+<pre><code>var lesson = EduCADCurriculum.planeSurface({ tiltDeg: 30 });
+// handle.table is the app table only inside the page closure;
+// from the console, rebuild via the visible demo path or extend the page.
+lesson.steps.forEach(function (s) { console.log(s); });</code></pre>
+<p>Note: the page closure does not expose the table, so console-built lessons currently serve as printed scripts unless the page is extended — the three demo buttons remain the only in-app lesson loaders.</p>
+<h3 id="133-traceability-table-manual-claim--anchor">13.3 Traceability table (manual claim → anchor)</h3>
+<table>
+<thead>
+<tr><th>#</th><th>Manual claim</th><th>Code / test anchor</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>mm world; px ephemeral</td><td><code>educad-viewport.js:9-11</code>; <code>test-phase2</code> #38–39</td></tr>
+<tr><td>2</td><td>elev.x == plan.x, eps 1e-9</td><td><code>educad-viewport.js:110-114</code>; <code>test-baseline</code> #28</td></tr>
+<tr><td>3</td><td>First-angle layout (plan below, elev above)</td><td><code>index.html:375-376</code>; fixtures <code>layout: monge-first-angle</code></td></tr>
+<tr><td>4</td><td><code>npm start</code> → 127.0.0.1:8124</td><td><code>tools/serve.js:9-10</code>; <code>package.json</code> scripts</td></tr>
+<tr><td>5</td><td>Port busy → next port + message</td><td><code>tools/serve.js:189-202</code></td></tr>
+<tr><td>6</td><td>HUD labels + pill rule y&gt;=0</td><td><code>index.html:61-64</code>, <code>:659-666</code></td></tr>
+<tr><td>7</td><td>Demo button labels (5)</td><td><code>index.html:67-71</code></td></tr>
+<tr><td>8</td><td>Zoom labels <code>+ - Home</code>, ×1.25, home s=2</td><td><code>edugraphics-common.js:27</code>; <code>educad-canvas.js:143-151</code></td></tr>
+<tr><td>9</td><td>Menu labels + 14 px suppression</td><td><code>educad-canvas.js:23-26</code>, <code>:62-68</code>; <code>test-phase1</code> 2-option/14px</td></tr>
+<tr><td>10</td><td>No toolbar/palette exists</td><td>grep: zero matches for toolbar/palette/toolbox/ribbon</td></tr>
+<tr><td>11</td><td>5 BIS popup rows + tooltips; no H</td><td><code>index.html:136-142</code>, <code>:155</code></td></tr>
+<tr><td>12</td><td>Watermarks + X/Y marks</td><td><code>index.html:366-376</code></td></tr>
+<tr><td>13</td><td>Place/select click flows, 14 px</td><td><code>index.html:771-901</code>; <code>educad-canvas.js:266-287</code></td></tr>
+<tr><td>14</td><td>Line tool 4-step + 300 ms + P1≠P2</td><td><code>index.html:246-292</code>, <code>:856-871</code>; <code>educad-canvas.js:428-503</code></td></tr>
+<tr><td>15</td><td>Polar 5-step, 0.5 mm, detents ±2°</td><td><code>index.html:806-838</code>, <code>:556-607</code>; <code>educad-canvas.js:517-697</code></td></tr>
+<tr><td>16</td><td>Plot 3-step, ⊥ badge, clamped foot</td><td><code>index.html:822-825</code>, <code>:848-855</code>, <code>:609-628</code>; <code>educad-canvas.js:737-764</code></td></tr>
+<tr><td>17</td><td>DIMENSION/TEXT/RAY/DATUM not drawn</td><td><code>index.html:425-456</code> (only 5 branches); §10.4</td></tr>
+<tr><td>18</td><td>Ruler/compass/solver/shim unwired</td><td>grep: no page calls to <code>ruler*</code>, <code>compass*</code>, <code>solverHandle</code>, applet methods</td></tr>
+<tr><td>19</td><td>Rename keys/trim/blank-delete</td><td><code>index.html:922-959</code>; <code>educad-canvas.js:312-338</code>; <code>test-phase1</code> rename</td></tr>
+<tr><td>20</td><td>Auto-naming a..z,a1.. + reuse</td><td><code>educad-canvas.js:340-359</code>; <code>test-phase1</code> next point name</td></tr>
+<tr><td>21</td><td>Right-click/Escape cancel-all; no native menu</td><td><code>index.html:703-725</code>, <code>:922-939</code></td></tr>
+<tr><td>22</td><td>No move/drag/Delete/multi-select/undo</td><td>grep: <code>table.move</code>/Delete-key/undo absent from page</td></tr>
+<tr><td>23</td><td>Snap 4 wired tiers, 14/22 px, ring only</td><td><code>index.html:677-678</code>, <code>:488-498</code>; <code>edugraphics-snapping.js:19-23</code>, <code>:380-387</code></td></tr>
+<tr><td>24</td><td>PROJECTOR/LOCUS never fire in page</td><td><code>index.html:677</code> passes no station lists; <code>edugraphics-snapping.js:365-377</code> needs them</td></tr>
+<tr><td>25</td><td>Axis lock + Δ badges</td><td><code>educad-canvas.js:379-405</code>; <code>index.html:525-535</code>, <code>:885-893</code></td></tr>
+<tr><td>26</td><td>Wheel ×1.15 cursor-anchored; clamp 0.05–50</td><td><code>index.html:690-701</code>; <code>educad-viewport.js:13-14</code>, <code>:65-77</code></td></tr>
+<tr><td>27</td><td>Cosmetic 1 px/2 px, cutoff 0.35</td><td><code>educad-entities.js:157-175</code>; <code>test-phase2</code> #47–51</td></tr>
+<tr><td>28</td><td>Quadrant signs incl. Q3 demo numbers</td><td><code>educad-curriculum.js:141-144</code>; <code>index.html:999-1000</code></td></tr>
+<tr><td>29</td><td>Line demo numbers (dx=40, PL/EL, loci)</td><td><code>index.html:991-994</code>; <code>educad-curriculum.js:207-214</code></td></tr>
+<tr><td>30</td><td>Prism demo (hex, 35×70, seam, facets)</td><td><code>index.html:1006</code>; <code>educad-curriculum.js:348-389</code></td></tr>
+<tr><td>31</td><td>viewRole assignment rules</td><td><code>index.html:220</code>, <code>:240</code>, <code>:284</code>, <code>:897</code></td></tr>
+<tr><td>32</td><td>3D geometry (glass state, aura, iso pose, styles)</td><td><code>educad-solid.js:21-58</code>, <code>:773-968</code>; <code>test-phase9</code> iso/hidden, <code>test-phase14</code> glass/aura</td></tr>
+<tr><td>33</td><td>3D gestures + aura routing</td><td><code>index.html:673-748</code> route, <code>:840-859</code> wheel; <code>educad-solid.js:337-355</code>, <code>:819-863</code>, <code>:976-1000</code> tap; <code>test-phase9</code> legacy, <code>test-phase14</code> aura</td></tr>
+<tr><td>34</td><td>Live rebuild per frame; derived-only</td><td><code>index.html:1047-1070</code>; <code>educad-entities.js:247-255</code> subscribe</td></tr>
+<tr><td>35</td><td>Classes A/B/C/D + tolerances + gate 0.999</td><td><code>educad-reconstruct.js:29-34</code>, <code>:555-1339</code>; <code>test-phase10</code>, <code>test-phase13</code></td></tr>
+<tr><td>36</td><td>Circles reconstruct (D), arcs deferred + hidden warnings</td><td><code>educad-reconstruct.js:105-106</code>, <code>:1472-1515</code>; page ignores <code>warnings</code>; <code>test-phase13</code></td></tr>
+<tr><td>37</td><td>All 3D reason strings</td><td><code>educad-reconstruct.js:37-48</code> + fail call sites; §8.8</td></tr>
+<tr><td>38</td><td>Console lessons + dispatcher kinds</td><td><code>educad-curriculum.js:473-511</code></td></tr>
+<tr><td>39</td><td>Hashes #points/#prism/#mesh; default line</td><td><code>index.html:1019-1034</code></td></tr>
+<tr><td>40</td><td>No save/export/storage; no browser claims</td><td>grep: no storage/download APIs; no browser doc (marked <code>[unverified]</code>)</td></tr>
+<tr><td>41</td><td>Hand recipes §4.8 (box 8v/12e, pyramid 5v/8e)</td><td><code>EduCADReconstruct.reconstruct</code> validation (<code>ok</code>, full coverage, no warnings); cf. <code>test-phase10</code> hand-box/prism/pyramid cases</td></tr>
+<tr><td>42</td><td>In-app Manual button + generated manual page</td><td><code>index.html</code> demo bar (<code>btn-manual</code> → <code>manual.html</code>); <code>tools/build-manual.js</code>; <code>test-phase11</code></td></tr>
+</tbody>
+</table>
+<p>Line numbers refer to the files as of this writing; behavior (not line numbers) is the contract. If a line drifts, search the file for the quoted string — every quoted string in this manual appears verbatim in the code.</p>
+</main>
+<footer>
+<p>Generated from docs/MANUAL.md by tools/build-manual.js — edit the Markdown and run npm run build:manual. Links that point outside the served mirror/ folder (for example into docs/ or tools/) are shown as plain text, not links, because only mirror/ is served.</p>
+</footer>
+</body>
+</html>

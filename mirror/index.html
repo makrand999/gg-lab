@@ -42,16 +42,131 @@
       padding: 6px 12px;
       font-size: 12px;
       font-weight: 500;
+      font-family: inherit;
       color: #334155;
       cursor: pointer;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       transition: all 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
     }
     .demo-btn:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
     .demo-btn.active { background: #0284c7; color: #ffffff; border-color: #0284c7; }
+
+    /* Mobile gate: CAD canvas is desktop-only. Opaque overlay intercepts all input. */
+    #mobile-block {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: #f8fafc;
+      padding: 24px;
+    }
+    body.mobile-blocked #mobile-block { display: flex; }
+    .mobile-block-card {
+      text-align: center;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 34px 38px;
+      max-width: 440px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    }
+    .monitor-glyph {
+      display: block;
+      width: 64px;
+      height: 42px;
+      margin: 0 auto 22px;
+      border: 3px solid #334155;
+      border-radius: 5px;
+      position: relative;
+    }
+    .monitor-glyph::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      width: 4px;
+      height: 9px;
+      margin-top: 2px;
+      background: #334155;
+      transform: translateX(-50%);
+    }
+    .monitor-glyph::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 11px);
+      width: 30px;
+      height: 4px;
+      background: #334155;
+      border-radius: 2px;
+      transform: translateX(-50%);
+    }
+    .mobile-block-card h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 10px;
+    }
+    .mobile-block-card p {
+      font-size: 14px;
+      line-height: 1.55;
+      color: #475569;
+      margin-bottom: 18px;
+    }
+    .mobile-block-card .demo-btn { font-size: 13px; }
   </style>
 </head>
 <body>
+  <div id="mobile-block" role="alertdialog" aria-label="Desktop required" aria-hidden="true">
+    <div class="mobile-block-card">
+      <span class="monitor-glyph" aria-hidden="true"></span>
+      <h2>Desktop required</h2>
+      <p>The EduCAD canvas needs a keyboard, mouse, and a wide screen. Please open this page on a desktop or laptop.</p>
+      <a class="demo-btn" href="tutorials.html">Open the tutorials sheet instead</a>
+    </div>
+  </div>
+  <script>
+    // Mobile gate: block touch-only devices entirely. Runs before the CAD
+    // modules load so phones never flash the canvas. Touchscreen laptops
+    // (fine pointer present) are allowed; no dismiss, no bypass.
+    (function gateMobile() {
+      function isMobile() {
+        var coarse = false, fine = false;
+        try {
+          if (window.matchMedia) {
+            coarse = window.matchMedia('(pointer: coarse)').matches;
+            fine = window.matchMedia('(pointer: fine)').matches;
+          }
+        } catch (err) {}
+        if (coarse && !fine) return true;
+        if (fine) return false;
+        var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        var small = Math.min(window.innerWidth || 0, window.innerHeight || 0) < 720;
+        return touch && small;
+      }
+      function applyGate() {
+        var blocked = isMobile();
+        var was = document.body.classList.contains('mobile-blocked');
+        document.body.classList.toggle('mobile-blocked', blocked);
+        var ov = document.getElementById('mobile-block');
+        if (ov) ov.setAttribute('aria-hidden', blocked ? 'false' : 'true');
+        var app = document.getElementById('app-container');
+        if (app) app.inert = blocked;
+        var demo = document.querySelector('.demo-bar');
+        if (demo) demo.inert = blocked;
+        // Input environment changed mid-session (e.g. mouse plugged in): reboot cleanly.
+        if (was && !blocked && window.location && window.location.reload) window.location.reload();
+      }
+      applyGate();
+      window.addEventListener('resize', applyGate);
+      window.addEventListener('orientationchange', function() { setTimeout(applyGate, 150); });
+    })();
+  </script>
   <div id="app-container"></div>
   
   <div class="status-hud">
@@ -64,6 +179,7 @@
     <button class="demo-btn" id="btn-demo-points">Quadrant Points (1st & 3rd)</button>
     <button class="demo-btn" id="btn-demo-prism">Hexagonal Prism (35mm)</button>
     <button class="demo-btn" id="btn-clear">Clear Sheet</button>
+    <a class="demo-btn" id="btn-manual" href="manual.html" target="_blank" rel="noopener">Manual</a>
   </div>
 
   <!-- Core Modules -->
@@ -222,6 +338,8 @@
       // Line-referenced plotting: first click on a datum segment arms
       // the perpendicular preview, second click commits the candidate.
       handle.plot = EduCADCanvas.createPlotToolState();
+      // Three-point circle picks (M3): ordered Ctrl+click list, no tool.
+      handle.circlePicks = EduCADCanvas.createCirclePickState();
       function abortPlotTask() {
         EduCADCanvas.abortPlotTool(handle.plot);
       }
@@ -294,6 +412,9 @@
         var sz = EduGraphicsCommon.hidpiBufferSize(w, h, dpr);
         EduGraphicsCommon.sizeCanvasForDpr(c1, sz);
         EduGraphicsCommon.sizeCanvasForDpr(c2, sz);
+        if (handle.solid && typeof handle.solid.resize === 'function') {
+          handle.solid.resize(w, h);
+        }
         renderLayer1();
       });
 
@@ -515,6 +636,18 @@
           }
         }
 
+        // Circle picks: amber ring plus order numeral per picked point.
+        var cpicks = handle.circlePicks.picks;
+        for (var cpi = 0; cpi < cpicks.length; cpi++) {
+          var cpEnt = handle.table.get(cpicks[cpi].id);
+          if (cpEnt && cpEnt.type === 'POINT' && cpEnt.visible !== false) {
+            var cpPx = EduCADViewport.forward(handle.view, { x: cpEnt.x, y: cpEnt.y });
+            EduCADCanvas.drawSelectionRing(ctx2, cpPx.x, cpPx.y);
+            EduCADCanvas.drawKnockoutLabel(ctx2, String(cpi + 1), cpPx.x + 8, cpPx.y - 8,
+              { font: '12px sans-serif', fillStyle: '#b45309' });
+          }
+        }
+
         // Axis-lock distance readout at the cursor tip (no guidelines).
         // Suppressed on the reference vertex itself (a click, not a place).
         if (refMm && cursorPx && refPx) {
@@ -630,18 +763,98 @@
       var panStart = { x: 0, y: 0 };
       var viewStart = { tx: 0, ty: 0 };
 
+      // Full-screen 3D glass routing. The glass canvas never takes
+      // pointer events itself (pointer-events:none); these window
+      // handlers consult the wireframe aura and steer each gesture to
+      // the 3D model or the 2D sheet. On ink: drag orbits, wheel zooms,
+      // middle-drag pans. Off ink: everything reaches the sheet as if
+      // the glass were not there.
+      var solidOrbiting = false;
+      var solidPanning = false;
+      var solidLast = { x: 0, y: 0 };
+      var solidPanStart = { x: 0, y: 0 };
+      var solidSuppressClick = false;
+      var solidTap = (typeof EduCADSolid !== 'undefined' &&
+        typeof EduCADSolid.createTapState === 'function') ?
+        EduCADSolid.createTapState() : { armed: false, t: 0, x: 0, y: 0 };
+      function solidNowMs() {
+        return (window.performance && typeof window.performance.now === 'function') ?
+          window.performance.now() : Date.now();
+      }
+      function solidAt(cursor) {
+        if (!handle.solid || typeof handle.solid.hitTest !== 'function') {
+          return false;
+        }
+        try {
+          return handle.solid.hitTest(cursor.x, cursor.y);
+        } catch (err) {
+          return false;
+        }
+      }
+      // An explicit 2D construction gesture owns clicks and wheel even
+      // on 3D ink, so points stay clickable through the glass mid-task.
+      // Middle-drag pan always routes by aura (it commits nothing).
+      // Shift+left always pans the sheet; Alt+click always clicks
+      // through to the sheet. Both are escape hatches from the aura.
+      function sheetToolActive() {
+        return handle.sel.editing !== null ||
+          EduCADCanvas.isLineToolActive(handle.line) ||
+          EduCADCanvas.isPolarToolActive(handle.polar) ||
+          EduCADCanvas.isPlotToolActive(handle.plot) ||
+          handle.circlePicks.picks.length > 0;
+      }
+
       window.addEventListener('pointerdown', function (e) {
         if (e.target.closest('.edugraphics-hud') || e.target.closest('.demo-bar') || e.target.closest('.edugraphics-menu')) return;
-        if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle click or shift+left to pan
+        // Dismiss menu
+        if (EduCADCanvas.shouldDismissMenu(e)) {
+          mount.menu.classList.remove('open');
+        }
+        if (e.button === 0) solidSuppressClick = false;
+        var cursor = { x: e.clientX, y: e.clientY };
+        if (e.button === 1) { // Middle-drag: 3D pan on ink, sheet pan elsewhere
+          if (solidAt(cursor)) {
+            solidPanning = true;
+            solidPanStart = { x: e.clientX, y: e.clientY };
+            c2.style.cursor = 'move';
+            e.preventDefault();
+            return;
+          }
           isPanning = true;
           panStart = { x: e.clientX, y: e.clientY };
           viewStart = { tx: handle.view.tx, ty: handle.view.ty };
           c2.style.cursor = 'grabbing';
           e.preventDefault();
+          return;
         }
-        // Dismiss menu
-        if (EduCADCanvas.shouldDismissMenu(e)) {
-          mount.menu.classList.remove('open');
+        if (e.button === 0 && e.shiftKey) { // Shift+left always pans the sheet
+          isPanning = true;
+          panStart = { x: e.clientX, y: e.clientY };
+          viewStart = { tx: handle.view.tx, ty: handle.view.ty };
+          c2.style.cursor = 'grabbing';
+          e.preventDefault();
+          return;
+        }
+        if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.altKey &&
+            !sheetToolActive() && solidAt(cursor)) {
+          // Double-tap resets the model pose. Detected here (not via
+          // the dblclick event) because the orbit press below calls
+          // preventDefault, which suppresses the browser's
+          // compatibility mouse events including dblclick.
+          if (typeof EduCADSolid.tapHit === 'function' &&
+              EduCADSolid.tapHit(solidTap, solidNowMs(), e.clientX, e.clientY)) {
+            handle.solid.resetView();
+            solidSuppressClick = true;
+            c2.style.cursor = 'grab';
+            e.preventDefault();
+            return;
+          }
+          solidOrbiting = true;
+          solidLast = { x: e.clientX, y: e.clientY };
+          solidSuppressClick = true;
+          c2.style.cursor = 'grabbing';
+          e.preventDefault();
+          return;
         }
       });
 
@@ -660,6 +873,27 @@
           planeInd.className = 'plane-tag plane-hp';
         }
 
+        if (solidOrbiting) {
+          var odx = e.clientX - solidLast.x, ody = e.clientY - solidLast.y;
+          if (odx !== 0 || ody !== 0) {
+            // Moved: a drag, not a tap (mirrors OS click semantics).
+            if (typeof EduCADSolid.invalidateTap === 'function') {
+              EduCADSolid.invalidateTap(solidTap);
+            } else {
+              solidTap.armed = false;
+            }
+            handle.solid.orbitBy(odx, ody);
+            solidLast = { x: e.clientX, y: e.clientY };
+          }
+          c2.style.cursor = 'grabbing';
+          return;
+        }
+        if (solidPanning) {
+          handle.solid.panBy(e.clientX - solidPanStart.x, e.clientY - solidPanStart.y);
+          solidPanStart = { x: e.clientX, y: e.clientY };
+          c2.style.cursor = 'move';
+          return;
+        }
         if (isPanning) {
           handle.view.tx = viewStart.tx + (e.clientX - panStart.x);
           handle.view.ty = viewStart.ty + (e.clientY - panStart.y);
@@ -668,13 +902,46 @@
           return;
         }
 
+        // Hover on 3D ink: grab cursor, snap preview off (3D owns this
+        // spot). UI chrome never triggers the aura.
+        if (!sheetToolActive() &&
+            !e.target.closest('.edugraphics-hud') &&
+            !e.target.closest('.demo-bar') &&
+            !e.target.closest('.edugraphics-menu') &&
+            solidAt(cursor)) {
+          c2.style.cursor = 'grab';
+          renderLayer2(cursor, null);
+          return;
+        }
+        if (!EduCADCanvas.isLineToolActive(handle.line)) {
+          c2.style.cursor = '';
+        }
+
         // Snapping candidate check
         var snapResult = EduCADSnapping.snapAt(cursor, handle.view, { entities: handle.table.list() }, handle.snapCurrent);
         handle.snapCurrent = snapResult.snap;
         renderLayer2(cursor, snapResult);
       });
 
-      window.addEventListener('pointerup', function () {
+      window.addEventListener('pointerup', function (e) {
+        if (solidOrbiting || solidPanning) {
+          solidOrbiting = false;
+          solidPanning = false;
+          var upAt = (e && isFinite(e.clientX) && isFinite(e.clientY)) ?
+            { x: e.clientX, y: e.clientY } : null;
+          c2.style.cursor = (upAt && !sheetToolActive() && solidAt(upAt)) ?
+            'grab' : '';
+        }
+        if (isPanning) {
+          isPanning = false;
+          c2.style.cursor = 'default';
+        }
+      });
+
+      window.addEventListener('pointercancel', function () {
+        solidOrbiting = false;
+        solidPanning = false;
+        solidSuppressClick = false;
         if (isPanning) {
           isPanning = false;
           c2.style.cursor = 'default';
@@ -684,8 +951,24 @@
       // Wheel Zoom anchored at cursor
       window.addEventListener('wheel', function (e) {
         if (e.target.closest('.demo-bar')) return;
-        e.preventDefault();
         var cursor = { x: e.clientX, y: e.clientY };
+        if (!sheetToolActive() &&
+            !e.target.closest('.edugraphics-hud') &&
+            !e.target.closest('.edugraphics-menu') &&
+            solidAt(cursor)) {
+          // Smooth 3D zoom into the ink: continuous exponential step
+          // (trackpad-friendly), clamped per event against jumps.
+          var dy = e.deltaY;
+          if (e.deltaMode === 1) dy *= 16;
+          var zf = Math.exp(-dy * 0.0016);
+          if (!(zf > 0)) zf = 1;
+          if (zf > 1.25) zf = 1.25;
+          if (zf < 0.8) zf = 0.8;
+          handle.solid.zoomAt(cursor.x, cursor.y, zf);
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
         var factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
         var nv = EduCADViewport.zoomAt(handle.view, cursor, factor);
         handle.view.s = nv.s;
@@ -703,7 +986,8 @@
         if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
             EduCADCanvas.isLineToolActive(handle.line) ||
             EduCADCanvas.isPolarToolActive(handle.polar) ||
-            EduCADCanvas.isPlotToolActive(handle.plot)) {
+            EduCADCanvas.isPlotToolActive(handle.plot) ||
+            handle.circlePicks.picks.length > 0) {
           e.preventDefault();
           if (typeof e.stopPropagation === 'function') e.stopPropagation();
           EduCADCanvas.deselect(handle.sel);
@@ -711,6 +995,7 @@
           abortLineTask();
           abortPolarTask();
           abortPlotTask();
+          EduCADCanvas.clearCirclePicks(handle.circlePicks);
           mount.menu.classList.remove('open');
           renderLayer1();
           renderLayer2(null, null);
@@ -726,12 +1011,14 @@
         if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
             EduCADCanvas.isLineToolActive(handle.line) ||
             EduCADCanvas.isPolarToolActive(handle.polar) ||
-            EduCADCanvas.isPlotToolActive(handle.plot)) {
+            EduCADCanvas.isPlotToolActive(handle.plot) ||
+            handle.circlePicks.picks.length > 0) {
           EduCADCanvas.deselect(handle.sel);
           stopCaretTimer();
           abortLineTask();
           abortPolarTask();
           abortPlotTask();
+          EduCADCanvas.clearCirclePicks(handle.circlePicks);
           mount.menu.classList.remove('open');
           renderLayer1();
           renderLayer2(null, null);
@@ -766,31 +1053,67 @@
       // Left click: existing point becomes the reference; empty canvas
       // places a new point (axis-locked when a reference is active).
       c2.addEventListener('click', function (e) {
+        // A press that started on 3D ink belongs to the model (orbit),
+        // never to the sheet: swallow the click it trails.
+        if (solidSuppressClick) { solidSuppressClick = false; return; }
         if (e.button !== 0 || e.shiftKey) return;
         var cursor = { x: e.clientX, y: e.clientY };
         // Ctrl+click anchors (or re-anchors) both construction tools
-        // on a point; the next click resolves the shared anchor.
+        // on a point; the next click resolves the shared anchor. When
+        // idle, Ctrl+click grows the three-point circle pick list.
         if (e.ctrlKey || e.metaKey) {
-          var cid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
-          if (cid === null) {
-            if (EduCADCanvas.isLineToolActive(handle.line) ||
-                EduCADCanvas.isPolarToolActive(handle.polar) ||
-                EduCADCanvas.isPlotToolActive(handle.plot)) {
+          if (EduCADCanvas.isLineToolActive(handle.line) ||
+              EduCADCanvas.isPolarToolActive(handle.polar)) {
+            var cid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
+            if (cid === null) {
               abortLineTask();
               abortPolarTask();
               abortPlotTask();
               renderLayer1();
               renderLayer2(cursor, null);
+            } else {
+              var cent = handle.table.get(cid);
+              abortPlotTask();
+              EduCADCanvas.anchorLineTool(handle.line, cid, cent.x, cent.y);
+              EduCADCanvas.anchorPolarTool(handle.polar, cid, cent.x, cent.y);
+              hideLineMenu();
+              setLineCursor(true);
+              renderLayer2(cursor, null);
             }
-          } else {
-            var cent = handle.table.get(cid);
-            abortPlotTask();
-            EduCADCanvas.anchorLineTool(handle.line, cid, cent.x, cent.y);
-            EduCADCanvas.anchorPolarTool(handle.polar, cid, cent.x, cent.y);
-            hideLineMenu();
-            setLineCursor(true);
-            renderLayer2(cursor, null);
+            return;
           }
+          abortPlotTask();
+          var pid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
+          if (pid === null) {
+            var wfree = EduCADViewport.inverse(handle.view, cursor);
+            var pname = EduCADCanvas.nextPointName(handle.table.list());
+            var placed = handle.table.create('POINT', {
+              x: wfree.x, y: wfree.y, name: pname, caption: pname, showLabel: true,
+              bisCode: 'B', viewRole: wfree.y >= 0 ? 'ELEVATION' : 'PLAN'
+            });
+            EduCADCanvas.toggleCirclePick(handle.circlePicks, placed.id, placed.x, placed.y);
+          } else {
+            var pent = handle.table.get(pid);
+            EduCADCanvas.toggleCirclePick(handle.circlePicks, pid, pent.x, pent.y);
+          }
+          if (handle.circlePicks.picks.length >= EduCADCanvas.CIRCLE_PICK_MAX) {
+            var pk = handle.circlePicks.picks;
+            var cres = EduCADCanvas.circleFromThreePoints(pk[0], pk[1], pk[2]);
+            if (cres.ok) {
+              var rMin = EduCADEntities.RADIUS_MIN_MM;
+              var rr = cres.r < rMin ? rMin : cres.r;
+              handle.table.create('CIRCLE', {
+                x: cres.x, y: cres.y, radius: rr,
+                bisCode: 'A', viewRole: cres.y >= 0 ? 'ELEVATION' : 'PLAN',
+                caption: '', showLabel: false, meta: { kind: 'user-circle' }
+              });
+            } else if (typeof console !== 'undefined' && console.warn) {
+              console.warn('EduCAD circle: ' + cres.message);
+            }
+            EduCADCanvas.clearCirclePicks(handle.circlePicks);
+          }
+          renderLayer1();
+          renderLayer2(cursor, null);
           return;
         }
         if (handle.line.phase === 'animating') return;
@@ -867,6 +1190,7 @@
         if (id !== null) {
           if (handle.sel.editing && handle.sel.editing.id === id) return;
           if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
+          EduCADCanvas.clearCirclePicks(handle.circlePicks);
           EduCADCanvas.selectPoint(handle.sel, id);
           stopCaretTimer();
           renderLayer1();
@@ -898,6 +1222,17 @@
       // Double-click a point starts on-site renaming (single click only
       // selects). The two preceding clicks harmlessly re-select first.
       c2.addEventListener('dblclick', function (e) {
+        // Fallback reset for browsers that still deliver a dblclick
+        // after a preventDefaulted press (Chrome suppresses it; the
+        // press-path double-tap above is the primary reset, and a
+        // second reset here is idempotent). Anywhere else keeps the
+        // rename behavior.
+        var dcur = { x: e.clientX, y: e.clientY };
+        if (!e.altKey && !sheetToolActive() && solidAt(dcur)) {
+          handle.solid.resetView();
+          e.preventDefault();
+          return;
+        }
         if (EduCADCanvas.isLineToolActive(handle.line) ||
             EduCADCanvas.isPolarToolActive(handle.polar)) return;
         var cursor = { x: e.clientX, y: e.clientY };
@@ -919,12 +1254,14 @@
           if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
               EduCADCanvas.isLineToolActive(handle.line) ||
               EduCADCanvas.isPolarToolActive(handle.polar) ||
-              EduCADCanvas.isPlotToolActive(handle.plot)) {
+              EduCADCanvas.isPlotToolActive(handle.plot) ||
+              handle.circlePicks.picks.length > 0) {
             EduCADCanvas.deselect(handle.sel);
             stopCaretTimer();
             abortLineTask();
             abortPolarTask();
             abortPlotTask();
+            EduCADCanvas.clearCirclePicks(handle.circlePicks);
             renderLayer1();
             renderLayer2(null, null);
             e.preventDefault();
@@ -978,6 +1315,7 @@
         abortLineTask();
         abortPolarTask();
         abortPlotTask();
+        EduCADCanvas.clearCirclePicks(handle.circlePicks);
         document.querySelectorAll('.demo-btn').forEach(function(b) { b.classList.remove('active'); });
 
         if (type === 'line') {
@@ -1029,14 +1367,22 @@
       }
       renderLayer1();
 
-      // Floating 3D wireframe cube: transparent stage in the top-right
-      // drafting quadrant. All of its pointer/wheel input is isolated
-      // inside the widget so sheet pan/zoom and drawing tools never fire.
-      if (typeof EduCADSolid !== 'undefined') {
+      // Full-screen 3D glass: the model floats on a transparent sheet
+      // over the whole window (no widget box). The sheet edge is the
+      // only zoom bound; middle-drag pans any part back into view. The
+      // glass captures the mouse only in the wireframe aura (see the
+      // window pointer/wheel routing above); everywhere else the 2D
+      // sheet works exactly as before.
+      if (typeof EduCADSolid !== 'undefined' &&
+          typeof EduCADSolid.mountSolidGlass === 'function') {
+        handle.solid = EduCADSolid.mountSolidGlass(container, {
+          w: window.innerWidth, h: window.innerHeight, dpr: dpr
+        });
+      } else if (typeof EduCADSolid !== 'undefined') {
         handle.solid = EduCADSolid.mountSolidWidget(container, { size: 260 });
       }
 
-      // Live 2D -> 3D bridge: every table change rebuilds the widget from
+      // Live 2D -> 3D bridge: every table change rebuilds the glass from
       // the current visible drawing, coalesced to one frame. 3D truth is
       // derived and ephemeral; nothing is stored on entities.
       if (handle.solid && typeof EduCADReconstruct !== 'undefined' &&

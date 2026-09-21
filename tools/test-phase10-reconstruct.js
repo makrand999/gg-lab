@@ -258,10 +258,21 @@ eq(r27a.reason, 'missing-view');
 eq(r27a.label, 'empty sheet');
 eq(R.reconstruct(planRect(0, -40, 30, -10)).reason, 'missing-view');
 pass('phase10 missing-view named');
-// 28 cylinder and cone defer curves
-eq(R.reconstruct(C.regularSolid({ solid: 'CYLINDER' }).entities).reason, 'unsupported-curves');
-eq(R.reconstruct(C.regularSolid({ solid: 'CONE' }).entities).reason, 'unsupported-curves');
-pass('phase10 curves deferred');
+// 28 M3 Class D: cylinder/cone reconstruct; arcs stay deferred
+var r28c = R.reconstruct(C.regularSolid({ solid: 'CYLINDER' }).entities);
+eq(r28c.status, 'ok');
+eq(r28c.class, 'D');
+eq(r28c.geometry.vertices.length, 48);
+eq(r28c.geometry.edges.length, 72);
+eq(r28c.geometry.faces.length, 26);
+var r28k = R.reconstruct(C.regularSolid({ solid: 'CONE' }).entities);
+eq(r28k.status, 'ok');
+eq(r28k.class, 'D');
+eq(r28k.geometry.vertices.length, 25);
+eq(r28k.geometry.edges.length, 48);
+eq(r28k.geometry.faces.length, 25);
+eq(R.reconstruct([{ type: 'CIRCULAR_ARC', x: 0, y: -25, x2: 5, y2: -20, radius: 17.5, startAngle: 0, endAngle: 1, bisCode: 'A', viewRole: 'PLAN' }]).reason, 'unsupported-curves');
+pass('phase10 cylinders cones ok arcs deferred');
 // 29 deterministic under reorder and rerun
 var ents29 = boxBoth();
 var a29 = R.reconstruct(ents29);

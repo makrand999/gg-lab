@@ -6,17 +6,20 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD two-view reconstruction: plan + elevation drawings resolve to a
-  // 3D wireframe in widget space (X, Y, Z) = (sheetX, elevY, -planY) with Y
-  // up and Z toward the viewer. Zero deps. Dual-env: browser via
+  // EduCAD two/three-view reconstruction: plan + elevation drawings, with
+  // an optional first-angle profile (side) view, resolve to a 3D wireframe
+  // in widget space (X, Y, Z) = (sheetX, elevY, -planY) with Y up and Z
+  // toward the viewer. Zero deps. Dual-env: browser via
   // window.EduCADReconstruct, plain Node via module.exports. Node-safe.
   //
   // Interpretation contract (locked): 3D point (x, d, h) reads as elevation
-  // (x, h) and plan (x, -d); viewRole wins when PLAN/ELEVATION and BOTH is
-  // classified by y-sign; dimensions/text/datum axes, meta.kind in
-  // {projector, locus, axis}, and sheet-vertical lines crossing XY are
-  // filtered out. Round-trip projection is the acceptance gate: drawn
-  // geometry must be covered by the reconstruction within tolerance.
+  // (x, h) and plan (x, -d); viewRole wins when PLAN/ELEVATION/PROFILE and
+  // BOTH is classified by y-sign plus a plan-x-overlap profile split;
+  // dimensions/text/datum axes, meta.kind in {projector, locus, axis}, and
+  // sheet-vertical lines crossing XY are filtered out. A profile depth d
+  // reads at xRef + s * (d - dRef); round-trip projection is the
+  // acceptance gate: drawn geometry must be covered by the reconstruction
+  // within tolerance.
   //
   // Strategy is recognize-then-verify (profile first): closed loops are
   // found per view, class hypotheses (A prismatic sweep, B pyramid with
@@ -33,6 +36,7 @@
   var LOOSE_EPS_MM = 2.5;
   var COVERAGE_GATE = 0.999;
   var VERTICAL_EPS = 1e-9;
+  var RIM_K = 24;
 
   var REASON_LABELS = {
     'missing-view': 'needs both plan and elevation views',
@@ -111,16 +115,78 @@
     return { kept: kept, curves: curves, dropped: dropped };
   }
 
-  // --- View classification (§3.3): viewRole wins when PLAN/ELEVATION;
-  // BOTH falls back to midpoint y-sign. Entities exactly on XY with no
-  // off-datum end are set aside with a warning.
-  function classifyViews(kept) {
-    var plan = [], elev = [], onDatum = [];
-    for (var i = 0; i < kept.length; i++) {
-      var e = kept[i];
+  // --- View classification (§3.3 + M2 third view): viewRole wins when
+  // PLAN/ELEVATION/PROFILE; BOTH falls back to midpoint y-sign. Entities
+  // exactly on XY with no off-datum end are set aside with a warning.
+  // Untagged upper entities are then split by plan-x overlap: the cluster
+  // aligning with the plan x-range stays elevation, a disjoint cluster is
+  // the profile view. The split only commits when the profile reading is
+  // confirmed (tagged PROFILE, or an untagged cluster that width/height
+  // matches); otherwise every bucket is exactly the legacy two-view
+  // reading, so two-view behavior is bit-for-bit unchanged.
+  function entityXRange(e) {
+    var x1 = (e.x === undefined) ? 0 : e.x;
+    var x2 = (e.x2 === undefined) ? x1 : e.x2;
+    return { x0: Math.min(x1, x2), x1: Math.max(x1, x2) };
+  }
+
+  function entityYRange(e) {
+    var y1 = (e.y === undefined) ? 0 : e.y;
+    var y2 = (e.y2 === undefined) ? y1 : e.y2;
+    return { y0: Math.min(y1, y2), y1: Math.max(y1, y2) };
+  }
+
+  function rangeOver(items) {
+    var r = null;
+    for (var i = 0; i < items.length; i++) {
+      var xr = entityXRange(items[i]), yr = entityYRange(items[i]);
+      if (!r) {
+        r = { x0: xr.x0, x1: xr.x1, y0: yr.y0, y1: yr.y1 };
+      } else {
+        if (xr.x0 < r.x0) r.x0 = xr.x0;
+        if (xr.x1 > r.x1) r.x1 = xr.x1;
+        if (yr.y0 < r.y0) r.y0 = yr.y0;
+        if (yr.y1 > r.y1) r.y1 = yr.y1;
+      }
+    }
+    return r;
+  }
+
+  function isDiagonal45(e, tol) {
+    if (e.type !== 'SEGMENT' && e.type !== 'LINE' && e.type !== 'RAY') {
+      return false;
+    }
+    var dx = Math.abs(e.x2 - e.x), dy = Math.abs(e.y2 - e.y);
+    if (!(dx > 0) && !(dy > 0)) return false;
+    return Math.abs(dx - dy) <= tol;
+  }
+
+  function inInterval(x, x0, x1, tol) {
+    return x >= x0 - tol && x <= x1 + tol;
+  }
+
+  // Endpoint sort vs the plan x-anchor: 'in' (both ends in), 'out'
+  // (both ends out), 'span' (straddling the view boundary).
+  function spanKind(e, anchor, epsT) {
+    var x1 = (e.x === undefined) ? 0 : e.x;
+    var x2 = (e.x2 === undefined) ? x1 : e.x2;
+    var in1 = inInterval(x1, anchor.x0, anchor.x1, epsT);
+    var in2 = inInterval(x2, anchor.x0, anchor.x1, epsT);
+    if (in1 && in2) return 'in';
+    if (!in1 && !in2) return 'out';
+    return 'span';
+  }
+
+  function classifyViews(kept, epsOpt, curvesOpt) {
+    var epsT = (epsOpt === undefined) ? MATCH_EPS_MM : epsOpt;
+    var plan = [], elev = [], profile = [], onDatum = [];
+    var i, e, my;
+    for (i = 0; i < kept.length; i++) {
+      e = kept[i];
       if (e.viewRole === 'PLAN') { plan.push(e); continue; }
       if (e.viewRole === 'ELEVATION') { elev.push(e); continue; }
-      var my = ((e.y === undefined ? 0 : e.y) +
+      if (e.viewRole === 'PROFILE') { profile.push(e); continue; }
+      my = ((e.y === undefined ? 0 : e.y) +
         (e.y2 === undefined ? 0 : e.y2)) / 2;
       if (my > 0) { elev.push(e); continue; }
       if (my < 0) { plan.push(e); continue; }
@@ -128,12 +194,152 @@
       if (e.y < 0 || e.y2 < 0) { plan.push(e); continue; }
       onDatum.push(e);
     }
-    return { plan: plan, elev: elev, onDatum: onDatum };
+    // Tentative plan x-anchor over the lower pool, blind to 45-degree
+    // diagonals so a miter line cannot widen it (solid 45-degree plan
+    // edges stay inside the anchor and are never mistaken for helpers).
+    var anchorItems = [];
+    for (i = 0; i < plan.length; i++) {
+      if (!isDiagonal45(plan[i], LOOSE_EPS_MM)) anchorItems.push(plan[i]);
+    }
+    var anchorR = rangeOver(anchorItems);
+    var anchor = anchorR ? { x0: anchorR.x0, x1: anchorR.x1 } : null;
+    if (Array.isArray(curvesOpt)) {
+      for (var ci = 0; ci < curvesOpt.length; ci++) {
+        var cc = curvesOpt[ci];
+        if (!cc || cc.type !== 'CIRCLE') continue;
+        if (cc.bisCode !== 'A' && cc.bisCode !== 'B') continue;
+        var isPlan = false;
+        if (cc.viewRole === 'PLAN') isPlan = true;
+        else if (cc.viewRole === 'ELEVATION' || cc.viewRole === 'PROFILE') {
+          isPlan = false;
+        } else {
+          var cyy = (cc.y === undefined) ? 0 : cc.y;
+          isPlan = cyy < 0;
+        }
+        if (!isPlan) continue;
+        var cocx0 = cc.x - cc.radius, cocx1 = cc.x + cc.radius;
+        if (!anchor) anchor = { x0: cocx0, x1: cocx1 };
+        else {
+          if (cocx0 < anchor.x0) anchor.x0 = cocx0;
+          if (cocx1 > anchor.x1) anchor.x1 = cocx1;
+        }
+      }
+    }
+    // Miter candidates: untagged lower 45-degree diagonals x-disjoint
+    // from the anchor that reach up to the datum. Dropped only when a
+    // profile view is confirmed (same side as the profile).
+    var miterCands = [];
+    if (anchor) {
+      for (i = 0; i < plan.length; i++) {
+        e = plan[i];
+        if (e.viewRole === 'PLAN') continue;
+        if (!isDiagonal45(e, LOOSE_EPS_MM)) continue;
+        var mr = entityXRange(e);
+        if (mr.x1 >= anchor.x0 - epsT && mr.x0 <= anchor.x1 + epsT) continue;
+        if (entityYRange(e).y1 < -epsT) continue;
+        miterCands.push(e);
+      }
+    }
+    // Upper split vs the anchor. Tagged ELEVATION stays; untagged
+    // degenerate-x entities (points, verticals) sort by station;
+    // untagged wide entities sort by endpoint: both ends in = elevation,
+    // both ends out = profile tentative, straddling = span helper.
+    var elevKeep = [], profTent = [], spanTent = [];
+    if (!anchor) {
+      elevKeep = elev.slice();
+    } else {
+      for (i = 0; i < elev.length; i++) {
+        e = elev[i];
+        if (e.viewRole === 'ELEVATION') { elevKeep.push(e); continue; }
+        var er = entityXRange(e);
+        if (er.x1 - er.x0 <= epsT) {
+          if (inInterval((er.x0 + er.x1) / 2, anchor.x0, anchor.x1, epsT)) {
+            elevKeep.push(e);
+          } else {
+            profTent.push(e);
+          }
+          continue;
+        }
+        var kind = spanKind(e, anchor, epsT);
+        if (kind === 'in') { elevKeep.push(e); continue; }
+        if (kind === 'out') { profTent.push(e); continue; }
+        spanTent.push(e);
+      }
+    }
+    // Confirmation: tagged PROFILE declares a three-view sheet outright.
+    // An untagged profile cluster must earn it: at least one drawn
+    // segment (point-only clusters need explicit tags), profile width
+    // matching plan depth, profile height matching elevation height.
+    var confirmed = profile.length > 0;
+    var profR = rangeOver(profTent);
+    if (!confirmed && profR) {
+      var hasSeg = false;
+      for (i = 0; i < profTent.length; i++) {
+        if (profTent[i].type !== 'POINT') { hasSeg = true; break; }
+      }
+      var planR = rangeOver(anchorItems);
+      var elevR = rangeOver(elevKeep);
+      if (hasSeg && planR && elevR &&
+          Math.abs((profR.x1 - profR.x0) - (planR.y1 - planR.y0)) <= epsT &&
+          Math.abs(profR.y0 - elevR.y0) <= epsT &&
+          Math.abs(profR.y1 - elevR.y1) <= epsT) {
+        confirmed = true;
+      }
+    }
+    var droppedHelpers = [];
+    if (confirmed && (profile.length > 0 || profTent.length > 0)) {
+      var sideR = rangeOver(profile.concat(profTent));
+      var anchorMid = anchor ? (anchor.x0 + anchor.x1) / 2 : 0;
+      var profMid = (sideR.x0 + sideR.x1) / 2;
+      var profSide = profMid >= anchorMid ? 1 : -1;
+      var keptPlan = [];
+      for (i = 0; i < plan.length; i++) {
+        e = plan[i];
+        var isMiter = miterCands.indexOf(e) !== -1;
+        if (isMiter) {
+          var ecr = entityXRange(e);
+          var mSide = ((ecr.x0 + ecr.x1) / 2 >= anchorMid) ? 1 : -1;
+          if (mSide === profSide) { droppedHelpers.push(e); continue; }
+        }
+        keptPlan.push(e);
+      }
+      plan = keptPlan;
+      elev = elevKeep;
+      for (i = 0; i < spanTent.length; i++) droppedHelpers.push(spanTent[i]);
+      profile = profile.concat(profTent);
+      // On-datum lines in a confirmed three-view sheet: spanners are
+      // construction (drop), disjoint lines belong to the profile view,
+      // in-range lines stay genuinely ambiguous (datum variants).
+      var keptDatum = [];
+      for (i = 0; i < onDatum.length; i++) {
+        e = onDatum[i];
+        if (anchor) {
+          var er = entityXRange(e);
+          if (er.x1 - er.x0 <= epsT) {
+            if (!inInterval((er.x0 + er.x1) / 2,
+                anchor.x0, anchor.x1, epsT)) {
+              profile.push(e);
+              continue;
+            }
+          } else {
+            var dk = spanKind(e, anchor, epsT);
+            if (dk === 'span') { droppedHelpers.push(e); continue; }
+            if (dk === 'out') { profile.push(e); continue; }
+          }
+        }
+        keptDatum.push(e);
+      }
+      onDatum = keptDatum;
+    }
+    return {
+      plan: plan, elev: elev, profile: profile, onDatum: onDatum,
+      droppedHelpers: droppedHelpers
+    };
   }
 
   // Adaptive weld tolerance: exact for generated drawings, forgiving for
   // hand-drawn ones. Floor is the locked coincident tolerance.
-  function weldTolerance(planItems, elevItems) {
+  function weldTolerance(planItems, elevItems, profileItems) {
     var minX = Infinity, maxX = -Infinity;
     var minY = Infinity, maxY = -Infinity;
     var n = 0;
@@ -146,6 +352,7 @@
       n++;
     }
     var all = planItems.concat(elevItems);
+    if (profileItems) all = all.concat(profileItems);
     for (var i = 0; i < all.length; i++) {
       var e = all[i];
       if (e.type === 'POINT') { eat(e.x, e.y); continue; }
@@ -548,11 +755,109 @@
     };
   }
 
+  // --- M2 third view: a plan depth d reads in the profile at local x
+  // x'(d) = xRef + s * (d - dRef), with s = +1 (direct) or -1 (mirrored)
+  // and dRef the near depth edge. Both orientations are always tried in
+  // fixed order; the drawing (not a convention guess) picks the winner.
+  function inferProfileMaps(dRef, p0, p1) {
+    return [
+      { xRef: p0, s: 1, dRef: dRef },
+      { xRef: p1, s: -1, dRef: dRef }
+    ];
+  }
+
+  function mapDepth(map, d) {
+    return map.xRef + map.s * (d - map.dRef);
+  }
+
+  // Distinct plan-loop depths, mirroring loopStations (which reads x).
+  function loopDepths(graph, loop, tol) {
+    var ds = [];
+    for (var i = 0; i < loop.order.length; i++) {
+      ds.push(-graph.verts[loop.order[i]].y);
+    }
+    ds.sort(function (a, b) { return a - b; });
+    var out = [];
+    for (var j = 0; j < ds.length; j++) {
+      if (out.length === 0 || Math.abs(ds[j] - out[out.length - 1]) > tol) {
+        out.push(ds[j]);
+      }
+    }
+    return out;
+  }
+
+  // Profile validation for Class A: the swept silhouette in the profile
+  // is the mapped depth span crossed with [z0, z1], with verticals at the
+  // mapped plan-loop depth stations. Rules mirror the elevation side.
+  // Returns a fail object, or {pass, coverage} when the map fits.
+  function checkPrismProfile(profG, depths, z0, z1, map, eps, stol) {
+    var px = [];
+    var pi;
+    for (pi = 0; pi < depths.length; pi++) px.push(mapDepth(map, depths[pi]));
+    var plo = Math.min.apply(null, px), phi = Math.max.apply(null, px);
+    var pr = drawnRangeAB(profG);
+    if (!pr) {
+      return fail('unmatched-edge', 'profile shows no prism extent', 0);
+    }
+    if (Math.abs(pr.x0 - plo) > eps || Math.abs(pr.x1 - phi) > eps) {
+      return fail('x-mismatch', 'profile x-range [' + pr.x0 + ', ' +
+        pr.x1 + '] vs mapped depth [' + plo + ', ' + phi + '] beyond eps', 0);
+    }
+    var onProf = onPrismElevLines(px, z0, z1);
+    var si, s, a, b, okLine, qx, qy;
+    for (si = 0; si < profG.segs.length; si++) {
+      s = profG.segs[si];
+      if (s.item.bisCode === 'E') continue;
+      a = profG.verts[s.a];
+      b = profG.verts[s.b];
+      okLine = true;
+      for (var m = 0; m < 5; m++) {
+        var u = m / 4;
+        qx = a.x + (b.x - a.x) * u;
+        qy = a.y + (b.y - a.y) * u;
+        if (!onProf(qx, qy, stol)) { okLine = false; break; }
+      }
+      if (!okLine) {
+        return fail('unmatched-edge', 'profile ' +
+          describeEntity(s.item, s.idx) + ' fits no prism line', 0);
+      }
+    }
+    if (!hCovered(profG, z0, plo, phi, stol)) {
+      return fail('unmatched-edge',
+        'profile misses the base line at y=' + z0, 0);
+    }
+    if (!hCovered(profG, z1, plo, phi, stol)) {
+      return fail('unmatched-edge',
+        'profile misses the top line at y=' + z1, 0);
+    }
+    for (si = 0; si < px.length; si++) {
+      if (!vCovered(profG, px[si], z0, z1, stol)) {
+        return fail('unmatched-edge',
+          'profile misses the vertical at x=' + px[si], 0);
+      }
+    }
+    var inside = rectInside(plo, phi, z0, z1);
+    var eOk = eSegsContained(profG.segs, profG.verts, inside, stol, 5);
+    if (!eOk.ok) {
+      return fail('unmatched-edge', 'profile hidden ' +
+        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
+    }
+    for (si = 0; si < profG.points.length; si++) {
+      var pv = profG.verts[profG.points[si].v];
+      if (!onProf(pv.x, pv.y, eps)) {
+        return fail('unmatched-point', 'profile point ' +
+          describeEntity(profG.points[si].item, profG.points[si].idx) +
+          ' sits off the prism lines', 0);
+      }
+    }
+    return { pass: true, coverage: viewCoverage(profG, onProf, inside, stol) };
+  }
+
   // --- Class A: prismatic sweep of the plan loop over [z0, z1]. ---
   // Same-view checks use the weld tol; cross-view checks (plan stations
   // vs drawn elevation) use the structural tol, since paired stations
   // may legitimately differ by up to eps.
-  function tryPrism(planG, elevG, planLoop, eps, tol) {
+  function tryPrism(planG, elevG, planLoop, eps, tol, profG) {
     if (!planLoop) return null;
     var stol = Math.max(tol, eps);
     var solid = loopSolidity(planG, planLoop, tol);
@@ -656,6 +961,28 @@
           ' sits off the prism lines', 0);
       }
     }
+    // M2: with a profile view, both depth orientations are tried in
+    // fixed order; the first passing map wins (the solid derives from
+    // plan/elevation alone, so dual-pass solids are identical and the
+    // pick is deterministic, never a guess). Two failing maps report
+    // the direct map's failure.
+    var profMap = null, profRes = null;
+    if (profG) {
+      var pDepths = loopDepths(planG, planLoop, tol);
+      var pr0 = drawnRangeAB(profG);
+      if (!pr0) {
+        return fail('unmatched-edge', 'profile shows no prism extent', 0);
+      }
+      var pMaps = inferProfileMaps(pDepths[0], pr0.x0, pr0.x1);
+      var pFirstErr = null;
+      for (var pmi = 0; pmi < pMaps.length; pmi++) {
+        var pTry = checkPrismProfile(profG, pDepths, z0, z1,
+          pMaps[pmi], eps, stol);
+        if (pTry.pass) { profMap = pMaps[pmi]; profRes = pTry; break; }
+        if (!pFirstErr) pFirstErr = pTry;
+      }
+      if (!profMap) return pFirstErr;
+    }
     var n = planLoop.order.length;
     var verts = [];
     for (si = 0; si < n; si++) {
@@ -691,18 +1018,24 @@
       loopInside(planG, planLoop), tol);
     var covElev = viewCoverage(elevG, onElev,
       rectInside(xL, xR, z0, z1), stol);
-    var cov = Math.min(covPlan, covElev);
+    var covProfA = profRes ? profRes.coverage : 1;
+    var cov = Math.min(covPlan, covElev, covProfA);
     if (cov < COVERAGE_GATE) {
       return fail('coverage-failed',
         'prism round-trip coverage ' + cov.toFixed(3), cov);
     }
-    return {
+    var outA = {
       pass: true, class: 'A', coverage: cov,
       totalLength: totalLength(verts, edges),
       geometry: { name: 'prism', vertices: verts, edges: edges, faces: faces },
       coveragePlan: covPlan, coverageElev: covElev,
       canonical: canonicalOf(verts, edges)
     };
+    if (profG) {
+      outA.coverageProfile = covProfA;
+      outA.profileMap = profMap;
+    }
+    return outA;
   }
 
   function onPyramidElevLines(xL, xR, xa, z0, z1) {
@@ -728,9 +1061,105 @@
     };
   }
 
+  function pyramidTriIn(xL, xR, xa, z0, z1) {
+    return function (qx, qy, t2) {
+      if (qy < z0 - t2 || qy > z1 + t2) return false;
+      var f = (qy - z0) / (z1 - z0);
+      var xl = xL + (xa - xL) * f, xr = xR + (xa - xR) * f;
+      var lo = Math.min(xl, xr) - t2, hi = Math.max(xl, xr) + t2;
+      return qx >= lo && qx <= hi;
+    };
+  }
+
+  // Profile validation for Class B: base line plus slants to the mapped
+  // apex, mirroring the elevation side. Returns a fail object, or
+  // {pass, coverage} when the map fits.
+  function checkPyramidProfile(profG, dLo, dHi, da, z0, z1, map, eps, tol, stol) {
+    var plo = Math.min(mapDepth(map, dLo), mapDepth(map, dHi));
+    var phi = Math.max(mapDepth(map, dLo), mapDepth(map, dHi));
+    var pr = drawnRangeAB(profG);
+    if (!pr) {
+      return fail('unmatched-edge', 'profile shows no pyramid extent', 0);
+    }
+    if (Math.abs(pr.x0 - plo) > eps || Math.abs(pr.x1 - phi) > eps) {
+      return fail('x-mismatch', 'profile x-range [' + pr.x0 + ', ' +
+        pr.x1 + '] vs mapped depth [' + plo + ', ' + phi + '] beyond eps', 0);
+    }
+    var xa = mapDepth(map, da);
+    var profApex = null;
+    for (var ei = 0; ei < profG.points.length; ei++) {
+      var qv = profG.verts[profG.points[ei].v];
+      if (Math.abs(qv.y - z1) <= tol) {
+        if (profApex !== null) {
+          return fail('ambiguous-pairing',
+            'two points share the profile top line', 0);
+        }
+        profApex = { x: qv.x, y: qv.y, ref: profG.points[ei] };
+      }
+    }
+    if (profApex === null) {
+      return fail('unmatched-point',
+        'plan apex has no mate on the profile top line', 0);
+    }
+    var dxa = Math.abs(profApex.x - xa);
+    if (dxa > eps) {
+      if (dxa <= LOOSE_EPS_MM) {
+        return fail('x-mismatch', 'apex mapped x=' + xa +
+          ' vs profile x=' + profApex.x + ' beyond eps', 0);
+      }
+      return fail('unmatched-point',
+        'profile top point matches no plan apex', 0);
+    }
+    var xap = (xa + profApex.x) / 2;
+    if (!hCovered(profG, z0, plo, phi, stol)) {
+      return fail('unmatched-edge',
+        'profile misses the base line at y=' + z0, 0);
+    }
+    if (!slantCovered(profG, plo, z0, xap, z1, stol)) {
+      return fail('unmatched-edge', 'profile misses the left slant', 0);
+    }
+    if (!slantCovered(profG, phi, z0, xap, z1, stol)) {
+      return fail('unmatched-edge', 'profile misses the right slant', 0);
+    }
+    var onProf = onPyramidElevLines(plo, phi, xap, z0, z1);
+    var si, s, a, b, okLine, qx, qy;
+    for (si = 0; si < profG.segs.length; si++) {
+      s = profG.segs[si];
+      if (s.item.bisCode === 'E') continue;
+      a = profG.verts[s.a];
+      b = profG.verts[s.b];
+      okLine = true;
+      for (var m = 0; m < 5; m++) {
+        var u = m / 4;
+        qx = a.x + (b.x - a.x) * u;
+        qy = a.y + (b.y - a.y) * u;
+        if (!onProf(qx, qy, stol)) { okLine = false; break; }
+      }
+      if (!okLine) {
+        return fail('unmatched-edge', 'profile ' +
+          describeEntity(s.item, s.idx) + ' fits no pyramid line', 0);
+      }
+    }
+    var triIn = pyramidTriIn(plo, phi, xap, z0, z1);
+    var eOk = eSegsContained(profG.segs, profG.verts, triIn, stol, 5);
+    if (!eOk.ok) {
+      return fail('unmatched-edge', 'profile hidden ' +
+        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
+    }
+    for (si = 0; si < profG.points.length; si++) {
+      var pv = profG.verts[profG.points[si].v];
+      if (!onProf(pv.x, pv.y, eps)) {
+        return fail('unmatched-point', 'profile point ' +
+          describeEntity(profG.points[si].item, profG.points[si].idx) +
+          ' sits off the pyramid lines', 0);
+      }
+    }
+    return { pass: true, coverage: viewCoverage(profG, onProf, triIn, stol) };
+  }
+
   // --- Class B: pyramid over the plan loop with an interior apex seen in
   // both views. Returns null when no plan apex exists (not a pyramid).
-  function tryPyramid(planG, elevG, planLoop, eps, tol) {
+  function tryPyramid(planG, elevG, planLoop, eps, tol, profG) {
     if (!planLoop) return null;
     var stol = Math.max(tol, eps);
     var solid = loopSolidity(planG, planLoop, tol);
@@ -837,13 +1266,7 @@
           describeEntity(s.item, s.idx) + ' fits no pyramid line', 0);
       }
     }
-    var triIn = function (qx, qy, t2) {
-      if (qy < z0 - t2 || qy > z1 + t2) return false;
-      var f = (qy - z0) / (z1 - z0);
-      var xl = xL + (xa - xL) * f, xr = xR + (xa - xR) * f;
-      var lo = Math.min(xl, xr) - t2, hi = Math.max(xl, xr) + t2;
-      return qx >= lo && qx <= hi;
-    };
+    var triIn = pyramidTriIn(xL, xR, xa, z0, z1);
     var eOk = eSegsContained(elevG.segs, elevG.verts, triIn, stol, 5);
     if (!eOk.ok) {
       return fail('unmatched-edge', 'elevation hidden ' +
@@ -870,6 +1293,26 @@
           describeEntity(elevG.points[si].item, elevG.points[si].idx) +
           ' sits off the pyramid lines', 0);
       }
+    }
+    // M2: profile trial mirrors Class A (fixed map order, first pass
+    // wins, direct map's failure reported when neither passes).
+    var profMapB = null, profResB = null;
+    if (profG) {
+      var bDepths = loopDepths(planG, planLoop, tol);
+      var br0 = drawnRangeAB(profG);
+      if (!br0) {
+        return fail('unmatched-edge', 'profile shows no pyramid extent', 0);
+      }
+      var bMaps = inferProfileMaps(bDepths[0], br0.x0, br0.x1);
+      var bFirstErr = null;
+      for (var bmi = 0; bmi < bMaps.length; bmi++) {
+        var bTry = checkPyramidProfile(profG, bDepths[0],
+          bDepths[bDepths.length - 1], -apex.y, z0, z1,
+          bMaps[bmi], eps, tol, stol);
+        if (bTry.pass) { profMapB = bMaps[bmi]; profResB = bTry; break; }
+        if (!bFirstErr) bFirstErr = bTry;
+      }
+      if (!profMapB) return bFirstErr;
     }
     var n = planLoop.order.length;
     var verts = [];
@@ -899,18 +1342,24 @@
     var covPlan = viewCoverage(planG, onPlan,
       loopInside(planG, planLoop), tol);
     var covElev = viewCoverage(elevG, onElev, triIn, stol);
-    var cov = Math.min(covPlan, covElev);
+    var covProfB = profResB ? profResB.coverage : 1;
+    var cov = Math.min(covPlan, covElev, covProfB);
     if (cov < COVERAGE_GATE) {
       return fail('coverage-failed',
         'pyramid round-trip coverage ' + cov.toFixed(3), cov);
     }
-    return {
+    var outB = {
       pass: true, class: 'B', coverage: cov,
       totalLength: totalLength(verts, edges),
       geometry: { name: 'pyramid', vertices: verts, edges: edges, faces: faces },
       coveragePlan: covPlan, coverageElev: covElev,
       canonical: canonicalOf(verts, edges)
     };
+    if (profG) {
+      outB.coverageProfile = covProfB;
+      outB.profileMap = profMapB;
+    }
+    return outB;
   }
 
   // Union x-stations across both views: sorted greedy clustering within
@@ -948,9 +1397,107 @@
     return s1 < s2 ? s1 + '-' + s2 : s2 + '-' + s1;
   }
 
+  function nearDrawnPoint(graph, px, py, tol) {
+    for (var j = 0; j < graph.points.length; j++) {
+      var v = graph.verts[graph.points[j].v];
+      var dx = px - v.x, dy = py - v.y;
+      if (dx * dx + dy * dy <= tol * tol) return true;
+    }
+    return false;
+  }
+
+  // Profile validation for Class C: the lifted wireframe projects into
+  // the profile through the depth map, and the projection must agree
+  // with the drawn profile both ways (drawn geometry explained,
+  // projected geometry drawn). Returns a fail object, or {pass,
+  // coverage} when the map fits.
+  function checkWireProfile(profG, verts, edges, map, eps, stol) {
+    var projE = [], projV = [];
+    var i;
+    for (i = 0; i < edges.length; i++) {
+      var va = verts[edges[i][0]], vb = verts[edges[i][1]];
+      projE.push({
+        ax: mapDepth(map, va.z), ay: va.y,
+        bx: mapDepth(map, vb.z), by: vb.y
+      });
+    }
+    for (i = 0; i < verts.length; i++) {
+      projV.push({ x: mapDepth(map, verts[i].z), y: verts[i].y });
+    }
+    function onProjE(qx, qy, t2) {
+      for (var l = 0; l < projE.length; l++) {
+        if (distPtSeg(qx, qy, projE[l].ax, projE[l].ay,
+            projE[l].bx, projE[l].by) <= t2) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function onProjEW(qx, qy, t2) {
+      if (onProjE(qx, qy, t2)) return true;
+      for (var v = 0; v < projV.length; v++) {
+        var dx = qx - projV[v].x, dy = qy - projV[v].y;
+        if (dx * dx + dy * dy <= t2 * t2) return true;
+      }
+      return false;
+    }
+    var eOk = eSegsContained(profG.segs, profG.verts,
+      function (qx, qy, t2) { return onProjE(qx, qy, t2); }, stol, 5);
+    if (!eOk.ok) {
+      return fail('unmatched-edge', 'profile hidden ' +
+        describeEntity(eOk.seg.item, eOk.seg.idx) +
+        ' matches no projected edge', 0);
+    }
+    var si, s, a, b, okLine, qx, qy;
+    for (si = 0; si < profG.segs.length; si++) {
+      s = profG.segs[si];
+      if (s.item.bisCode === 'E') continue;
+      a = profG.verts[s.a];
+      b = profG.verts[s.b];
+      okLine = true;
+      for (var m = 0; m < 5; m++) {
+        var u = m / 4;
+        qx = a.x + (b.x - a.x) * u;
+        qy = a.y + (b.y - a.y) * u;
+        if (!onProjEW(qx, qy, stol)) { okLine = false; break; }
+      }
+      if (!okLine) {
+        return fail('unmatched-edge', 'profile ' +
+          describeEntity(s.item, s.idx) + ' matches no projected edge', 0);
+      }
+    }
+    for (si = 0; si < profG.points.length; si++) {
+      var pv = profG.verts[profG.points[si].v];
+      if (!onProjEW(pv.x, pv.y, eps)) {
+        return fail('unmatched-point', 'profile point ' +
+          describeEntity(profG.points[si].item, profG.points[si].idx) +
+          ' matches no projected vertex', 0);
+      }
+    }
+    for (i = 0; i < projE.length; i++) {
+      if (segCoveredFrac(projE[i].ax, projE[i].ay, projE[i].bx, projE[i].by,
+          profG, stol, 9) < 1) {
+        return fail('unmatched-edge',
+          'profile omits the projection of a wireframe edge', 0);
+      }
+    }
+    for (i = 0; i < projV.length; i++) {
+      if (minDistToSegs(projV[i].x, projV[i].y, profG.verts, profG.segs,
+          isAB) > stol &&
+          !nearDrawnPoint(profG, projV[i].x, projV[i].y, stol)) {
+        return fail('unmatched-edge',
+          'profile omits the projection of a wireframe vertex', 0);
+      }
+    }
+    var cov = viewCoverage(profG,
+      function (qx, qy, t2) { return onProjEW(qx, qy, t2); },
+      function (qx, qy, t2) { return onProjE(qx, qy, t2); }, stol);
+    return { pass: true, coverage: cov };
+  }
+
   // --- Class C: lifted wireframe. Vertices pair across views by station;
   // edges need both projections (degenerate point+segment pins excepted).
-  function tryWireframe(planG, elevG, eps, tol) {
+  function tryWireframe(planG, elevG, eps, tol, profG) {
     var stol = Math.max(tol, eps);
     var U = unionStations(planG, elevG, eps);
     var planSt = U.planSt, elevSt = U.elevSt;
@@ -1322,12 +1869,55 @@
       function (qx, qy, t2) { return onProj(projPlan)(qx, qy, t2); }, stol);
     var covElev = viewCoverage(elevG, onProjW(projElev, projVertElev),
       function (qx, qy, t2) { return onProj(projElev)(qx, qy, t2); }, stol);
-    var cov = Math.min(covPlan, covElev);
+    // M2: with a profile view, both depth orientations are validated
+    // against the lifted wireframe; the best passing map wins (ties go
+    // to direct, deterministically). Two failing maps report the direct
+    // map's failure.
+    var covProfC = 1, profMapC = null;
+    if (profG) {
+      var zd = [];
+      for (var zi = 0; zi < verts.length; zi++) zd.push(verts[zi].z);
+      var zd0 = Math.min.apply(null, zd);
+      var prC = drawnRangeAB(profG);
+      var pp0, pp1;
+      if (prC) {
+        pp0 = prC.x0;
+        pp1 = prC.x1;
+      } else if (profG.points.length > 0) {
+        pp0 = Infinity;
+        pp1 = -Infinity;
+        for (var zp = 0; zp < profG.points.length; zp++) {
+          var zv = profG.verts[profG.points[zp].v];
+          if (zv.x < pp0) pp0 = zv.x;
+          if (zv.x > pp1) pp1 = zv.x;
+        }
+      } else {
+        return fail('unmatched-edge',
+          'profile shows no wireframe extent', 0);
+      }
+      var cMaps = inferProfileMaps(zd0, pp0, pp1);
+      var cBest = null, cFirstErr = null;
+      for (var cmi = 0; cmi < cMaps.length; cmi++) {
+        var cTry = checkWireProfile(profG, verts, edges, cMaps[cmi],
+          eps, stol);
+        if (cTry.pass) {
+          if (!cBest || cTry.coverage > cBest.coverage) {
+            cBest = cTry;
+            profMapC = cMaps[cmi];
+          }
+        } else if (!cFirstErr) {
+          cFirstErr = cTry;
+        }
+      }
+      if (!cBest) return cFirstErr;
+      covProfC = cBest.coverage;
+    }
+    var cov = Math.min(covPlan, covElev, covProfC);
     if (cov < COVERAGE_GATE) {
       return fail('coverage-failed',
         'wireframe round-trip coverage ' + cov.toFixed(3), cov);
     }
-    return {
+    var outC = {
       pass: true, class: 'C', coverage: cov,
       totalLength: totalLength(verts, edges),
       geometry: {
@@ -1336,12 +1926,600 @@
       coveragePlan: covPlan, coverageElev: covElev,
       canonical: canonicalOf(verts, edges)
     };
+    if (profG) {
+      outC.coverageProfile = covProfC;
+      outC.profileMap = profMapC;
+    }
+    return outC;
+  }
+
+  // --- Class D: vertical-axis solids of revolution (M3 curves). ---
+  // Plan carries exactly one A/B CIRCLE (no polygon loop); elevation shows
+  // the silhouette (rectangle = cylinder, triangle + apex = cone). Full
+  // CIRCLE entities only; CIRCULAR_ARC never forms a D hypothesis.
+  function isPlanCircle(curve) {
+    if (!curve || curve.type !== 'CIRCLE') return false;
+    if (curve.bisCode !== 'A' && curve.bisCode !== 'B') return false;
+    if (curve.viewRole === 'PLAN') return true;
+    if (curve.viewRole === 'ELEVATION' || curve.viewRole === 'PROFILE') {
+      return false;
+    }
+    var cy = (curve.y === undefined) ? 0 : curve.y;
+    return cy < 0;
+  }
+
+  function planCirclesOf(curves) {
+    var out = [];
+    for (var i = 0; i < curves.length; i++) {
+      if (isPlanCircle(curves[i])) out.push(curves[i]);
+    }
+    return out;
+  }
+
+  // Rim vertex k (0..K-1) at angle th = 2*pi*k/K: x = xc + r*cos, z =
+  // zc + r*sin. Vertex 0 sits at +X from the axis; increasing k runs
+  // counter-clockwise seen from +Y (with +Z up in that top view).
+  function rimPoint(xc, zc, r, y, k) {
+    var th = 2 * Math.PI * k / RIM_K;
+    return { x: xc + r * Math.cos(th), y: y, z: zc + r * Math.sin(th) };
+  }
+
+  function buildCylinderGeometry(xc, zc, r, z0, z1) {
+    var verts = [], edges = [], faces = [], checks = [];
+    var k;
+    for (k = 0; k < RIM_K; k++) verts.push(rimPoint(xc, zc, r, z0, k));
+    for (k = 0; k < RIM_K; k++) verts.push(rimPoint(xc, zc, r, z1, k));
+    for (k = 0; k < RIM_K; k++) {
+      var nx = (k + 1) % RIM_K;
+      edges.push([k, nx]);
+      edges.push([k + RIM_K, nx + RIM_K]);
+      edges.push([k, k + RIM_K]);
+    }
+    var bottom = [], top = [];
+    for (k = 0; k < RIM_K; k++) { bottom.push(k); top.push(k + RIM_K); }
+    faces.push(bottom);
+    checks.push(function (nn) { return nn.y < 0; });
+    faces.push(top);
+    checks.push(function (nn) { return nn.y > 0; });
+    for (k = 0; k < RIM_K; k++) {
+      var jx = (k + 1) % RIM_K;
+      faces.push([k, jx, jx + RIM_K, k + RIM_K]);
+      checks.push(outwardSideCheck(verts, bottom, k, jx));
+    }
+    faces = orientFaces(verts, faces, checks);
+    return { name: 'cylinder', vertices: verts, edges: edges, faces: faces };
+  }
+
+  // Cylinder from a plan circle + elevation silhouette. Returns null only
+  // when the caller should not treat this as a D hypothesis (never here;
+  // the wrapper decides); otherwise pass or a named fail.
+  function tryCylinder(planG, elevG, circle, eps, tol, profG) {
+    var stol = Math.max(tol, eps);
+    var xc = circle.x, yc = circle.y, r = circle.radius;
+    assertFinite(xc, yc, r);
+    if (!(r > 0)) {
+      return fail('non-manifold', 'plan circle has zero radius', 0);
+    }
+    var si, s, a, b, px, py;
+    for (si = 0; si < planG.segs.length; si++) {
+      s = planG.segs[si];
+      a = planG.verts[s.a];
+      b = planG.verts[s.b];
+      if (s.item.bisCode === 'E') {
+        var inside = true;
+        for (var k = 0; k < 5; k++) {
+          var t = k / 4;
+          px = a.x + (b.x - a.x) * t;
+          py = a.y + (b.y - a.y) * t;
+          var dx = px - xc, dy = py - yc;
+          if (Math.sqrt(dx * dx + dy * dy) > r + tol) {
+            inside = false;
+            break;
+          }
+        }
+        if (!inside) {
+          return fail('unmatched-edge', 'plan hidden ' +
+            describeEntity(s.item, s.idx) + ' escapes the circle', 0);
+        }
+        continue;
+      }
+      return fail('unmatched-edge', 'plan ' +
+        describeEntity(s.item, s.idx) + ' fits no cylinder circle', 0);
+    }
+    if (planG.points.length > 1) {
+      return fail('ambiguous-pairing', planG.points.length +
+        ' plan points compete for the cylinder center', 0);
+    }
+    for (si = 0; si < planG.points.length; si++) {
+      var pv = planG.verts[planG.points[si].v];
+      var cdx = pv.x - xc, cdy = pv.y - yc;
+      if (Math.sqrt(cdx * cdx + cdy * cdy) > tol) {
+        return fail('unmatched-point', 'plan point ' +
+          describeEntity(planG.points[si].item, planG.points[si].idx) +
+          ' sits off the circle center', 0);
+      }
+    }
+    var er = drawnRangeAB(elevG);
+    if (!er) {
+      return fail('unmatched-edge', 'elevation shows no cylinder extent', 0);
+    }
+    var silCx = (er.x0 + er.x1) / 2;
+    var halfW = (er.x1 - er.x0) / 2;
+    if (Math.abs(silCx - xc) > eps) {
+      return fail('x-mismatch', 'cylinder center plan x=' + xc +
+        ' vs elevation x=' + silCx + ' beyond eps', 0);
+    }
+    if (Math.abs(halfW - r) > eps) {
+      return fail('x-mismatch', 'cylinder radius r=' + r +
+        ' vs elevation half-width ' + halfW + ' beyond eps', 0);
+    }
+    var z0 = er.y0, z1 = er.y1;
+    if (!(z1 - z0 > tol)) {
+      return fail('non-manifold', 'elevation extent has zero height', 0);
+    }
+    var xL = xc - r, xR = xc + r;
+    var onElev = onPrismElevLines([xL, xR], z0, z1);
+    for (si = 0; si < elevG.segs.length; si++) {
+      s = elevG.segs[si];
+      if (s.item.bisCode === 'E') continue;
+      a = elevG.verts[s.a];
+      b = elevG.verts[s.b];
+      var okLine = true;
+      for (var m = 0; m < 5; m++) {
+        var u = m / 4;
+        px = a.x + (b.x - a.x) * u;
+        py = a.y + (b.y - a.y) * u;
+        if (!onElev(px, py, stol)) { okLine = false; break; }
+      }
+      if (!okLine) {
+        return fail('unmatched-edge', 'elevation ' +
+          describeEntity(s.item, s.idx) + ' fits no cylinder line', 0);
+      }
+    }
+    if (!hCovered(elevG, z0, xL, xR, stol)) {
+      return fail('unmatched-edge',
+        'elevation misses the base line at y=' + z0, 0);
+    }
+    if (!hCovered(elevG, z1, xL, xR, stol)) {
+      return fail('unmatched-edge',
+        'elevation misses the top line at y=' + z1, 0);
+    }
+    if (!vCovered(elevG, xL, z0, z1, stol)) {
+      return fail('unmatched-edge',
+        'elevation misses the vertical at x=' + xL, 0);
+    }
+    if (!vCovered(elevG, xR, z0, z1, stol)) {
+      return fail('unmatched-edge',
+        'elevation misses the vertical at x=' + xR, 0);
+    }
+    var eOk = eSegsContained(elevG.segs, elevG.verts,
+      rectInside(xL, xR, z0, z1), stol, 5);
+    if (!eOk.ok) {
+      return fail('unmatched-edge', 'elevation hidden ' +
+        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
+    }
+    for (si = 0; si < elevG.points.length; si++) {
+      var ev = elevG.verts[elevG.points[si].v];
+      if (!onElev(ev.x, ev.y, eps)) {
+        return fail('unmatched-point', 'elevation point ' +
+          describeEntity(elevG.points[si].item, elevG.points[si].idx) +
+          ' sits off the cylinder lines', 0);
+      }
+    }
+    var profMap = null, profRes = null;
+    if (profG) {
+      var d0 = -(yc + r), d1 = -(yc - r);
+      var pr0 = drawnRangeAB(profG);
+      if (!pr0) {
+        return fail('unmatched-edge', 'profile shows no cylinder extent', 0);
+      }
+      var pMaps = inferProfileMaps(d0, pr0.x0, pr0.x1);
+      var pFirstErr = null;
+      for (var pmi = 0; pmi < pMaps.length; pmi++) {
+        var pTry = checkCylinderProfile(profG, d0, d1, z0, z1,
+          pMaps[pmi], eps, stol);
+        if (pTry.pass) { profMap = pMaps[pmi]; profRes = pTry; break; }
+        if (!pFirstErr) pFirstErr = pTry;
+      }
+      if (!profMap) return pFirstErr;
+    }
+    var zc = -yc;
+    var geometry = buildCylinderGeometry(xc, zc, r, z0, z1);
+    var covPlan = 1;
+    var covElev = viewCoverage(elevG, onElev,
+      rectInside(xL, xR, z0, z1), stol);
+    var covProf = profRes ? profRes.coverage : 1;
+    var cov = Math.min(covPlan, covElev, covProf);
+    if (cov < COVERAGE_GATE) {
+      return fail('coverage-failed',
+        'cylinder round-trip coverage ' + cov.toFixed(3), cov);
+    }
+    var outD = {
+      pass: true, class: 'D', coverage: cov,
+      totalLength: totalLength(geometry.vertices, geometry.edges),
+      geometry: geometry,
+      coveragePlan: covPlan, coverageElev: covElev,
+      canonical: canonicalOf(geometry.vertices, geometry.edges)
+    };
+    if (profG) {
+      outD.coverageProfile = covProf;
+      outD.profileMap = profMap;
+    }
+    return outD;
+  }
+
+  function checkCylinderProfile(profG, d0, d1, z0, z1, map, eps, stol) {
+    var px = [mapDepth(map, d0), mapDepth(map, d1)];
+    var plo = Math.min(px[0], px[1]), phi = Math.max(px[0], px[1]);
+    var pr = drawnRangeAB(profG);
+    if (!pr) {
+      return fail('unmatched-edge', 'profile shows no cylinder extent', 0);
+    }
+    if (Math.abs(pr.x0 - plo) > eps || Math.abs(pr.x1 - phi) > eps) {
+      return fail('x-mismatch', 'profile x-range [' + pr.x0 + ', ' +
+        pr.x1 + '] vs mapped depth [' + plo + ', ' + phi + '] beyond eps', 0);
+    }
+    var onProf = onPrismElevLines(px, z0, z1);
+    var si, s, a, b, okLine, qx, qy;
+    for (si = 0; si < profG.segs.length; si++) {
+      s = profG.segs[si];
+      if (s.item.bisCode === 'E') continue;
+      a = profG.verts[s.a];
+      b = profG.verts[s.b];
+      okLine = true;
+      for (var m = 0; m < 5; m++) {
+        var u = m / 4;
+        qx = a.x + (b.x - a.x) * u;
+        qy = a.y + (b.y - a.y) * u;
+        if (!onProf(qx, qy, stol)) { okLine = false; break; }
+      }
+      if (!okLine) {
+        return fail('unmatched-edge', 'profile ' +
+          describeEntity(s.item, s.idx) + ' fits no cylinder line', 0);
+      }
+    }
+    if (!hCovered(profG, z0, plo, phi, stol)) {
+      return fail('unmatched-edge',
+        'profile misses the base line at y=' + z0, 0);
+    }
+    if (!hCovered(profG, z1, plo, phi, stol)) {
+      return fail('unmatched-edge',
+        'profile misses the top line at y=' + z1, 0);
+    }
+    for (si = 0; si < px.length; si++) {
+      if (!vCovered(profG, px[si], z0, z1, stol)) {
+        return fail('unmatched-edge',
+          'profile misses the vertical at x=' + px[si], 0);
+      }
+    }
+    var inside = rectInside(plo, phi, z0, z1);
+    var eOk = eSegsContained(profG.segs, profG.verts, inside, stol, 5);
+    if (!eOk.ok) {
+      return fail('unmatched-edge', 'profile hidden ' +
+        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
+    }
+    for (si = 0; si < profG.points.length; si++) {
+      var pv = profG.verts[profG.points[si].v];
+      if (!onProf(pv.x, pv.y, eps)) {
+        return fail('unmatched-point', 'profile point ' +
+          describeEntity(profG.points[si].item, profG.points[si].idx) +
+          ' sits off the cylinder lines', 0);
+      }
+    }
+    return { pass: true, coverage: viewCoverage(profG, onProf, inside, stol) };
+  }
+
+  function buildConeGeometry(xc, zc, r, z0, xa, za, z1) {
+    var verts = [], edges = [], faces = [], checks = [];
+    var k;
+    for (k = 0; k < RIM_K; k++) verts.push(rimPoint(xc, zc, r, z0, k));
+    var apexIdx = RIM_K;
+    verts.push({ x: xa, y: z1, z: za });
+    for (k = 0; k < RIM_K; k++) {
+      var nx = (k + 1) % RIM_K;
+      edges.push([k, nx]);
+      edges.push([k, apexIdx]);
+    }
+    var base = [];
+    for (k = 0; k < RIM_K; k++) base.push(k);
+    faces.push(base);
+    checks.push(function (nn) { return nn.y < 0; });
+    for (k = 0; k < RIM_K; k++) {
+      var jx = (k + 1) % RIM_K;
+      faces.push([k, jx, apexIdx]);
+      checks.push(outwardSideCheck(verts, base, k, jx));
+    }
+    faces = orientFaces(verts, faces, checks);
+    return { name: 'cone', vertices: verts, edges: edges, faces: faces };
+  }
+
+  function checkConeProfile(profG, d0, d1, da, z0, z1, map, eps, tol, stol) {
+    var plo = Math.min(mapDepth(map, d0), mapDepth(map, d1));
+    var phi = Math.max(mapDepth(map, d0), mapDepth(map, d1));
+    var pr = drawnRangeAB(profG);
+    if (!pr) {
+      return fail('unmatched-edge', 'profile shows no cone extent', 0);
+    }
+    if (Math.abs(pr.x0 - plo) > eps || Math.abs(pr.x1 - phi) > eps) {
+      return fail('x-mismatch', 'profile x-range [' + pr.x0 + ', ' +
+        pr.x1 + '] vs mapped depth [' + plo + ', ' + phi + '] beyond eps', 0);
+    }
+    var xa = mapDepth(map, da);
+    var profApex = null;
+    for (var ei = 0; ei < profG.points.length; ei++) {
+      var qv = profG.verts[profG.points[ei].v];
+      if (Math.abs(qv.y - z1) <= tol) {
+        if (profApex !== null) {
+          return fail('ambiguous-pairing',
+            'two points share the profile top line', 0);
+        }
+        profApex = { x: qv.x, y: qv.y, ref: profG.points[ei] };
+      }
+    }
+    if (profApex === null) {
+      return fail('unmatched-point',
+        'plan apex has no mate on the profile top line', 0);
+    }
+    var dxa = Math.abs(profApex.x - xa);
+    if (dxa > eps) {
+      if (dxa <= LOOSE_EPS_MM) {
+        return fail('x-mismatch', 'apex mapped x=' + xa +
+          ' vs profile x=' + profApex.x + ' beyond eps', 0);
+      }
+      return fail('unmatched-point',
+        'profile top point matches no plan apex', 0);
+    }
+    var xap = (xa + profApex.x) / 2;
+    if (!hCovered(profG, z0, plo, phi, stol)) {
+      return fail('unmatched-edge',
+        'profile misses the base line at y=' + z0, 0);
+    }
+    if (!slantCovered(profG, plo, z0, xap, z1, stol)) {
+      return fail('unmatched-edge', 'profile misses the left slant', 0);
+    }
+    if (!slantCovered(profG, phi, z0, xap, z1, stol)) {
+      return fail('unmatched-edge', 'profile misses the right slant', 0);
+    }
+    var onProf = onPyramidElevLines(plo, phi, xap, z0, z1);
+    var si, s, a, b, okLine, qx, qy;
+    for (si = 0; si < profG.segs.length; si++) {
+      s = profG.segs[si];
+      if (s.item.bisCode === 'E') continue;
+      a = profG.verts[s.a];
+      b = profG.verts[s.b];
+      okLine = true;
+      for (var m = 0; m < 5; m++) {
+        var u = m / 4;
+        qx = a.x + (b.x - a.x) * u;
+        qy = a.y + (b.y - a.y) * u;
+        if (!onProf(qx, qy, stol)) { okLine = false; break; }
+      }
+      if (!okLine) {
+        return fail('unmatched-edge', 'profile ' +
+          describeEntity(s.item, s.idx) + ' fits no cone line', 0);
+      }
+    }
+    var triIn = pyramidTriIn(plo, phi, xap, z0, z1);
+    var eOk = eSegsContained(profG.segs, profG.verts, triIn, stol, 5);
+    if (!eOk.ok) {
+      return fail('unmatched-edge', 'profile hidden ' +
+        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
+    }
+    for (si = 0; si < profG.points.length; si++) {
+      var pv = profG.verts[profG.points[si].v];
+      if (!onProf(pv.x, pv.y, eps)) {
+        return fail('unmatched-point', 'profile point ' +
+          describeEntity(profG.points[si].item, profG.points[si].idx) +
+          ' sits off the cone lines', 0);
+      }
+    }
+    return { pass: true, coverage: viewCoverage(profG, onProf, triIn, stol) };
+  }
+
+  function tryCone(planG, elevG, circle, eps, tol, profG) {
+    var stol = Math.max(tol, eps);
+    var xc = circle.x, yc = circle.y, r = circle.radius;
+    assertFinite(xc, yc, r);
+    if (!(r > 0)) {
+      return fail('non-manifold', 'plan circle has zero radius', 0);
+    }
+    var si, s, a, b, px, py;
+    for (si = 0; si < planG.segs.length; si++) {
+      s = planG.segs[si];
+      a = planG.verts[s.a];
+      b = planG.verts[s.b];
+      if (s.item.bisCode === 'E') {
+        var inside = true;
+        for (var k = 0; k < 5; k++) {
+          var t = k / 4;
+          px = a.x + (b.x - a.x) * t;
+          py = a.y + (b.y - a.y) * t;
+          var dx = px - xc, dy = py - yc;
+          if (Math.sqrt(dx * dx + dy * dy) > r + tol) {
+            inside = false;
+            break;
+          }
+        }
+        if (!inside) {
+          return fail('unmatched-edge', 'plan hidden ' +
+            describeEntity(s.item, s.idx) + ' escapes the circle', 0);
+        }
+        continue;
+      }
+      return fail('unmatched-edge', 'plan ' +
+        describeEntity(s.item, s.idx) + ' fits no cone circle', 0);
+    }
+    if (planG.points.length === 0) {
+      return fail('unmatched-point',
+        'plan apex has no mate on the elevation top line', 0);
+    }
+    if (planG.points.length > 1) {
+      return fail('ambiguous-pairing', planG.points.length +
+        ' plan points compete for the cone apex', 0);
+    }
+    var planApexV = planG.verts[planG.points[0].v];
+    var cdx = planApexV.x - xc, cdy = planApexV.y - yc;
+    if (Math.sqrt(cdx * cdx + cdy * cdy) > tol) {
+      return fail('unmatched-point', 'plan point ' +
+        describeEntity(planG.points[0].item, planG.points[0].idx) +
+        ' sits off the circle center', 0);
+    }
+    var apexPlan = { x: planApexV.x, y: planApexV.y };
+    var er = drawnRangeAB(elevG);
+    if (!er) {
+      return fail('unmatched-edge', 'elevation shows no cone extent', 0);
+    }
+    var silCx = (er.x0 + er.x1) / 2;
+    var halfW = (er.x1 - er.x0) / 2;
+    if (Math.abs(silCx - xc) > eps) {
+      return fail('x-mismatch', 'cone center plan x=' + xc +
+        ' vs elevation x=' + silCx + ' beyond eps', 0);
+    }
+    if (Math.abs(halfW - r) > eps) {
+      return fail('x-mismatch', 'cone radius r=' + r +
+        ' vs elevation half-width ' + halfW + ' beyond eps', 0);
+    }
+    var z0 = er.y0, z1 = er.y1;
+    if (!(z1 - z0 > tol)) {
+      return fail('non-manifold', 'elevation extent has zero height', 0);
+    }
+    var xL = xc - r, xR = xc + r;
+    var elevApex = null;
+    for (var ei = 0; ei < elevG.points.length; ei++) {
+      var qv = elevG.verts[elevG.points[ei].v];
+      if (Math.abs(qv.y - z1) <= tol) {
+        if (elevApex !== null) {
+          return fail('ambiguous-pairing',
+            'two points share the elevation top line', 0);
+        }
+        elevApex = { x: qv.x, y: qv.y, ref: elevG.points[ei] };
+      }
+    }
+    if (elevApex === null) {
+      return fail('unmatched-point',
+        'plan apex has no mate on the elevation top line', 0);
+    }
+    var dxa = Math.abs(elevApex.x - apexPlan.x);
+    if (dxa > eps) {
+      if (dxa <= LOOSE_EPS_MM) {
+        return fail('x-mismatch', 'apex plan x=' + apexPlan.x +
+          ' vs elevation x=' + elevApex.x + ' beyond eps', 0);
+      }
+      return fail('unmatched-point',
+        'elevation top point matches no plan apex', 0);
+    }
+    var xa = (apexPlan.x + elevApex.x) / 2;
+    if (!hCovered(elevG, z0, xL, xR, stol)) {
+      return fail('unmatched-edge',
+        'elevation misses the base line at y=' + z0, 0);
+    }
+    if (!slantCovered(elevG, xL, z0, xa, z1, stol)) {
+      return fail('unmatched-edge', 'elevation misses the left slant', 0);
+    }
+    if (!slantCovered(elevG, xR, z0, xa, z1, stol)) {
+      return fail('unmatched-edge', 'elevation misses the right slant', 0);
+    }
+    var onElev = onPyramidElevLines(xL, xR, xa, z0, z1);
+    for (si = 0; si < elevG.segs.length; si++) {
+      s = elevG.segs[si];
+      if (s.item.bisCode === 'E') continue;
+      a = elevG.verts[s.a];
+      b = elevG.verts[s.b];
+      var okLine = true;
+      for (var m = 0; m < 5; m++) {
+        var u = m / 4;
+        px = a.x + (b.x - a.x) * u;
+        py = a.y + (b.y - a.y) * u;
+        if (!onElev(px, py, stol)) { okLine = false; break; }
+      }
+      if (!okLine) {
+        return fail('unmatched-edge', 'elevation ' +
+          describeEntity(s.item, s.idx) + ' fits no cone line', 0);
+      }
+    }
+    var triIn = pyramidTriIn(xL, xR, xa, z0, z1);
+    var eOk = eSegsContained(elevG.segs, elevG.verts, triIn, stol, 5);
+    if (!eOk.ok) {
+      return fail('unmatched-edge', 'elevation hidden ' +
+        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
+    }
+    for (si = 0; si < elevG.points.length; si++) {
+      var ev = elevG.verts[elevG.points[si].v];
+      if (!onElev(ev.x, ev.y, eps)) {
+        return fail('unmatched-point', 'elevation point ' +
+          describeEntity(elevG.points[si].item, elevG.points[si].idx) +
+          ' sits off the cone lines', 0);
+      }
+    }
+    var profMap = null, profRes = null;
+    if (profG) {
+      var d0 = -(yc + r), d1 = -(yc - r), da = -apexPlan.y;
+      var pr0 = drawnRangeAB(profG);
+      if (!pr0) {
+        return fail('unmatched-edge', 'profile shows no cone extent', 0);
+      }
+      var pMaps = inferProfileMaps(d0, pr0.x0, pr0.x1);
+      var pFirstErr = null;
+      for (var pmi = 0; pmi < pMaps.length; pmi++) {
+        var pTry = checkConeProfile(profG, d0, d1, da, z0, z1,
+          pMaps[pmi], eps, tol, stol);
+        if (pTry.pass) { profMap = pMaps[pmi]; profRes = pTry; break; }
+        if (!pFirstErr) pFirstErr = pTry;
+      }
+      if (!profMap) return pFirstErr;
+    }
+    var zc = -yc, za = -apexPlan.y;
+    var geometry = buildConeGeometry(xc, zc, r, z0, xa, za, z1);
+    var covPlan = 1;
+    var covElev = viewCoverage(elevG, onElev, triIn, stol);
+    var covProf = profRes ? profRes.coverage : 1;
+    var cov = Math.min(covPlan, covElev, covProf);
+    if (cov < COVERAGE_GATE) {
+      return fail('coverage-failed',
+        'cone round-trip coverage ' + cov.toFixed(3), cov);
+    }
+    var outB = {
+      pass: true, class: 'D', coverage: cov,
+      totalLength: totalLength(geometry.vertices, geometry.edges),
+      geometry: geometry,
+      coveragePlan: covPlan, coverageElev: covElev,
+      canonical: canonicalOf(geometry.vertices, geometry.edges)
+    };
+    if (profG) {
+      outB.coverageProfile = covProf;
+      outB.profileMap = profMap;
+    }
+    return outB;
+  }
+
+  // Class D dispatcher (cylinder + cone). Returns null when no D
+  // hypothesis applies (plan loop exists, or no A/B plan circle);
+  // otherwise a pass or a named fail. Two plan circles report
+  // ambiguous-pairing, never a guess. Cylinder is tried first, then
+  // cone; the first pass wins, otherwise the better-ranked fail.
+  function tryRevolved(planG, elevG, planLoop, curves, eps, tol, profG) {
+    if (planLoop) return null;
+    var circles = planCirclesOf(curves || []);
+    if (circles.length === 0) return null;
+    if (circles.length > 1) {
+      var amb = fail('ambiguous-pairing', circles.length +
+        ' plan circles compete (no guess)', 0);
+      amb.competingCircles = true;
+      return amb;
+    }
+    var rcyl = tryCylinder(planG, elevG, circles[0], eps, tol, profG);
+    if (rcyl.pass) return rcyl;
+    var rcon = tryCone(planG, elevG, circles[0], eps, tol, profG);
+    if (rcon.pass) return rcon;
+    return failRank(rcyl.reason) <= failRank(rcon.reason) ? rcyl : rcon;
   }
 
   // Project a widget-space geometry back onto both sheet views:
   // elevation (X, Y), plan (X, -Z). Independent of the class attempts;
   // tests use it to verify the round-trip invariant from outside.
-  function projectToViews(geometry) {
+  // An optional profile map {xRef, s, dRef} adds the profile projection
+  // (xRef + s * (Z - dRef), Y); one-argument calls are unchanged.
+  function projectToViews(geometry, mapOpt) {
     var verts = geometry.vertices;
     var planPts = verts.map(function (v) { return { x: v.x, y: -v.z }; });
     var elevPts = verts.map(function (v) { return { x: v.x, y: v.y }; });
@@ -1351,10 +2529,24 @@
       planSegs.push({ a: planPts[a], b: planPts[b] });
       elevSegs.push({ a: elevPts[a], b: elevPts[b] });
     }
-    return {
+    var out = {
       planPts: planPts, elevPts: elevPts,
       planSegs: planSegs, elevSegs: elevSegs
     };
+    if (mapOpt !== undefined && mapOpt !== null) {
+      assertFinite(mapOpt.xRef, mapOpt.s, mapOpt.dRef);
+      var profilePts = verts.map(function (v) {
+        return { x: mapDepth(mapOpt, v.z), y: v.y };
+      });
+      var profileSegs = [];
+      for (var j = 0; j < geometry.edges.length; j++) {
+        var c = geometry.edges[j][0], d = geometry.edges[j][1];
+        profileSegs.push({ a: profilePts[c], b: profilePts[d] });
+      }
+      out.profilePts = profilePts;
+      out.profileSegs = profileSegs;
+    }
+    return out;
   }
 
   var FAIL_PRIORITY = [
@@ -1379,20 +2571,24 @@
     var list = Array.isArray(entities) ? entities.slice() : [];
     var warnings = [];
     var f = filterEntities(list);
-    var cls = classifyViews(sortStable(f.kept));
-    var tol = weldTolerance(cls.plan, cls.elev);
+    var cls = classifyViews(sortStable(f.kept), undefined, f.curves);
+    var tol = weldTolerance(cls.plan, cls.elev, cls.profile);
     var stats = {
       kept: f.kept.length, curves: f.curves.length,
       dropped: f.dropped, onDatum: cls.onDatum.length,
       planItems: cls.plan.length, elevItems: cls.elev.length,
+      profileItems: cls.profile.length,
+      helpersDropped: cls.droppedHelpers.length,
       weldTol: tol, eps: eps, attempts: [], variant: 'direct'
     };
     function unavailable(reason, label) {
+      var covOut = { plan: 0, elev: 0 };
+      if (cls.profile.length > 0) covOut.profile = 0;
       return {
         status: 'unavailable', reason: reason,
         label: label || REASON_LABELS[reason] || reason,
         class: null, geometry: null,
-        coverage: { plan: 0, elev: 0 },
+        coverage: covOut,
         warnings: warnings, stats: stats
       };
     }
@@ -1409,17 +2605,20 @@
     // report ambiguity rather than guessing.
     var variants;
     if (cls.onDatum.length === 0) {
-      variants = [{ plan: cls.plan, elev: cls.elev, tag: 'direct' }];
+      variants = [{ plan: cls.plan, elev: cls.elev, profile: cls.profile,
+        tag: 'direct' }];
     } else {
       variants = [
         { plan: cls.plan, elev: cls.elev.concat(cls.onDatum),
-          tag: 'datum-in-elev' },
+          profile: cls.profile, tag: 'datum-in-elev' },
         { plan: cls.plan.concat(cls.onDatum), elev: cls.elev,
-          tag: 'datum-in-plan' }
+          profile: cls.profile, tag: 'datum-in-plan' }
       ];
     }
     function solveFor(variant) {
-      if (variant.plan.length === 0 || variant.elev.length === 0) {
+      var hasPlanCircle = planCirclesOf(f.curves).length > 0;
+      if ((variant.plan.length === 0 && !hasPlanCircle) ||
+          variant.elev.length === 0) {
         return {
           tag: variant.tag, planLoop: null, attempts: [],
           win: null,
@@ -1429,22 +2628,29 @@
       }
       var planG = buildViewGraph(sortStable(variant.plan), tol);
       var elevG = buildViewGraph(sortStable(variant.elev), tol);
+      var profG = variant.profile.length > 0 ?
+        buildViewGraph(sortStable(variant.profile), tol) : null;
       var planLoop = convexLoop(planG, tol);
       var attempts = [];
-      var ra = tryPrism(planG, elevG, planLoop, eps, tol);
+      var ra = tryPrism(planG, elevG, planLoop, eps, tol, profG);
       if (ra) {
         attempts.push({ class: 'A', pass: !!ra.pass,
           coverage: ra.coverage || 0, reason: ra.reason || null });
       }
-      var rb = tryPyramid(planG, elevG, planLoop, eps, tol);
+      var rb = tryPyramid(planG, elevG, planLoop, eps, tol, profG);
       if (rb) {
         attempts.push({ class: 'B', pass: !!rb.pass,
           coverage: rb.coverage || 0, reason: rb.reason || null });
       }
-      var rc = tryWireframe(planG, elevG, eps, tol);
+      var rc = tryWireframe(planG, elevG, eps, tol, profG);
       attempts.push({ class: 'C', pass: !!rc.pass,
         coverage: rc.coverage || 0, reason: rc.reason || null });
-      var passing = [ra, rb, rc].filter(function (r) { return r && r.pass; });
+      var rd = tryRevolved(planG, elevG, planLoop, f.curves, eps, tol, profG);
+      if (rd) {
+        attempts.push({ class: 'D', pass: !!rd.pass,
+          coverage: rd.coverage || 0, reason: rd.reason || null });
+      }
+      var passing = [ra, rb, rc, rd].filter(function (r) { return r && r.pass; });
       passing.sort(function (a, b) {
         if (a.coverage !== b.coverage) return b.coverage - a.coverage;
         return a.totalLength - b.totalLength;
@@ -1452,6 +2658,7 @@
       var sol = {
         tag: variant.tag, planLoop: planLoop, attempts: attempts,
         planVerts: planG.verts.length, elevVerts: elevG.verts.length,
+        profVerts: profG ? profG.verts.length : 0,
         win: null, fail: null
       };
       if (passing.length > 0) {
@@ -1465,11 +2672,15 @@
         sol.win = passing[0];
         return sol;
       }
-      var fails = [ra, rb, rc].filter(function (r) { return r && !r.pass; });
+      if (rd && !rd.pass && rd.competingCircles) {
+        sol.fail = rd;
+        return sol;
+      }
+      var fails = [ra, rb, rc, rd].filter(function (r) { return r && !r.pass; });
       fails.sort(function (a, b) {
         return failRank(a.reason) - failRank(b.reason);
       });
-      if (!planLoop && f.curves.length > 0) {
+      if (!planLoop && f.curves.length > 0 && !rd) {
         sol.fail = fail('unsupported-curves',
           REASON_LABELS['unsupported-curves'], 0);
         return sol;
@@ -1498,7 +2709,9 @@
       stats.attempts = wins[0].attempts;
       stats.planVerts = wins[0].planVerts;
       stats.elevVerts = wins[0].elevVerts;
+      stats.profVerts = wins[0].profVerts;
       stats.planLoop = wins[0].planLoop ? wins[0].planLoop.order.length : 0;
+      if (first.profileMap) stats.profileMap = first.profileMap;
       if (variants.length > 1) {
         warnings.push({
           code: 'on-datum-placed',
@@ -1506,17 +2719,30 @@
             (wins[0].tag === 'datum-in-plan' ? 'plan' : 'elevation')
         });
       }
-      if (f.curves.length > 0) {
+      if (cls.droppedHelpers.length > 0) {
+        warnings.push({
+          code: 'helpers-ignored',
+          label: cls.droppedHelpers.length +
+            ' construction helper(s) left out (projector/miter)'
+        });
+      }
+      var leftoverCurves = f.curves.length;
+      if (first.class === 'D') leftoverCurves = f.curves.length - 1;
+      if (leftoverCurves > 0) {
         warnings.push({
           code: 'curves-ignored',
-          label: f.curves.length +
+          label: leftoverCurves +
             ' circle/arc entit(y/ies) left out (curves deferred)'
         });
+      }
+      var covOk = { plan: first.coveragePlan, elev: first.coverageElev };
+      if (first.coverageProfile !== undefined) {
+        covOk.profile = first.coverageProfile;
       }
       return {
         status: 'ok', reason: null, label: '', class: first.class,
         geometry: first.geometry,
-        coverage: { plan: first.coveragePlan, elev: first.coverageElev },
+        coverage: covOk,
         warnings: warnings, stats: stats
       };
     }
@@ -1530,6 +2756,7 @@
     stats.attempts = best.attempts;
     stats.planVerts = best.planVerts;
     stats.elevVerts = best.elevVerts;
+    stats.profVerts = best.profVerts;
     stats.planLoop = best.planLoop ? best.planLoop.order.length : 0;
     return unavailable(best.fail.reason, best.fail.label);
   }
@@ -1547,9 +2774,15 @@
     buildViewGraph: buildViewGraph,
     convexLoop: convexLoop,
     pointInLoop: pointInLoop,
+    inferProfileMaps: inferProfileMaps,
+    mapDepth: mapDepth,
     tryPrism: tryPrism,
     tryPyramid: tryPyramid,
     tryWireframe: tryWireframe,
+    tryCylinder: tryCylinder,
+    tryCone: tryCone,
+    tryRevolved: tryRevolved,
+    RIM_K: RIM_K,
     projectToViews: projectToViews,
     reconstruct: reconstruct
   };

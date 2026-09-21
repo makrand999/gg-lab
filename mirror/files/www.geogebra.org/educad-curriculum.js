@@ -20,7 +20,7 @@
   var PROJECTIONS = ['FIRST_ANGLE', 'THIRD_ANGLE'];
   var SOLID_TYPES = ['PRISM', 'PYRAMID', 'CYLINDER', 'CONE'];
   var BIS_CODES = ['A', 'B', 'E', 'G', 'H', 'K'];
-  var VIEW_ROLES = ['PLAN', 'ELEVATION', 'BOTH'];
+  var VIEW_ROLES = ['PLAN', 'ELEVATION', 'BOTH', 'PROFILE'];
 
   function assertFinite() {
     for (var i = 0; i < arguments.length; i++) {
@@ -469,6 +469,136 @@
     };
   }
 
+  // First-angle three-view sheet: a regularSolid bundle plus a
+  // PROFILE-tagged side view and construction helpers. The profile is
+  // read back from the drawn plan/elevation extents (depth span maps to
+  // profile width, heights shared), so it always matches the solid.
+  // Helpers: a tagged X1Y1 reference axis, untagged horizontal
+  // front-to-side projectors and an untagged 45-degree miter, which the
+  // reconstruction filter recognizes geometrically. PRISM/PYRAMID plus
+  // CYLINDER/CONE (M3 curves); arcs stay deferred.
+  // opts.side = +1 (right) or -1 (left).
+  function threeViewSheet(opts) {
+    opts = opts || {};
+    var solid = normalizeSolid(opts.solid === undefined ? 'PRISM' : opts.solid);
+    if (solid !== 'PRISM' && solid !== 'PYRAMID' &&
+        solid !== 'CYLINDER' && solid !== 'CONE') {
+      throw new Error('threeViewSheet covers PRISM/PYRAMID/CYLINDER/CONE only');
+    }
+    var side = (opts.side === undefined) ? 1 : opts.side;
+    if (side !== 1 && side !== -1) throw new Error('side must be +1 or -1');
+    var bundle = regularSolid(opts);
+    var DROP = { projector: 1, locus: 1, axis: 1 };
+    var planY0 = Infinity, planY1 = -Infinity;
+    var eX0 = Infinity, eX1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    var stations = [];
+    var apexPlan = null;
+    var bi, be, kind;
+    for (bi = 0; bi < bundle.entities.length; bi++) {
+      be = bundle.entities[bi];
+      kind = be.meta && be.meta.kind;
+      if (kind && DROP[kind]) continue;
+      if (be.type === 'DATUM_AXIS') continue;
+      if (be.viewRole === 'PLAN' && (be.bisCode === 'A' || be.bisCode === 'B')) {
+        if (be.type === 'SEGMENT' || be.type === 'LINE' || be.type === 'RAY') {
+          if (be.y < planY0) planY0 = be.y;
+          if (be.y2 < planY0) planY0 = be.y2;
+          if (be.y > planY1) planY1 = be.y;
+          if (be.y2 > planY1) planY1 = be.y2;
+          stations.push(-be.y);
+          stations.push(-be.y2);
+        } else if (be.type === 'CIRCLE') {
+          var cy0 = be.y - be.radius, cy1 = be.y + be.radius;
+          if (cy0 < planY0) planY0 = cy0;
+          if (cy1 > planY1) planY1 = cy1;
+        } else if (be.type === 'POINT') {
+          if (apexPlan === null &&
+              (solid === 'PYRAMID' || solid === 'CONE')) apexPlan = be;
+        }
+      } else if (be.viewRole === 'ELEVATION' &&
+          (be.bisCode === 'A' || be.bisCode === 'B')) {
+        if (be.type === 'SEGMENT' || be.type === 'LINE' || be.type === 'RAY') {
+          if (be.y < z0) z0 = be.y;
+          if (be.y2 < z0) z0 = be.y2;
+          if (be.y > z1) z1 = be.y;
+          if (be.y2 > z1) z1 = be.y2;
+          if (be.x < eX0) eX0 = be.x;
+          if (be.x2 < eX0) eX0 = be.x2;
+          if (be.x > eX1) eX1 = be.x;
+          if (be.x2 > eX1) eX1 = be.x2;
+        }
+      }
+    }
+    if (!(planY0 <= planY1) || !(z0 <= z1)) {
+      throw new Error('threeViewSheet found no solid plan/elevation views');
+    }
+    var d0 = -planY1, d1 = -planY0, span = d1 - d0;
+    var xRef = (opts.xRefMm === undefined) ?
+      (side === 1 ? eX1 + 30 : eX0 - 30) : opts.xRefMm;
+    assertFinite(xRef);
+    function px(d) { return side === 1 ? xRef + (d - d0) : xRef - (d - d0); }
+    var pLo = Math.min(px(d0), px(d1)), pHi = Math.max(px(d0), px(d1));
+    var nearX = side === 1 ? pLo : pHi;
+    var pMeta = { kind: 'three-view-profile', solid: solid };
+    var extra = [];
+    if (solid === 'PRISM') {
+      extra.push(segSpec(pLo, z0, pHi, z0, 'PROFILE', 'A', "pf-b", pMeta));
+      extra.push(segSpec(pHi, z0, pHi, z1, 'PROFILE', 'A', "pf-R", pMeta));
+      extra.push(segSpec(pHi, z1, pLo, z1, 'PROFILE', 'A', "pf-t", pMeta));
+      extra.push(segSpec(pLo, z1, pLo, z0, 'PROFILE', 'A', "pf-L", pMeta));
+      stations.sort(function (a, b) { return a - b; });
+      var uniq = [];
+      for (bi = 0; bi < stations.length; bi++) {
+        if (uniq.length === 0 ||
+            Math.abs(stations[bi] - uniq[uniq.length - 1]) > 1e-9) {
+          uniq.push(stations[bi]);
+        }
+      }
+      for (bi = 0; bi < uniq.length; bi++) {
+        if (uniq[bi] > d0 + 1e-9 && uniq[bi] < d1 - 1e-9) {
+          extra.push(segSpec(px(uniq[bi]), z0, px(uniq[bi]), z1,
+            'PROFILE', 'A', 'pf-facet', pMeta));
+        }
+      }
+      extra.push(segSpec(pLo, (z0 + z1) / 2, pHi, (z0 + z1) / 2,
+        'PROFILE', 'E', 'pf-hidden', { kind: 'hidden' }));
+    } else if (solid === 'CYLINDER') {
+      extra.push(segSpec(pLo, z0, pHi, z0, 'PROFILE', 'A', "pf-b", pMeta));
+      extra.push(segSpec(pHi, z0, pHi, z1, 'PROFILE', 'A', "pf-R", pMeta));
+      extra.push(segSpec(pHi, z1, pLo, z1, 'PROFILE', 'A', "pf-t", pMeta));
+      extra.push(segSpec(pLo, z1, pLo, z0, 'PROFILE', 'A', "pf-L", pMeta));
+    } else {
+      if (!apexPlan) throw new Error('threeViewSheet found no plan apex');
+      var da = -apexPlan.y;
+      var xap = px(da);
+      extra.push(segSpec(pLo, z0, pHi, z0, 'PROFILE', 'A', "pf-b", pMeta));
+      extra.push(segSpec(pLo, z0, xap, z1, 'PROFILE', 'A', "pf-sl", pMeta));
+      extra.push(segSpec(pHi, z0, xap, z1, 'PROFILE', 'A', "pf-sr", pMeta));
+      extra.push(ptSpec(xap, z1, 'PROFILE', 'B', "pf-s", pMeta));
+    }
+    var elevEdge = side === 1 ? eX1 : eX0;
+    extra.push(segSpec(elevEdge, z0, nearX, z0, 'BOTH', 'G', 'proj-pf-b', {}));
+    extra.push(segSpec(elevEdge, z1, nearX, z1, 'BOTH', 'G', 'proj-pf-t', {}));
+    extra.push(lineSpec(xRef, Math.min(0, z0), xRef, z1, 'BOTH', 'G',
+      'ref-X1Y1', { kind: 'axis' }));
+    var mLen = span > 0 ? span : 10;
+    extra.push(segSpec(nearX, 0, nearX + side * mLen, -mLen,
+      'BOTH', 'G', 'miter', {}));
+    var steps = bundle.steps.slice();
+    steps.push(steps.length + 1 + '. Side view Type A at xRef=' + xRef +
+      ' mm (profile width = plan depth ' + span + ' mm).');
+    steps.push(steps.length + 1 + '. X1Y1 reference axis Type G; ' +
+      'horizontal projectors + 45-degree miter carry depth across.');
+    return {
+      kind: 'three-view-sheet', solid: solid, side: side,
+      sizeMm: bundle.sizeMm, heightMm: bundle.heightMm, xMm: bundle.xMm,
+      xRefMm: xRef, d0: d0, d1: d1, z0: z0, z1: z1,
+      entities: bundle.entities.concat(extra),
+      steps: steps, loci: bundle.loci, projectors: bundle.projectors,
+      projectorOk: bundle.projectorOk
+    };
+  }
+
   // Dispatcher across lesson kinds.
   function generateLesson(kind, opts) {
     var k = String(kind === undefined ? '' : kind).trim().toUpperCase().replace(/[-\s]+/g, '_');
@@ -559,6 +689,7 @@
     straightLine: straightLine, lineLesson: straightLine, mongeLine: straightLine,
     planeSurface: planeSurface, planeLesson: planeSurface, surfaceLesson: planeSurface,
     regularSolid: regularSolid, solidLesson: regularSolid, solid: regularSolid, solid35mm: regularSolid,
+    threeViewSheet: threeViewSheet,
     generateLesson: generateLesson, generate: generateLesson, buildLesson: generateLesson,
     generateCurriculum: generateCurriculum, buildCurriculum: generateCurriculum,
     curriculum: generateCurriculum, fullCurriculum: generateCurriculum,

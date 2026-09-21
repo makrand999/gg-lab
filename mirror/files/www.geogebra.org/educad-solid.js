@@ -39,6 +39,30 @@
   var CANVAS_CLASS = 'educad-solid-canvas';
   var HANDLE_CLASS = 'educad-solid-handle';
   var HANDLE_TEXT = '⠿ 3D Solid';
+  // Full-screen glass overlay: the model floats on a transparent sheet
+  // covering the whole window (no widget box). Pointer events pass
+  // through everywhere except the "aura": a soft margin around the
+  // drawn wireframe ink. The sheet edge is the only zoom bound; pan
+  // keeps every part reachable instead.
+  var GLASS_RADIUS_FRAC = 0.16;
+  var GLASS_RADIUS_MIN = 64;
+  var GLASS_RADIUS_MAX = 200;
+  var GLASS_ZOOM_MIN = 0.08;
+  var GLASS_ZOOM_MAX = 60;
+  // Pan margin in radii: sqrt(3) + headroom. Normalized geometry has
+  // |v| <= sqrt(3), so any vertex reaches any screen point (zoom has
+  // no practical limit with pan), while the model bbox always keeps
+  // an overlap strip on the sheet (the aura stays grabbable).
+  var GLASS_PAN_MARGIN = 1.75;
+  var AURA_PX = 12;
+  // Double-tap reset window: two presses within 450 ms and 8 px
+  // (manhattan) reset the glass. Detected manually because the orbit
+  // press calls preventDefault (no text selection while dragging),
+  // which suppresses the browser's compatibility dblclick event.
+  var TAP_WINDOW_MS = 450;
+  var TAP_SLOP_PX = 8;
+  var GLASS_CLASS = 'educad-solid-glass';
+  var GLASS_CANVAS_CLASS = 'educad-solid-glass-canvas';
 
   // Unit cube corners. Index map: bit0 -> +X, bit1 -> +Y, bit2 -> +Z.
   var VERTICES = [
@@ -327,11 +351,18 @@
   function zoomBy(st, factor) {
     assertFinite(factor);
     if (!(factor > 0)) throw new Error('zoom factor must be > 0');
-    st.scale = clamp(st.scale * factor, ZOOM_MIN, ZOOM_MAX);
-    return st;
+    var lo = (st && st.minScale !== undefined && st.minScale !== null) ?
+      st.minScale : ZOOM_MIN;
+    var hi = (st && st.maxScale !== undefined && st.maxScale !== null) ?
+      st.maxScale : ZOOM_MAX;
+    st.scale = clamp(st.scale * factor, lo, hi);
+    return clampPan(st);
   }
 
   function projectionRadius(st) {
+    if (st && st.baseR !== undefined && st.baseR !== null) {
+      return st.scale * st.baseR;
+    }
     return st.scale * st.size * RADIUS_FRAC;
   }
 
@@ -719,6 +750,488 @@
     };
   }
 
+  // Base projection radius (scale 1) for the glass sheet: a fraction
+  // of the smaller window dimension, clamped so the resting model
+  // reads at any window size. Fixed at mount; later resizes never
+  // rescale the ink.
+  function glassBaseRadius(w, h) {
+    assertFinite(w, h);
+    if (!(w > 0 && h > 0)) throw new Error('glass needs positive w/h');
+    return clamp(Math.min(w, h) * GLASS_RADIUS_FRAC,
+      GLASS_RADIUS_MIN, GLASS_RADIUS_MAX);
+  }
+
+  // Resting projection center: top-right drafting quadrant, clear of
+  // the demo bar and status HUD at typical window sizes.
+  function glassRestCenter(w, h, baseR) {
+    assertFinite(w, h, baseR);
+    var x = w - Math.max(190, baseR * 2.1);
+    var y = Math.max(170, baseR * 2.0);
+    return {
+      x: clamp(x, 40, Math.max(40, w - 40)),
+      y: clamp(y, 40, Math.max(40, h - 40))
+    };
+  }
+
+  // Glass state: legacy orbit/zoom state plus a pan-able projection
+  // center (cx, cy), sheet size (w, h), base radius, and wide zoom
+  // limits. Node-safe and pure.
+  function createGlassState(opts) {
+    opts = opts || {};
+    var w = (opts.w === undefined || opts.w === null) ? 800 : opts.w;
+    var h = (opts.h === undefined || opts.h === null) ? 600 : opts.h;
+    assertFinite(w, h);
+    if (!(w > 0 && h > 0)) throw new Error('glass needs positive w/h');
+    var st = createSolidState(opts);
+    st.minScale = GLASS_ZOOM_MIN;
+    st.maxScale = GLASS_ZOOM_MAX;
+    var sc = (opts.scale === undefined || opts.scale === null) ?
+      1 : opts.scale;
+    assertFinite(sc);
+    st.scale = clamp(sc, GLASS_ZOOM_MIN, GLASS_ZOOM_MAX);
+    st.baseR = glassBaseRadius(w, h);
+    st.w = w;
+    st.h = h;
+    var rest = glassRestCenter(w, h, st.baseR);
+    st.cx = (opts.cx === undefined || opts.cx === null) ? rest.x : opts.cx;
+    st.cy = (opts.cy === undefined || opts.cy === null) ? rest.y : opts.cy;
+    assertFinite(st.cx, st.cy);
+    return clampPan(st);
+  }
+
+  // Clamp the projection center to [-m*r, w+m*r] (m = pan margin):
+  // wide enough to slide any vertex onto any screen point, tight
+  // enough that the model bbox always overlaps the sheet, so the aura
+  // stays reachable and the model can never be lost off-screen
+  // (double-click the ink to reset). No-op for states without a pan
+  // center (legacy widget states).
+  function clampPan(st) {
+    if (!st || typeof st.cx !== 'number' || typeof st.cy !== 'number') {
+      return st;
+    }
+    if (typeof st.w !== 'number' || typeof st.h !== 'number' ||
+        !(st.w > 0) || !(st.h > 0)) {
+      return st;
+    }
+    var r = projectionRadius(st);
+    if (!isFinite(r) || r < 0) return st;
+    var m = GLASS_PAN_MARGIN * r;
+    st.cx = clamp(st.cx, -m, st.w + m);
+    st.cy = clamp(st.cy, -m, st.h + m);
+    return st;
+  }
+
+  // Middle-drag pan: slide the projection center by a CSS-px delta.
+  function panBy(st, dxPx, dyPx) {
+    assertFinite(dxPx, dyPx);
+    if (typeof st.cx !== 'number' || typeof st.cy !== 'number') {
+      var c = (st && isFinite(st.size)) ? st.size / 2 : 0;
+      st.cx = c;
+      st.cy = c;
+    }
+    st.cx += dxPx;
+    st.cy += dyPx;
+    return clampPan(st);
+  }
+
+  // Cursor-anchored zoom: the model point under (mx, my) stays fixed
+  // while the radius scales, so wheel zoom leans into the ink instead
+  // of drifting toward the projection center.
+  function glassZoomAt(st, mx, my, factor) {
+    assertFinite(mx, my, factor);
+    if (!(factor > 0)) throw new Error('zoom factor must be > 0');
+    if (typeof st.cx !== 'number' || typeof st.cy !== 'number') {
+      var c = (st && isFinite(st.size)) ? st.size / 2 : 0;
+      st.cx = c;
+      st.cy = c;
+    }
+    var r0 = projectionRadius(st);
+    zoomBy(st, factor);
+    var r1 = projectionRadius(st);
+    var k = (r0 > 1e-12) ? r1 / r0 : 1;
+    st.cx = mx + (st.cx - mx) * k;
+    st.cy = my + (st.cy - my) * k;
+    return clampPan(st);
+  }
+
+  // Glass rest pose: isometric orbit, unit scale, rest center.
+  function resetGlassView(st) {
+    resetView(st);
+    if (typeof st.w === 'number' && typeof st.h === 'number' &&
+        typeof st.baseR === 'number' && st.w > 0 && st.h > 0) {
+      var rest = glassRestCenter(st.w, st.h, st.baseR);
+      st.cx = rest.x;
+      st.cy = rest.y;
+    }
+    return clampPan(st);
+  }
+
+  // Track sheet resizes. The base radius stays fixed (no surprise
+  // rescale); only the pan clamp follows the new bounds.
+  function resizeGlassState(st, w, h) {
+    assertFinite(w, h);
+    if (!(w > 0 && h > 0)) throw new Error('glass needs positive w/h');
+    st.w = w;
+    st.h = h;
+    return clampPan(st);
+  }
+
+  function defaultCenter(st) {
+    var c = (st && isFinite(st.size)) ? st.size / 2 : 0;
+    return {
+      x: (st && typeof st.cx === 'number') ? st.cx : c,
+      y: (st && typeof st.cy === 'number') ? st.cy : c
+    };
+  }
+
+  // Distance from P to segment AB (CSS px). Degenerate segments read
+  // as points.
+  function distPointSeg(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay;
+    var len2 = dx * dx + dy * dy;
+    if (!(len2 > 1e-12)) {
+      var ex = px - ax, ey = py - ay;
+      return Math.sqrt(ex * ex + ey * ey);
+    }
+    var t = ((px - ax) * dx + (py - ay) * dy) / len2;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+    var qx = px - (ax + dx * t), qy = py - (ay + dy * t);
+    return Math.sqrt(qx * qx + qy * qy);
+  }
+
+  // Aura frame: the projected wireframe plus its bounding box. Hidden
+  // (dashed) edges count as ink: the aura hugs every drawn stroke, and
+  // lone vertices when the geometry has no edges (3D points).
+  function buildGlassFrame(st) {
+    var dc = defaultCenter(st);
+    var status = statusOf(st);
+    if (!status.available) {
+      return {
+        pts: [], edges: [], bbox: null,
+        cx: dc.x, cy: dc.y, available: false
+      };
+    }
+    var pts = project(st, dc.x, dc.y);
+    var g = geometryOf(st);
+    var bbox = null;
+    if (pts.length > 0) {
+      var minX = pts[0].x, minY = pts[0].y;
+      var maxX = pts[0].x, maxY = pts[0].y;
+      for (var i = 1; i < pts.length; i++) {
+        if (pts[i].x < minX) minX = pts[i].x;
+        if (pts[i].y < minY) minY = pts[i].y;
+        if (pts[i].x > maxX) maxX = pts[i].x;
+        if (pts[i].y > maxY) maxY = pts[i].y;
+      }
+      bbox = { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+    }
+    return {
+      pts: pts, edges: g.edges, bbox: bbox,
+      cx: dc.x, cy: dc.y, available: true
+    };
+  }
+
+  // Aura hit test in CSS px: true on or near a drawn stroke (within
+  // auraPx) or vertex dot (within auraPx + dot radius). The bbox
+  // rejects far misses in O(1); near misses walk the edges (O(E),
+  // E <= ~10^2, microseconds). Pure; the mounted widget feeds its
+  // cached frame so hover never projects.
+  function hitTestFrame(frame, x, y, auraPx) {
+    if (!frame || frame.available === false) return false;
+    var a = (auraPx === undefined || auraPx === null) ?
+      AURA_PX : Number(auraPx);
+    if (!(a >= 0) || !isFinite(a)) return false;
+    if (typeof x !== 'number' || typeof y !== 'number') return false;
+    if (!isFinite(x) || !isFinite(y)) return false;
+    var pts = frame.pts || [];
+    var edges = frame.edges || [];
+    if (pts.length < 1) return false;
+    if (frame.bbox) {
+      var b = frame.bbox, m = a + VERTEX_R_PX;
+      if (x < b.minX - m || x > b.maxX + m ||
+          y < b.minY - m || y > b.maxY + m) {
+        return false;
+      }
+    }
+    for (var i = 0; i < edges.length; i++) {
+      var pa = pts[edges[i][0]], pb = pts[edges[i][1]];
+      if (!pa || !pb) continue;
+      if (distPointSeg(x, y, pa.x, pa.y, pb.x, pb.y) <= a) return true;
+    }
+    var vr = a + VERTEX_R_PX;
+    var vr2 = vr * vr;
+    for (var j = 0; j < pts.length; j++) {
+      var dx = x - pts[j].x, dy = y - pts[j].y;
+      if (dx * dx + dy * dy <= vr2) return true;
+    }
+    return false;
+  }
+
+  // Double-tap tracker (pure): feed each aura press; returns true
+  // when the press completes a double-tap (consumes it, so chains
+  // need a fresh pair). A drag invalidates the pending tap via
+  // invalidateTap, mirroring OS click semantics (moved presses are
+  // not taps). Node-safe.
+  function createTapState() {
+    return { armed: false, t: 0, x: 0, y: 0 };
+  }
+
+  function tapHit(st, nowMs, x, y) {
+    assertFinite(nowMs, x, y);
+    var dt = nowMs - st.t;
+    var near = (Math.abs(x - st.x) + Math.abs(y - st.y)) <= TAP_SLOP_PX;
+    var hit = st.armed && (dt >= 0) && (dt < TAP_WINDOW_MS) && near;
+    if (hit) {
+      st.armed = false;
+    } else {
+      st.armed = true;
+      st.t = nowMs;
+      st.x = x;
+      st.y = y;
+    }
+    return hit;
+  }
+
+  function invalidateTap(st) {
+    st.armed = false;
+    return st;
+  }
+
+  // Batched pen draw: same ink, weights, dashes, and dots as render(),
+  // but one path + stroke per edge pass and one path + fill for all
+  // vertex dots, so a full-screen frame costs a handful of canvas
+  // calls no matter the edge count. Returns the same counts shape.
+  function renderFast(ctx, st, o) {
+    if (!ctx || typeof ctx.beginPath !== 'function') return null;
+    o = o || {};
+    var dc = defaultCenter(st);
+    var cx = (o.cxPx === undefined || o.cxPx === null) ? dc.x : o.cxPx;
+    var cy = (o.cyPx === undefined || o.cyPx === null) ? dc.y : o.cyPx;
+    assertFinite(cx, cy);
+    var status = statusOf(st);
+    if (!status.available) return renderUnavailable(ctx, status, cx, cy);
+    var pts = project(st, cx, cy);
+    var edges = classifyEdges(st);
+    var counts = { front: 0, hidden: 0, vertices: pts.length };
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = LINE_COLOR;
+    ctx.lineWidth = LINE_WIDTH_PX;
+    var i, e;
+    ctx.beginPath();
+    var drewHidden = false;
+    for (i = 0; i < edges.length; i++) {
+      e = edges[i];
+      if (!e.hidden) continue;
+      counts.hidden++;
+      drewHidden = true;
+      ctx.moveTo(pts[e.a].x, pts[e.a].y);
+      ctx.lineTo(pts[e.b].x, pts[e.b].y);
+    }
+    if (drewHidden) {
+      ctx.globalAlpha = HIDDEN_OPACITY;
+      if (typeof ctx.setLineDash === 'function') {
+        ctx.setLineDash(HIDDEN_DASH);
+      }
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    var drewFront = false;
+    for (i = 0; i < edges.length; i++) {
+      e = edges[i];
+      if (e.hidden) continue;
+      counts.front++;
+      drewFront = true;
+      ctx.moveTo(pts[e.a].x, pts[e.a].y);
+      ctx.lineTo(pts[e.b].x, pts[e.b].y);
+    }
+    if (drewFront) {
+      ctx.globalAlpha = 1;
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+      ctx.stroke();
+    }
+    if (pts.length > 0) {
+      ctx.globalAlpha = 1;
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+      ctx.fillStyle = VERTEX_FILL;
+      ctx.beginPath();
+      for (i = 0; i < pts.length; i++) {
+        // moveTo the arc start first: without it, arc() would connect
+        // each dot to the previous one with a straight line and the
+        // single fill() would paint the caps/faces between them black.
+        ctx.moveTo(pts[i].x + VERTEX_R_PX, pts[i].y);
+        ctx.arc(pts[i].x, pts[i].y, VERTEX_R_PX, 0, 2 * Math.PI);
+      }
+      ctx.fill();
+    }
+    ctx.restore();
+    return counts;
+  }
+
+  // Full-screen glass mount: a transparent sheet-sized canvas above
+  // the 2D layers (below HUD chrome) with pointer-events:none, so the
+  // 2D sheet keeps every event the aura does not claim. No listeners
+  // of its own: the app routes gestures through hitTest/orbitBy/
+  // panBy/zoomAt/resetView, and draw() refreshes the cached aura
+  // frame. Frames render only while interacting (one RAF per dirty
+  // frame); idle costs nothing.
+  function mountSolidGlass(container, opts) {
+    opts = opts || {};
+    var cw = (container && isFinite(container.clientWidth)) ?
+      container.clientWidth : 0;
+    var ch = (container && isFinite(container.clientHeight)) ?
+      container.clientHeight : 0;
+    var ww = (typeof window !== 'undefined' && window &&
+      isFinite(window.innerWidth)) ? window.innerWidth : 800;
+    var wh = (typeof window !== 'undefined' && window &&
+      isFinite(window.innerHeight)) ? window.innerHeight : 600;
+    var w = (opts.w !== undefined && opts.w !== null) ? opts.w :
+      (cw > 0 ? cw : ww);
+    var h = (opts.h !== undefined && opts.h !== null) ? opts.h :
+      (ch > 0 ? ch : wh);
+    var st = createGlassState({
+      w: w, h: h, yaw: opts.yaw, pitch: opts.pitch, scale: opts.scale,
+      geometry: opts.geometry, cx: opts.cx, cy: opts.cy
+    });
+    function noopState() { return st; }
+    if (!hasDOM() || container === null || container === undefined ||
+        typeof container.appendChild !== 'function') {
+      return {
+        headless: true, container: null, el: null, canvas: null,
+        state: st, mounted: true,
+        draw: function () { return null; },
+        scheduleDraw: function () { return null; },
+        frameOf: function () { return null; },
+        resize: function () { return st; },
+        hitTest: function () { return false; },
+        orbitBy: noopState, panBy: noopState, zoomAt: noopState,
+        resetView: noopState,
+        dispose: function () { return null; }
+      };
+    }
+    var dpr = resolveDpr(opts.dpr);
+    var el = document.createElement('div');
+    el.className = GLASS_CLASS;
+    el.setAttribute('data-solid', geometryOf(st).name || 'cube');
+    // Critical layout inline, so the glass can never block or shift
+    // the sheet even if the stylesheet fails to load.
+    el.style.position = 'absolute';
+    el.style.left = '0px';
+    el.style.top = '0px';
+    el.style.zIndex = '2';
+    el.style.background = 'transparent';
+    el.style.pointerEvents = 'none';
+    el.style.overflow = 'hidden';
+    var cv = document.createElement('canvas');
+    cv.className = GLASS_CANVAS_CLASS;
+    cv.style.display = 'block';
+    cv.style.background = 'transparent';
+    cv.style.pointerEvents = 'none';
+    el.appendChild(cv);
+    container.appendChild(el);
+    var ctx = null;
+    try {
+      if (typeof cv.getContext === 'function') ctx = cv.getContext('2d');
+    } catch (e) { ctx = null; }
+    function applySize() {
+      cv.width = Math.max(1, Math.round(st.w * dpr));
+      cv.height = Math.max(1, Math.round(st.h * dpr));
+      cv.style.width = st.w + 'px';
+      cv.style.height = st.h + 'px';
+      el.style.width = st.w + 'px';
+      el.style.height = st.h + 'px';
+    }
+    applySize();
+    var frame = null;
+    var rectL = 0, rectT = 0;
+    function draw() {
+      if (!ctx) { frame = null; return null; }
+      if (typeof ctx.setTransform === 'function') {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      if (typeof ctx.clearRect === 'function') {
+        ctx.clearRect(0, 0, st.w, st.h);
+      }
+      var counts = renderFast(ctx, st, { cxPx: st.cx, cyPx: st.cy });
+      frame = buildGlassFrame(st);
+      try {
+        if (typeof cv.getBoundingClientRect === 'function') {
+          var r = cv.getBoundingClientRect();
+          if (r && isFinite(r.left) && isFinite(r.top)) {
+            rectL = r.left;
+            rectT = r.top;
+          }
+        }
+      } catch (err) { /* rect cache keeps its last value */ }
+      return counts;
+    }
+    var rafPending = false;
+    function scheduleDraw() {
+      if (rafPending) return null;
+      rafPending = true;
+      var raf = (typeof window !== 'undefined' && window &&
+        typeof window.requestAnimationFrame === 'function') ?
+        window.requestAnimationFrame : null;
+      if (!raf) {
+        rafPending = false;
+        return draw();
+      }
+      raf(function () {
+        rafPending = false;
+        draw();
+      });
+      return null;
+    }
+    var widget = {
+      headless: false, container: container, el: el, canvas: cv,
+      state: st, mounted: true, dpr: dpr,
+      draw: draw, scheduleDraw: scheduleDraw,
+      frameOf: function () { return frame; },
+      resize: function (nw, nh) {
+        resizeGlassState(st, nw, nh);
+        applySize();
+        scheduleDraw();
+        return st;
+      },
+      hitTest: function (clientX, clientY, auraPx) {
+        if (!frame) return false;
+        return hitTestFrame(frame, clientX - rectL, clientY - rectT, auraPx);
+      },
+      orbitBy: function (dxPx, dyPx) {
+        rotateBy(st, dxPx, dyPx);
+        scheduleDraw();
+        return st;
+      },
+      panBy: function (dxPx, dyPx) {
+        panBy(st, dxPx, dyPx);
+        scheduleDraw();
+        return st;
+      },
+      zoomAt: function (clientX, clientY, factor) {
+        glassZoomAt(st, clientX - rectL, clientY - rectT, factor);
+        scheduleDraw();
+        return st;
+      },
+      resetView: function () {
+        resetGlassView(st);
+        scheduleDraw();
+        return st;
+      },
+      dispose: function () {
+        if (el.parentNode &&
+            typeof el.parentNode.removeChild === 'function') {
+          el.parentNode.removeChild(el);
+        }
+        frame = null;
+        return null;
+      }
+    };
+    draw();
+    return widget;
+  }
+
   return {
     SIZE_DEFAULT: SIZE_DEFAULT, SIZE_MIN: SIZE_MIN, SIZE_MAX: SIZE_MAX,
     LINE_COLOR: LINE_COLOR, LINE_WIDTH_PX: LINE_WIDTH_PX,
@@ -746,7 +1259,29 @@
     projectionRadius: projectionRadius,
     project: project, classifyEdges: classifyEdges,
     render: render,
+    renderFast: renderFast,
     hasDOM: hasDOM,
-    mountSolidWidget: mountSolidWidget
+    mountSolidWidget: mountSolidWidget,
+    GLASS_RADIUS_FRAC: GLASS_RADIUS_FRAC,
+    GLASS_RADIUS_MIN: GLASS_RADIUS_MIN,
+    GLASS_RADIUS_MAX: GLASS_RADIUS_MAX,
+    GLASS_ZOOM_MIN: GLASS_ZOOM_MIN, GLASS_ZOOM_MAX: GLASS_ZOOM_MAX,
+    GLASS_PAN_MARGIN: GLASS_PAN_MARGIN,
+    TAP_WINDOW_MS: TAP_WINDOW_MS, TAP_SLOP_PX: TAP_SLOP_PX,
+    createTapState: createTapState,
+    tapHit: tapHit, invalidateTap: invalidateTap,
+    AURA_PX: AURA_PX,
+    GLASS_CLASS: GLASS_CLASS, GLASS_CANVAS_CLASS: GLASS_CANVAS_CLASS,
+    createGlassState: createGlassState,
+    glassBaseRadius: glassBaseRadius,
+    glassRestCenter: glassRestCenter,
+    clampPan: clampPan, panBy: panBy,
+    glassZoomAt: glassZoomAt,
+    resetGlassView: resetGlassView,
+    resizeGlassState: resizeGlassState,
+    distPointSeg: distPointSeg,
+    buildGlassFrame: buildGlassFrame,
+    hitTestFrame: hitTestFrame,
+    mountSolidGlass: mountSolidGlass
   };
 });

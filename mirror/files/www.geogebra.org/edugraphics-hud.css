@@ -78,3 +78,24 @@
 .educad-solid-handle:active {
   opacity: 1;
 }
+/* EduCAD full-screen 3D glass: transparent sheet over the whole window.
+   Ink floats above the 2D layers (later DOM order wins the z-index tie)
+   and below HUD chrome; pointer-events:none everywhere so the sheet
+   keeps every event the wireframe aura does not claim. Critical layout
+   is also set inline at mount, so a missing stylesheet can never block
+   or shift the drawing. */
+.educad-solid-glass {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  background: transparent;
+  pointer-events: none;
+  touch-action: none;
+  overflow: hidden;
+}
+.educad-solid-glass-canvas {
+  display: block;
+  background: transparent;
+  pointer-events: none;
+}

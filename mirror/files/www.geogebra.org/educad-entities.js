@@ -15,7 +15,7 @@
   var RADIUS_MIN_MM = 0.01;
 
   var ENTITY_TYPES = ['POINT', 'SEGMENT', 'LINE', 'RAY', 'CIRCLE', 'CIRCULAR_ARC', 'DIMENSION', 'TEXT', 'DATUM_AXIS'];
-  var VIEW_ROLES = ['PLAN', 'ELEVATION', 'BOTH'];
+  var VIEW_ROLES = ['PLAN', 'ELEVATION', 'BOTH', 'PROFILE'];
   var BIS_CODES = ['A', 'B', 'E', 'G', 'H', 'K'];
   var LAYER_STATIC = 'layer1';
   var LAYER_DYNAMIC = 'layer2';

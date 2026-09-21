@@ -170,4 +170,92 @@ ambiguous drawings.
 | 2 | Update model | Live on every table change, RAF-coalesced |
 | 3 | Prism demo | Make it truly hexagonal (35 mm, 70 mm high) |
 
-Deferred: curve fidelity (tessellated vs analytic), third-angle timing.
+## 10. Third view — side/profile reading (M2 amendment)
+
+A first-angle side (profile) view joins plan and elevation as an optional
+third input. Two-view behavior is unchanged: sheets without a profile view
+follow §3–§4 exactly.
+
+### 10.1 Roles and classification
+
+- `viewRole` gains `PROFILE`, honored outright wherever the entity sits.
+- Untagged (`BOTH`) upper geometry splits by plan-x overlap: entities
+  overlapping the plan x-range stay elevation; a disjoint upper cluster is
+  the profile view. The split commits only when confirmed (tagged PROFILE,
+  or an untagged cluster with a drawn segment whose width matches the plan
+  depth span and whose height matches the elevation); otherwise the legacy
+  two-view reading applies exactly.
+- Entities exactly on XY keep the §4.4 variant rule; in a confirmed
+  three-view sheet, on-datum spanners drop as helpers and disjoint
+  on-datum lines join the profile view.
+
+### 10.2 Reference line and depth mapping
+
+- Plan depth `d = -planY` reads in the profile at `x'(d) = xRef + s·(d − d0)`
+  with `s ∈ {+1, −1}`, `d0` the near plan-depth edge, and `xRef` the drawn
+  reference edge. Heights are shared with the elevation.
+- Both orientations are tried in fixed order (direct, then mirrored)
+  against the drawn profile; the first passing map wins. Geometry derives
+  from plan/elevation alone, so dual-pass maps yield identical solids and
+  the pick is deterministic, never a guess. Two failing maps report the
+  direct map's named failure.
+
+### 10.3 Helper filtering
+
+Kept alongside the §3.2 drops, and only on confirmed three-view sheets:
+untagged horizontal front↔side projectors (entities straddling the
+elevation/profile boundary), untagged 45° miter diagonals below XY that sit
+clear of the plan and reach the datum on the profile's side, and
+`meta.kind` axes as before. Tagged solid geometry is never helper-dropped.
+Dropped helpers surface as a `helpers-ignored` warning.
+
+### 10.4 Solvers and acceptance gate
+
+- Class A/B: the plan-loop depth span maps into the profile; outline,
+  stations/slants/apex, hidden-line containment, and drawn points must all
+  agree, mirroring the elevation rules. Class C: the lifted wireframe must
+  project onto the drawn profile both ways (drawn geometry explained,
+  projected geometry drawn).
+- No new failure reasons: profile disagreements reuse `x-mismatch`,
+  `unmatched-edge`, `unmatched-point`, `ambiguous-pairing`, and
+  `coverage-failed`. `projectToViews` takes an optional `{xRef, s, dRef}`
+  map; `coverage` gains a `profile` key only when a profile view exists.
+- Gate: round-trip coverage ≥ 0.999 in plan, elevation, and profile.
+
+## 11. Curves — vertical cylinders and cones (M3 amendment)
+
+This section amends §4.1/§7: full-circle cylinders/cones now reconstruct
+as Class D; arcs stay deferred.
+
+### 11.1 Scope lock
+
+Full `CIRCLE` only, vertical-axis solids of revolution (plan circle +
+elevation silhouette: rectangle = cylinder, triangle + apex = cone).
+`CIRCULAR_ARC` stays deferred exactly as before (`unsupported-curves`
+when load-bearing, `curves-ignored` otherwise). No tilted axes,
+ellipses, partial rims, or freeform curves. No new failure reasons.
+
+### 11.2 Class D pairing
+
+Attempted when the plan has no polygon loop but carries exactly one
+`A`/`B` plan circle. Two plan circles report `ambiguous-pairing`.
+A `B` center/apex point at the circle center is required for cones
+and tolerated for cylinders (within weld tolerance). Cross-view checks
+within 0.5 mm: center-x vs silhouette center-x, radius vs half-width
+(`x-mismatch`); silhouette mirrors Class A (cylinder base/top/sides)
+and Class B (cone base/slants/apex); `E` edges contained; profile (when
+present) maps the circle depth span through the §10.2 depth map, both
+orientations tried, first pass wins.
+
+### 11.3 Tessellation and gate
+
+Rim circles tessellate to a fixed K = 24-gon; vertex 0 at angle 0 (+X
+from the axis), subsequent vertices counter-clockwise seen from +Y.
+Cylinder: 48 vertices / 72 edges / 26 faces. Cone: 25 vertices / 48
+edges / 25 faces. Faces feed the existing hidden-line classifier;
+`projectToViews` is unchanged. The drawn circle is covered by
+construction after the §11.2 checks pass; silhouette coverage ≥ 0.999
+in plan, elevation, and profile. Class D competes by coverage, then
+edge length; ties report `ambiguous-pairing`.
+
+Deferred: arcs, tilted axes, ellipses, third-angle timing.

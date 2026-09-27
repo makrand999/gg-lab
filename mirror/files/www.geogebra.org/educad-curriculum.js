@@ -12,7 +12,7 @@
   // equals plan x (mm). Dual-env: browser via window.EduCADCurriculum,
   // plain Node via module.exports. Zero dependencies. No 3D. Canvas2D only.
   var WORLD_UNITS = 'mm';
-  var VERSION = '6.0.0-educad';
+  var VERSION = '6.1.0-educad';
   var DEG = Math.PI / 180;
   var VERTICAL_EPS = 1e-9;
   var SOLID_SIZE_MM = 35;
@@ -216,13 +216,13 @@
     var physicallyImpossible = (st * st + sp * sp) > 1 + 1e-9;
     var meta = { kind: 'straight-line', TL: TL, thetaDeg: thetaDeg, phiDeg: phiDeg };
     var degenerateViews = [];
-    // Apparent views shorter than 1e-6 mm (e.g. theta = 90 deg collapses
+    // Apparent views of at most 1e-6 mm (e.g. theta = 90 deg collapses
     // the plan to a point) are emitted as POINTs, never zero-length
     // SEGMENTs, so direction vectors downstream never divide by zero.
     function viewSeg(x1, y1, x2, y2, role, bis, caption, viewTag, m) {
       var mm = (m === undefined) ? meta : m;
       var ddx = x2 - x1, ddy = y2 - y1;
-      if (ddx * ddx + ddy * ddy < 1e-12) {
+      if (ddx * ddx + ddy * ddy <= 1e-12) {
         degenerateViews.push(viewTag);
         return ptSpec(x1, y1, role, bis, caption, mm);
       }
@@ -290,13 +290,24 @@
     var HTelev = { x1: x1, y1: 0, x2: x2, y2: 0 };
     var VTplan = { x1: xMm, y1: 0, x2: vtx, y2: 0 };
     var VTelev = { x1: xMm, y1: 0, x2: vtx, y2: vty };
+    // Tilt extremes collapse a trace to one point (tilt 0: the VT tip
+    // sits on XY, so proj-VT vanishes; tilt 90: the plan mate VT
+    // vanishes). Collapsed traces are emitted as POINTs, never
+    // zero-length segments -- a line IS two distinct points.
+    function traceSeg(x1s, y1s, x2s, y2s, role, bis, caption, m) {
+      var ddx = x2s - x1s, ddy = y2s - y1s;
+      if (ddx * ddx + ddy * ddy <= 1e-12) {
+        return ptSpec(x1s, y1s, role, bis, caption, m);
+      }
+      return segSpec(x1s, y1s, x2s, y2s, role, bis, caption, m);
+    }
     var entities = [
       datumSpec(x1 - 15, Math.max(x2, vtx) + 15),
       segSpec(HTplan.x1, 0, HTplan.x2, 0, 'PLAN', 'A', 'HT', meta),
       segSpec(HTelev.x1, 0, HTelev.x2, 0, 'ELEVATION', 'G', "HT'", { kind: 'projector-mate' }),
-      segSpec(VTelev.x1, VTelev.y1, VTelev.x2, VTelev.y2, 'ELEVATION', 'A', "VT'", meta),
-      segSpec(VTplan.x1, 0, VTplan.x2, 0, 'PLAN', 'G', 'VT', { kind: 'projector-mate' }),
-      segSpec(vtx, 0, vtx, vty, 'BOTH', 'G', 'proj-VT', { kind: 'projector' }),
+      traceSeg(VTelev.x1, VTelev.y1, VTelev.x2, VTelev.y2, 'ELEVATION', 'A', "VT'", meta),
+      traceSeg(VTplan.x1, 0, VTplan.x2, 0, 'PLAN', 'G', 'VT', { kind: 'projector-mate' }),
+      traceSeg(vtx, 0, vtx, vty, 'BOTH', 'G', 'proj-VT', { kind: 'projector' }),
       lineSpec(x1 - 15, 0, Math.max(x2, vtx) + 15, 0, 'BOTH', 'K', 'locus-XY', { kind: 'locus' }, true)
     ];
     var loci = [locusRec('PLAN', 0, 'HT'), locusRec('ELEVATION', vty, "VT'")];
@@ -334,6 +345,7 @@
     var loci = [];
     var projectors = [];
     var steps = [];
+    var corners = null;
     function proj(x, py, ey, cap) {
       entities.push(segSpec(x, py, x, ey, 'BOTH', 'G', cap, { kind: 'projector' }));
       projectors.push(projectorRec(x, py, ey));
@@ -347,17 +359,30 @@
     }
     if (solid === 'PRISM') {
       // True hexagonal prism: regular flat-top hexagon in plan, sizeMm
-      // across corners (R = sizeMm/2), extruded to heightMm.
+      // across corners (R = sizeMm/2), extruded to heightMm. Corners run
+      // bottom a-f / top g-l around the hexagon (v0..v5). Plan stations
+      // pair bottom+top, elevation interior stations pair back+front;
+      // outer elevation stations are single corners. Visible member is
+      // listed first; no hidden verdicts ship (the student adds parens).
+      // Every hidden edge coincides with a visible one, so no Type E is
+      // drawn: visible wins per ISO 128, and hidden-ness lives in the
+      // verdicts, not the ink.
       var hexR = sizeMm / 2;
       var hexDy = hexR * Math.sqrt(3) / 2;
       var hx = [hexR, hexR / 2, -hexR / 2, -hexR, -hexR / 2, hexR / 2];
       var hy = [0, hexDy, hexDy, 0, -hexDy, -hexDy];
+      var botN = ['a', 'b', 'c', 'd', 'e', 'f'];
+      var topN = ['g', 'h', 'i', 'j', 'k', 'l'];
       var hi, hj;
       for (hi = 0; hi < 6; hi++) {
         hj = (hi + 1) % 6;
         entities.push(segSpec(xMm + hx[hi], planYc + hy[hi],
           xMm + hx[hj], planYc + hy[hj], 'PLAN', 'A',
           'h' + (hi + 1) + 'h' + (hj + 1), meta));
+      }
+      for (hi = 0; hi < 6; hi++) {
+        entities.push(ptSpec(xMm + hx[hi], planYc + hy[hi], 'PLAN', 'B',
+          topN[hi] + ',' + botN[hi], meta));
       }
       var hexTop = planYc + hexDy, hexBot = planYc - hexDy;
       // Elevation: outer rectangle over the corner-to-corner width plus
@@ -371,22 +396,40 @@
         'ELEVATION', 'A', 'facet-L', meta));
       entities.push(segSpec(xMm + hexR / 2, 0, xMm + hexR / 2, heightMm,
         'ELEVATION', 'A', 'facet-R', meta));
-      entities.push(segSpec(xL, heightMm / 2, xR, heightMm / 2, 'ELEVATION', 'E', 'hidden-seam', { kind: 'hidden' }));
+      entities.push(ptSpec(xR, 0, 'ELEVATION', 'B', "a'", meta));
+      entities.push(ptSpec(xR, heightMm, 'ELEVATION', 'B', "g'", meta));
+      entities.push(ptSpec(xL, 0, 'ELEVATION', 'B', "d'", meta));
+      entities.push(ptSpec(xL, heightMm, 'ELEVATION', 'B', "j'", meta));
+      entities.push(ptSpec(xMm + hexR / 2, 0, 'ELEVATION', 'B', "f',b'", meta));
+      entities.push(ptSpec(xMm + hexR / 2, heightMm, 'ELEVATION', 'B', "l',h'", meta));
+      entities.push(ptSpec(xMm - hexR / 2, 0, 'ELEVATION', 'B', "e',c'", meta));
+      entities.push(ptSpec(xMm - hexR / 2, heightMm, 'ELEVATION', 'B', "k',i'", meta));
       axis(xMm, hexBot - 6, hexTop + 6, 'PLAN');
       axis(xMm, -6, heightMm + 6, 'ELEVATION');
-      proj(xL, hexTop, heightMm, 'proj-L');
-      proj(xR, hexTop, heightMm, 'proj-R');
-      proj(xMm - hexR / 2, hexTop, heightMm, 'proj-inner-L');
-      proj(xMm + hexR / 2, hexTop, heightMm, 'proj-inner-R');
+      proj(xL, planYc, heightMm, 'proj-L');
+      proj(xR, planYc, heightMm, 'proj-R');
+      proj(xMm - hexR / 2, hexBot, heightMm, 'proj-inner-L');
+      proj(xMm + hexR / 2, hexBot, heightMm, 'proj-inner-R');
       locusH(0, 'ELEVATION', 'locus-base');
       locusH(heightMm, 'ELEVATION', 'locus-top');
       steps = [
         '1. Draw XY; ' + sizeMm + ' mm hex prism base centred at x=' + xMm + ' mm.',
-        '2. Plan: regular hexagon across corners Type A visible below XY.',
-        '3. Elevation: ' + sizeMm + 'x' + heightMm + ' mm rectangle + facet verticals Type A above XY; hidden seam Type E.',
+        '2. Plan: regular hexagon across corners Type A visible below XY; corner stations pair top+bottom (g,a ...).',
+        '3. Elevation: ' + sizeMm + 'x' + heightMm + ' mm rectangle + facet verticals Type A above XY; interior stations pair front+back, outer stations are single corners.',
         '4. Centre axes Type G; projectors hold elev.x == plan.x at outer/inner stations.',
-        "5. Loci Type K through base y=0 and top y=" + heightMm + " mm; prime labels (h1') in elevation."
+        "5. Every hidden edge coincides with a visible one (no Type E drawn). Mark hidden verdicts with parens, e.g. (b'), then press Check."
       ];
+      corners = {};
+      for (hi = 0; hi < 6; hi++) {
+        corners[botN[hi]] = {
+          plan: { x: xMm + hx[hi], y: planYc + hy[hi] },
+          elev: { x: xMm + hx[hi], y: 0 }
+        };
+        corners[topN[hi]] = {
+          plan: { x: xMm + hx[hi], y: planYc + hy[hi] },
+          elev: { x: xMm + hx[hi], y: heightMm }
+        };
+      }
     } else if (solid === 'PYRAMID') {
       var qy1 = planYc - h, qy2 = planYc + h;
       entities.push(segSpec(xL, qy1, xR, qy1, 'PLAN', 'A', 'b1b2', meta));
@@ -465,7 +508,66 @@
     }
     return {
       kind: 'regular-solid', solid: solid, sizeMm: sizeMm, heightMm: heightMm, xMm: xMm,
-      entities: entities, steps: steps, loci: loci, projectors: projectors, projectorOk: ok
+      entities: entities, steps: steps, loci: loci, projectors: projectors, projectorOk: ok,
+      corners: corners
+    };
+  }
+
+  // Profile-plane square lamina: edge-on in both views (the ambiguous
+  // sheet). A sizeMm square in plane x=xMm standing on HP (z 0..sizeMm),
+  // spanning depths around planYc. VP shows a vertical line pairing
+  // near+far corners at top/bottom; HP shows a horizontal line pairing
+  // top+bottom corners at the feet. Corners a (near-top), b (far-top),
+  // c (far-bottom), d (near-bottom); drawn captions are neutral letter
+  // pairs with no verdicts: the student pairs projectors and marks
+  // parens. Reconstruction reports ambiguous-pairing (every corner
+  // shares one x); the student's projectors record the pairing, and v1
+  // checks them without feeding reconstruction.
+  function profileSquare(opts) {
+    opts = opts || {};
+    var sizeMm = (opts.sizeMm === undefined) ? 40 : opts.sizeMm;
+    var xMm = (opts.xMm === undefined) ? 0 : opts.xMm;
+    assertFinite(sizeMm, xMm);
+    if (sizeMm <= 0) throw new Error('sizeMm must be > 0');
+    var half = sizeMm / 2;
+    var planYc = -(half + 8);
+    var yNear = planYc + half, yFar = planYc - half;
+    var z0 = 0, z1 = sizeMm;
+    var meta = { kind: 'profile-square', sizeMm: sizeMm };
+    var entities = [datumSpec(xMm - 30, xMm + 30)];
+    var loci = [];
+    var projectors = [];
+    entities.push(segSpec(xMm, yFar, xMm, yNear, 'PLAN', 'A', 'sq-plan', meta));
+    entities.push(segSpec(xMm, z0, xMm, z1, 'ELEVATION', 'A', 'sq-elev', meta));
+    entities.push(ptSpec(xMm, yNear, 'PLAN', 'B', 'a,d', meta));
+    entities.push(ptSpec(xMm, yFar, 'PLAN', 'B', 'b,c', meta));
+    entities.push(ptSpec(xMm, z1, 'ELEVATION', 'B', "b',a'", meta));
+    entities.push(ptSpec(xMm, z0, 'ELEVATION', 'B', "c',d'", meta));
+    entities.push(lineSpec(xMm, yFar - 6, xMm, yNear + 6, 'PLAN', 'G', 'axis', { kind: 'axis' }));
+    entities.push(lineSpec(xMm, -6, xMm, z1 + 6, 'ELEVATION', 'G', 'axis', { kind: 'axis' }));
+    entities.push(segSpec(xMm, yNear, xMm, z1, 'BOTH', 'G', 'proj-sq', { kind: 'projector' }));
+    projectors.push(projectorRec(xMm, yNear, z1));
+    entities.push(lineSpec(xMm - 30, z0, xMm + 30, z0, 'ELEVATION', 'K', 'locus-base', { kind: 'locus' }, true));
+    loci.push(locusRec('ELEVATION', z0, 'locus-base'));
+    entities.push(lineSpec(xMm - 30, z1, xMm + 30, z1, 'ELEVATION', 'K', 'locus-top', { kind: 'locus' }, true));
+    loci.push(locusRec('ELEVATION', z1, 'locus-top'));
+    return {
+      kind: 'profile-square', sizeMm: sizeMm, xMm: xMm,
+      entities: entities,
+      steps: [
+        '1. Draw XY; ' + sizeMm + ' mm square in profile plane x=' + xMm + ' mm, standing on HP.',
+        '2. VP: vertical edge-on line; top/bottom stations pair near+far corners (no verdicts).',
+        '3. HP: horizontal edge-on line; feet pair top+bottom corners (no verdicts).',
+        '4. Draw one projector per corner from a VP station to its HP foot; declare the member when anchoring.',
+        '5. Mark hidden verdicts with parens, then press Check. (3D stays ambiguous: one x fits every pairing.)'
+      ],
+      loci: loci, projectors: projectors, projectorOk: true,
+      corners: {
+        a: { plan: { x: xMm, y: yNear }, elev: { x: xMm, y: z1 } },
+        b: { plan: { x: xMm, y: yFar }, elev: { x: xMm, y: z1 } },
+        c: { plan: { x: xMm, y: yFar }, elev: { x: xMm, y: z0 } },
+        d: { plan: { x: xMm, y: yNear }, elev: { x: xMm, y: z0 } }
+      }
     };
   }
 
@@ -574,7 +676,7 @@
       extra.push(segSpec(pLo, z0, pHi, z0, 'PROFILE', 'A', "pf-b", pMeta));
       extra.push(segSpec(pLo, z0, xap, z1, 'PROFILE', 'A', "pf-sl", pMeta));
       extra.push(segSpec(pHi, z0, xap, z1, 'PROFILE', 'A', "pf-sr", pMeta));
-      extra.push(ptSpec(xap, z1, 'PROFILE', 'B', "pf-s", pMeta));
+      extra.push(ptSpec(xap, z1, 'PROFILE', 'B', "s''", pMeta));
     }
     var elevEdge = side === 1 ? eX1 : eX0;
     extra.push(segSpec(elevEdge, z0, nearX, z0, 'BOTH', 'G', 'proj-pf-b', {}));
@@ -595,7 +697,7 @@
       xRefMm: xRef, d0: d0, d1: d1, z0: z0, z1: z1,
       entities: bundle.entities.concat(extra),
       steps: steps, loci: bundle.loci, projectors: bundle.projectors,
-      projectorOk: bundle.projectorOk
+      projectorOk: bundle.projectorOk, corners: bundle.corners || null
     };
   }
 
@@ -689,6 +791,7 @@
     straightLine: straightLine, lineLesson: straightLine, mongeLine: straightLine,
     planeSurface: planeSurface, planeLesson: planeSurface, surfaceLesson: planeSurface,
     regularSolid: regularSolid, solidLesson: regularSolid, solid: regularSolid, solid35mm: regularSolid,
+    profileSquare: profileSquare, squareLesson: profileSquare,
     threeViewSheet: threeViewSheet,
     generateLesson: generateLesson, generate: generateLesson, buildLesson: generateLesson,
     generateCurriculum: generateCurriculum, buildCurriculum: generateCurriculum,

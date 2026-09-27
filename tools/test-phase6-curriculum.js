@@ -165,12 +165,20 @@ var hexEx = [];
 hexElev.forEach(function (e) { hexEx.push(e.x, e.x2); });
 near(Math.max.apply(null, hexEx) - Math.min.apply(null, hexEx), 35, 1e-9, 'hex elev width 35');
 pass('phase6 solids 35mm');
-// 16 solids hidden E + axis G + visible A
+// 16 solids hidden E + axis G + visible A. PRISM is exempt from E: every
+// prism hidden edge coincides with a visible one, so visible wins per
+// ISO 128 and no Type E is drawn (the old mid-height seam was fiction);
+// hidden-ness lives in the corner verdicts instead. The other solids
+// keep true drawable hidden edges (slant, hidden base).
 ['PRISM', 'PYRAMID', 'CYLINDER', 'CONE'].forEach(function (s) {
   var b = C.regularSolid({ solid: s });
   var bis = b.entities.map(function (e) { return e.bisCode; });
   ok(bis.indexOf('A') !== -1, s + ' A');
-  ok(bis.indexOf('E') !== -1, s + ' E hidden');
+  if (s === 'PRISM') {
+    ok(bis.indexOf('E') === -1, 'PRISM draws no fictional E');
+  } else {
+    ok(bis.indexOf('E') !== -1, s + ' E hidden');
+  }
   ok(bis.indexOf('G') !== -1, s + ' G axis');
   ok(bis.indexOf('K') !== -1, s + ' K loci');
   var apex = b.entities.filter(function (e) { return e.caption === "s'"; });

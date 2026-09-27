@@ -15,6 +15,11 @@
   var RADIUS_MIN_MM = 0.01;
 
   var ENTITY_TYPES = ['POINT', 'SEGMENT', 'LINE', 'RAY', 'CIRCLE', 'CIRCULAR_ARC', 'DIMENSION', 'TEXT', 'DATUM_AXIS'];
+  // Core line property: a line-like entity IS two distinct points. These
+  // types can never be created, added, or updated into a coincident
+  // (zero-length) state -- endpoints within COINCIDENT_TOL_MM are one
+  // point, and one point is a POINT, never a line.
+  var TWO_POINT_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION', 'DATUM_AXIS'];
   var VIEW_ROLES = ['PLAN', 'ELEVATION', 'BOTH', 'PROFILE'];
   var BIS_CODES = ['A', 'B', 'E', 'G', 'H', 'K'];
   var LAYER_STATIC = 'layer1';
@@ -44,6 +49,16 @@
       if (typeof v !== 'number' || Number.isNaN(v) || !Number.isFinite(v)) {
         throw new Error('NaN guard: expected finite number, got ' + String(v));
       }
+    }
+  }
+
+  function assertTwoPoints(type, x, y, x2, y2) {
+    if (TWO_POINT_TYPES.indexOf(type) === -1) return;
+    assertFinite(x, y, x2, y2);
+    var dx = x2 - x, dy = y2 - y;
+    if (Math.sqrt(dx * dx + dy * dy) <= COINCIDENT_TOL_MM) {
+      throw new Error(String(type) + ' needs two distinct points ' +
+        '(endpoints coincide within ' + COINCIDENT_TOL_MM + ' mm)');
     }
   }
 
@@ -77,6 +92,7 @@
     var x2 = (opts.x2 === undefined) ? 0 : opts.x2;
     var y2 = (opts.y2 === undefined) ? 0 : opts.y2;
     assertFinite(x2, y2);
+    assertTwoPoints(type, x, y, x2, y2);
     var radius = (opts.radius === undefined) ? 0 : opts.radius;
     assertFinite(radius);
     if (radius !== 0) radius = clampRadius(radius);
@@ -266,6 +282,7 @@
     }
     if (this._map[entity.id] !== undefined) throw new Error('duplicate entity id: ' + entity.id);
     if (!isValidType(entity.type)) throw new Error('unknown entity type: ' + String(entity.type));
+    assertTwoPoints(entity.type, entity.x, entity.y, entity.x2, entity.y2);
     this._map[entity.id] = entity;
     this._order.push(entity.id);
     this._emit('add', entity);
@@ -328,6 +345,13 @@
       assertFinite(patch.thickness);
       if (patch.thickness <= 0) throw new Error('thickness must be > 0');
     }
+    if (touchesXY) {
+      var nx = (patch.x !== undefined) ? patch.x : e.x;
+      var ny = (patch.y !== undefined) ? patch.y : e.y;
+      var nx2 = (patch.x2 !== undefined) ? patch.x2 : e.x2;
+      var ny2 = (patch.y2 !== undefined) ? patch.y2 : e.y2;
+      assertTwoPoints(e.type, nx, ny, nx2, ny2);
+    }
     for (var key in patch) {
       if (Object.prototype.hasOwnProperty.call(patch, key) && Object.prototype.hasOwnProperty.call(e, key)) {
         e[key] = patch[key];
@@ -382,6 +406,93 @@
     return this.list().filter(function (e) { return e.visible; });
   };
 
+  // Point-cascade delete: a line must not survive its points. Deleting a
+  // POINT also deletes line-like entities (SEGMENT/LINE/RAY/DIMENSION)
+  // that reference it via meta.refs or whose endpoint coincides with it
+  // (within COINCIDENT_TOL_MM), plus any transitive meta.refs/vertices
+  // dependents (midpoints, parallels, polygon heads). Polygon edges follow
+  // their head via meta.polygon. Locked entities and DATUM_AXIS never
+  // auto-delete. Returns doomed ids in deletion order, root first.
+  var CASCADE_LINE_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION'];
+
+  function pointsCoincideMm(ax, ay, bx, by, tolMm) {
+    var tol = (tolMm === undefined || tolMm === null) ? COINCIDENT_TOL_MM : tolMm;
+    assertFinite(ax, ay, bx, by, tol);
+    var dx = ax - bx, dy = ay - by;
+    return Math.sqrt(dx * dx + dy * dy) <= tol;
+  }
+
+  function collectCascadeDeleteIds(entities, rootId, tolMm) {
+    if (!Array.isArray(entities)) throw new Error('entities must be an array');
+    var tol = (tolMm === undefined || tolMm === null) ? COINCIDENT_TOL_MM : tolMm;
+    assertFinite(tol);
+    var byId = {};
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (e && typeof e.id === 'string') byId[e.id] = e;
+    }
+    if (!byId[rootId]) return [];
+    var doomed = {};
+    doomed[rootId] = true;
+    var order = [rootId];
+    var deadPoints = [];
+    if (byId[rootId].type === 'POINT') {
+      deadPoints.push({ x: byId[rootId].x, y: byId[rootId].y });
+    }
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (var j = 0; j < entities.length; j++) {
+        var c = entities[j];
+        if (!c || doomed[c.id]) continue;
+        if (c.locked) continue;
+        if (c.type === 'DATUM_AXIS') continue;
+        var m = c.meta || {};
+        var hit = false;
+        if (!hit && typeof m.polygon === 'string' && m.polygon !== '' &&
+            doomed[m.polygon]) {
+          hit = true;
+        }
+        if (!hit && Array.isArray(m.refs)) {
+          for (var r = 0; r < m.refs.length; r++) {
+            if (doomed[m.refs[r]]) { hit = true; break; }
+          }
+        }
+        if (!hit && Array.isArray(m.vertices)) {
+          for (var v = 0; v < m.vertices.length; v++) {
+            if (doomed[m.vertices[v]]) { hit = true; break; }
+          }
+        }
+        if (!hit && deadPoints.length > 0 &&
+            CASCADE_LINE_TYPES.indexOf(c.type) !== -1) {
+          for (var d = 0; d < deadPoints.length; d++) {
+            var px = deadPoints[d].x, py = deadPoints[d].y;
+            if (pointsCoincideMm(c.x, c.y, px, py, tol) ||
+                pointsCoincideMm(c.x2, c.y2, px, py, tol)) {
+              hit = true;
+              break;
+            }
+          }
+        }
+        if (hit) {
+          doomed[c.id] = true;
+          order.push(c.id);
+          if (c.type === 'POINT') {
+            deadPoints.push({ x: c.x, y: c.y });
+          }
+          changed = true;
+        }
+      }
+    }
+    return order;
+  }
+
+  CadEntityTable.prototype.removeCascade = function (id, tolMm) {
+    var ids = collectCascadeDeleteIds(this.list(), id, tolMm);
+    for (var i = 0; i < ids.length; i++) this.remove(ids[i]);
+    return ids;
+  };
+
   function createTable() { return new CadEntityTable(); }
 
   return {
@@ -410,6 +521,11 @@
     cosmeticDashPx: cosmeticDashPx,
     arrowheadMm: arrowheadMm, arrowFlipNeeded: arrowFlipNeeded,
     renderEntity: renderEntity, renderJobFor: renderEntity, toRenderPx: renderEntity,
-    checkProjector: checkProjector, checkEntityProjector: checkEntityProjector
+    checkProjector: checkProjector, checkEntityProjector: checkEntityProjector,
+    CASCADE_LINE_TYPES: CASCADE_LINE_TYPES,
+    TWO_POINT_TYPES: TWO_POINT_TYPES,
+    assertTwoPoints: assertTwoPoints,
+    pointsCoincideMm: pointsCoincideMm,
+    collectCascadeDeleteIds: collectCascadeDeleteIds
   };
 });

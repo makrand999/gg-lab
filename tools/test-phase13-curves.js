@@ -256,10 +256,12 @@ eq(r19.class, 'A');
 ok(r19.warnings.map(function (w) { return w.code; }).indexOf('curves-ignored') !== -1, 'arc warned');
 pass('phase13 box plus arc ignored');
 
-// 20 failure hygiene: no new reasons, labels untouched
-assert.deepStrictEqual(Object.keys(R.REASON_LABELS).sort(), ['ambiguous-pairing', 'coverage-failed', 'missing-view', 'no-closed-profile', 'non-convex-profile', 'non-manifold', 'unmatched-edge', 'unmatched-point', 'unsupported-curves', 'x-mismatch']);
+// 20 failure hygiene: reason set pins the pair-by-name amendment (+name-mismatch)
+// and the M5 Class E amendment (+hint-conflict, +hint-loose-foot,
+// +duplicate-corners, +corners-not-coplanar, +non-convex-corners); old labels untouched
+assert.deepStrictEqual(Object.keys(R.REASON_LABELS).sort(), ['ambiguous-pairing', 'corners-not-coplanar', 'coverage-failed', 'duplicate-corners', 'hint-conflict', 'hint-loose-foot', 'missing-view', 'name-mismatch', 'no-closed-profile', 'non-convex-corners', 'non-convex-profile', 'non-manifold', 'unmatched-edge', 'unmatched-point', 'unsupported-curves', 'x-mismatch']);
 eq(R.REASON_LABELS['unsupported-curves'], 'curves not supported yet');
-var allowed20 = { 'x-mismatch': 1, 'unmatched-edge': 1, 'unmatched-point': 1, 'ambiguous-pairing': 1, 'coverage-failed': 1, 'non-manifold': 1, 'unsupported-curves': 1, 'missing-view': 1 };
+var allowed20 = { 'x-mismatch': 1, 'name-mismatch': 1, 'unmatched-edge': 1, 'unmatched-point': 1, 'ambiguous-pairing': 1, 'coverage-failed': 1, 'non-manifold': 1, 'unsupported-curves': 1, 'missing-view': 1 };
 [r3, r4, r5, r7b, r9, r10a, r10b, r13, r14].forEach(function (r) {
   ok(allowed20[r.reason], 'known reason ' + r.reason);
 });
@@ -431,9 +433,9 @@ ok(src28.indexOf('isPolarToolActive(handle.polar)') !== -1, 'polar guard wired')
 ok(src28.indexOf('toggleCirclePick(handle.circlePicks') !== -1, 'picks wired idle');
 pass('phase13 precedence armed wins');
 
-// 29 clears wired: commit Escape right-click plain-select
+// 29 clears wired: bank drops through one cursor-safe helper
 var src29 = fs.readFileSync('mirror/index.html', 'utf8');
-ok(src29.split('clearCirclePicks(handle.circlePicks)').length - 1 >= 5, 'clears wired');
+ok(src29.split('clearBank();').length - 1 >= 5, 'clears wired');
 ok(src29.indexOf('drawKnockoutLabel(ctx2, String(cpi + 1)') !== -1, 'numerals wired');
 pass('phase13 clears numerals wired');
 

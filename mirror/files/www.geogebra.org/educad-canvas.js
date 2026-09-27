@@ -253,6 +253,15 @@
   var LINE_TOOL_PHASES = ['idle', 'anchored', 'menu', 'animating'];
   var LINE_BIS_CODES = ['A', 'B', 'E', 'G', 'K'];
   var LINE_STROKE_MS = 300;
+  // Mirrors EduCADEntities.COINCIDENT_TOL_MM (this module stays zero-dep):
+  // endpoints this close are one point, and one point can never commit
+  // a line -- the menu/animating phases always hold two distinct points.
+  var LINE_COINCIDENT_TOL_MM = 1e-6;
+
+  function lineEndsCoincide(p1Mm, p2Mm) {
+    var dx = p2Mm.x - p1Mm.x, dy = p2Mm.y - p1Mm.y;
+    return Math.sqrt(dx * dx + dy * dy) <= LINE_COINCIDENT_TOL_MM;
+  }
 
   function createSelectionState() {
     return { selectedId: null, editing: null };
@@ -337,16 +346,33 @@
     return { id: ed.id, name: name };
   }
 
+  // Mirrors EduCADLabels.splitCaption/bareName (this module stays
+  // zero-dep): multi-caption parts and hidden-mark parens count toward
+  // the used-letter set, so 'a,(b)' blocks both a and b.
+  function captionBareParts(caption) {
+    var raw = String(caption === undefined || caption === null ? '' : caption).split(',');
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var t = raw[i].replace(/^\s+|\s+$/g, '');
+      if (t.length >= 2 && t.charAt(0) === '(' && t.charAt(t.length - 1) === ')') {
+        t = t.slice(1, -1).replace(/^\s+|\s+$/g, '');
+      }
+      if (t !== '') out.push(t);
+    }
+    return out;
+  }
+
   // Next unused point letter: a..z, then a1..z1, a2.. Scans live POINT
-  // captions, so deleted letters are re-used automatically. Terminates:
-  // candidates are infinite, entities finite.
+  // captions (multi-caption bare parts), so deleted letters are re-used
+  // automatically. Terminates: candidates are infinite, entities finite.
   function nextPointName(entities) {
     if (!Array.isArray(entities)) throw new Error('entities must be an array');
     var used = {};
     for (var i = 0; i < entities.length; i++) {
       var e = entities[i];
       if (e && e.type === 'POINT' && typeof e.caption === 'string' && e.caption !== '') {
-        used[e.caption] = true;
+        var parts = captionBareParts(e.caption);
+        for (var p = 0; p < parts.length; p++) used[parts[p]] = true;
       }
     }
     for (var n = 0; ; n++) {
@@ -404,6 +430,117 @@
     return { lock: null, xMm: wx, yMm: wy, readout: null };
   }
 
+  // Typed axis distance: with a point selected and the axis badge
+  // showing, the user types millimetres and presses Enter to stake a
+  // new point at that distance along the locked axis, on the cursor's
+  // side of the reference. Headless state + parsing only; the page
+  // owns arming (bare selection, no tools/menus) and the commit.
+  var TYPED_DIST_MAX_MM = 10000;
+  var TYPED_DIST_MAX_CHARS = 12;
+
+  function createTypedDistState() {
+    return { buffer: '' };
+  }
+
+  function clearTypedDist(state) {
+    if (state) state.buffer = '';
+    return state;
+  }
+
+  function isTypedDistActive(state) {
+    return !!(state && state.buffer.length > 0);
+  }
+
+  // Pure key router for the distance buffer: 'input' when the buffer
+  // changed (digits, one dot, Backspace), 'ignored' otherwise. Enter
+  // and Escape are page-level (commit needs cursor + view + table)
+  // and are always ignored here.
+  function handleTypedDistKey(state, key) {
+    if (!state) throw new Error('typed-dist state required');
+    if (key === 'Backspace') {
+      if (state.buffer.length === 0) return 'ignored';
+      state.buffer = state.buffer.slice(0, -1);
+      return 'input';
+    }
+    if (typeof key !== 'string' || key.length !== 1) return 'ignored';
+    if (state.buffer.length >= TYPED_DIST_MAX_CHARS) return 'ignored';
+    if (key >= '0' && key <= '9') {
+      state.buffer += key;
+      return 'input';
+    }
+    if (key === '.' && state.buffer.indexOf('.') === -1) {
+      state.buffer += key;
+      return 'input';
+    }
+    return 'ignored';
+  }
+
+  // Strict millimetre parse: {ok, value} or a named rejection
+  // {ok:false, reason, message}. Only what the key router can produce
+  // (digits plus one dot) validates; sign/exponent forms never parse.
+  function parseTypedDist(buffer) {
+    var s = String(buffer === undefined || buffer === null ? '' :
+      buffer).replace(/^\s+|\s+$/g, '');
+    if (s === '') {
+      return { ok: false, reason: 'empty',
+        message: 'type a distance in mm first' };
+    }
+    if (!/^(\d+(\.\d*)?|\.\d+)$/.test(s)) {
+      return { ok: false, reason: 'not-a-number',
+        message: 'distance "' + s + '" is not a number (digits, e.g. 40 or 12.5)' };
+    }
+    var v = parseFloat(s);
+    if (!isFinite(v)) {
+      return { ok: false, reason: 'not-a-number',
+        message: 'distance "' + s + '" is not a number (digits, e.g. 40 or 12.5)' };
+    }
+    if (!(v > 0)) {
+      return { ok: false, reason: 'not-positive',
+        message: 'distance must be greater than 0 mm' };
+    }
+    if (v > TYPED_DIST_MAX_MM) {
+      return { ok: false, reason: 'too-large',
+        message: 'distance above ' + TYPED_DIST_MAX_MM + ' mm is not placed' };
+    }
+    return { ok: true, value: v };
+  }
+
+  // Cursor side along the locked axis in world mm: +1 / -1, or 0 when
+  // the cursor sits exactly on the reference (no direction to take).
+  // Lock 'y' walks X (the dX axis); lock 'x' walks Y (the dY axis).
+  function typedDistSign(lock, cursorPx, view, refMm) {
+    assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty,
+      refMm.x, refMm.y);
+    var wx = (cursorPx.x - view.tx) / view.s;
+    var wy = (view.ty - cursorPx.y) / view.s;
+    if (lock === 'y') {
+      if (wx > refMm.x) return 1;
+      if (wx < refMm.x) return -1;
+      return 0;
+    }
+    if (lock === 'x') {
+      if (wy > refMm.y) return 1;
+      if (wy < refMm.y) return -1;
+      return 0;
+    }
+    return 0;
+  }
+
+  // Target point at distMm from ref along lock toward sign. Null when
+  // there is no direction (sign 0) or no axis (any other lock): the
+  // page warns instead of guessing.
+  function typedDistPoint(refMm, lock, sign, distMm) {
+    assertFinite(refMm.x, refMm.y, sign, distMm);
+    if (sign !== 1 && sign !== -1) return null;
+    if (lock === 'y') {
+      return { xMm: refMm.x + sign * distMm, yMm: refMm.y };
+    }
+    if (lock === 'x') {
+      return { xMm: refMm.x, yMm: refMm.y + sign * distMm };
+    }
+    return null;
+  }
+
   // Amber selection halo (snap ring owns cyan). No-op without a 2d context.
   function drawSelectionRing(ctx, x, y, o) {
     if (!ctx || typeof ctx.beginPath !== 'function') return false;
@@ -427,14 +564,17 @@
   // Any empty click or Escape aborts back to idle with no creation.
   function createLineToolState() {
     return { phase: 'idle', p1Id: null, p1Mm: null,
-      p2Id: null, p2Mm: null, bisCode: null };
+      p2Id: null, p2Mm: null, bisCode: null, p1Member: null };
   }
 
   function isLineToolActive(ls) {
     return !!ls && ls.phase !== 'idle';
   }
 
-  function anchorLineTool(ls, id, xMm, yMm) {
+  // Optional member declares which multi-caption part the student draws
+  // for (the projector claim); null for single-caption anchors. The page
+  // commits it into the segment's meta.fromMember.
+  function anchorLineTool(ls, id, xMm, yMm, member) {
     assertFinite(xMm, yMm);
     ls.phase = 'anchored';
     ls.p1Id = id;
@@ -442,6 +582,7 @@
     ls.p2Id = null;
     ls.p2Mm = null;
     ls.bisCode = null;
+    ls.p1Member = (member === undefined || member === null) ? null : String(member);
     return ls;
   }
 
@@ -450,6 +591,7 @@
     if (!ls || ls.phase !== 'anchored') return false;
     if (id === ls.p1Id) return false;
     assertFinite(xMm, yMm);
+    if (lineEndsCoincide(ls.p1Mm, { x: xMm, y: yMm })) return false;
     ls.phase = 'menu';
     ls.p2Id = id;
     ls.p2Mm = { x: xMm, y: yMm };
@@ -461,6 +603,7 @@
     if (!ls || ls.phase !== 'menu') return false;
     if (id === ls.p1Id) return false;
     assertFinite(xMm, yMm);
+    if (lineEndsCoincide(ls.p1Mm, { x: xMm, y: yMm })) return false;
     ls.p2Id = id;
     ls.p2Mm = { x: xMm, y: yMm };
     return true;
@@ -493,9 +636,15 @@
       y: p1Mm.y + (p2Mm.y - p1Mm.y) * t };
   }
 
-  // Take the commit spec and reset to idle. Null unless animating.
+  // Take the commit spec and reset to idle. Null unless animating, and
+  // null (reset to idle) when the pair coincides: one point never
+  // commits a line, so the table's two-point guard is unreachable here.
   function finishLineStroke(ls) {
     if (!ls || ls.phase !== 'animating') return null;
+    if (lineEndsCoincide(ls.p1Mm, ls.p2Mm)) {
+      abortLineTool(ls);
+      return null;
+    }
     var spec = { x1: ls.p1Mm.x, y1: ls.p1Mm.y,
       x2: ls.p2Mm.x, y2: ls.p2Mm.y, bisCode: ls.bisCode };
     abortLineTool(ls);
@@ -510,6 +659,7 @@
       ls.p2Id = null;
       ls.p2Mm = null;
       ls.bisCode = null;
+      ls.p1Member = null;
     }
     return ls;
   }
@@ -715,7 +865,7 @@
   var PLOT_TOOL_PHASES = ['idle', 'plotting'];
 
   function createPlotToolState() {
-    return { phase: 'idle', aMm: null, bMm: null };
+    return { phase: 'idle', aMm: null, bMm: null, ground: false };
   }
 
   function isPlotToolActive(ps) {
@@ -727,6 +877,31 @@
     ps.phase = 'plotting';
     ps.aMm = { x: axMm, y: ayMm };
     ps.bMm = { x: bxMm, y: byMm };
+    ps.ground = false;
+    return ps;
+  }
+
+  // Ground-fold grab rule (Alt+click): the 14 px corridor plus an mm
+  // ceiling, so full zoom-out cannot grab the fold from ~280 mm away.
+  // min(14/s, 20): default scale behaves exactly as before (7 mm);
+  // the ceiling only binds below s = 0.7 px/mm.
+  var GROUND_FOLD_MAX_MM = 20;
+
+  function groundFoldGrabbed(distMm, scale) {
+    assertFinite(distMm, scale);
+    var d = Math.abs(distMm);
+    return d * scale <= AXIS_TOL_PX && d <= GROUND_FOLD_MAX_MM;
+  }
+
+  // Focus the VP/HP ground fold (the y = 0 decor line, which is never
+  // an entity) as an infinite datum: the foot is the cursor's x on
+  // the fold, so perpendicular and vertical offsets coincide exactly.
+  function beginGroundPlot(ps) {
+    if (!ps) throw new Error('plot state required');
+    ps.phase = 'plotting';
+    ps.aMm = null;
+    ps.bMm = null;
+    ps.ground = true;
     return ps;
   }
 
@@ -754,11 +929,47 @@
       distMm: Math.sqrt(ox * ox + oy * oy) };
   }
 
+  // Typed plot offset: like the click candidate, but the
+  // perpendicular offset length is the typed millimetres instead of
+  // the cursor's. The foot still clamps to [A,B] and the side still
+  // comes from the cursor. Null when the cursor sits on the datum
+  // (no side to take) instead of guessing.
+  var PLOT_ON_LINE_TOL_MM = 1e-6;
+
+  function plotTypedPoint(aMm, bMm, cursorMm, distMm) {
+    assertFinite(aMm.x, aMm.y, bMm.x, bMm.y,
+      cursorMm.x, cursorMm.y, distMm);
+    var c = plotCandidateFor(aMm, bMm, cursorMm);
+    var ox = c.pointMm.x - c.footMm.x, oy = c.pointMm.y - c.footMm.y;
+    var len = Math.sqrt(ox * ox + oy * oy);
+    if (!(len > PLOT_ON_LINE_TOL_MM)) return null;
+    var s = distMm / len;
+    return { xMm: c.footMm.x + ox * s, yMm: c.footMm.y + oy * s };
+  }
+
+  // Ground candidates share the click-candidate shape: the foot is
+  // the cursor's x on the fold, the distance is |y|. The typed form
+  // stakes (x, +/-dist); both are null-safe on the fold itself.
+  function plotGroundCandidate(cursorMm) {
+    assertFinite(cursorMm.x, cursorMm.y);
+    return { footMm: { x: cursorMm.x, y: 0 },
+      pointMm: { x: cursorMm.x, y: cursorMm.y },
+      distMm: Math.abs(cursorMm.y) };
+  }
+
+  function plotGroundTyped(cursorMm, distMm) {
+    assertFinite(cursorMm.x, cursorMm.y, distMm);
+    if (!(Math.abs(cursorMm.y) > PLOT_ON_LINE_TOL_MM)) return null;
+    return { xMm: cursorMm.x,
+      yMm: (cursorMm.y > 0 ? 1 : -1) * distMm };
+  }
+
   // Click #2: take the commit spec and reset to idle. Null unless
-  // plotting.
+  // plotting. A ground focus commits off the fold, never off A/B.
   function commitPlotPoint(ps, cursorMm) {
     if (!ps || ps.phase !== 'plotting') return null;
-    var c = plotCandidateFor(ps.aMm, ps.bMm, cursorMm);
+    var c = ps.ground ? plotGroundCandidate(cursorMm) :
+      plotCandidateFor(ps.aMm, ps.bMm, cursorMm);
     var spec = { xMm: c.pointMm.x, yMm: c.pointMm.y, distMm: c.distMm };
     abortPlotTool(ps);
     return spec;
@@ -769,6 +980,7 @@
       ps.phase = 'idle';
       ps.aMm = null;
       ps.bMm = null;
+      ps.ground = false;
     }
     return ps;
   }
@@ -783,7 +995,7 @@
     return { picks: [] };
   }
 
-  function toggleCirclePick(state, id, xMm, yMm) {
+  function toggleCirclePick(state, id, xMm, yMm, member) {
     if (!state) throw new Error('pick state required');
     assertFinite(xMm, yMm);
     var sid = String(id);
@@ -793,7 +1005,9 @@
         return state;
       }
     }
-    state.picks.push({ id: sid, x: xMm, y: yMm });
+    var pick = { id: sid, x: xMm, y: yMm };
+    if (member !== undefined && member !== null) pick.member = String(member);
+    state.picks.push(pick);
     return state;
   }
 
@@ -965,11 +1179,22 @@
     caretOn: caretOn,
     isRenameInputKey: isRenameInputKey,
     nextPointName: nextPointName,
+    captionBareParts: captionBareParts,
     axisLockState: axisLockState,
     AXIS_TOL_PX: AXIS_TOL_PX,
+    TYPED_DIST_MAX_MM: TYPED_DIST_MAX_MM,
+    TYPED_DIST_MAX_CHARS: TYPED_DIST_MAX_CHARS,
+    createTypedDistState: createTypedDistState,
+    clearTypedDist: clearTypedDist,
+    isTypedDistActive: isTypedDistActive,
+    handleTypedDistKey: handleTypedDistKey,
+    parseTypedDist: parseTypedDist,
+    typedDistSign: typedDistSign,
+    typedDistPoint: typedDistPoint,
     LINE_TOOL_PHASES: LINE_TOOL_PHASES,
     LINE_BIS_CODES: LINE_BIS_CODES,
     LINE_STROKE_MS: LINE_STROKE_MS,
+    LINE_COINCIDENT_TOL_MM: LINE_COINCIDENT_TOL_MM,
     createLineToolState: createLineToolState,
     isLineToolActive: isLineToolActive,
     anchorLineTool: anchorLineTool,
@@ -1007,7 +1232,14 @@
     createPlotToolState: createPlotToolState,
     isPlotToolActive: isPlotToolActive,
     beginPlotTool: beginPlotTool,
+    GROUND_FOLD_MAX_MM: GROUND_FOLD_MAX_MM,
+    groundFoldGrabbed: groundFoldGrabbed,
+    beginGroundPlot: beginGroundPlot,
+    plotGroundCandidate: plotGroundCandidate,
+    plotGroundTyped: plotGroundTyped,
     plotCandidateFor: plotCandidateFor,
+    PLOT_ON_LINE_TOL_MM: PLOT_ON_LINE_TOL_MM,
+    plotTypedPoint: plotTypedPoint,
     commitPlotPoint: commitPlotPoint,
     abortPlotTool: abortPlotTool,
     CIRCLE_PICK_MAX: CIRCLE_PICK_MAX,

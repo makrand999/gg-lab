@@ -53,8 +53,9 @@ Verified against `quadrantPoint` (`curriculum.js:141-144`) and `straightLine`
 
 Include: `POINT, SEGMENT, LINE, RAY, CIRCLE, CIRCULAR_ARC`.
 Exclude: `DIMENSION, TEXT, DATUM_AXIS`, and `meta.kind ∈ {projector, locus, axis}`.
-Also exclude sheet-vertical segments crossing XY (projector helpers, regardless
-of `meta.kind`).
+Also exclude sheet-vertical segments crossing XY or running from XY into
+the plan half (projector helpers, regardless of `meta.kind`). Single-sided
+verticals (edges ending on XY from above) stay geometry.
 
 ### 3.3 View classification
 
@@ -79,6 +80,9 @@ ephemeral.
   both views. (Square pyramid, cone*.)
 - **Class C — wireframe:** point/line lessons. Paired vertices + edge matching
   produce a 3D wireframe, no faces.
+- **Class E — claimed lamina (M5):** where C fails, projector claims identify
+  corners explicitly (one claim = one 3D corner); v1 builds profile laminae
+  whose face is the convex hull in (depth, height).
 - Anything else → explicit "3D unavailable" state with a reason.
 
 *Curves are deferred to a later tier; until then circle/arc drawings report
@@ -259,3 +263,84 @@ in plan, elevation, and profile. Class D competes by coverage, then
 edge length; ties report `ambiguous-pairing`.
 
 Deferred: arcs, tilted axes, ellipses, third-angle timing.
+
+## 12. Verify-only lesson layer (M4 amendment)
+
+Student verdicts and projector claims are checked, never derived:
+
+- Multi-caption points (`a,b`) name coincident corners; parens (`a,(b)`)
+  record the student's hidden verdict for that view. The name gate
+  (§4.4 pair-by-name) compares bare part sets and strips parens, so
+  typing verdicts can never break reconstruction.
+- Anchoring a line on a multi-caption point asks which member the student
+  draws for; the declaration is stored as `meta.fromMember` alongside the
+  existing `meta.refs`. Reconstruction ignores both.
+- `educad-verify.js` grades verdicts and claims against curriculum corner
+  truth. Without truth (hand drawings) everything reports `unverifiable`,
+  never a guess. Profile verdicts report `unchecked-view` in v1.
+- Deferred: quiz-mode 3D gating, label recoloring.
+
+## 13. Claimed corners — Class E corner-lift (M5 amendment)
+
+Class C pairs whole vertices 1:1, which cannot express coincident corners
+(one elevation dot yielding two corners at different plan feet). Where C
+fails, Class E lifts corners from projector claims instead:
+
+- One claim (projector-shaped line + `fromMember` + station/foot refs) =
+  one 3D corner at (x̄, h, d) from its plan and elevation feet. Claims on
+  non-projector lines are ignored (the checker flags them); claims apply
+  always, since hand drawings have no Check truth to gate on.
+- v1 builds profile laminae only: all corners share x
+  (`corners-not-coplanar` otherwise), number ≥ 3, all on their convex hull
+  in (depth, height) (`non-convex-corners` otherwise, collinear included).
+- Wrong pairings fail loudly: same corner twice (`hint-conflict`), feet off
+  drawn vertices (`hint-loose-foot`), two corners lifting to one point
+  (`duplicate-corners`). Coverage is checked both directions per view
+  against drawn A/B ink through the standard gate.
+- E attempts only when no geometric class passes and claims exist, so hints
+  rescue ambiguity but never compete with a success. Profile ink is ignored
+  in v1. The lamina face is emitted double-wound (no interior to hide).
+
+## 12. Names are absolute — pair-by-name (M4 amendment)
+
+This section amends §4.2 step 4: cross-view pairing follows POINT
+labels, not bare x-stations.
+
+### 12.1 Base names
+
+Plan `a`, elevation `a'`, and profile `a''` share the base `a`
+(caption trimmed, trailing prime ticks `'`, `′`, `’` stripped) and
+name one 3D point. Only genuine `POINT` entities name a vertex;
+segment captions (edge names like `ab`) never do.
+
+### 12.2 Pairing rule
+
+A plan vertex and an elevation vertex at one x-station pair when they
+share a base; the shared x (within eps) validates the pair, it no
+longer selects it. Names resolve geometric ambiguity (two labeled
+dots per view at one station pair by base); multi-labeled end-on dots
+still read as vertical/depth pins. A named vertex whose base-mate
+sits at another station is `x-mismatch` at any distance; one letter
+on two dots is `ambiguous-pairing`, never a guess. Unlabeled vertices
+keep the exact §4.2 geometric reading.
+
+### 12.3 Gate and profile
+
+Before class attempts, any shared station labeled on both sides must
+agree on at least one base, else the new `name-mismatch` reason;
+every profile base must name a plan/elevation base. The gate adds the
+first new failure reason since M1; all other reasons are unchanged.
+`reconstruct(entities, { strictNames: false })` restores the legacy
+pure-geometric pairing for programmatic use. Curriculum profile apex
+labels read `s''` (not `pf-s`).
+
+## 14. The honest solid — prism lesson (M6 note)
+
+Not every stacked station needs a claim. The hexagonal prism's
+elevation pairs (front+back at one x) resolve geometrically: Class C
+pairs whole vertices 1:1 by base name, and the 3D solid builds the
+moment ink + names are complete — verdicts and projectors are
+Check-only. The `Tutorial: Prism` lesson pins this in 88 scripted
+user steps ending 18/18 (14 stations + 4 projector wellformed
+checks) with zero `fromMember` claims: claims are the square's
+rescue for coincident corners, not a ritual every sheet must repeat.

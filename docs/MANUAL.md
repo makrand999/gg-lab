@@ -45,6 +45,75 @@ then the [Appendix](#13-appendix-developer-reference).
 | Draw at an angle and distance | [§4.5 polar point](#45-polar-point-angle--distance-from-an-anchor) |
 | Place a point measured off a line | [§4.6 plotting](#46-line-referenced-plotting-perpendicular-offset-point) |
 | Load a demo lesson | [§9.1 demos](#91-demo-buttons-guided-walkthroughs) |
+| Log in or continue as guest | [§3.8 login](#38-login-session-chip-and-desktop-gate) |
+| Grade my hidden verdicts | [§9.3b Check](#93b-competing-points-verdicts-and-check) |
+| Replay a guided tutorial | [§9.4 square](#94-tutorial-square-scripted-user) · [§9.5 prism](#95-tutorial-prism-scripted-user) |
+| Measure without editing anything | [§3.9 modes](#39-edit-and-view-modes) |
+
+### Topic index (the whole manual on one screen)
+
+First visit? Read §1, §2, then pick a goal above. Coming back? Jump straight
+to the topic — every subsection is one click away:
+
+- [1. What EduCAD is](#1-what-educad-is): [run](#how-to-run-the-app) ·
+  [browsers](#browser-requirements)
+- [2. Quick start](#2-quick-start-your-first-drawing-in-5-minutes) — first
+  drawing in 5 minutes, no subsections
+- [3. Interface tour](#3-interface-tour): [status](#31-status-hud-top-left) ·
+  [demo bar](#32-demo-bar-top-right) · [zoom](#33-zoom-hud-bottom-right) ·
+  [sheet](#34-the-sheet-itself) · [popups](#35-popups) · [3D
+  overview](#36-the-3d-view-floating-ink-on-glass) · [layout
+  diagram](#37-layout-diagram-from-the-real-domcss) · [login &
+  desktop gate](#38-login-session-chip-and-desktop-gate) ·
+  [modes](#39-edit-and-view-modes)
+- [4. Drawing](#4-drawing-tool-by-tool): [point](#41-place-point-click-empty-sheet) ·
+  [select](#42-select-click-a-point) · [line](#43-line--segment-ctrlclick-p1-click-p2-pick-bis-type) ·
+  [line-type popup](#44-line-type-bis-sp-46-popup) ·
+  [polar](#45-polar-point-angle--distance-from-an-anchor) ·
+  [plotting](#46-line-referenced-plotting-perpendicular-offset-point) ·
+  [not in the UI](#47-not-reachable-from-the-ui-read-before-searching) ·
+  [box & pyramid recipes](#48-recipes-draw-a-box-and-a-pyramid-by-hand) ·
+  [circle](#49-circle-from-three-points-bank-two-click-third)
+- [5. Editing](#5-editing-and-housekeeping): [selection](#51-selection) ·
+  [deselect](#52-deselect-right-click--escape) ·
+  [rename](#53-rename-double-click-then-keys) ·
+  [auto-naming](#54-auto-naming-rules) · [deleting](#55-deleting) ·
+  [hover](#56-hover-behavior) · [cannot do](#57-what-you-cannot-do-recap)
+- [6. Precision](#6-precision-snapping-axis-lock-zoom-line-weights):
+  [snapping](#61-object-snapping-always-on-no-toggles) ·
+  [axis lock](#62-axis-locked-placement) ·
+  [tolerances](#63-tolerances-that-matter) · [zoom](#64-zoom-behavior) ·
+  [line weights](#65-cosmetic-zoom-invariant-line-weights)
+- [7. Views and planes](#7-views-and-planes):
+  [two views](#71-the-sheet-is-two-views-glued-at-xy) ·
+  [invariant](#72-the-invariant-for-beginners) ·
+  [quadrants](#73-quadrant-behavior-including-q3q4-negatives) ·
+  [first angle](#74-what-first-angle-means-on-this-sheet) ·
+  [view roles](#75-view-roles-under-the-hood-one-paragraph)
+- [8. The 3D view](#8-the-3d-view): [where](#81-where-it-is) ·
+  [orbit / zoom / pan](#82-orbit-zoom-pan-reset) ·
+  [pen look](#83-pen-sketch-look-and-hidden-edges) ·
+  [aura](#84-the-aura-pointer-routing) ·
+  [live update](#85-live-update-behavior) ·
+  [drawing classes](#86-supported-drawing-classes-user-language) ·
+  [curves](#87-curve-limitation-user-language) ·
+  [failure messages](#88-failure-and-empty-state-messages-complete-list)
+- [9. Demos and lessons](#9-demos-and-lessons):
+  [demos](#91-demo-buttons-guided-walkthroughs) ·
+  [console lessons](#92-curriculum-lessons-the-full-set) ·
+  [teaching scripts](#93-teaching-scripts-follow-verbatim) ·
+  [verdicts & Check](#93b-competing-points-verdicts-and-check) ·
+  [tutorial square](#94-tutorial-square-scripted-user) ·
+  [tutorial prism](#95-tutorial-prism-scripted-user)
+- [10. Reference](#10-reference-tables): [mouse](#101-mouse-actions) ·
+  [keyboard](#102-keyboard-shortcuts) · [tools](#103-tool-summary) ·
+  [entities](#104-entity-types) · [messages](#105-status-and-message-strings) ·
+  [snap tiers](#106-snappable-geometry)
+- [11. Troubleshooting](#11-troubleshooting) ·
+  [12. Limitations](#12-limitations--not-implemented) ·
+  [13. Appendix](#13-appendix-developer-reference):
+  [modules](#131-module-map) · [anchors](#132-behavior-anchors-fileline) ·
+  [traceability](#133-traceability-table-manual-claim--anchor)
 
 ### Words you need (jargon, defined once)
 
@@ -91,6 +160,10 @@ two-view engineering-drawing sheet with a front view (elevation) and a top view
 1. Open a terminal in the repository root.
 2. Start the server: `npm start`.
 3. Open **http://127.0.0.1:8124/** in your browser.
+4. Log in: pick the **Academics**, **Teacher**, or **Student** tab and enter
+   its demo account (shown on the page), or choose **Continue as guest**
+   (guest skips the server entirely). Without a session the app sends you
+   back to this login page.
 
 What to expect:
 
@@ -99,25 +172,38 @@ What to expect:
   and prints `educad serve: port 8124 busy, using <port>` — open the URL it
   prints instead. You can also force a port: `npm start -- <port>` or
   `PORT=<port> npm start`.
-- The server binds to localhost only; it is a static file server for the
-  `mirror/` folder. Stop it with `Ctrl+C` when you are done.
+- The server binds to localhost only; it serves the `mirror/` folder plus the
+  tiny demo-login endpoint. Stop it with `Ctrl+C` when you are done.
 - The **Manual** button in the demo bar (top-right) opens this guide in a
   new tab at `manual.html`.
+- Touch-only phones and small tablets get a **Desktop required** overlay
+  instead of the canvas, with a link to the tutorials sheet (§3.8).
+
+Demo accounts (also printed on the login page itself):
+
+| Role | Username | Password |
+|------|----------|----------|
+| Academics | `academics` | `admin123` |
+| Teacher | `teacher` | `teach123` |
+| Student | `student` | `learn123` |
 
 ### Browser requirements
 
-`[unverified]` — the repository states no browser requirements and the
-automated suite never drives a real browser. From the code, the page needs
-JavaScript, Canvas 2D, Pointer Events, and `requestAnimationFrame`; any
-recent desktop browser provides these. Touch/pen input, small screens, and
-specific browser versions were not tested, so they are not claimed here.
+The page needs JavaScript, Canvas 2D, Pointer Events, `requestAnimationFrame`,
+and `localStorage` (for the login session); any recent desktop browser
+provides these, and the sheet was smoke-tested in one via the project's
+obscura harness. Touch/pen input on desktop, specific browser versions, and
+the exact phone overlay behavior are `[unverified]` — the desktop gate
+traced to source blocks touch-only small screens, but no phone was tested,
+so teach from a desktop or laptop.
 
 ---
 
 ## 2. Quick start: your first drawing in 5 minutes
 
-The app opens with the **Line Rotation** demo already loaded (or with a demo
-chosen by the page address — see [Demos](#9-demos-and-lessons)). Do this:
+Once past the login page, the app opens with the **Line Rotation** demo
+already loaded (or with a demo chosen by the page address — see
+[Demos](#9-demos-and-lessons)). Do this:
 
 1. **Look at the sheet.** The horizontal line across the middle is the XY
    ground line (`y = 0 mm`). Labels above it read `V.P. (Front View /
@@ -165,8 +251,9 @@ double-click to rename, right-click or **Escape** to cancel anything.
 
 There is **no toolbar or tool palette** — every drawing action is a mouse
 gesture directly on the sheet (see [Drawing](#4-drawing-tool-by-tool)). The
-visible chrome is: one status box, one demo bar, three zoom buttons, two
-popups, sheet watermarks, and the floating 3D wireframe.
+visible chrome is: one status box, one demo bar, one session chip, three
+zoom buttons, five popups, sheet watermarks, and the floating 3D wireframe
+(plus the login page and the desktop-only gate in front of it all, §3.8).
 
 ### 3.1 Status HUD (top-left)
 
@@ -184,14 +271,21 @@ mouse clicks (it never steals a drawing click).
 
 ### 3.2 Demo bar (top-right)
 
-Five buttons:
+Ten buttons plus the Edit/View mode pair (twelve controls in one row):
 
 | Button (exact label) | What it does |
 |----------------------|--------------|
 | `Line Rotation (TL=80, θ=30°, φ=45°)` | Loads the inclined-line lesson. Active (blue) on first load. |
 | `Quadrant Points (1st & 3rd)` | Loads two quadrant-point lessons (Q1 + Q3). |
 | `Hexagonal Prism (35mm)` | Loads the hexagonal-prism solid lesson. |
+| `3-View Prism (35mm)` | Loads the three-view prism lesson (plan + elevation + profile side view with projectors and miter). |
+| `Profile Square (40mm)` | Loads the edge-on square lesson (both views show lines; 3D stays ambiguous). |
+| `Tutorial: Square` | Replays the square lesson click by click, with narration (see §9.4). |
+| `Tutorial: Prism` | Replays the hexagonal-prism lesson click by click, with narration (see §9.5). |
 | `Clear Sheet` | Deletes every entity, cancels every tool, empties the 3D view. Never stays highlighted. |
+| `Check hidden` | Grades your hidden verdicts and projector claims against the loaded demo. Never clears the sheet. |
+| `Edit` | Drawing mode (default, blue on load): every click draws, selects, banks, or renames. |
+| `View` | Read-only measure mode: clicks inspect one entity at a time instead of editing (see §3.9). |
 | `Manual` | Opens this guide in a new tab at `manual.html`. |
 
 Clicking a demo also clears whatever you drew before it. See
@@ -237,6 +331,18 @@ Three small buttons pinned to the bottom-right corner of the sheet:
    Type B`, `Dashed Thin — Type E`, `Chain Thin — Type G`, `Double-Dash
    Chain — Type K`. Click a preview to draw that BIS line type. (Type H is
    not offered here.)
+3. **Member popup.** Banking (Ctrl+click) on a dot that carries two corner
+   names (§9.3b) asks which member you draw for — pick one. That declaration
+   is your projector claim, graded by Check; anything but a pick dismisses it.
+4. **Check report panel.** Pressing `Check hidden` grades the sheet and shows
+   one row per verdict/claim: pass, fail naming the flipped member or
+   mismatched foot, or *unverifiable* off-demo. Dismiss with × or by loading
+   a demo.
+5. **Tutorial stepper panel** (bottom-left). `Tutorial: Square` / `Tutorial:
+   Prism` replay their lesson one real user action per **Next**, with one
+   line of narration per step (32 / 88 steps). **Back** re-reads only,
+   **Restart** replays from step 1, **Exit** (or any demo button) closes it
+   and leaves the sheet yours.
 
 ### 3.6 The 3D view (floating ink on glass)
 
@@ -256,7 +362,13 @@ there. Full details in [The 3D view](#8-the-3d-view).
 │ │ EduCAD 2D Engine • 1st Angle ...   │  │ Line Rotation ...  │  │
 │ │ [V.P. (Elevation / Front)]         │  │ Quadrant Points... │  │
 │ │ X: 12.34 mm • Y: -56.78 mm         │  │ Hexagonal Prism... │  │
-│ └────────────────────────────────────┘  │ Clear Sheet        │  │
+│ └────────────────────────────────────┘  │ 3-View Prism...    │  │
+│                                         │ Profile Square...  │  │
+│                                         │ Tutorial: Square   │  │
+│                                         │ Tutorial: Prism    │  │
+│                                         │ Clear Sheet        │  │
+│                                         │ Check hidden       │  │
+│                                         │ Edit · View (mode)  │  │
 │                                         │ Manual             │  │
 │                                         └────────────────────┘  │
 │  Sheet canvas (full window, two stacked layers)                 │
@@ -269,19 +381,79 @@ there. Full details in [The 3D view](#8-the-3d-view).
 │   3D Solid glass (full window, above sheet, below chrome):      │
 │   floating wireframe / 3D unavailable, aura-only input         │
 │                                                                │
-│   right-click menu (at cursor):          Zoom HUD (bottom-right)│
+│   Session chip (bottom-left):            Zoom HUD (bottom-right)│
 │   ┌───────────────────┐                   ┌───────────────┐    │
-│   │ Plain (No Mesh)   │                   │  +  │  -  │Home│    │
-│   │ Box Mesh          │                   └───────────────┘    │
-│   └───────────────────┘                                        │
+│   │ Guest (guest)     │ right-click menu  │  +  │  -  │Home│    │
+│   │ [Logout]          │ (at cursor)       └───────────────┘    │
+│   └───────────────────┘ + tutorial stepper (above chip)        │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 Positions: status HUD `top:12px left:12px`; demo bar `top:12px right:12px`;
-zoom HUD `right:8px bottom:8px`; 3D glass covers the window (z-index 2,
-above the sheet layers, below HUD chrome; `pointer-events:none` except
-the wireframe aura); both popups open near the cursor and are clamped
-inside the window.
+session chip `left:12px bottom:12px`; zoom HUD `right:8px bottom:8px`;
+3D glass covers the window (z-index 2, above the sheet layers, below HUD
+chrome; `pointer-events:none` except the wireframe aura); the cursor popups
+open near the pointer and are clamped inside the window; the mobile
+`Desktop required` overlay (§3.8), when active, covers everything and
+freezes the app behind it.
+
+### 3.8 Login, session chip, and desktop gate
+
+Three things stand around the sheet itself:
+
+- **Login page.** Opening the app without a session redirects to
+  `login.html` before any canvas loads. Pick a role tab (Academics /
+  Teacher / Student), enter that tab's demo account, and the server checks
+  it against its demo list; **Continue as guest** skips the server and
+  signs you in as `Guest (guest)`. The session lives in the browser's
+  `localStorage`, so closing the tab keeps you logged in — and so does a
+  reload. Guests keep nothing else: reload and the sheet is gone. Logged-in
+  users can **Save** the sheet to their account from the session chip and
+  reopen it later from **Drawings** (the first save asks for a title,
+  later saves update the same drawing); the C++ backend also records
+  finished tutorials, which earn a ✓ on the lesson button next visit.
+- **Session chip** (bottom-left). Shows who is logged in as `name (role)`
+  plus **Save**, **Drawings**, and **Logout** buttons and a status line.
+  Clicks here never draw (the chip swallows all pointer gestures).
+  **Logout** clears the session and returns to the login page. It sits
+  outside the demo bar, so `Manual` stays the bar's last child.
+- **Desktop gate.** Touch-only devices with no fine pointer (phones, small
+  tablets) get an opaque **Desktop required** overlay: the canvas needs a
+  keyboard, mouse, and wide screen. The overlay offers one way out — a
+  link to the tutorials sheet. There is no dismiss and no bypass;
+  touchscreen laptops (fine pointer present) are let through, and if the
+  input setup changes mid-session the page reloads itself cleanly.
+
+### 3.9 Edit and View modes
+
+The `Edit`/`View` pair switches what the sheet does with your clicks:
+
+- **Edit** (default, blue on load) is the drawing mode: clicks place,
+  select, bank, plot, and rename, exactly as §4–§6 describe.
+- **View** is the read-only measure mode. View measures, never edits:
+  click the entity to inspect — a point, segment, circle, or arc — and
+  a badge reads it back. A point shows its coordinates with the
+  Elevation/Plan tag; a segment shows its length with ΔX/ΔY and its
+  angle from +X; a circle shows its center with radius and diameter.
+  Clicking empty sheet clears the pick, Escape clears the readout, and
+  so does a right-click.
+
+Drafting style: a segment gets a true dimension — extension lines
+off both ends, a parallel dimension line with arrow tips, and the bare
+value centered (all values in mm). The dimension opens toward the click:
+click above the span and it draws above it. Short spans park the value
+past the far end with a leader. Circles and arcs get a radius leader
+(arrow on the rim, `R` value on a shelf, diameter beneath), and points
+keep their callout plus a witness to the XY fold labeled with the
+height — the point's distance to its own plane.
+
+Entering View parks every authoring gesture (selection, rename, line
+menu, polar sweep, plotting, bank, typed buffer, popups), and while
+View is on, double-click never renames and typing never stakes — there
+is nothing to change by accident. Panning, zooming, the 3D glass, and
+`Check hidden` all keep working, and starting a tutorial returns the
+sheet to Edit. The readout lives on the overlay layer only: it is never
+an entity, never saved, and never reconstructed.
 
 ---
 
@@ -333,27 +505,43 @@ Selecting never moves, edits, or deletes anything by itself.
 Creates: one `SEGMENT` entity spanning both views, drawn with a short
 stroke animation.
 
-1. **Ctrl+click** an existing point P1. The cursor becomes a crosshair and
-   an anchor ring appears on P1. (Ctrl+clicking another point re-anchors.
-   Ctrl+clicking empty space aborts.)
-2. **Click** a *different* point P2. A grey P1–P2 preview appears and the
-   line-type popup opens at the cursor.
-3. While the popup is open you may click a different P2 to re-aim (clicking
-   P1 itself just selects it; the tool stays armed).
+1. **Ctrl+click** an existing point P1. Nothing arms: P1 joins the
+   pick bank (amber ring + numeral `1`) and the cursor turns into a
+   crosshair, which now means "banking in progress". Ctrl+clicking P1
+   again unbanks it; Ctrl+clicking empty sheet places a point and
+   banks it instead. If P1 carries a multi-caption (§5.3), a member
+   popup asks which corner you bank — pick one (that declaration is
+   your projector claim, graded by Check); Escape, right-click, or
+   any other click dismisses it.
+2. **Click** a *different* point P2. The plain click finalizes the
+   bank of one into a line: a grey P1–P2 preview appears, the bank
+   empties, and the line-type popup opens at the cursor. Clicking P1
+   itself does nothing; clicking empty sheet aborts the bank instead
+   of drawing.
+3. While the popup is open you may click a different P2 to re-aim
+   (clicking P1 itself just selects it; the BIS popup stays open).
 4. **Click a dash preview** in the popup. A 300 ms animation draws the
    stroke, then the segment is committed.
-5. Right-click, **Escape**, or clicking empty sheet at any earlier step
-   aborts with nothing created.
+5. Right-click or **Escape** at any earlier step aborts with nothing
+   created (and empties the bank).
 
 Worked example: with `a = (-40, 20)` and `b = (30, 20)` from §4.1,
-Ctrl+click `a`, release Ctrl, click `b`, choose
+Ctrl+click `a`, click `b`, choose
 `Continuous Thick — Type A`. The sheet gains a thick visible-outline
 segment from `(-40, 20)` to `(30, 20)` — a 70 mm horizontal line in the
 elevation.
 
 Notes:
 
-- P1 and P2 must be different points; the tool refuses P1 == P2.
+- P1 and P2 must be two *distinct* points: the tool refuses P1 == P2, and
+  a P2 sitting on P1's spot (within 1e-6 mm) is refused too — a line *is*
+  two distinct endpoints, so a one-point line can never be drawn, stored,
+  or edited into existence anywhere in the engine (not via the API, XML,
+  or coordinate edits either). Collapsed lesson traces are emitted as
+  points instead (§9.2).
+- Banking a second point before finalizing changes the verdict: the
+  finalizer then draws a circle (§4.9), not a line. To re-pick P1
+  instead, Ctrl+click P1 again (unbank) and bank the new first point.
 - There is no cursor-following rubber band by design: the preview appears
   only after P2 is picked.
 - New segments are visible in both views (`BOTH`) with no label.
@@ -379,8 +567,8 @@ engine but is **not offered in this popup**.
 Creates: one `POINT` placed at a chosen angle off an existing line and a
 chosen distance along the locked ray. This is the protractor-and-scale tool.
 
-1. **Ctrl+click** an existing point P0 (same anchor gesture as the line
-   tool; the anchor is shared).
+1. **Ctrl+click** an existing point P0 to bank it (same banking
+   gesture as the line tool; the bank is shared).
 2. **Click a baseline segment** that passes through P0 (within 0.5 mm).
    A cyan ring marks P0 and the angle sweep begins.
    - If the clicked line misses P0, the tool parks in an invalid state and
@@ -398,7 +586,7 @@ chosen distance along the locked ray. This is the protractor-and-scale tool.
 
 Worked example: first place a point at `(0, 0)` and draw an X-axis
 segment through it (place `(40, 0)` with the `ΔX` badge, join them).
-Anchor P0 = `a = (0, 0)`, baseline = that X-axis segment. Sweep to the
+Bank P0 = `a = (0, 0)`, baseline = that X-axis segment. Sweep to the
 `∠ 30.0°` detent with the cursor above the baseline, click, sweep the
 ray out to `25.00 mm (∠ 30.0° locked)`, click. The new point lands at
 `(21.65, 12.50)` mm (25·cos30°, 25·sin30°), auto-named. (Below the
@@ -419,6 +607,25 @@ measured off it.
 3. **Click** to commit the candidate as a new auto-named point.
 4. Right-click or **Escape** aborts with nothing created.
 
+Type the offset instead of eyeballing it: while plotting, type digits
+at any time (`10`, `7.5`) — the badge switches to `⊥ 10 mm (Enter)`
+and the guideline stretches to the staked target on the cursor's
+side of the datum. Press Enter to commit, which ends plotting like a
+click commit; Backspace edits and the first Escape clears the number.
+While a line is focused the keyboard belongs to it: a selected
+point's typed axis entry (§6.2) waits until plotting ends, and Enter
+with the cursor on the datum only warns.
+
+The VP/HP ground line (the fold at y = 0) focuses the same way even
+though it is drawn decor, never an entity: **Alt+click** within 14 px
+of the fold. The corridor never exceeds 20 mm: fully zoomed out,
+Alt+clicks farther than that from the fold place normal points
+instead of focusing the datum. A plain click there keeps placing
+points, so the Alt key is what asks for the datum. The foot is your
+cursor's x on the fold with nothing to clamp, the same `⊥` badge and
+typed entry apply, and commit/Escape behave exactly like segment
+plotting.
+
 Worked example: first draw a datum segment from `(0, 0)` to `(40, 0)`
 (place the two points, join them). With no tool armed, click the
 segment's middle — away from its endpoint dots, or the click selects a
@@ -436,7 +643,7 @@ edits, or toggles it**. They are listed here so you do not hunt for them.
 | Capability | Status | Where it actually lives |
 |------------|--------|-------------------------|
 | Ray | Not reachable | Entity type exists; nothing draws or creates it in the app. |
-| Circle | Ctrl+click three points (§4.9) | Ordered pick list with numerals; third pick auto-commits a Type A `CIRCLE`. |
+| Circle | Bank two points, click the third (§4.9) | Ordered bank with numerals; the finalizer commits a Type A `CIRCLE`. |
 | Arc | Not reachable | No creation gesture; arcs stay deferred in 3D. |
 | Dimension | Not reachable | No dimension gesture; dimension geometry is not drawn by the sheet renderer even if present. |
 | Text / free label | Not reachable | Labels come only from point captions (rename) and demo data. |
@@ -447,7 +654,7 @@ edits, or toggles it**. They are listed here so you do not hunt for them.
 | Constraint solver | Not reachable | Powers nothing on screen; demo geometry is computed by the lesson builders, not the solver. |
 | Command line (`Point(…)`, …) | Not reachable | Developer API only; there is no input box. |
 | Undo / redo buttons or keys | Not reachable | API-only history; the UI has no undo. |
-| Save / export / print | Not reachable | Nothing persists or exports; reloading loses the sheet. |
+| Save / export / print | Session-bar Save/Drawings | Logged-in users persist sheets to their account (§3.8); guests still lose the sheet on reload; no print pipeline. |
 | Line thickness picker | Not reachable | Weights are fixed cosmetic 1 px / 2 px. |
 | BIS Type H in popup | Not reachable | Engine supports it; the popup offers A/B/E/G/K only. |
 | Snap on/off toggles | Not reachable | Snapping is always on; see §6. |
@@ -521,21 +728,25 @@ slants above XY — the class-B row of §8.6:
    apex drifted off `(0, 50)`; `apex plan x=… vs elevation x=… beyond
    eps` means the two apexes disagree in x.
 
-### 4.9 Circle from three points (Ctrl+click ×3)
+### 4.9 Circle from three points (bank two, click third)
 
 Creates: one `CIRCLE` (Type A) through three picked points. No tool to arm.
 
-1. With line/polar idle, **Ctrl+click** a point (an existing dot, or empty
-   sheet which places-and-adds). The pick joins an ordered list, shown with
-   the amber ring plus a numeral (1/2/3). Re-clicking a picked point removes it.
-2. Pick two more the same way. The third pick auto-commits: non-collinear
+1. **Ctrl+click** two points (existing dots, or empty sheet which
+   places-and-banks). Each banked pick shows the amber ring plus a
+   numeral (1/2), and the crosshair means banking is in progress.
+   Re-clicking a banked point unbanks it; a third Ctrl+click only
+   warns — the bank holds two.
+2. **Click** the third point. The plain click finalizes: non-collinear
    triples give the circumcircle; collinear triples with an equidistant middle
    give the centered circle (middle as center, half the outer span); other
    collinear triples are rejected with a message and nothing is committed.
+   Clicking a banked point again does nothing; clicking empty sheet
+   aborts the bank instead of drawing.
 3. The committed circle takes `ELEVATION` at/above XY and `PLAN` below it,
-   `bisCode A`, radius at least 0.01 mm. The pick list clears on commit,
-   Escape, right-click, or any plain point-select click. While line/polar is
-   armed, Ctrl+click keeps its anchor behavior and picks do not grow.
+   `bisCode A`, radius at least 0.01 mm. The bank empties on commit,
+   Escape, right-click, or any abort. A banked corner claim (§4.3)
+   applies to lines only and evaporates if the bank commits a circle.
 
 ---
 
@@ -546,15 +757,17 @@ Creates: one `CIRCLE` (Type A) through three picked points. No tool to arm.
 - Click a point to select it (amber ring, 7 px). Only points are selectable;
   segments are never selected — clicking a segment starts plotting (§4.6)
   or feeds the polar tool (§4.5) instead.
-- Only one point is selected at a time; there is no multi-select.
+- Only one point is selected (amber ring) at a time; multi-select lives
+  in the pick bank instead (Ctrl+click, §4.3).
 - The selection is a *reference*: it drives the axis lock for the next
   placed point and marks which point a double-click will rename.
 
 ### 5.2 Deselect (right-click / Escape)
 
 Right-click or **Escape** cancels, in one gesture, the selection, any
-rename in progress (buffer discarded, original kept), the line tool, the
-polar tool, the plot tool, and any open menu. Right-click is handled before
+banked picks, any rename in progress (buffer discarded, original kept),
+the line tool, the polar tool, the plot tool, and any open menu.
+Right-click is handled before
 the sheet menu, so with anything active, right-click always means "cancel",
 never "menu". The browser's native right-click menu never appears anywhere
 on the sheet.
@@ -579,26 +792,42 @@ on the sheet.
    (this includes the 300 ms stroke animation after picking a line type —
    wait for the segment to finish drawing).
 
+**Multi-captions.** One dot can carry several coincident corner names,
+separated by commas: `a,b` labels one projection shared by corners `a`
+and `b` (competing points — see §9.3b). The names render side by side,
+placed apart automatically. Wrap one part in parentheses to record your
+hidden verdict: `a,(b)` says corner `b` is hidden in this view. Type the
+visible member first by convention. Empty parts (`a,,b`) are ignored, so
+no error popup exists — what you type is what is stored.
+
 ### 5.4 Auto-naming rules
 
 New points take the first free name in the sequence `a`…`z`, then `a1`…`z1`,
 `a2`…, scanning the captions of points currently on the sheet. Consequences:
 
 - Deleting a point frees its letter for reuse.
+- Multi-caption parts each occupy their bare name: after `a,(b)` exists,
+  neither `a` nor `b` is issued again.
 - Demo labels (`a'`, `b'`, …) occupy their names too, so a fresh point
   after loading a demo may skip to a later letter. (Only *point* captions
   count; segment captions such as `h1h2` do not.)
 - Renaming to an already-used name is allowed (no uniqueness check); the
   next auto-name still skips used captions.
+- Auto-names are sequential, not paired: placing a plan dot (`a`) and then
+  its elevation mate at the same x names the mate `b`, not `a'`. For 3D,
+  rename the mate to the primed name yourself (§8.6) — `a` below with `b`
+  above reads as two different points, each missing its mate.
 
 ### 5.5 Deleting
 
 There is no erase tool and no Delete key. Exactly two deletions exist:
 
 1. **Blank delete**: double-click a point, erase the whole name with
-   Backspace (or leave only spaces), press **Enter**. The point is removed.
-   Segments attached to nothing remain — segments reference positions, not
-   points, so deleting a point never deletes a segment.
+   Backspace (or leave only spaces), press **Enter**. The point is removed,
+   and every line drawn from it goes with it: a line needs two points, so
+   deleting one endpoint deletes the line (segments/lines that start, end,
+   or reference the deleted point are removed; the surviving endpoint
+   point stays).
 2. **Clear Sheet** button: removes every entity, cancels every tool, closes
    menus, and empties the 3D view (which then shows `empty sheet`).
 
@@ -608,15 +837,16 @@ Moving the mouse (no buttons) updates the coordinates readout, the plane
 pill, the turquoise snap ring, and any active tool preview. Hovering never
 selects anything and never changes the cursor, except:
 
-- crosshair while the line/polar anchor is armed;
+- crosshair while the pick bank is non-empty;
 - grabbing hand while panning.
 
 ### 5.7 What you cannot do (recap)
 
 No drag-move, no multi-select, no segment editing (endpoints are fixed once
 drawn), no undo. If you misplace a point, delete it (§5.5) and place it
-again; if you misdraw a segment, **Clear Sheet** and redraw, or reload a
-demo. See [Limitations](#12-limitations--not-implemented).
+again; if you misdraw a segment, delete either endpoint point to remove
+the segment (then re-place the point), or **Clear Sheet** and redraw, or
+reload a demo. See [Limitations](#12-limitations--not-implemented).
 
 ---
 
@@ -665,6 +895,17 @@ point axis-locked to the selection:
 The same `ΔX`/`ΔY` badge follows your cursor live whenever a selection is
 active, so you can read the distance before you click.
 
+Type the distance instead of clicking it: with a point selected, type
+digits at any time (`40`, `12.5`) — the badge switches to
+`ΔX: 40 mm (Enter)` with a sky preview ring on the staked target. Aim
+the cursor onto the wanted axis on the wanted side of the selection
+and press Enter: the new point lands that exact distance along the
+axis, zoom-proof, unlike eyeballing the cursor. Backspace edits, the
+first Escape clears what you typed, the second deselects, and the
+selection stays put for repeat entry. Typing needs the bare
+selection: rename editing, banked picks, line/polar tools, and popups
+keep the keyboard while they run, and Enter off-axis only warns.
+
 ### 6.3 Tolerances that matter
 
 | # | Tolerance | Value | Effect you feel |
@@ -673,10 +914,11 @@ active, so you can read the distance before you click.
 | 2 | Snap lock / release | 14 px / 22 px | Ring stickiness |
 | 3 | Axis-lock grab | 14 px | How close to an axis to lock |
 | 4 | Sheet-menu suppression | 14 px | Right-click nearer a snap target than this never opens the menu |
-| 5 | Polar baseline fit | 0.5 mm | Clicked line must pass this close to the anchor |
+| 5 | Polar baseline fit | 0.5 mm | Clicked line must pass this close to the banked P0 |
 | 6 | Polar angle detents | 15/30/45/60/90° ±2° | Soft protractor clicks |
 | 7 | 3D x-station pairing | 0.5 mm (loose 2.5 mm) | How exactly plan/elevation x must agree for 3D |
 | 8 | Projector invariant | 1e-9 mm | Code-level exactness of elev.x == plan.x |
+| 9 | Ground-fold grab ceiling | 20 mm | Alt+click corridor never reaches past this, at any zoom |
 
 ### 6.4 Zoom behavior
 
@@ -724,7 +966,10 @@ share the same left-right position. So on the sheet, **the elevation dot
 and the plan dot of one 3D point always sit on one vertical line** (one
 projector): `elevation.x == plan.x`, checked to `1e-9` mm. If two dots you
 meant as a pair do not share x, they are not a pair — the 3D view will say
-so (see `x-mismatch` in §8.8).
+so (see `x-mismatch` in §8.8). Names are absolute too: the two dots of one
+point must carry the same base name — plan `a` with elevation `a'` (and
+profile `a''`) — or they are two different points, each missing its mate
+(see `name-mismatch` in §8.8).
 
 ### 7.3 Quadrant behavior (including Q3/Q4 negatives)
 
@@ -854,7 +1099,7 @@ verify pipeline, and keeps the best one that fully explains the drawing:
 |-------|---------------|--------------------|
 | **A — prismatic** | Boxes, hexagonal prisms: a flat outline swept straight up | A **closed convex outline** (all edges drawn) in the plan + an elevation rectangle spanning the same x-range with drawn base, top, and one vertical per outline x-station |
 | **B — pyramidal** | Pyramids: outline + one apex | A closed convex plan outline + one interior plan point (apex) with a matching point on the elevation top line at the same x + drawn base and two slants |
-| **C — wireframe** | Points and line lessons | Paired plan/elevation vertices (x agreeing within 0.5 mm) with matching edges in both views; lone point-vs-segment pairs at one x read as vertical/depth edges |
+| **C — wireframe** | Points and line lessons | Paired plan/elevation vertices (same base name at a shared x within 0.5 mm) with matching edges in both views; lone point-vs-segment pairs at one x read as vertical/depth edges |
 | **D — revolved** | Cylinders, cones: plan circle swept or tapered | One plan `CIRCLE` (no polygon loop) + elevation silhouette (rectangle with base/top/sides for cylinders; base/slants/apex for cones), center and radius agreeing within 0.5 mm |
 
 Rules shared by all classes:
@@ -863,6 +1108,19 @@ Rules shared by all classes:
   pyramid/cone apex checks distinguish near misses up to 2.5 mm (reported as
   `x-mismatch`) from worse misses (reported as unmatched mates); the
   prism/cylinder range checks use 0.5 mm flat.
+- **Names gate, geometry pairs.** A plan `a`, an elevation `a'`, and a
+  profile `a''` share the base `a`: mates on one projector must share a
+  base, and the name gate vetoes drawings that don't. Names never *select*
+  among several geometric mates — pairing stays geometric (Class C), or
+  comes from projector claims (Class E, §9.3b). Multi-captions compare as
+  sets: plan `g,a` meets elevation `a'` through the shared base `a`.
+  Parentheses are invisible to the gate — typing verdicts never breaks
+  3D. Consequences: `a'` above with `d` below never forms a point (each
+  half misses its mate); one letter on two dots is `ambiguous-pairing`,
+  never a guess; a shared x with no shared name fails as `name-mismatch`.
+  Unlabeled dots and segment corners still pair by geometry, so
+  caption-less drawings read exactly as before. Only `POINT` labels count —
+  segment captions (edge names like `ab`) never name a vertex.
 - Every drawn edge and point must be explained; anything left over fails
   the interpretation with a named reason instead of rendering garbage.
 - Ties break deterministically: highest round-trip coverage wins, then
@@ -904,14 +1162,14 @@ page does not display).
 
 When reconstruction fails, the 3D view clears the geometry and shows two
 centered ink lines: the title **`3D unavailable`** and, beneath it, the
-reason subtitle. Every failure carries one of ten reason codes; in practice
+reason subtitle. Every failure carries one of eleven reason codes; in practice
 the 3D view shows a **detail subtitle** naming the exact entity or coordinate
 (templates listed below), not the code's canonical text. The one canonical
-text shown verbatim is `curves not supported yet`. (Basis: all 132 `fail(`
+text shown verbatim is `curves not supported yet`. (Basis: all 134 `fail(`
 call sites in `educad-reconstruct.js` pass an explicit detail label; only
 the `unsupported-curves` site passes its canonical text. Side-view checks
-reuse the same ten codes.) The table lists
-all ten codes with their canonical labels, causes, and fixes; the detail
+reuse the same eleven codes.) The table lists
+all eleven codes with their canonical labels, causes, and fixes; the detail
 templates after it are what you actually read on screen.
 
 | # | Reason code → canonical label | Cause | What to fix |
@@ -926,6 +1184,12 @@ templates after it are what you actually read on screen.
 | 8 | unmatched-point → `a drawn point fits no interpretation` | A stray point sits off every interpretation | Blank-rename-delete the stray point, or pair it across views |
 | 9 | non-manifold → `degenerate solid (zero height or area)` | Elevation extent has zero height (flat solid) | Give the elevation real height (base ≠ top) |
 | 10 | coverage-failed → `round-trip coverage below gate` | Best 3D guess covers < 99.9% of drawn length | Look for the nearly-missed edge the detail names |
+| 11 | name-mismatch → `plan/elevation labels name different points` | Labeled mates on one projector share no base name (`a'` above `d` below; multi-captions meet if any part shares) | Rename the mates to one shared base (`a`/`a'`), or blank-rename-delete the wrong half |
+| 12 | hint-conflict → `projector claims contradict each other` | One corner claimed two ways, a claim left its station, or feet disagree | Re-declare the member on the right station; keep one projector per corner |
+| 13 | hint-loose-foot → `a claim foot lands off drawn vertices` | A claimed foot sits on no drawn dot | Lock projector ends onto drawn station dots, not empty sheet |
+| 14 | duplicate-corners → `two corners lift to one 3D point` | Two claims pair onto the same corner (wrong foot) | Move the wrong claim to its true mate foot |
+| 15 | corners-not-coplanar → `claimed corners leave the profile plane` | Claimed corners span more than one x (v1 builds profile laminae only) | Keep every claimed corner on one x station |
+| 16 | non-convex-corners → `claimed corners bound no convex face` | Fewer than 3 corners, a corner inside the hull, or collinear claims | Claim 3+ corners that ring a convex face |
 
 Empty states (exact wordings):
 
@@ -997,7 +1261,12 @@ Cylinder/cone (class D) details:
 Wireframe (class C) details:
 
 - `plan vertex near x=<x> misses its mate beyond eps` (and `elevation …`)
-- `plan point near x=<x> has no mate` (and `elevation …`)
+- `plan "<a>" has no mate in elevation` (and `elevation "<a>" has no mate in plan`; named flavor)
+- `label "<a>" reads x=<x> in plan but x=<y> in elevation` (and the elevation-first flavor)
+- `plan label "<a>" marks two dots` (and `elevation …`)
+- `plan "<a>" vs elevation "<b>" at x=<x> share a projector but name different points`
+- `profile "<a>" names no plan/elevation point`
+- `plan point near x=<x> has no mate` (and `elevation …`; unlabeled flavor)
 - `plan vertex near x=<x> has no mate` (edge-vertex flavor; and `elevation …`)
 - `plan <TYPE> <id> lacks an elevation mate`
 - `elevation <TYPE> <id> lacks a plan mate`
@@ -1031,7 +1300,8 @@ rebuilds within one frame and either renders or names the next problem.
 
 Each demo button clears the sheet first, then loads its lesson. The app
 opens on the Line Rotation demo unless the page address ends with `#points`
-(loads Quadrant Points), `#prism` (loads Hexagonal Prism), or `#mesh`
+(loads Quadrant Points), `#prism` (loads Hexagonal Prism), `#3view`
+(loads 3-View Prism), `#square` (loads Profile Square), or `#mesh`
 (loads Line Rotation with the grid on and the sheet menu open).
 
 #### `Line Rotation (TL=80, θ=30°, φ=45°)` — the inclined line
@@ -1073,22 +1343,66 @@ front of VP) and Q3 (`b` at x = +50, 30 mm below HP, 35 mm behind VP).
 #### `Hexagonal Prism (35mm)` — a true solid
 
 Loads a regular-solid lesson: hexagonal prism, 35 mm across corners,
-70 mm tall, centered at x = 0.
+70 mm tall, centered at x = 0. Bottom corners run `a`–`f`, top corners
+`g`–`l` around the hexagon.
 
 - **What it loads.** Datum span; six plan edges forming a regular hexagon
-  (corners at R = 17.5 mm about `(0, -25.5)`); elevation outline (35×70 mm
+  (corners at R = 17.5 mm about `(0, -25.5)`) with a station dot on each
+  vertex pairing top+bottom (`g,a` …); elevation outline (35×70 mm
   rectangle over x ∈ [-17.5, 17.5]) with two interior facet verticals at
-  x = ±8.75 and a hidden Type E seam at mid-height y = 35; Type G center
-  axes in both views; four projectors; Type K loci through base (y = 0)
-  and top (y = 70).
+  x = ±8.75; four single-corner dots on the outer stations (`a'`, `g'`,
+  `d'`, `j'`) and four front+back pair dots on the interior stations
+  (`f',b'` …); Type G center axes in both views; four projectors; Type K
+  loci through base (y = 0) and top (y = 70). No Type E is drawn: every
+  hidden edge coincides with a visible one, so visible wins per ISO 128.
 - **What to look at.** Each interior facet vertical stands for a coincident
-  front/back edge pair of the hexagon; the dashed seam is the one hidden
-  edge. Projectors at all four x-stations hold elev.x == plan.x.
+  front/back edge pair of the hexagon; each interior station dot carries
+  both corner names. Projectors at all four x-stations hold elev.x == plan.x.
 - **What it teaches.** Reading a solid off two views: hexagon below +
-  rectangle above = prism; hidden vs visible edges (Type E vs Type A);
+  rectangle above = prism; competing points (one dot, two corners);
+  hidden-vs-visible analysis, recorded as parens and graded by Check;
   center axes (Type G); loci marking levels.
 - **In 3D.** Renders as a class-A prism: 12 vertices, 18 edges, drawn
   35:70 proportions. Orbit to check the dashed hidden edges move correctly.
+
+#### `3-View Prism (35mm)` — plan, elevation, and profile
+
+Loads the three-view prism lesson: the same 35 mm hexagonal prism, 70 mm
+tall, at x = 0 — plus a first-angle `PROFILE` side view with the
+conventional construction drawn around it.
+
+- **What it loads.** Everything the Hexagonal Prism demo loads, plus a side
+  view at `xRef` (Type A outline, same heights as the elevation, width
+  equal to the plan's depth span); the X1Y1 reference axis (Type G);
+  horizontal front↔side projectors; and the 45° miter line.
+- **What to look at.** Each plan depth `d` reappears in the profile at
+  `x' = xRef ± (d − d0)`; the horizontal projectors carry each height
+  across from the elevation; the miter turns plan depths into profile
+  widths. The side view validates depth: the solid must explain all three
+  views at once.
+- **What it teaches.** Three-view (first-angle) reading: plan + elevation +
+  profile, the reference axis, and why the miter sits at 45°.
+- **In 3D.** Renders as a class-A prism: 12 vertices, 18 edges, drawn
+  35:70 proportions, coverage 1.0 in all three views.
+
+#### `Profile Square (40mm)` — the ambiguous sheet
+
+Loads a 40 mm square lamina standing on HP in the profile plane x = 0,
+seen edge-on in both views: a vertical line in VP, a horizontal line in
+HP. Corners: `a` near-top, `b` far-top, `c` far-bottom, `d` near-bottom.
+
+- **What it loads.** Datum span; edge-on Type A outline in each view;
+  four pair dots without verdicts (`b',a'` / `c',d'` in VP, `a,d` / `b,c`
+  in HP); Type G axes; one shared projector; Type K loci at y = 0, 40.
+- **What to look at.** Every corner shares x = 0, so geometry alone cannot
+  pair the views — 3D reports `ambiguous-pairing`, and that is the lesson:
+  only your projectors record which VP station meets which HP foot.
+- **What it teaches.** Pairing across views corner by corner (declare the
+  member when banking, §4.3); competing-points visibility in both views;
+  why one x-station can hold four corners.
+- **In 3D.** `3D unavailable (ambiguous pairing)` until you draw the four
+  projector claims — then Class E lifts the lamina and the square appears.
+  A wrong foot fails loudly (`duplicate-corners`) instead of warping it.
 
 #### `Clear Sheet`
 
@@ -1098,7 +1412,7 @@ fail 3D interpretations — §8.8 #7).
 
 ### 9.2 Curriculum lessons (the full set)
 
-Beyond the three demo buttons, the lesson engine contains more lessons.
+Beyond the five demo buttons, the lesson engine contains more lessons.
 They have **no buttons**: a teacher triggers them from the browser's
 JavaScript console while the app is open (they are plain data builders on
 the global `EduCADCurriculum` — call them as
@@ -1114,9 +1428,9 @@ printable construction script and `projectorOk` confirms the invariant.
 | `planeSurface({xMm, sizeMm, tiltDeg})` | HT/VT traces meeting on XY plus tilt angle | default 40 mm, 30° |
 | `regularSolid({solid:'PRISM', sizeMm, heightMm, xMm})` | Hexagonal prism (the demo) | 35 mm default |
 | `regularSolid({solid:'PYRAMID', …})` | Square pyramid with apex `s`/`s'` and one hidden slant | base 35 mm |
-| `regularSolid({solid:'CYLINDER', …})` | Cylinder: plan circle d = 35 mm + elevation rectangle | circle defers 3D (§8.7) |
-| `regularSolid({solid:'CONE', …})` | Cone: plan base circle + apex at center, elevation triangle | circle defers 3D (§8.7) |
-| `threeViewSheet({solid, sizeMm, heightMm, xMm, side, xRefMm})` | Prism/pyramid plan + elevation + `PROFILE` side view with projectors, 45° miter, X1Y1 axis | `solid` PRISM/PYRAMID only; `side` +1 (right) / −1 (left) |
+| `regularSolid({solid:'CYLINDER', …})` | Cylinder: plan circle d = 35 mm + elevation rectangle | full circle reconstructs as Class D (§8.6-§8.7) |
+| `regularSolid({solid:'CONE', …})` | Cone: plan base circle + apex at center, elevation triangle | full circle reconstructs as Class D (§8.6-§8.7) |
+| `threeViewSheet({solid, sizeMm, heightMm, xMm, side, xRefMm})` | Solid plan + elevation + `PROFILE` side view with projectors, 45° miter, X1Y1 axis | `solid` PRISM/PYRAMID/CYLINDER/CONE; `side` +1 (right) / −1 (left) |
 | `generateLesson(kind, opts)` | Dispatcher: `POINT`/`LINE`/`PLANE`/`SOLID` (+ aliases) | same options as above |
 | `generateCurriculum(opts)` | Whole bundle: 4 quadrants + line + plane + 4 solids | teaching-ordered `steps` with `[Q1]`… tags |
 
@@ -1149,9 +1463,11 @@ appendix. The `steps` arrays work stand-alone as blackboard scripts.
 **Script C — Reading solids (15 min, needs: Hexagonal Prism demo).**
 1. "Cover the bottom half: what 3D shape could the rectangle be? (Anything
    flat.) Now uncover the hexagon: only a hex prism fits both."
-2. "Count hidden edges on the sheet (one dashed seam) vs in 3D while
-   orbiting (they move). Hidden depends on viewpoint; the sheet picks one."
-3. "Trace each projector from a hexagon corner to its elevation vertical."
+2. "Every hidden edge here coincides with a visible one, so the sheet shows
+   no dashed lines — visible wins. Mark each hidden corner with parens and
+   press Check; then orbit in 3D and watch the dashed edges move. Hidden
+   depends on viewpoint; the sheet records your verdict instead."
+3. "Trace each projector from a hexagon corner to its elevation station."
 4. Exercise: students Clear the sheet, hand-draw plan+elevation rectangles
    at shared x-stations (axis lock, §6.2) leaving one plan edge open, and
    read the failure message; then they draw the missing edge and watch
@@ -1175,6 +1491,74 @@ appendix. The `steps` arrays work stand-alone as blackboard scripts.
 3. Draw the missing edge: the box appears. "The 3D view never guesses —
    every refusal names the exact missing piece. Read the second line."
 
+### 9.3b Competing points, verdicts, and Check
+
+Corners that share one projection are *competing points*: one dot, two
+corners, one of them hidden. The prism and square demos ship every station
+as an unjudged pair (`f',b'`); the analysis is yours.
+
+**Words that do not flip.** *Front*/*back* live in space; *upper*/*lower*
+live in the drawing. Front = foremost in space = largest depth = the
+*lowest* dot in plan (most negative y). Back = the plan dot nearest XY.
+Top/bottom = largest/smallest height = upper/lower in elevation. Never say
+bare "near/far" — it means opposite things in the two spaces.
+
+**Verdicts.** Wrap the hidden member in parentheses: `a,(b)` says `b` is
+hidden *in this view*. Judge from the *other* view: compare depths in plan
+to call elevation (back hides), heights in elevation to call plan (bottom
+hides). One view alone can never disqualify a competitor — that is the
+whole lesson. Parentheses never affect 3D; they are your answer sheet.
+
+**Claims.** Banking a line's first point on a pair dot asks which member you draw for
+(§4.3); draw to the foot you claim is its mate. The declaration plus the
+foot form one checkable claim. Claims belong on projectors: a declared
+member drawn on a non-projector line fails Check, so draw shared edges
+before naming (as the §9.4 tutorial does). Consistent claims do more than
+pass Check — where geometry alone is ambiguous, Class E lifts them into
+3D: one claim, one corner, face from the convex hull. Contradictory claims
+fail by name (`hint-conflict`, `duplicate-corners`) instead of guessing.
+
+**Check hidden.** Grades the loaded demo sheet (prism, 3-view, square):
+every flipped verdict and every mismatched projector foot is named in the
+report panel (× or loading a demo dismisses it). A fresh demo fails on
+purpose — add your parens first, then press Check. On hand drawings and
+the line/points demos there is no reference sheet, so every verdict and
+claim reports *unverifiable* instead of failing. Profile stations are not
+checked in v1.
+
+### 9.4 Tutorial: Square (scripted user)
+
+`Tutorial: Square` replays the Profile Square lesson click by click in a
+stepper panel (bottom-left): each **Next** performs exactly one real user
+action — place, rename, anchor, lock, line-type pick — through the same
+functions your clicks call, with one line of narration per step. 32 steps:
+datum, four corner dots, shared edge-on outlines (drawn *before* naming,
+so no member claim attaches to shared ink), neutral pair names, one
+declared projector per corner, paren verdicts, then Check. Watch the 3D
+widget: the lamina grows as claims land (triangle at three, square at four).
+
+**Back** re-reads only — nothing undraws. **Restart** replays from step 1
+(the sheet keeps what was drawn; step 1 clears it again). **Exit** closes
+the panel and leaves the sheet yours. Loading any demo also closes it. If
+you rename or delete a tutorial dot mid-run, the stepper says so instead
+of guessing — press Restart.
+
+### 9.5 Tutorial: Prism (scripted user)
+
+`Tutorial: Prism` replays the hexagonal-prism lesson the same way, in
+88 steps: datum, six plan dots around the flat-top hexagon (back edge
+nearest XY, front edge deepest), eight elevation dots (four lone
+silhouette corners, four stacked front+back pairs), twelve Type A ink
+lines (hexagon + 35×70 rectangle + two facet verticals, drawn *before*
+naming), four full-height unclaimed Type G projectors (k'/l' reach
+k/l), neutral pair names, paren
+verdicts (plan bottoms hide under the top face; elevation backs hide
+behind the front), then Check. No member claims: here geometry pairs
+every corner itself, so the square's claims would be ritual, not rescue.
+Watch the 3D widget: the solid builds itself the moment the last name
+lands (step 77), before a single verdict is judged. The finale grades
+18/18 — 14 stations plus 4 projector wellformed checks.
+
 ---
 
 ## 10. Reference tables
@@ -1185,18 +1569,24 @@ appendix. The `steps` arrays work stand-alone as blackboard scripts.
 |--------|---------|--------|
 | Left-click empty sheet | No tool armed | Place point (axis-locked if a selection exists) |
 | Left-click a point | No tool armed | Select it (amber ring) |
-| Left-click empty sheet | Line/polar armed | Abort the tool, nothing created |
-| Left-click a point P2 ≠ P1 | Line anchored | Lock P2, open line-type popup |
-| Left-click P1 again | Line anchored/menu | Re-select P1; tool stays armed |
-| Ctrl/Cmd+click a point | Any | Anchor (or re-anchor) line + polar tools; aborts plotting |
-| Ctrl/Cmd+click empty sheet | Tool armed | Abort all construction tools |
-| Left-click a segment | Polar awaiting baseline | Accept/reject baseline (must pass through anchor) |
+| Left-click empty sheet | Menu open / polar sweeping | Abort the tool, nothing created |
+| Left-click empty sheet | Banking | Abort the bank, nothing created |
+| Left-click a point P2 ≠ P1 | One point banked | Finalize the line: lock P2, open line-type popup |
+| Left-click a banked point | Banking | No-op (Ctrl+click it again to unbank) |
+| Ctrl/Cmd+click a point | Any | Toggle it in the two-slot bank (preempts menu/polar/plotting) |
+| Ctrl/Cmd+click empty sheet | Any | Place a point and bank it (bank-full warns instead) |
+| Left-click a segment | One point banked | Start polar from the bank (baseline must pass through P0) |
 | Left-click anywhere | Polar angle sweep | Lock the angle |
 | Left-click anywhere | Polar distance sweep | Commit the polar point |
 | Left-click anywhere | Polar invalid | Drop the tool |
 | Left-click a segment | Nothing armed | Begin line-referenced plotting |
+| Alt+click near the VP/HP fold (within 14 px) | Nothing armed | Focus the ground line for plotting |
 | Left-click anywhere | Plotting | Commit the plotted point |
 | Left-click | During 300 ms line animation | Ignored |
+| Left-click an entity | View mode | Inspect it: readout badge, nothing changed |
+| Left-click empty sheet | View mode | Clear the readout |
+| Right-click | View mode | Clear the readout (never opens the menu) |
+| Double-click, typing | View mode | Ignored (read-only) |
 | Double-click a point | Line/polar not armed | Begin rename |
 | Double-click a point | Line/polar armed | Ignored |
 | Double-click on 3D ink | — | Reset 3D to isometric rest pose |
@@ -1216,7 +1606,13 @@ appendix. The `steps` arrays work stand-alone as blackboard scripts.
 | Printable character, Space | Renaming | Append to name buffer |
 | Backspace | Renaming | Delete last buffer character |
 | Enter | Renaming | Commit (trim; blank deletes the point; unchanged writes nothing) |
-| Escape | Any | Cancel selection/rename/tools/menus (rename buffer discarded) |
+| Digits, dot | Point selected, nothing else armed | Append to the typed distance (§6.2) |
+| Digits, dot | Line focused (plotting) | Append to the typed offset (§4.6); the line owns the keyboard |
+| Backspace | Typed distance active | Delete the last distance character |
+| Enter | Typed distance active, line focused | Stake the point at the typed perpendicular mm (ends plotting) |
+| Enter | Typed distance active, point selected | Stake the point at the typed mm along the axis, toward the cursor |
+| Escape | Any | Cancel selection/rename/tools/menus (a typed distance clears first; rename buffer discarded) |
+| Escape | View mode | Clear the inspect readout |
 | Any other key (arrows, Delete, Tab, …) | Renaming | Ignored |
 | Ctrl/Cmd/Alt + any key | Renaming | Ignored (modifier combos never edit) |
 | Any key | Not renaming (except Escape) | Nothing |
@@ -1230,10 +1626,13 @@ keys. All drawing is mouse-driven.
 |------|-------|---------|--------|
 | Place point | Click empty sheet | `POINT` (auto-named, role by y-sign) | — |
 | Select | Click point | Reference only | Right-click / Escape |
-| Line/segment + BIS popup | Ctrl+click P1, click P2, pick style | `SEGMENT` (`BOTH`, unlabeled) | Right-click / Escape / empty click |
-| Polar point | Ctrl+click P0, click baseline, click angle, click distance | `POINT` at polar target | Right-click / Escape / invalid-click |
-| Line-referenced plotting | Click segment, click candidate | `POINT` at perpendicular offset | Right-click / Escape |
+| Typed distance | Point selected: type mm, aim axis, Enter | `POINT` at the exact axis distance | First Escape clears the buffer |
+| Line/segment + BIS popup | Bank P1 (Ctrl+click), click P2, pick style | `SEGMENT` (`BOTH`, unlabeled) | Right-click / Escape / empty click |
+| Polar point | Bank P0 (Ctrl+click), click baseline, click angle, click distance | `POINT` at polar target | Right-click / Escape / invalid-click |
+| Line-referenced plotting | Click segment, click candidate (or type mm + Enter) | `POINT` at perpendicular offset | Right-click / Escape |
+| Ground-line plotting | Alt+click the fold, click candidate (or type mm + Enter) | `POINT` at fold offset | Right-click / Escape |
 | Sheet menu | Right-click empty sheet | Grid on/off only | Click option / right-click / Escape / pointer-down |
+| View inspect | View mode: click an entity | Readout only (never an entity) | Empty click / right-click / Escape |
 | Pan / zoom / Home | Middle- or Shift-drag / wheel / buttons | View only | — |
 | 3D orbit / zoom / pan / reset | On-ink gestures (§8.2) | View only | — |
 | Ray, circle, arc, dimension, text, datum, projector, ruler, compass, solver, commands, undo, save | **Not in UI** | — | — |
@@ -1276,14 +1675,14 @@ Sheet strings:
 | `Plain (No Mesh)` / `Box Mesh` | Sheet right-click menu |
 | `Continuous Thick — Type A` … `Double-Dash Chain — Type K` | Line-type popup tooltips (5 rows) |
 | `+` / `-` / `Home` | Zoom HUD |
-| `Line Rotation (TL=80, θ=30°, φ=45°)` etc. | Demo bar (5 buttons, §3.2) |
+| `Line Rotation (TL=80, θ=30°, φ=45°)` etc. | Demo bar (6 buttons, §3.2) |
 | `Manual` | Demo bar link: opens this guide in a new tab (`manual.html`) |
 | `ΔX: <n> mm` / `ΔY: <n> mm` | Axis-lock badges |
 | `∠ <n>°` / `<r> mm (∠ <θ>° locked)` / `⊥ Dist: <n> mm` | Polar / plot badges |
 | `locus of <name>` | Locus line labels (`locus-` captions rewritten) |
 | `3D unavailable` + reason subtitle | 3D failure state (§8.8) |
 
-3D reason subtitles: see the complete list in §8.8 (10 reason codes + 3
+3D reason subtitles: see the complete list in §8.8 (11 reason codes + 3
 empty-state wordings + detail templates — the 3D view shows details, not
 canonical text, except `curves not supported yet`). No other error dialogs,
 toasts, or status strings exist in the app.
@@ -1298,7 +1697,7 @@ priority order within 14 px wins):
 | ENDPOINT | Every point dot; every segment end |
 | INTERSECTION | Segment/line crossings (e.g. projector × locus in the prism demo) |
 | MIDPOINT | Every segment midpoint |
-| CENTER | Nothing on the three demo sheets (no circles) |
+| CENTER | Nothing on the four demo sheets (no circles) |
 | PROJECTOR / LOCUS | Never fire (page sends no station lists) |
 
 ---
@@ -1308,9 +1707,9 @@ priority order within 14 px wins):
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Click does nothing / no point appears | A tool is armed (clicks feed it), or you clicked within 14 px of a point (re-select), or during the 300 ms line animation (ignored) | Right-click or Escape to disarm, then click clearly empty sheet |
-| Line-type popup never opens | You clicked empty sheet (aborts), clicked P1 itself (re-selects), or never Ctrl+clicked an anchor | Ctrl+click P1 (crosshair appears), then click a *different* point |
+| Line-type popup never opens | You clicked empty sheet (aborts the bank), clicked P1 itself (no-op), banked two (third click circles), or never banked P1 | Ctrl+click P1 (crosshair + numeral appear), then click a *different* point |
 | Popup shows dash samples but no text | By design: rows are preview-only | Hover a row for its `… — Type X` tooltip |
-| Polar tool dies after baseline click | Clicked line misses P0 by > 0.5 mm → invalid state; next click drops it | Re-anchor (Ctrl+click P0) and click a segment through P0 |
+| Polar tool dies after baseline click | Clicked line misses P0 by > 0.5 mm → invalid state; next click drops it | Bank P0 again (Ctrl+click) and click a segment through P0 |
 | `∠` badge stuck / no distance sweep | You have not locked the angle yet | Left-click once to lock the angle, then sweep distance |
 | Plotted point lands at segment end | Foot clamps to [A, B] past the ends; offset is kept from the clamped foot | Aim the cursor between the ends for interior feet |
 | Right-click opens no menu | Something is active (right-click cancels first), or cursor is within 14 px of a snap target | Right-click once to cancel, move to clearly empty sheet (away from dots, ends, midpoints, crossings), right-click again |
@@ -1327,7 +1726,12 @@ priority order within 14 px wins):
 | 3D shows `ambiguous…` | Duplicate x stations or double readings | Separate stations; delete duplicates |
 | 3D shows `…leaves the loop` / `misses the…` | Outline open or elevation incomplete | Close the outline; draw the named base/top/vertical/slant |
 | 3D never updates / looks stale | `[unverified]` in normal use — rebuilds run every frame on change; a frozen 3D view suggests a script error | Reload the page (sheet is lost — there is no save) |
-| Page address `#…` loads wrong demo | Only `#points`, `#prism`, `#mesh` are recognized; anything else loads Line Rotation | Fix the hash or click the demo button |
+| Page address `#…` loads wrong demo | Only `#points`, `#prism`, `#3view`, `#square`, `#mesh` are recognized; anything else loads Line Rotation | Fix the hash or click the demo button |
+| Check hidden fails on a fresh demo | Demos ship pairs without verdicts — that is the exercise, not a bug | Add parens (§5.3, §9.3b), then Check again |
+| App opens on a login page, not the sheet | No session yet: the gate redirects before any canvas loads | Pick a role tab + its demo account, or Continue as guest (§3.8) |
+| Login says `Invalid username or password` | Wrong pair for the active role tab | Match the tab to the account; the demo pairs print under the form |
+| `Desktop required` overlay, no canvas | Touch-only small screen blocked by the desktop gate | Open on a desktop/laptop; the overlay links the tutorials sheet (§3.8) |
+| Clicks won't draw anything | View mode is on: it measures, never edits | Switch back to Edit (§3.9) |
 | Server prints `port 8124 busy, using N` | Port occupied (another server or runaway process) | Open the printed port; stop the other server if it is yours |
 | `npm start` fails immediately | Node missing or port range exhausted | Install Node; free ports 8124–8133 |
 
@@ -1347,9 +1751,10 @@ it, and (unless noted) no remnant wires it to the screen.
    (points) or abandoned (segments) and redrawn.
 4. No erase/delete tool and no Delete key; only blank-rename delete and
    Clear Sheet.
-5. No multi-select; no segment selection at all.
+5. No segment selection at all; multi-select banks points only
+   (two slots, §4.3).
 6. No arc, ray, dimension, text, axis, datum, or projector creation
-   gestures (circles use Ctrl+click ×3, §4.9). No virtual ruler/compass
+   gestures (circles bank two points plus a finalizer, §4.9). No virtual ruler/compass
    gestures (engines exist, unwired).
 7. No line-thickness picker; on-screen weights are fixed 1 px / 2 px.
 8. BIS Type H is not offered in the line-type popup.
@@ -1378,12 +1783,18 @@ it, and (unless noted) no remnant wires it to the screen.
 
 **Platform & workflow.**
 
-18. No touch/pen, mobile-layout, or accessibility claims — untested
+18. No touch/pen input on desktop and no accessibility claims — untested
     (`[unverified]` if you need them: try before teaching with them).
-19. No stated browser requirements; no browser-driven tests (`[unverified]`
-    beyond "recent desktop browser with Canvas 2D + Pointer Events").
-20. No user accounts, sharing, printing pipeline, or print-accurate (mm-true)
-    output; print/export scaling helpers exist only as code functions.
+    Touch-only small screens are blocked outright by the desktop gate
+    (§3.8), so there is no mobile layout to claim.
+19. No browser-driven tests inside `npm test` (plain Node only); browser
+    behavior beyond one obscura smoke check is `[unverified]`, and no
+    specific browser versions are claimed.
+20. Demo-only accounts (three roles + guest, `localStorage` session, no
+    real security — see §3.8). The Node demo server keeps a plaintext
+    demo list; the C++ backend hashes passwords into SQLite. No sharing,
+    printing pipeline, or print-accurate (mm-true) output; print/export
+    scaling helpers exist only as code functions.
 
 ---
 
@@ -1404,30 +1815,52 @@ rendering, and event handling). Library modules in
 | `educad-solver.js` | Line rotation, loci, LM constraint solver | **No** (handle created, never used by page) |
 | `edugraphics-snapping.js` | 6-tier snap engine | Partial (4 tiers; ring only, no badges) |
 | `edugraphics-instruments.js` | Virtual ruler + compass state machines | **No** (created, never driven) |
-| `educad-curriculum.js` | Lesson data builders (quadrant/line/plane/solids) | Partial (3 lessons via demo buttons; rest console-only) |
+| `educad-curriculum.js` | Lesson data builders (quadrant/line/plane/solids) | Partial (5 lesson demos via buttons; rest console-only) |
+| `educad-tutorial.js` | Scripted tutorials (square 32 steps, prism 88) replayed through real user actions | Yes |
+| `educad-verify.js` | `Check hidden` grading of verdicts and projector claims | Yes |
 | `educad-labels.js` | 3-tier label layout + leader fallback | Yes |
 | `educad-solid.js` | Full-screen 3D glass (orbit/zoom/pan/aura/render) | Yes |
 | `educad-reconstruct.js` | Two/three-view → 3D reconstruction, classes A/B/C/D, named failures | Yes |
 | `edugraphics-common.js` | Dual-layer mount, zoom HUD, 2-option menu | Yes |
 | `educad-boot.js` | Cold-boot wiring of all modules | Yes |
+| `educad-measure.js` | Edit/View mode state, single-click inspect readouts (coords, L/Δ/∠, r/Ø), View hit-testing | Yes |
 | `edugraphics-hud.css` | HUD/menu/glass positioning | Yes |
 
-Server: [`tools/serve.js`](../tools/serve.js) (`npm start`, 127.0.0.1:8124).
+Server: [`tools/serve.js`](../tools/serve.js) (`npm start`, 127.0.0.1:8124,
+plus the demo `POST /api/login` endpoint).
 Manual page: `tools/build-manual.js` (`npm run build:manual` renders
 `docs/MANUAL.md` → `mirror/manual.html`, opened from the demo bar).
-Tests: [`tools/test-*.js`](../tools/) (574 checks, all green at writing
+Tests: [`tools/test-*.js`](../tools/) (850 checks, all green at writing
 time — see the repo README for the per-phase list), including
 `tools/test-phase11-manual.js` (manual build, in-app link, freshness),
-`tools/test-phase12-reconstruct-3view.js` (side-view reconstruction), and
-`tools/test-phase13-curves.js` (Class D cylinders/cones, circle gesture).
+`tools/test-phase12-reconstruct-3view.js` (side-view reconstruction),
+`tools/test-phase13-curves.js` (Class D cylinders/cones, circle gesture),
+`tools/test-phase14-glass.js` (fullscreen 3D glass, aura, gestures),
+`tools/test-phase15-demo-3view.js` (3-view demo button wiring),
+`tools/test-phase16-line-circle.js` (bank + finalizer clicks),
+`tools/test-phase17-point-cascade.js` (point-delete line cascade),
+`tools/test-phase18-two-point-line.js` (two-point line property),
+`tools/test-phase19-multi-caption.js` (competing captions),
+`tools/test-phase20-claims-verify.js` (Check hidden grading),
+`tools/test-phase21-tutorial.js` + `tools/test-phase23-prism-tutorial.js`
+(scripted tutorials), `tools/test-phase22-claimed-lamina.js` (Class E),
+`tools/test-phase24-typed-distance.js` /
+`tools/test-phase25-plot-typed.js` / `tools/test-phase26-ground-plot.js`
+(typed entry + ground-line datum), `tools/test-phase27-pick-bank.js`
+(two-slot bank), `tools/test-phase28-view-measure.js` (Edit/View toggle,
+select-and-measure inspect), and `tools/test-login.js` (demo roles +
+guest gate).
 
 ### 13.2 Behavior anchors (file:line)
 
-Key behaviors and where they live (line numbers at writing time).
-All `index.html` anchors below were re-verified after the in-app Manual
-link was added, so they match the current file.
+Key behaviors and where they live (line numbers at writing time;
+older rows predate the tutorial / Check / login additions and may have
+drifted — the demo-bar, gate, and session rows were re-verified for this
+revision).
 
-- HUD DOM + demo buttons: `mirror/index.html:61-72`
+- Status HUD + demo bar (10 buttons, Manual last): `mirror/index.html:200-215`
+- Login gate + mobile gate + session chip: `index.html:142-152`, `:160-199`,
+  `:218-244`
 - Boot + module wiring: `index.html:97-101`, `educad-boot.js:80-136`
 - XY ground line + watermarks + X/Y marks: `index.html:351-378`
 - Grid: `index.html:326-349` (steps), `educad-canvas.js:817-831` (toggle)
@@ -1466,7 +1899,7 @@ lesson.steps.forEach(function (s) { console.log(s); });
 ```
 
 Note: the page closure does not expose the table, so console-built lessons
-currently serve as printed scripts unless the page is extended — the three
+currently serve as printed scripts unless the page is extended — the four
 demo buttons remain the only in-app lesson loaders.
 
 ### 13.3 Traceability table (manual claim → anchor)
@@ -1479,7 +1912,7 @@ demo buttons remain the only in-app lesson loaders.
 | 4 | `npm start` → 127.0.0.1:8124 | `tools/serve.js:9-10`; `package.json` scripts |
 | 5 | Port busy → next port + message | `tools/serve.js:189-202` |
 | 6 | HUD labels + pill rule y>=0 | `index.html:61-64`, `:659-666` |
-| 7 | Demo button labels (5) | `index.html:67-71` |
+| 7 | Demo-bar button labels (10, Manual last) | `index.html:205-215`; `test-phase11` #18, `test-phase20` #22 |
 | 8 | Zoom labels `+ - Home`, ×1.25, home s=2 | `edugraphics-common.js:27`; `educad-canvas.js:143-151` |
 | 9 | Menu labels + 14 px suppression | `educad-canvas.js:23-26`, `:62-68`; `test-phase1` 2-option/14px |
 | 10 | No toolbar/palette exists | grep: zero matches for toolbar/palette/toolbox/ribbon |
@@ -1502,19 +1935,21 @@ demo buttons remain the only in-app lesson loaders.
 | 27 | Cosmetic 1 px/2 px, cutoff 0.35 | `educad-entities.js:157-175`; `test-phase2` #47–51 |
 | 28 | Quadrant signs incl. Q3 demo numbers | `educad-curriculum.js:141-144`; `index.html:999-1000` |
 | 29 | Line demo numbers (dx=40, PL/EL, loci) | `index.html:991-994`; `educad-curriculum.js:207-214` |
-| 30 | Prism demo (hex, 35×70, seam, facets) | `index.html:1006`; `educad-curriculum.js:348-389` |
+| 30 | Prism demo (hex, 35×70, corners, facets, no seam) | `index.html:1006`; `educad-curriculum.js:348-389` |
 | 31 | viewRole assignment rules | `index.html:220`, `:240`, `:284`, `:897` |
 | 32 | 3D geometry (glass state, aura, iso pose, styles) | `educad-solid.js:21-58`, `:773-968`; `test-phase9` iso/hidden, `test-phase14` glass/aura |
 | 33 | 3D gestures + aura routing | `index.html:673-748` route, `:840-859` wheel; `educad-solid.js:337-355`, `:819-863`, `:976-1000` tap; `test-phase9` legacy, `test-phase14` aura |
 | 34 | Live rebuild per frame; derived-only | `index.html:1047-1070`; `educad-entities.js:247-255` subscribe |
 | 35 | Classes A/B/C/D + tolerances + gate 0.999 | `educad-reconstruct.js:29-34`, `:555-1339`; `test-phase10`, `test-phase13` |
 | 36 | Circles reconstruct (D), arcs deferred + hidden warnings | `educad-reconstruct.js:105-106`, `:1472-1515`; page ignores `warnings`; `test-phase13` |
-| 37 | All 3D reason strings | `educad-reconstruct.js:37-48` + fail call sites; §8.8 |
+| 37 | All 3D reason strings | `educad-reconstruct.js:41-53` + fail call sites; §8.8 |
 | 38 | Console lessons + dispatcher kinds | `educad-curriculum.js:473-511` |
-| 39 | Hashes #points/#prism/#mesh; default line | `index.html:1019-1034` |
-| 40 | No save/export/storage; no browser claims | grep: no storage/download APIs; no browser doc (marked `[unverified]`) |
+| 39 | Hashes #points/#prism/#3view/#square/#mesh; default line | `index.html:1019-1034` |
+| 40 | Drawing saves (account) + tutorial progress | C++ `/api/drawings`, `/api/progress`; `educad-saves.js` snapshot/restore; session-bar Save/Drawings; `npm run test:cpp`, `npm run test:saves`; guests stay local-only |
 | 41 | Hand recipes §4.8 (box 8v/12e, pyramid 5v/8e) | `EduCADReconstruct.reconstruct` validation (`ok`, full coverage, no warnings); cf. `test-phase10` hand-box/prism/pyramid cases |
 | 42 | In-app Manual button + generated manual page | `index.html` demo bar (`btn-manual` → `manual.html`); `tools/build-manual.js`; `test-phase11` |
+| 43 | 3-view demo button loads the class-A prism sheet | `index.html` demo bar (`btn-demo-3view` → `threeViewSheet`); `tools/test-phase12-reconstruct-3view.js` (engine proof); `tools/test-phase15-demo-3view.js` (wiring proof) |
+| 44 | Edit/View toggle + read-only measure readouts | `educad-measure.js` (mode state, hit test, readout numbers); `index.html` mode pair (`btn-mode-edit`/`btn-mode-view`), inspect/clear paths; `tools/test-phase28-view-measure.js` |
 
 Line numbers refer to the files as of this writing; behavior (not line
 numbers) is the contract. If a line drifts, search the file for the quoted

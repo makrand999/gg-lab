@@ -55,7 +55,7 @@ throws(function () { E.createEntity('POINT', { x: NaN }); }); pass('entities NaN
 // 19 radius clamps to 0.01
 eq(E.createEntity('CIRCLE', { radius: 0.001 }).radius, 0.01); pass('entities radius min 0.01');
 // 20 DATUM_AXIS locked by default
-eq(E.createEntity('DATUM_AXIS', {}).locked, true); pass('entities datum locked default');
+eq(E.createEntity('DATUM_AXIS', { x: 0, y: 0, x2: 10, y2: 0 }).locked, true); pass('entities datum locked default');
 // 21 locked move throws
 var t1 = E.createTable(); E.resetIdCounter();
 var lk = t1.create('SEGMENT', { x: 0, y: 0, x2: 10, y2: 0 });
@@ -84,10 +84,10 @@ t2.clear(); eq(t2.count(), 0); pass('entities table clear');
 t2.add(E.createEntity('POINT', { id: 'p1' })); t2.add(E.createEntity('CIRCLE', { id: 'c1', radius: 5 }));
 eq(t2.findByType('POINT').length, 1); pass('entities findByType');
 // 30 findByBisCode
-t2.add(E.createEntity('LINE', { id: 'l1', bisCode: 'A' }));
+t2.add(E.createEntity('LINE', { id: 'l1', bisCode: 'A', x: 0, y: 0, x2: 10, y2: 0 }));
 eq(t2.findByBisCode('A').length, 1); pass('entities findByBisCode');
 // 31 findByViewRole
-t2.add(E.createEntity('RAY', { id: 'r1', viewRole: 'PLAN' }));
+t2.add(E.createEntity('RAY', { id: 'r1', viewRole: 'PLAN', x: 0, y: 0, x2: 10, y2: 0 }));
 eq(t2.findByViewRole('PLAN').length, 1); pass('entities findByViewRole');
 // 32 findByLayer
 t2.add(E.createEntity('TEXT', { id: 't1', layer: 'layer2' }));
@@ -96,9 +96,9 @@ eq(t2.findByLayer('layer2').length, 1); pass('entities findByLayer');
 t2.add(E.createEntity('POINT', { id: 'hid', visible: false }));
 ok(t2.visibleEntities().every(function (e) { return e.visible; })); pass('entities visible filter');
 // 34 resolveStyle thickness override else BIS
-var eB = E.createEntity('SEGMENT', { bisCode: 'B' });
+var eB = E.createEntity('SEGMENT', { bisCode: 'B', x: 0, y: 0, x2: 1, y2: 1 });
 eq(E.resolveStyle(eB).widthMm, 0.20);
-var eT = E.createEntity('SEGMENT', { bisCode: 'B', thickness: 0.7 });
+var eT = E.createEntity('SEGMENT', { bisCode: 'B', thickness: 0.7, x: 0, y: 0, x2: 1, y2: 1 });
 eq(E.resolveStyle(eT).widthMm, 0.7); pass('entities resolveStyle thickness');
 // 35 dashToPx
 deep(E.dashToPx([8, 4], 2), [16, 8]); pass('entities dashToPx');

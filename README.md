@@ -28,10 +28,40 @@ The demo bar (top-right) has a **Manual** button that opens the in-app
 user manual in a new tab. The manual page is generated from the Markdown
 source: after editing `docs/MANUAL.md`, run `npm run build:manual`.
 
+## Login
+
+Opening the app redirects to [`mirror/login.html`](mirror/login.html):
+pick the **Academics**, **Teacher**, or **Student** tab and log in, or
+**Continue as guest** (guest skips the server entirely: no saves, the
+sheet stays local). Demo credentials:
+
+| Role | Username | Password |
+|------|----------|----------|
+| Academics | `academics` | `admin123` |
+| Teacher | `teacher` | `teach123` |
+| Student | `student` | `learn123` |
+
+Two servers implement the same `POST /api/login` contract (the login
+page works against either):
+
+- `npm start` — minimal Node demo server (`tools/serve.js`): checks
+  plain-text demo users in `tools/users.json` (outside the served root,
+  never sent to browsers). Login only, no saves.
+- `npm run start:cpp` — C++ backend (`backend/`, vendored httplib/JSON/
+  SQLite + libsodium): `educad-seed` hashes the demo passwords into
+  SQLite once per database, sessions are server-side tokens with 24 h
+  expiry, and logged-in users get drawing saves plus tutorial progress.
+
+The session chip (bottom-left) shows who is logged in; **Save** stores
+the sheet to your account (first save asks for a title, later saves
+update), **Drawings** lists/loads/deletes saved sheets, and **Logout**
+clears the session and returns to the login page. Finishing a tutorial
+records progress and earns its lesson button a ✓ next visit.
+
 ## Test
 
 ```sh
-npm test       # full suite: baseline + phases 1–14 (616 checks)
+npm test       # full suite: baseline + phases 1–29 (862 checks)
 ```
 
 | Command | Suite |
@@ -46,11 +76,29 @@ npm test       # full suite: baseline + phases 1–14 (616 checks)
 | `npm run test:phase7` | Production audit: boot, server, budgets, mount (33) |
 | `npm run test:phase8` | Labels: 3-tier layout + leader fallback (28) |
 | `npm run test:phase9` | Solid widget: iso render, orbit/zoom, hidden edges (55) |
-| `npm run test:phase10` | Reconstruction: classes A/B/C, failures, live sync (44) |
+| `npm run test:phase10` | Reconstruction: classes A/B/C, failures, live sync (53) |
 | `npm run test:phase11` | Manual: Markdown→HTML build, in-app link, freshness guard (22) |
 | `npm run test:phase12` | Reconstruction 3-view: PROFILE role, depth maps, triple gate (30) |
 | `npm run test:phase13` | Curves: Class D cylinders/cones, K=24 tessellation (30) |
 | `npm run test:phase14` | Glass overlay: fullscreen sheet, aura hit-test, orbit/zoom/pan (42) |
+| `npm run test:phase15` | Demo 3-view: button wiring, `#3view` hash, class-A prism proof (14) |
+| `npm run test:phase16` | Line vs circle: shared Ctrl+click anchor, plain-click draws line (12) |
+| `npm run test:phase17` | Point cascade: deleting a point deletes its lines, refs + coincident (12) |
+| `npm run test:phase18` | Two-point line: core rejects one-point lines everywhere (12) |
+| `npm run test:phase19` | Multi-caption: coincident pairs, parens verdicts, corner truth (24) |
+| `npm run test:phase20` | Claims + verify: member chooser, checker, Check button (26) |
+| `npm run test:phase21` | Tutorial: scripted user, square stepper, action funnel (24) |
+| `npm run test:phase22` | Class E: claimed corner-lift lamina, hint failures (20) |
+| `npm run test:phase23` | Tutorial: hex-prism lesson, 88 steps, honest solid (20) |
+| `npm run test:phase24` | Typed distance: select point, type mm, Enter stakes (12) |
+| `npm run test:phase25` | Typed plot offset: focus line, type mm, Enter stakes (12) |
+| `npm run test:phase26` | Ground-line plotting: Alt+click fold, type mm, Enter stakes (12) |
+| `npm run test:phase27` | Pick bank: Ctrl banks, plain click finalizes (12) |
+| `npm run test:phase28` | View mode: Edit/View toggle, select-and-measure inspect (12) |
+| `npm run test:phase29` | View dimensions: drafting-style overlay (extension lines, leaders) (12) |
+| `npm run test:login` | Login: 3 roles + guest, minimal `/api/login`, gate ships (15) |
+| `npm run test:cpp` | C++ backend: static parity, auth, drawings/progress, restart proof (26) |
+| `npm run test:saves` | Saves module: snapshot/restore, API client, guest gate, UI ships (16) |
 
 App entry point: [`mirror/index.html`](mirror/index.html).
 Library modules: [`mirror/files/www.geogebra.org/`](mirror/files/www.geogebra.org/).

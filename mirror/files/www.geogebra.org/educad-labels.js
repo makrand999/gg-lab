@@ -17,7 +17,7 @@
   // World mm inside; screen px is ephemeral (needs view {s,tx,ty,w,h}).
   // Deterministic: fixed sector order, strict-min wins. Zero deps.
   var WORLD_UNITS = 'mm';
-  var VERSION = '8.0.0-educad';
+  var VERSION = '8.1.0-educad';
   var SECTORS_DEG = [0, 45, 90, 135, 180, 225, 270, 315];
   // Screen-px steps (y down): 45 deg reads visually up-right.
   var SECTOR_STEP = {
@@ -109,6 +109,39 @@
       return c !== '' ? c : 'locus';
     }
     return e.caption;
+  }
+
+  // Multi-caption points: a POINT caption lists coincident corner names
+  // separated by commas ('a,b'), each optionally wrapped in one paren pair
+  // marking the student's hidden verdict ('a,(b)'). Parts keep typed order
+  // (first part wins the best sector); empty parts are ignored so rename
+  // needs no error channel. Single captions behave exactly as before.
+  function splitCaption(caption) {
+    var parts = String(caption === undefined || caption === null ? '' : caption).split(',');
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var t = parts[i].replace(/^\s+|\s+$/g, '');
+      if (t !== '') out.push(t);
+    }
+    return out;
+  }
+
+  // Identity of one part: one wrapping paren pair (the hidden mark) is
+  // stripped; anything else is literal. '(b)' -> 'b', 'b' -> 'b'.
+  function bareName(part) {
+    var t = String(part === undefined || part === null ? '' : part);
+    t = t.replace(/^\s+|\s+$/g, '');
+    if (t.length >= 2 && t.charAt(0) === '(' && t.charAt(t.length - 1) === ')') {
+      return t.slice(1, -1).replace(/^\s+|\s+$/g, '');
+    }
+    return t;
+  }
+
+  // True when the part carries the student's hidden verdict.
+  function isHiddenMark(part) {
+    var t = String(part === undefined || part === null ? '' : part);
+    t = t.replace(/^\s+|\s+$/g, '');
+    return t.length >= 2 && t.charAt(0) === '(' && t.charAt(t.length - 1) === ')';
   }
 
   // Fallback text metrics (override via opts.measure with ctx.measureText).
@@ -388,8 +421,11 @@
         fixed.push({ entity: e, kind: kind, text: e.caption,
           anchorMm: { x: e.x, y: e.y }, fixed: true });
       } else if (kind === 'point') {
-        points.push({ entity: e, kind: kind, text: e.caption,
-          anchorMm: { x: e.x, y: e.y }, sectors: SECTORS_DEG });
+        var parts = splitCaption(e.caption);
+        for (var pi = 0; pi < parts.length; pi++) {
+          points.push({ entity: e, kind: kind, text: parts[pi],
+            anchorMm: { x: e.x, y: e.y }, sectors: SECTORS_DEG });
+        }
       } else if (kind === 'dimension') {
         dims.push({ entity: e, kind: kind, text: e.caption,
           anchorMm: { x: (e.x + e.x2) / 2, y: (e.y + e.y2) / 2 },
@@ -539,6 +575,7 @@
     geometryCrossesBox: geometryCrossesBox,
     boxWorldBounds: boxWorldBounds,
     costCandidate: costCandidate, groundRuleFor: groundRuleFor,
-    collectJobs: collectJobs, resolve: resolve
+    collectJobs: collectJobs, resolve: resolve,
+    splitCaption: splitCaption, bareName: bareName, isHiddenMark: isHiddenMark
   };
 });

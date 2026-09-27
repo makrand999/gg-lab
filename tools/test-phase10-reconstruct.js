@@ -6,7 +6,7 @@ var S = require('../mirror/files/www.geogebra.org/educad-solid.js');
 var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
 var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
 
-var TOTAL = 44;
+var TOTAL = 53;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -533,6 +533,87 @@ after.forEach(function (k) {
   ok(k.indexOf('vertices') === -1 && k.indexOf('geometry') === -1, 'no 3D keys');
 });
 pass('phase10 entities stay 2D');
+// 45 baseNameOf strips prime ticks to the shared base
+eq(R.baseNameOf("a'"), 'a');
+eq(R.baseNameOf('a'), 'a');
+eq(R.baseNameOf("a''"), 'a');
+eq(R.baseNameOf('b1’'), 'b1');
+eq(R.baseNameOf('  c′  '), 'c');
+eq(R.baseNameOf(''), '');
+eq(R.baseNameOf("'"), '');
+eq(R.baseNameOf(undefined), '');
+pass('phase10 baseNameOf primes');
+// 46 strict name gate: a' vs d at one station refuses 3D
+function npt(x, y, role, caption) {
+  return { type: 'POINT', x: x, y: y, bisCode: 'B', viewRole: role, caption: caption };
+}
+var r46 = R.reconstruct([
+  npt(10, -25, 'PLAN', 'd'), npt(10, 35, 'ELEVATION', "a'")
+]);
+eq(r46.status, 'unavailable');
+eq(r46.reason, 'name-mismatch');
+var r46p = R.reconstruct([
+  npt(10, -25, 'PLAN', 'a'), npt(10, 35, 'ELEVATION', "a'"),
+  npt(60, 35, 'PROFILE', "d''")
+]);
+eq(r46p.status, 'unavailable');
+eq(r46p.reason, 'name-mismatch');
+var r46q = R.reconstruct([
+  npt(10, -25, 'PLAN', 'a'), npt(10, 35, 'ELEVATION', "a'"),
+  npt(60, 35, 'PROFILE', "a''")
+]);
+ok(r46q.reason !== 'name-mismatch', 'profile match passes gate');
+pass('phase10 name gate mismatch');
+// 47 matching a/a' still reconstructs the 3D point
+var r47 = R.reconstruct([
+  npt(10, -25, 'PLAN', 'a'), npt(10, 35, 'ELEVATION', "a'")
+]);
+eq(r47.status, 'ok');
+eq(r47.class, 'C');
+eq(r47.geometry.vertices.length, 1);
+pass('phase10 name gate match');
+// 48 caption-less drawings keep the legacy geometric reading
+var r48 = R.reconstruct([pt(10, -25, 'PLAN'), pt(10, 35, 'ELEVATION')]);
+eq(r48.status, 'ok');
+eq(r48.class, 'C');
+pass('phase10 name gate unlabeled exempt');
+// 49 strictNames:false opts out of the gate
+var r49 = R.reconstruct([
+  npt(10, -25, 'PLAN', 'd'), npt(10, 35, 'ELEVATION', "a'")
+], { strictNames: false });
+eq(r49.status, 'ok');
+eq(r49.class, 'C');
+pass('phase10 name gate opt-out');
+// 50 one-sided labels stay exempt; pyramid s/s' still passes
+var r50a = R.reconstruct([npt(10, -25, 'PLAN', 'd'), pt(10, 35, 'ELEVATION')]);
+eq(r50a.status, 'ok');
+var r50b = R.reconstruct(C.regularSolid({ solid: 'PYRAMID' }).entities);
+eq(r50b.status, 'ok');
+pass('phase10 name gate one-sided plus pyramid');
+// 51 names resolve a shared-x ambiguity the geometry cannot
+var r51 = R.reconstruct([
+  npt(10, -20, 'PLAN', 'a'), npt(10, -25, 'PLAN', 'b'),
+  npt(10, 20, 'ELEVATION', "a'"), npt(10, 30, 'ELEVATION', "b'")
+]);
+eq(r51.status, 'ok');
+eq(r51.class, 'C');
+eq(r51.geometry.vertices.length, 2);
+pass('phase10 names resolve shared-x');
+// 52 a named mate at another station is x-mismatch, not unmatched
+var r52 = R.reconstruct([
+  npt(10, -25, 'PLAN', 'a'), npt(13, 35, 'ELEVATION', "a'")
+]);
+eq(r52.status, 'unavailable');
+eq(r52.reason, 'x-mismatch');
+pass('phase10 name-selected x-mismatch');
+// 53 one letter on two dots is ambiguous, never guessed
+var r53 = R.reconstruct([
+  npt(10, -25, 'PLAN', 'a'), npt(30, -25, 'PLAN', 'a'),
+  npt(10, 35, 'ELEVATION', "a'")
+]);
+eq(r53.status, 'unavailable');
+eq(r53.reason, 'ambiguous-pairing');
+pass('phase10 duplicate label ambiguous');
 
 assert.strictEqual(n, TOTAL);
 console.log('OK ' + TOTAL + '/' + TOTAL + ' phase10 tests passed');

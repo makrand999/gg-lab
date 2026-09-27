@@ -92,6 +92,9 @@
     return built.length;
   }
 
+  // API paths are mount-relative (no leading slash) so the same code
+  // works on a root-mounted dev server (/api/…) and under a sub-path
+  // mount (/major/api/…). Callers must pass relative paths too.
   // Thin fetch wrapper: bearer auth, JSON in/out, Error(status) on failure.
   function apiRequest(fetchImpl, method, path, session, body) {
     if (typeof fetchImpl !== 'function') {
@@ -122,26 +125,26 @@
   }
 
   function listDrawings(fetchImpl, session) {
-    return apiRequest(fetchImpl, 'GET', '/api/drawings', session);
+    return apiRequest(fetchImpl, 'GET', 'api/drawings', session);
   }
   function createDrawing(fetchImpl, session, title, data) {
-    return apiRequest(fetchImpl, 'POST', '/api/drawings', session,
+    return apiRequest(fetchImpl, 'POST', 'api/drawings', session,
       { title: title, data: data });
   }
   function getDrawing(fetchImpl, session, id) {
-    return apiRequest(fetchImpl, 'GET', '/api/drawings/' + id, session);
+    return apiRequest(fetchImpl, 'GET', 'api/drawings/' + id, session);
   }
   function updateDrawing(fetchImpl, session, id, patch) {
-    return apiRequest(fetchImpl, 'PUT', '/api/drawings/' + id, session, patch);
+    return apiRequest(fetchImpl, 'PUT', 'api/drawings/' + id, session, patch);
   }
   function deleteDrawing(fetchImpl, session, id) {
-    return apiRequest(fetchImpl, 'DELETE', '/api/drawings/' + id, session);
+    return apiRequest(fetchImpl, 'DELETE', 'api/drawings/' + id, session);
   }
   function listProgress(fetchImpl, session) {
-    return apiRequest(fetchImpl, 'GET', '/api/progress', session);
+    return apiRequest(fetchImpl, 'GET', 'api/progress', session);
   }
   function putProgress(fetchImpl, session, lesson, state) {
-    return apiRequest(fetchImpl, 'PUT', '/api/progress/' + lesson, session,
+    return apiRequest(fetchImpl, 'PUT', 'api/progress/' + lesson, session,
       { state: state });
   }
 

@@ -77,7 +77,9 @@
       return;
     }
     if (submitBtn) submitBtn.disabled = true;
-    window.fetch('/api/login', {
+    // Relative path: resolves under a sub-path mount (/major/api/…)
+    // as well as a root-mounted dev server (/api/…).
+    window.fetch('api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role: role, username: username, password: password })

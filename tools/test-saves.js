@@ -114,8 +114,8 @@ async function main() {
   pass('saves restore atomic');
 
   // 7 apiRequest attaches auth + parses ok
-  var f7 = stubFetch({ 'GET /api/me': { status: 200, body: { ok: true, username: 's' } } });
-  var me = await S.apiRequest(f7, 'GET', '/api/me', session('student', 'tok123'));
+  var f7 = stubFetch({ 'GET api/me': { status: 200, body: { ok: true, username: 's' } } });
+  var me = await S.apiRequest(f7, 'GET', 'api/me', session('student', 'tok123'));
   eq(me.username, 's');
   eq(f7.calls.length, 1);
   eq(f7.calls[0].init.headers.Authorization, 'Bearer tok123');
@@ -123,7 +123,7 @@ async function main() {
 
   // 8 guest never reaches fetch
   var f8 = stubFetch({});
-  await S.apiRequest(f8, 'GET', '/api/me', session('guest', 'guest')).then(function () {
+  await S.apiRequest(f8, 'GET', 'api/me', session('guest', 'guest')).then(function () {
     throw new Error('guest must reject');
   }, function (err) {
     ok(/guest/.test(err.message), 'guest error');
@@ -132,8 +132,8 @@ async function main() {
   pass('saves guest blocked');
 
   // 9 api errors carry status + server message
-  var f9 = stubFetch({ 'GET /api/me': { status: 401, body: { ok: false, error: 'unauthorized' } } });
-  await S.apiRequest(f9, 'GET', '/api/me', session('student', 'bad')).then(function () {
+  var f9 = stubFetch({ 'GET api/me': { status: 401, body: { ok: false, error: 'unauthorized' } } });
+  await S.apiRequest(f9, 'GET', 'api/me', session('student', 'bad')).then(function () {
     throw new Error('401 must reject');
   }, function (err) {
     eq(err.status, 401);
@@ -143,11 +143,11 @@ async function main() {
 
   // 10 drawing CRUD wrappers hit method + path
   var f10 = stubFetch({
-    'POST /api/drawings': { status: 201, body: { ok: true, id: 7 } },
-    'GET /api/drawings': { status: 200, body: { ok: true, drawings: [] } },
-    'GET /api/drawings/7': { status: 200, body: { ok: true, id: 7 } },
-    'PUT /api/drawings/7': { status: 200, body: { ok: true, id: 7 } },
-    'DELETE /api/drawings/7': { status: 200, body: { ok: true } }
+    'POST api/drawings': { status: 201, body: { ok: true, id: 7 } },
+    'GET api/drawings': { status: 200, body: { ok: true, drawings: [] } },
+    'GET api/drawings/7': { status: 200, body: { ok: true, id: 7 } },
+    'PUT api/drawings/7': { status: 200, body: { ok: true, id: 7 } },
+    'DELETE api/drawings/7': { status: 200, body: { ok: true } }
   });
   var s10 = session('teacher', 't');
   eq((await S.createDrawing(f10, s10, 'T', { a: 1 })).id, 7);
@@ -157,22 +157,22 @@ async function main() {
   await S.updateDrawing(f10, s10, 7, { title: 'T2' });
   await S.deleteDrawing(f10, s10, 7);
   deep(f10.calls.map(function (c) { return c.init.method + ' ' + c.path; }), [
-    'POST /api/drawings', 'GET /api/drawings', 'GET /api/drawings/7',
-    'PUT /api/drawings/7', 'DELETE /api/drawings/7'
+    'POST api/drawings', 'GET api/drawings', 'GET api/drawings/7',
+    'PUT api/drawings/7', 'DELETE api/drawings/7'
   ]);
   pass('saves drawing wrappers');
 
   // 11 progress wrappers hit method + path
   var f11 = stubFetch({
-    'PUT /api/progress/square': { status: 200, body: { ok: true, lesson: 'square' } },
-    'GET /api/progress': { status: 200, body: { ok: true, progress: [] } }
+    'PUT api/progress/square': { status: 200, body: { ok: true, lesson: 'square' } },
+    'GET api/progress': { status: 200, body: { ok: true, progress: [] } }
   });
   var s11 = session('student', 't');
   eq((await S.putProgress(f11, s11, 'square', { done: true })).lesson, 'square');
   deep(JSON.parse(f11.calls[0].init.body), { state: { done: true } });
   await S.listProgress(f11, s11);
   deep(f11.calls.map(function (c) { return c.init.method + ' ' + c.path; }), [
-    'PUT /api/progress/square', 'GET /api/progress'
+    'PUT api/progress/square', 'GET api/progress'
   ]);
   pass('saves progress wrappers');
 
@@ -181,7 +181,7 @@ async function main() {
     { storage: memStorage(JSON.stringify(session('guest', 'guest'))), fetch: stubFetch({}) });
   eq(g12.skipped, true);
   var f12 = stubFetch({
-    'PUT /api/progress/square': { status: 200, body: { ok: true, lesson: 'square' } }
+    'PUT api/progress/square': { status: 200, body: { ok: true, lesson: 'square' } }
   });
   var u12 = await S.recordProgress('square', { done: true },
     { storage: memStorage(JSON.stringify(session('student', 't'))), fetch: f12 });
@@ -195,7 +195,7 @@ async function main() {
   eq(g13.skipped, true);
   deep(g13.progress, []);
   var f13 = stubFetch({
-    'GET /api/progress': { status: 200, body: { ok: true, progress: [{ lesson: 'square' }] } }
+    'GET api/progress': { status: 200, body: { ok: true, progress: [{ lesson: 'square' }] } }
   });
   var u13 = await S.fetchProgress(
     { storage: memStorage(JSON.stringify(session('student', 't'))), fetch: f13 });

@@ -179,7 +179,7 @@ async function main() {
     var r12 = await req(port, 'GET', '/login.html');
     eq(r12.status, 200);
     ok(r12.body.indexOf('Continue as guest') !== -1, 'guest link');
-    ok(r12.body.indexOf('/api/login') !== -1, 'api wired');
+    ok(r12.body.indexOf('api/login') !== -1, 'api wired');
     var r12js = await req(port, 'GET', '/menu-lava.js');
     eq(r12js.status, 200);
     ok(String(r12js.headers['content-type']).indexOf('text/javascript') !== -1, 'js type');

@@ -161,7 +161,7 @@ async function main() {
     var r15 = await get(port, '/login.html');
     eq(r15.status, 200);
     ok(r15.body.indexOf('Continue as guest') !== -1, 'guest link');
-    ok(r15.body.indexOf('/api/login') !== -1, 'api wired');
+    ok(r15.body.indexOf('api/login') !== -1, 'api wired');
     ok(r15.body.indexOf('class="menu-list"') !== -1, 'cf menu');
     ok(r15.body.indexOf('class="current"') !== -1, 'active item');
     ok(r15.body.indexOf('menu-lava.js') !== -1, 'lava wired');

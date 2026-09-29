@@ -2,3 +2,7 @@ dustbin/
 node_modules/
 backend/build/
 backend/data/
+# Local agent / planning notes (not part of the shipped repo)
+AGENTS.md
+HANDOFF.md
+MUSE-*.md

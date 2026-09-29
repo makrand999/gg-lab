@@ -285,7 +285,7 @@ ok(MD.indexOf('18/18') !== -1, 'finale stated');
 pass('phase23 manual');
 
 // 18 readme + package pin the new suite
-ok(README.indexOf('baseline + phases 1–29 (862 checks)') !== -1,
+ok(README.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
   'grand total 789');
 ok(PKG.indexOf('node tools/test-phase23-prism-tutorial.js') !== -1,
   'suite runs phase23');

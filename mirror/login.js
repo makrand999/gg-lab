@@ -20,9 +20,17 @@
     try { window.localStorage.setItem(KEY, JSON.stringify(s)); return true; }
     catch (err) { return false; }
   }
-  function goApp() { window.location.replace('index.html'); }
+  // Role home: teachers and academics get the studio, students the
+  // workspace, guests the bare sheet.
+  function homeFor(role) {
+    if (role === 'teacher' || role === 'academics') return 'teacher.html';
+    if (role === 'student') return 'student.html';
+    return 'index.html';
+  }
+  function goApp(role) { window.location.replace(homeFor(role)); }
 
-  if (load()) { goApp(); return; }
+  var existing = load();
+  if (existing) { goApp(existing.role); return; }
 
   var hint = $('demo-hint');
   var error = $('login-error');
@@ -95,7 +103,7 @@
       }
       save({ role: out.data.role, username: out.data.username,
         name: out.data.name, token: out.data.token });
-      goApp();
+      goApp(out.data.role);
     }).catch(function () {
       showError('Server unreachable. Is `npm start` running?');
       if (submitBtn) submitBtn.disabled = false;
@@ -106,6 +114,6 @@
   if (guest) guest.addEventListener('click', function (e) {
     e.preventDefault();
     save({ role: 'guest', username: 'guest', name: 'Guest', token: 'guest' });
-    goApp();
+    goApp('guest');
   });
 })();

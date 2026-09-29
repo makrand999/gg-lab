@@ -17,7 +17,7 @@ var SEED = path.join(ROOT, 'backend', 'build', 'educad-seed');
 var USERS = path.join(__dirname, 'users.json');
 var MIRROR = path.join(ROOT, 'mirror');
 
-var TOTAL = 26;
+var TOTAL = 42;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -426,6 +426,388 @@ async function main() {
     eq(plAfter.json.progress.length, 1);
     assert.deepStrictEqual(plAfter.json.progress[0].state, { step: 1 });
     pass('cpp restart persistence');
+
+    // 27 teacher posts a question set (fresh teacher token; 25 logged it out)
+    teacher = (await req(port, 'POST', '/api/login',
+      { role: 'teacher', username: 'teacher', password: 'teach123' })).json.token;
+    var academics = (await req(port, 'POST', '/api/login',
+      { role: 'academics', username: 'academics', password: 'admin123' })).json.token;
+    var set1 = await req(port, 'POST', '/api/sets', {
+      code: 'geo-101', title: 'Projections 1',
+      questions: [
+        { prompt: '  Draw the front view of a 40mm cube.  ', hint: 'Start with a square.' },
+        { prompt: 'Add the top view below the XY line.', starter: { entities: [] } }
+      ]
+    }, undefined, auth(teacher));
+    eq(set1.status, 201);
+    ok(set1.json.id > 0, 'set id');
+    eq(set1.json.code, 'geo-101');
+    var gotSet = await req(port, 'GET', '/api/sets/geo-101', undefined, undefined,
+      auth(teacher));
+    eq(gotSet.status, 200);
+    eq(gotSet.json.title, 'Projections 1');
+    eq(gotSet.json.questions.length, 2);
+    eq(gotSet.json.questions[0].prompt, 'Draw the front view of a 40mm cube.');
+    eq(gotSet.json.questions[0].hint, 'Start with a square.');
+    assert.deepStrictEqual(gotSet.json.questions[1].starter, { entities: [] });
+    eq(gotSet.json.owner, 'Demo Teacher');
+    pass('cpp set create fetch');
+
+    // 28 set validation: codes, questions, duplicates, roles
+    async function badSet(payload, token) {
+      return (await req(port, 'POST', '/api/sets', payload, undefined, auth(token))).status;
+    }
+    var goodQ = [{ prompt: 'Q?' }];
+    eq(await badSet({ code: 'ab', title: 't', questions: goodQ }, teacher), 400);
+    eq(await badSet({ code: 'has space!', title: 't', questions: goodQ }, teacher), 400);
+    eq(await badSet({ code: 'a/b', title: 't', questions: goodQ }, teacher), 400);
+    eq(await badSet({ title: 't', questions: goodQ }, teacher), 400);
+    eq(await badSet({ code: 'geo-x', title: 't' }, teacher), 400);
+    eq(await badSet({ code: 'geo-x', title: 't', questions: [] }, teacher), 400);
+    eq(await badSet({ code: 'geo-x', title: 't', questions: 'nope' }, teacher), 400);
+    var many = [];
+    for (var mi = 0; mi < 51; mi++) many.push({ prompt: 'q' + mi });
+    eq(await badSet({ code: 'geo-x', title: 't', questions: many }, teacher), 400);
+    eq(await badSet({ code: 'geo-x', title: 't', questions: [{}] }, teacher), 400);
+    eq(await badSet({ code: 'geo-x', title: 't', questions: [{ prompt: '  ' }] }, teacher), 400);
+    eq(await badSet({ code: 'geo-x', title: 't', questions: [{ prompt: 7 }] }, teacher), 400);
+    eq(await badSet({ code: 'geo-x', title: 't', questions: [{ prompt: 'q', hint: 7 }] },
+      teacher), 400);
+    eq(await badSet({ code: 'geo-x', title: 't', questions: [{ prompt: 'q', starter: [] }] },
+      teacher), 400);
+    eq(await badSet({ code: 'geo-101', title: 'dup', questions: goodQ }, teacher), 409);
+    eq(await badSet({ code: 'geo-102', title: 't', questions: goodQ }, student), 403);
+    eq((await req(port, 'POST', '/api/sets',
+      { code: 'geo-102', title: 't', questions: goodQ })).status, 401);
+    var acadSet = await req(port, 'POST', '/api/sets',
+      { code: 'geo-102', title: 'Office set', questions: goodQ }, undefined, auth(academics));
+    eq(acadSet.status, 201);
+    pass('cpp set validation roles');
+
+    // 29 set fetch + list scoping
+    var stuGet = await req(port, 'GET', '/api/sets/geo-101', undefined, undefined,
+      auth(student));
+    eq(stuGet.status, 200);
+    eq(stuGet.json.questions.length, 2);
+    eq((await req(port, 'GET', '/api/sets/nope-999', undefined, undefined,
+      auth(student))).status, 404);
+    eq((await req(port, 'GET', '/api/sets/ab', undefined, undefined,
+      auth(student))).status, 404);
+    eq((await req(port, 'GET', '/api/sets/geo-101')).status, 401);
+    var teachList = await req(port, 'GET', '/api/sets', undefined, undefined, auth(teacher));
+    eq(teachList.status, 200);
+    eq(teachList.json.sets.length, 1);
+    eq(teachList.json.sets[0].code, 'geo-101');
+    eq(teachList.json.sets[0].nquestions, 2);
+    var stuList = await req(port, 'GET', '/api/sets', undefined, undefined, auth(student));
+    eq(stuList.status, 200);
+    eq(stuList.json.sets.length, 2);
+    ok(stuList.json.sets.every(function (e) { return e.class_code === ''; }),
+      'open sets carry empty class');
+    var acadList = await req(port, 'GET', '/api/sets', undefined, undefined, auth(academics));
+    eq(acadList.json.sets.length, 2);
+    pass('cpp set fetch list scope');
+
+    // 30 student submits solutions
+    var sub1 = await req(port, 'POST', '/api/sets/geo-101/submissions',
+      { question_index: 1, data: { version: 1, entities: [{ id: 'E1' }] }, note: 'my try' },
+      undefined, auth(student));
+    eq(sub1.status, 201);
+    ok(sub1.json.id > 0, 'submission id');
+    var sub2 = await req(port, 'POST', '/api/sets/geo-101/submissions',
+      { data: { version: 1, entities: [] } }, undefined, auth(student));
+    eq(sub2.status, 201);
+    async function badSub(payload) {
+      return (await req(port, 'POST', '/api/sets/geo-101/submissions', payload,
+        undefined, auth(student))).status;
+    }
+    eq(await badSub({ question_index: 5, data: {} }), 400);
+    eq(await badSub({ question_index: -1, data: {} }), 400);
+    eq(await badSub({ question_index: 1.5, data: {} }), 400);
+    eq(await badSub({ question_index: 'x', data: {} }), 400);
+    eq(await badSub({ question_index: 99999999999999999999, data: {} }), 400);
+    eq(await badSub({}), 400);
+    eq(await badSub({ data: [1] }), 400);
+    eq(await badSub({ data: {}, note: 7 }), 400);
+    eq((await req(port, 'POST', '/api/sets/nope-999/submissions', { data: {} },
+      undefined, auth(student))).status, 404);
+    eq((await req(port, 'POST', '/api/sets/geo-101/submissions', { data: {} })).status, 401);
+    // huge index must not have crashed the worker: server still answers
+    eq((await req(port, 'GET', '/api/sets/geo-101', undefined, undefined,
+      auth(student))).status, 200);
+    pass('cpp submit validation');
+
+    // 31 teacher lists submissions (no blobs); students cannot
+    var subs = await req(port, 'GET', '/api/sets/geo-101/submissions', undefined, undefined,
+      auth(teacher));
+    eq(subs.status, 200);
+    eq(subs.json.submissions.length, 2);
+    eq(subs.json.submissions[0].username, 'student');
+    eq(subs.json.submissions[0].name, 'Demo Student');
+    eq(subs.json.submissions[0].question_index, 1);
+    eq(subs.json.submissions[0].note, 'my try');
+    ok(subs.json.submissions[0].data === undefined, 'list omits blobs');
+    eq(subs.json.submissions[1].question_index, 0);
+    var subsAcad = await req(port, 'GET', '/api/sets/geo-101/submissions', undefined,
+      undefined, auth(academics));
+    eq(subsAcad.status, 200);
+    eq((await req(port, 'GET', '/api/sets/geo-101/submissions', undefined, undefined,
+      auth(student))).status, 403);
+    eq((await req(port, 'GET', '/api/sets/nope-999/submissions', undefined, undefined,
+      auth(teacher))).status, 404);
+    pass('cpp submissions list gate');
+
+    // 32 single submission: owner, submitter, admin see it; strangers 404
+    var one = await req(port, 'GET', '/api/submissions/' + sub1.json.id, undefined,
+      undefined, auth(teacher));
+    eq(one.status, 200);
+    eq(one.json.set_code, 'geo-101');
+    eq(one.json.question_index, 1);
+    assert.deepStrictEqual(one.json.data, { version: 1, entities: [{ id: 'E1' }] });
+    var own = await req(port, 'GET', '/api/submissions/' + sub1.json.id, undefined,
+      undefined, auth(student));
+    eq(own.status, 200);
+    var adm = await req(port, 'GET', '/api/submissions/' + sub1.json.id, undefined,
+      undefined, auth(academics));
+    eq(adm.status, 200);
+    // academics owns geo-102; student submits there; teacher is a stranger
+    var subX = await req(port, 'POST', '/api/sets/geo-102/submissions',
+      { data: {} }, undefined, auth(student));
+    eq(subX.status, 201);
+    eq((await req(port, 'GET', '/api/submissions/' + subX.json.id, undefined,
+      undefined, auth(teacher))).status, 404);
+    eq((await req(port, 'GET', '/api/submissions/999999', undefined, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'GET', '/api/submissions/abc', undefined, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'GET', '/api/submissions/' + sub1.json.id)).status, 401);
+    pass('cpp submission fetch gate');
+
+    // 33 mine list + delete cascades
+    var mine = await req(port, 'GET', '/api/submissions/mine', undefined, undefined,
+      auth(student));
+    eq(mine.status, 200);
+    eq(mine.json.submissions.length, 3);
+    ok(mine.json.submissions.every(function (e) { return e.set_code !== undefined; }),
+      'mine carries set codes');
+    var mineT = await req(port, 'GET', '/api/submissions/mine', undefined, undefined,
+      auth(teacher));
+    eq(mineT.json.submissions.length, 0);
+    eq((await req(port, 'DELETE', '/api/sets/geo-101', undefined, undefined,
+      auth(student))).status, 403);
+    eq((await req(port, 'DELETE', '/api/sets/nope-999', undefined, undefined,
+      auth(teacher))).status, 404);
+    var del = await req(port, 'DELETE', '/api/sets/geo-101', undefined, undefined,
+      auth(teacher));
+    eq(del.status, 200);
+    eq((await req(port, 'GET', '/api/sets/geo-101', undefined, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'GET', '/api/submissions/' + sub1.json.id, undefined,
+      undefined, auth(teacher))).status, 404);
+    var mineAfter = await req(port, 'GET', '/api/submissions/mine', undefined, undefined,
+      auth(student));
+    eq(mineAfter.json.submissions.length, 1);
+    eq(mineAfter.json.submissions[0].set_code, 'geo-102');
+    pass('cpp set delete cascades');
+
+    // 34 method mismatches on sets routes
+    var setM = await req(port, 'POST', '/api/sets',
+      { code: 'geo-m', title: 'm', questions: goodQ }, undefined, auth(teacher));
+    eq(setM.status, 201);
+    eq((await req(port, 'PUT', '/api/sets', {})).status, 405);
+    eq((await req(port, 'DELETE', '/api/sets')).status, 405);
+    eq((await req(port, 'POST', '/api/sets/geo-m', {})).status, 404);
+    eq((await req(port, 'PUT', '/api/sets/geo-m/submissions', {})).status, 405);
+    eq((await req(port, 'DELETE', '/api/sets/geo-m/submissions')).status, 404);
+    eq((await req(port, 'GET', '/api/sets/geo-m/unknown', undefined, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'POST', '/api/submissions/mine', {})).status, 405);
+    eq((await req(port, 'PUT', '/api/submissions/1', {})).status, 405);
+    pass('cpp sets methods');
+
+    // 35 teacher creates a class; validation + roles
+    var cls1 = await req(port, 'POST', '/api/classes',
+      { code: 'be-101', title: 'BE-A Graphics' }, undefined, auth(teacher));
+    eq(cls1.status, 201);
+    ok(cls1.json.id > 0, 'class id');
+    eq(cls1.json.code, 'be-101');
+    async function badClass(payload, token, raw) {
+      return (await req(port, 'POST', '/api/classes', payload, raw,
+        token === null ? undefined : auth(token))).status;
+    }
+    eq(await badClass({ code: 'be-101', title: 'dup' }, teacher), 409);
+    eq(await badClass({ code: 'ab', title: 't' }, teacher), 400);
+    eq(await badClass({ code: 'has space!', title: 't' }, teacher), 400);
+    eq(await badClass({ title: 't' }, teacher), 400);
+    eq(await badClass({ code: 'be-102', title: 7 }, teacher), 400);
+    eq(await badClass({ code: 'be-102', title: 't' }, student), 403);
+    eq(await badClass({ code: 'be-102', title: 't' }, null), 401);
+    var clsA = await req(port, 'POST', '/api/classes',
+      { code: 'ac-100', title: 'Office class' }, undefined, auth(academics));
+    eq(clsA.status, 201);
+    pass('cpp class create validation roles');
+
+    // 36 class list scoping per role
+    var teachCls = await req(port, 'GET', '/api/classes', undefined, undefined,
+      auth(teacher));
+    eq(teachCls.status, 200);
+    eq(teachCls.json.classes.length, 1);
+    eq(teachCls.json.classes[0].code, 'be-101');
+    eq(teachCls.json.classes[0].owner, 'Demo Teacher');
+    eq(teachCls.json.classes[0].nmembers, 0);
+    eq(teachCls.json.classes[0].nsets, 0);
+    var stuCls = await req(port, 'GET', '/api/classes', undefined, undefined,
+      auth(student));
+    eq(stuCls.json.classes.length, 0);
+    var acadCls = await req(port, 'GET', '/api/classes', undefined, undefined,
+      auth(academics));
+    eq(acadCls.json.classes.length, 2);
+    eq((await req(port, 'GET', '/api/classes')).status, 401);
+    pass('cpp class list scope');
+
+    // 37 join/leave round-trip + member list privacy
+    eq((await req(port, 'GET', '/api/classes/be-101', undefined, undefined,
+      auth(student))).status, 403);
+    var join1 = await req(port, 'POST', '/api/classes/be-101/join', {},
+      undefined, auth(student));
+    eq(join1.status, 200);
+    eq(join1.json.joined, true);
+    var join2 = await req(port, 'POST', '/api/classes/be-101/join', {},
+      undefined, auth(student));
+    eq(join2.json.joined, false);
+    eq((await req(port, 'POST', '/api/classes/be-101/join', {}, undefined,
+      auth(teacher))).status, 400);
+    eq((await req(port, 'POST', '/api/classes/nope-999/join', {}, undefined,
+      auth(student))).status, 404);
+    var gotCls = await req(port, 'GET', '/api/classes/be-101', undefined, undefined,
+      auth(student));
+    eq(gotCls.status, 200);
+    eq(gotCls.json.title, 'BE-A Graphics');
+    eq(gotCls.json.nmembers, 1);
+    var mem = await req(port, 'GET', '/api/classes/be-101/members', undefined,
+      undefined, auth(teacher));
+    eq(mem.status, 200);
+    eq(mem.json.members.length, 1);
+    eq(mem.json.members[0].username, 'student');
+    eq(mem.json.members[0].name, 'Demo Student');
+    eq((await req(port, 'GET', '/api/classes/be-101/members', undefined,
+      undefined, auth(student))).status, 403);
+    var leave1 = await req(port, 'POST', '/api/classes/be-101/leave', {},
+      undefined, auth(student));
+    eq(leave1.status, 200);
+    eq(leave1.json.left, true);
+    var leave2 = await req(port, 'POST', '/api/classes/be-101/leave', {},
+      undefined, auth(student));
+    eq(leave2.json.left, false);
+    eq((await req(port, 'GET', '/api/classes/be-101', undefined, undefined,
+      auth(student))).status, 403);
+    eq((await req(port, 'POST', '/api/classes/be-101/join', {}, undefined,
+      auth(student))).json.joined, true);
+    pass('cpp class join leave members');
+
+    // 38 sets posted to a class; student feed merges class + open sets
+    var cset = await req(port, 'POST', '/api/sets',
+      { code: 'geo-201', title: 'Class set', class_code: 'be-101',
+        questions: goodQ }, undefined, auth(teacher));
+    eq(cset.status, 201);
+    var gotCSet = await req(port, 'GET', '/api/sets/geo-201', undefined, undefined,
+      auth(teacher));
+    eq(gotCSet.json.class_code, 'be-101');
+    eq(gotCSet.json.class_title, 'BE-A Graphics');
+    eq(await badSet({ code: 'geo-x1', title: 't', questions: goodQ,
+      class_code: 'nope-999' }, teacher), 404);
+    eq(await badSet({ code: 'geo-x2', title: 't', questions: goodQ,
+      class_code: 7 }, teacher), 400);
+    eq(await badSet({ code: 'geo-x3', title: 't', questions: goodQ,
+      class_code: 'ac-100' }, teacher), 403);
+    var csetA = await req(port, 'POST', '/api/sets',
+      { code: 'geo-202', title: 'Office in class', class_code: 'be-101',
+        questions: goodQ }, undefined, auth(academics));
+    eq(csetA.status, 201);
+    var feed = await req(port, 'GET', '/api/sets', undefined, undefined,
+      auth(student));
+    var feedCodes = feed.json.sets.map(function (e) { return e.code; }).sort();
+    assert.deepStrictEqual(feedCodes, ['geo-102', 'geo-201', 'geo-202', 'geo-m']);
+    var csets = await req(port, 'GET', '/api/classes/be-101/sets', undefined,
+      undefined, auth(student));
+    eq(csets.status, 200);
+    eq(csets.json.sets.length, 2);
+    eq(csets.json.sets[0].nquestions, 1);
+    var csetsT = await req(port, 'GET', '/api/classes/be-101/sets', undefined,
+      undefined, auth(teacher));
+    eq(csetsT.json.sets.length, 2);
+    pass('cpp class sets feed');
+
+    // 39 class content gates for outsiders
+    eq((await req(port, 'GET', '/api/classes/ac-100/sets', undefined, undefined,
+      auth(student))).status, 403);
+    eq((await req(port, 'GET', '/api/classes/ac-100', undefined, undefined,
+      auth(student))).status, 403);
+    eq((await req(port, 'GET', '/api/classes/ac-100/sets', undefined, undefined,
+      auth(teacher))).status, 403);
+    eq((await req(port, 'GET', '/api/classes/nope-999/sets', undefined, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'GET', '/api/classes/ab', undefined, undefined,
+      auth(teacher))).status, 404);
+    pass('cpp class gates');
+
+    // 40 student submits into a class set; teacher reviews
+    var csub = await req(port, 'POST', '/api/sets/geo-201/submissions',
+      { data: { version: 1, entities: [{ id: 'E9' }] }, note: 'class try' },
+      undefined, auth(student));
+    eq(csub.status, 201);
+    var csubs = await req(port, 'GET', '/api/sets/geo-201/submissions', undefined,
+      undefined, auth(teacher));
+    eq(csubs.json.submissions.length, 1);
+    eq(csubs.json.submissions[0].note, 'class try');
+    var cone = await req(port, 'GET', '/api/submissions/' + csub.json.id, undefined,
+      undefined, auth(teacher));
+    eq(cone.status, 200);
+    eq(cone.json.set_code, 'geo-201');
+    assert.deepStrictEqual(cone.json.data, { version: 1, entities: [{ id: 'E9' }] });
+    pass('cpp class submission review');
+
+    // 41 deleting a class unlinks its sets (open) and drops memberships
+    eq((await req(port, 'DELETE', '/api/classes/be-101', undefined, undefined,
+      auth(student))).status, 403);
+    eq((await req(port, 'DELETE', '/api/classes/nope-999', undefined, undefined,
+      auth(teacher))).status, 404);
+    var delC = await req(port, 'DELETE', '/api/classes/be-101', undefined,
+      undefined, auth(teacher));
+    eq(delC.status, 200);
+    eq((await req(port, 'GET', '/api/classes/be-101', undefined, undefined,
+      auth(teacher))).status, 404);
+    var unlinked = await req(port, 'GET', '/api/sets/geo-201', undefined, undefined,
+      auth(teacher));
+    eq(unlinked.status, 200);
+    eq(unlinked.json.class_code, '');
+    var feedAfter = await req(port, 'GET', '/api/sets', undefined, undefined,
+      auth(student));
+    ok(feedAfter.json.sets.some(function (e) { return e.code === 'geo-201'; }),
+      'unlinked set stays solvable');
+    var delA = await req(port, 'DELETE', '/api/classes/ac-100', undefined,
+      undefined, auth(academics));
+    eq(delA.status, 200);
+    pass('cpp class delete unlinks');
+
+    // 42 method mismatches on class routes
+    var clsM = await req(port, 'POST', '/api/classes',
+      { code: 'mm-100', title: 'm' }, undefined, auth(teacher));
+    eq(clsM.status, 201);
+    eq((await req(port, 'PUT', '/api/classes', {})).status, 405);
+    eq((await req(port, 'DELETE', '/api/classes')).status, 405);
+    eq((await req(port, 'POST', '/api/classes/mm-100', {}, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'GET', '/api/classes/mm-100/join', undefined, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'PUT', '/api/classes/mm-100/members', {})).status, 405);
+    eq((await req(port, 'GET', '/api/classes/mm-100/unknown', undefined, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'DELETE', '/api/classes/mm-100/join', undefined, undefined,
+      auth(teacher))).status, 404);
+    eq((await req(port, 'POST', '/api/classes/mm-100/members', {}, undefined,
+      auth(teacher))).status, 404);
+    pass('cpp class methods');
   } finally {
     srv.kill('SIGTERM');
     await new Promise(function (resolve) { srv.on('exit', resolve); });

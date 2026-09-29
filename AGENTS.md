@@ -15,6 +15,6 @@ one-liners, no puppeteer-chromium, no manual-only flows as substitutes).
 - App under test: `npm start` in this repo (serves `mirror/` on
   `http://127.0.0.1:8124/`), then `page.goto()` that URL from obscura
 
-Node suite (`npm test`, 862 plain-Node checks) stays as-is for
+Node suite (`npm test`, 880 plain-Node checks) stays as-is for
 non-browser coverage; anything needing a real browser goes through
 obscura.

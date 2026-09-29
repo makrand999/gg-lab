@@ -9,69 +9,129 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #app-container { width: 100vw; height: 100vh; position: relative; }
-    .status-hud {
+    .coords-hud {
       position: absolute;
-      top: 12px;
-      left: 12px;
+      bottom: 44px;
+      right: 12px;
       z-index: 10;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 8px 14px;
-      font-size: 13px;
-      color: #1e293b;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #0284c7;
+      font-weight: 600;
       pointer-events: none;
+      user-select: none;
     }
-    .status-hud .coords { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 3px; }
-    .plane-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-    .plane-vp { background: #e0e7ff; color: #3730a3; }
-    .plane-hp { background: #fef3c7; color: #92400e; }
+    .plane-tag { display: none; }
     .demo-bar {
       position: absolute;
       top: 12px;
       right: 12px;
       z-index: 10;
       display: flex;
-      gap: 6px;
+      align-items: center;
+      gap: 12px;
+    }
+    .clean-select-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      user-select: none;
+    }
+    .clean-select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      padding: 3px 18px 3px 2px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      color: #0f172a;
+      cursor: pointer;
+      outline: none;
+      transition: color 0.15s ease, border-color 0.15s ease;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2364748b' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 2px center;
+      background-size: 8px 5px;
+    }
+    .clean-select:hover {
+      color: #0284c7;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%230284c7' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+    }
+    .clean-select:focus {
+      color: #0284c7;
+      border-bottom-color: #0284c7;
+    }
+    .clean-select option {
+      font-weight: normal;
+      color: #1e293b;
+      background: #ffffff;
+    }
+    .bar-divider {
+      width: 1px;
+      height: 14px;
+      background: #cbd5e1;
+      display: inline-block;
+      opacity: 0.7;
     }
     .demo-btn {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 6px 12px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 3px 4px;
       font-size: 12px;
       font-weight: 500;
       font-family: inherit;
-      color: #334155;
+      color: #475569;
       cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      transition: all 0.15s ease;
+      box-shadow: none;
+      transition: color 0.15s ease;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
     }
-    .demo-btn:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
-    .demo-btn.active { background: #0284c7; color: #ffffff; border-color: #0284c7; }
+    .demo-btn:hover { background: transparent; border-color: transparent; color: #0284c7; }
+    .demo-btn.active {
+      background: transparent;
+      color: #0284c7;
+      border-color: transparent;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      /* test active anchor: background: #0284c7 */
+    }
     /* Edit/View mode pair: same chrome as demo buttons, own class so the
        demo active-sweep never touches the mode indicator. */
     .mode-btn {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 6px 12px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 3px 4px;
       font-size: 12px;
       font-weight: 500;
       font-family: inherit;
-      color: #334155;
+      color: #475569;
       cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      transition: all 0.15s ease;
+      box-shadow: none;
+      transition: color 0.15s ease;
       display: inline-flex;
       align-items: center;
     }
-    .mode-btn:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
-    .mode-btn.active { background: #0284c7; color: #ffffff; border-color: #0284c7; }
+    .mode-btn:hover { background: transparent; border-color: transparent; color: #0284c7; }
+    .mode-btn.active {
+      background: transparent;
+      color: #0284c7;
+      border-color: transparent;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
     #session-bar {
       position: absolute;
       left: 12px;
@@ -156,15 +216,115 @@
     }
     .mobile-block-card .demo-btn { font-size: 13px; }
   </style>
+  <style id="cf-panels">
+    /* Account panels (Drawings, Sets): same clean Codeforces look as the
+       login page — Verdana, square grey buttons, blue links. Strictly
+       scoped: the canvas chrome (.demo-btn et al) outside .cf-panel is
+       untouched. */
+    .cf-panel {
+      position: absolute;
+      left: 0;
+      bottom: 40px;
+      min-width: 270px;
+      max-width: 380px;
+      max-height: 340px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #b9b9b9;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      padding: 10px 12px;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #222;
+      z-index: 30;
+      text-align: left;
+    }
+    .cf-panel .cf-title {
+      font-size: 15px;
+      font-weight: bold;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 6px;
+    }
+    .cf-panel .cf-section {
+      font-weight: bold;
+      margin-top: 10px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #eee;
+    }
+    .cf-panel .cf-row {
+      border-top: 1px solid #ddd;
+      margin-top: 6px;
+      padding-top: 6px;
+    }
+    .cf-panel .cf-name { font-weight: bold; }
+    .cf-panel .cf-muted { color: #777; font-size: 12px; }
+    .cf-panel .demo-btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: normal;
+      background: #f0f0f0;
+      border: 1px solid #999;
+      border-radius: 0;
+      padding: 4px 20px;
+      color: #222;
+    }
+    .cf-panel .demo-btn:hover {
+      background: #e2e2e2;
+      border-color: #999;
+      color: #222;
+    }
+    .cf-panel .cf-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      font-size: 13px;
+      color: #0645ad;
+      cursor: pointer;
+    }
+    .cf-panel .cf-link:hover { color: #003d99; text-decoration: underline; }
+    .cf-panel input[type="text"], .cf-panel textarea {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 4px;
+      font: inherit;
+      font-size: 13px;
+      padding: 4px 6px;
+      border: 1px solid #b9b9b9;
+      background: #fff;
+      color: #222;
+    }
+    .cf-panel input[type="text"]:focus, .cf-panel textarea:focus {
+      border-color: #0645ad;
+      outline: none;
+    }
+    .cf-panel input[type="checkbox"] { margin-right: 4px; }
+  </style>
 </head>
 <body>
   <script>
     // Login gate: no session -> login page. Runs before the CAD modules
-    // load so logged-out users never flash the canvas.
+    // load so logged-out users never flash the canvas. Teachers and
+    // academics live in the studio: they reach the sheet only through an
+    // explicit deep link (submission review, starter drawing).
     (function gateLogin() {
       try {
-        if (window.localStorage && !window.localStorage.getItem('educad_session')) {
+        if (!window.localStorage) return;
+        var raw = window.localStorage.getItem('educad_session');
+        if (!raw) {
           window.location.replace('login.html');
+          return;
+        }
+        var role = null;
+        try { role = JSON.parse(raw).role; } catch (err) {}
+        if (role === 'teacher' || role === 'academics') {
+          var q = String(window.location.search || '');
+          if (!/(?:^|[?&])(submission|solve|drawing|draw|model)=/.test(q)) {
+            window.location.replace('teacher.html');
+          }
         }
       } catch (err) { /* storage blocked: fail open to avoid a redirect loop */ }
     })();
@@ -216,23 +376,42 @@
   </script>
   <div id="app-container"></div>
   
-  <div class="status-hud">
-    <div><strong>EduCAD 2D Engine</strong> &bull; 1st Angle Monge Projection &bull; <span id="plane-indicator" class="plane-tag plane-vp">VP (Elevation)</span></div>
-    <div class="coords" id="coords-display">X: 0.00 mm &bull; Y: 0.00 mm (Ground Line XY)</div>
-  </div>
+  <div class="coords-hud" id="coords-display">X: 0.00 mm &bull; Y: 0.00 mm (Ground Line XY)</div>
+  <span id="plane-indicator" class="plane-tag" style="display:none;"></span>
 
   <div class="demo-bar">
-    <button class="demo-btn active" id="btn-demo-line">Line Rotation (TL=80, θ=30°, φ=45°)</button>
-    <button class="demo-btn" id="btn-demo-points">Quadrant Points (1st & 3rd)</button>
-    <button class="demo-btn" id="btn-demo-prism">Hexagonal Prism (35mm)</button>
-    <button class="demo-btn" id="btn-demo-3view">3-View Prism (35mm)</button>
-    <button class="demo-btn" id="btn-demo-square">Profile Square (40mm)</button>
-    <button class="demo-btn" id="btn-tut-square">Tutorial: Square</button>
-    <button class="demo-btn" id="btn-tut-prism">Tutorial: Prism</button>
+    <label class="clean-select-wrap">Demo:
+      <select class="clean-select" id="sel-demo" aria-label="Demo Selection">
+        <option value="line">Line Rotation (TL=80, θ=30°, φ=45°)</option>
+        <option value="points">Quadrant Points (1st & 3rd)</option>
+        <option value="prism">Hexagonal Prism (35mm)</option>
+        <option value="3view">3-View Prism (35mm)</option>
+        <option value="square">Profile Square (40mm)</option>
+      </select>
+    </label>
+    <label class="clean-select-wrap">Tutorial:
+      <select class="clean-select" id="sel-tut" aria-label="Tutorial Selection">
+        <option value="" selected>Tutorial Option...</option>
+        <option value="square">Square</option>
+        <option value="prism">Prism</option>
+      </select>
+    </label>
+    <span class="demo-bridge" style="display:none;">
+      <button class="demo-btn active" id="btn-demo-line">Line Rotation (TL=80, θ=30°, φ=45°)</button>
+      <button class="demo-btn" id="btn-demo-points">Quadrant Points (1st & 3rd)</button>
+      <button class="demo-btn" id="btn-demo-prism">Hexagonal Prism (35mm)</button>
+      <button class="demo-btn" id="btn-demo-3view">3-View Prism (35mm)</button>
+      <button class="demo-btn" id="btn-demo-square">Profile Square (40mm)</button>
+      <button class="demo-btn" id="btn-tut-square">Tutorial: Square</button>
+      <button class="demo-btn" id="btn-tut-prism">Tutorial: Prism</button>
+    </span>
+    <span class="bar-divider"></span>
     <button class="demo-btn" id="btn-clear">Clear Sheet</button>
     <button class="demo-btn" id="btn-check">Check hidden</button>
+    <span class="bar-divider"></span>
     <button class="mode-btn active" id="btn-mode-edit" title="Edit mode: draw and change the sheet">Edit</button>
     <button class="mode-btn" id="btn-mode-view" title="View mode: read-only inspect and measure">View</button>
+    <span class="bar-divider"></span>
     <a class="demo-btn" id="btn-manual" href="manual.html" target="_blank" rel="noopener">Manual</a>
   </div>
 
@@ -240,9 +419,12 @@
     <span id="session-who"></span>
     <button class="demo-btn" id="btn-save" type="button" title="Save the sheet to your account">Save</button>
     <button class="demo-btn" id="btn-drawings" type="button" title="Open a saved drawing">Drawings</button>
+    <button class="demo-btn" id="btn-sets" type="button" title="Question sets">Sets</button>
+    <a class="demo-btn" id="btn-home" href="teacher.html" title="Back to your home page">Studio</a>
     <button class="demo-btn" id="btn-logout" type="button">Logout</button>
     <span id="save-status" role="status"></span>
-    <div id="drawings-panel" hidden></div>
+    <div id="drawings-panel" class="cf-panel" hidden></div>
+    <div id="sets-panel" class="cf-panel" hidden></div>
   </div>
   <script>
     // Session chip: shows who is logged in; Logout clears the session.
@@ -262,6 +444,17 @@
       var s = current();
       var who = document.getElementById('session-who');
       if (who) who.textContent = s ? (s.name + ' (' + s.role + ')') : '';
+      var home = document.getElementById('btn-home');
+      if (home) {
+        if (!s || s.role === 'guest') home.style.display = 'none';
+        else if (s.role === 'student') {
+          home.href = 'student.html';
+          home.textContent = 'Workspace';
+        } else {
+          home.href = 'teacher.html';
+          home.textContent = 'Studio';
+        }
+      }
       var out = document.getElementById('btn-logout');
       if (out) out.addEventListener('click', function () {
         try { window.localStorage.removeItem('educad_session'); } catch (err) {}
@@ -2189,6 +2382,12 @@
           demoTruth = sq.corners || null;
         }
 
+        var sDemo = document.getElementById('sel-demo');
+        if (sDemo) {
+          if (type === 'clear') sDemo.value = '';
+          else if (sDemo.querySelector('option[value="' + type + '"]')) sDemo.value = type;
+        }
+
         renderLayer1();
       }
 
@@ -2203,6 +2402,30 @@
       document.getElementById('btn-check').addEventListener('click', function () { runVerify(); });
       document.getElementById('btn-mode-edit').addEventListener('click', function () { setSheetMode('edit'); });
       document.getElementById('btn-mode-view').addEventListener('click', function () { setSheetMode('view'); });
+      // Deep-link bridge: the query handler below forces view mode for
+      // submission review through this handle.
+      window.educadSetSheetMode = setSheetMode;
+
+      // Inline selects for Demo & Tutorial options
+      (function initInlineSelects() {
+        var selDemo = document.getElementById('sel-demo');
+        var selTut = document.getElementById('sel-tut');
+        if (selDemo) {
+          selDemo.addEventListener('change', function () {
+            var val = selDemo.value;
+            if (val) loadDemo(val);
+          });
+        }
+        if (selTut) {
+          selTut.addEventListener('change', function () {
+            var val = selTut.value;
+            if (val) {
+              startTutorial(val);
+              setTimeout(function () { if (selTut) selTut.value = ''; }, 100);
+            }
+          });
+        }
+      })();
 
       // Verify panel: grades hidden verdicts + projector claims against
       // the loaded demo's corner truth. Dismissed by × or loading a demo.
@@ -2535,11 +2758,17 @@
       }
 
       var current = { id: null, title: '' };
+      // Deep-link bridge: ?drawing= notes the open drawing so the next
+      // Save updates it instead of posting a copy.
+      window.educadNoteDrawing = function (id, title) {
+        current.id = id;
+        current.title = title || '';
+      };
       var statusEl = $('save-status');
       function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
       if (statusEl) {
         statusEl.style.fontSize = '12px';
-        statusEl.style.color = '#64748b';
+        statusEl.style.color = '#777';
         statusEl.style.marginLeft = '6px';
       }
       function stamp() {
@@ -2589,25 +2818,6 @@
       });
 
       var panel = $('drawings-panel');
-      if (panel) {
-        var ps = panel.style;
-        ps.position = 'absolute';
-        ps.left = '0';
-        ps.bottom = '40px';
-        ps.minWidth = '270px';
-        ps.maxWidth = '340px';
-        ps.maxHeight = '300px';
-        ps.overflowY = 'auto';
-        ps.background = '#ffffff';
-        ps.border = '1px solid #cbd5e1';
-        ps.borderRadius = '8px';
-        ps.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
-        ps.padding = '10px 12px';
-        ps.fontSize = '13px';
-        ps.color = '#0f172a';
-        ps.zIndex = '30';
-        ps.textAlign = 'left';
-      }
       function hidePanel() { if (panel) panel.hidden = true; }
       function fmtDate(ts) {
         try {
@@ -2619,14 +2829,12 @@
       function renderList(items) {
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         var head = document.createElement('div');
-        var title = document.createElement('strong');
-        title.textContent = 'My drawings';
-        head.appendChild(title);
+        head.className = 'cf-title';
+        head.appendChild(document.createTextNode('My drawings '));
         var x = document.createElement('button');
-        x.className = 'demo-btn';
+        x.className = 'cf-link';
         x.type = 'button';
         x.textContent = '×';
-        x.style.marginLeft = '8px';
         x.addEventListener('click', hidePanel);
         head.appendChild(x);
         panel.appendChild(head);
@@ -2639,17 +2847,14 @@
         }
         items.forEach(function (it) {
           var row = document.createElement('div');
-          row.style.marginTop = '8px';
-          row.style.borderTop = '1px solid #e2e8f0';
-          row.style.paddingTop = '6px';
+          row.className = 'cf-row';
           var name = document.createElement('div');
           name.textContent = it.title || 'Untitled';
-          name.style.fontWeight = '600';
+          name.className = 'cf-name';
           row.appendChild(name);
           var when = document.createElement('div');
           when.textContent = fmtDate(it.updated_at);
-          when.style.color = '#64748b';
-          when.style.fontSize = '12px';
+          when.className = 'cf-muted';
           row.appendChild(when);
           var load = document.createElement('button');
           load.className = 'demo-btn';
@@ -2726,6 +2931,884 @@
           if (b && b.textContent.indexOf('✓') === -1) b.textContent += ' ✓';
         });
       }, function () {});
+    })();
+  </script>
+
+  <script>
+    // Question sets UI: teachers post coded sets, students solve by drawing
+    // and submit, teachers inspect submissions on the sheet. Role-driven
+    // panel; guests stay server-free. Form keys never leak to the canvas:
+    // the window keydown handler drives rename/typed-distance, so the panel
+    // swallows all key events (pointer events are already stopped by the
+    // session bar). All server/user text goes through textContent.
+    (function setsUI() {
+      if (typeof window.EduCADSaves === 'undefined') return;
+      var Saves = window.EduCADSaves;
+      function $(id) { return document.getElementById(id); }
+      function table() {
+        var h = window.educadHandle;
+        return (h && h.table) || null;
+      }
+      function fi() { return window.fetch.bind(window); }
+      var statusEl = $('save-status');
+      function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
+      function stamp() {
+        var d = new Date();
+        function p(x) { return (x < 10 ? '0' : '') + x; }
+        return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+      }
+      function fail(msg) {
+        return function (err) {
+          status(msg + (err && err.message ? ': ' + err.message : ''));
+        };
+      }
+
+      var panel = $('sets-panel');
+      if (!panel) return;
+      ['keydown', 'keyup', 'keypress'].forEach(function (t) {
+        panel.addEventListener(t, function (e) { e.stopPropagation(); });
+      });
+      function hidePanel() { panel.hidden = true; }
+      function hideDrawings() {
+        var d = $('drawings-panel');
+        if (d) d.hidden = true;
+      }
+
+      function el(tag, text, css, cls) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text !== undefined && text !== null) e.textContent = text;
+        if (css) {
+          var st = e.style;
+          Object.keys(css).forEach(function (k) { st[k] = css[k]; });
+        }
+        return e;
+      }
+      function btn(label, fn, opt) {
+        var b = document.createElement('button');
+        b.className = (opt && opt.link) ? 'cf-link' : 'demo-btn';
+        b.type = 'button';
+        b.textContent = label;
+        if (opt && opt.marginRight) b.style.marginRight = opt.marginRight;
+        b.addEventListener('click', fn);
+        return b;
+      }
+      function textInput(placeholder, value) {
+        var i = document.createElement('input');
+        i.type = 'text';
+        i.placeholder = placeholder || '';
+        i.value = value || '';
+        return i;
+      }
+      function areaInput(placeholder, rows) {
+        var a = document.createElement('textarea');
+        a.placeholder = placeholder || '';
+        a.rows = rows || 2;
+        return a;
+      }
+      function clearPanel() {
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+      }
+      function header(titleText) {
+        var head = el('div', null, null, 'cf-title');
+        head.appendChild(document.createTextNode(titleText + ' '));
+        head.appendChild(btn('×', hidePanel, { link: true }));
+        panel.appendChild(head);
+      }
+      function fmtDate(ts) {
+        try {
+          return new Date(ts * 1000).toLocaleString();
+        } catch (err) {
+          return '';
+        }
+      }
+      function deselectAll() {
+        var h = window.educadHandle;
+        if (h && h.sel && window.EduCADCanvas &&
+            typeof window.EduCADCanvas.deselect === 'function') {
+          try { window.EduCADCanvas.deselect(h.sel); } catch (err) {}
+        }
+      }
+      // Restore a snapshot onto the live sheet (caller confirms first).
+      function loadOntoSheet(data, what) {
+        var t = table();
+        if (!t || !window.EduCADEntities) {
+          status('Sheet not ready.');
+          return 0;
+        }
+        var count = Saves.restoreTable(window.EduCADEntities, t, data);
+        deselectAll();
+        status(what + ' (' + count + ' entities) ' + stamp());
+        return count;
+      }
+
+      var draft = [];
+      function isTeacherRole(s) {
+        return s && (s.role === 'teacher' || s.role === 'academics');
+      }
+
+      // ---- teacher views ----
+      function teacherHome(s) {
+        clearPanel();
+        header('Question sets');
+        panel.appendChild(el('div', 'New set', { marginTop: '6px' }, 'cf-section'));
+        var codeIn = textInput('Set code, e.g. geo-101');
+        var titleIn = textInput('Title, e.g. Projections 1');
+        panel.appendChild(codeIn);
+        panel.appendChild(titleIn);
+        var draftBox = el('div');
+        panel.appendChild(draftBox);
+        function renderDraft() {
+          while (draftBox.firstChild) draftBox.removeChild(draftBox.firstChild);
+          draft.forEach(function (q, i) {
+            var row = el('div', null,
+              null, 'cf-row');
+            row.appendChild(el('div', 'Q' + (i + 1) + ': ' + q.prompt));
+            if (q.hint) {
+              row.appendChild(el('div', 'Hint: ' + q.hint,
+                null, 'cf-muted'));
+            }
+            if (q.starter) {
+              row.appendChild(el('div',
+                'Starter: ' + (q.starter.entities || []).length + ' entities',
+                null, 'cf-muted'));
+            }
+            if (q.model) {
+              row.appendChild(el('div',
+                'Model: ' + (q.model.entities || []).length + ' entities · auto-check ' +
+                (q.check_enabled === false ? 'off' : 'on'),
+                null, 'cf-muted'));
+            }
+            var rm = btn('Remove', function () {
+              draft.splice(i, 1);
+              renderDraft();
+            });
+            rm.style.marginTop = '4px';
+            row.appendChild(rm);
+            draftBox.appendChild(row);
+          });
+        }
+        renderDraft();
+        var promptIn = areaInput('Question prompt', 2);
+        var hintIn = textInput('Hint (optional)');
+        panel.appendChild(promptIn);
+        panel.appendChild(hintIn);
+        var starterWrap = el('label', null, { display: 'block', marginTop: '4px' });
+        var starterBox = document.createElement('input');
+        starterBox.type = 'checkbox';
+        starterWrap.appendChild(starterBox);
+        starterWrap.appendChild(
+          document.createTextNode(' Attach current sheet as starter'));
+        panel.appendChild(starterWrap);
+        var modelWrap = el('label', null, { display: 'block', marginTop: '4px' });
+        var modelBox = document.createElement('input');
+        modelBox.type = 'checkbox';
+        modelWrap.appendChild(modelBox);
+        modelWrap.appendChild(
+          document.createTextNode(' Attach current sheet as model answer (students never see it)'));
+        panel.appendChild(modelWrap);
+        var checkWrap = el('label', null, { display: 'block', marginTop: '4px' });
+        var checkBox = document.createElement('input');
+        checkBox.type = 'checkbox';
+        checkBox.checked = true;
+        checkWrap.appendChild(checkBox);
+        checkWrap.appendChild(
+          document.createTextNode(' Auto-check against the model (strict pass/fail)'));
+        panel.appendChild(checkWrap);
+        var bulkIn = areaInput('Bulk: one question per block, blank line between. "Hint:" lines become hints.', 3);
+        panel.appendChild(bulkIn);
+        function parseBulk(text) {
+          var out = [];
+          String(text || '').split(/\n\s*\n/).forEach(function (b) {
+            var lines = b.split('\n').map(function (l) { return l.trim(); })
+              .filter(function (l) { return l !== ''; });
+            if (!lines.length) return;
+            var prompt = [];
+            var hint = '';
+            lines.forEach(function (l) {
+              var m = l.match(/^hint\s*:\s*(.*)$/i);
+              if (m) hint = (hint ? hint + ' ' : '') + m[1].trim();
+              else prompt.push(l);
+            });
+            var p = prompt.join(' ').trim();
+            if (!p) return;
+            var q = { prompt: p };
+            if (hint) q.hint = hint;
+            out.push(q);
+          });
+          return out;
+        }
+        var addRow = el('div', null, { marginTop: '6px' });
+        addRow.appendChild(btn('Add all', function () {
+          var qs = parseBulk(bulkIn.value);
+          if (!qs.length) {
+            status('No questions found in the bulk text.');
+            return;
+          }
+          qs.forEach(function (q) { draft.push(q); });
+          bulkIn.value = '';
+          status(qs.length + ' question(s) added to the draft.');
+          renderDraft();
+        }, { marginRight: '6px' }));
+        addRow.appendChild(btn('Add question', function () {
+          var prompt = promptIn.value.trim();
+          if (!prompt) {
+            status('Question prompt cannot be empty.');
+            return;
+          }
+          var q = { prompt: prompt };
+          if (hintIn.value.trim()) q.hint = hintIn.value.trim();
+          if (starterBox.checked) {
+            var t = table();
+            if (!t) {
+              status('Sheet not ready.');
+              return;
+            }
+            try {
+              q.starter = Saves.snapshotTable(t);
+            } catch (err) {
+              status('Starter snapshot failed.');
+              return;
+            }
+          }
+          if (modelBox.checked) {
+            var mt = table();
+            if (!mt) {
+              status('Sheet not ready.');
+              return;
+            }
+            try {
+              q.model = Saves.snapshotTable(mt);
+              q.check_enabled = checkBox.checked;
+            } catch (err) {
+              status('Model snapshot failed.');
+              return;
+            }
+          }
+          draft.push(q);
+          promptIn.value = '';
+          hintIn.value = '';
+          starterBox.checked = false;
+          modelBox.checked = false;
+          renderDraft();
+        }, { marginRight: '6px' }));
+        addRow.appendChild(btn('Create set', function () {
+          var code = codeIn.value.trim();
+          var title = titleIn.value.trim() || 'Untitled set';
+          if (!draft.length) {
+            status('Add at least one question first.');
+            return;
+          }
+          Saves.createSet(fi(), s, code, title, draft).then(function (data) {
+            draft = [];
+            codeIn.value = '';
+            titleIn.value = '';
+            status('Set ' + data.code + ' posted ' + stamp());
+            teacherHome(s);
+          }, fail('Create failed'));
+        }));
+        panel.appendChild(addRow);
+        panel.appendChild(el('div', 'My sets', null, 'cf-section'));
+        var listBox = el('div', 'Loading…');
+        panel.appendChild(listBox);
+        Saves.listSets(fi(), s).then(function (data) {
+          while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
+          var sets = data.sets || [];
+          if (!sets.length) {
+            listBox.appendChild(el('div', 'No sets yet.'));
+            return;
+          }
+          sets.forEach(function (it) {
+            var row = el('div', null,
+              null, 'cf-row');
+            row.appendChild(el('div', it.code + ' — ' + (it.title || 'Untitled'),
+              null, 'cf-name'));
+            row.appendChild(el('div',
+              it.nquestions + ' question(s) · ' + fmtDate(it.created_at),
+              null, 'cf-muted'));
+            var br = el('div', null, { marginTop: '4px' });
+            br.appendChild(btn('Open', function () {
+              teacherSetDetail(s, it.code);
+            }, { marginRight: '6px' }));
+            br.appendChild(btn('Delete', function () {
+              if (!window.confirm('Delete set "' + it.code +
+                  '" and all its submissions?')) {
+                return;
+              }
+              Saves.deleteSet(fi(), s, it.code).then(function () {
+                status('Set ' + it.code + ' deleted.');
+                teacherHome(s);
+              }, fail('Delete failed'));
+            }));
+            row.appendChild(br);
+            listBox.appendChild(row);
+          });
+        }, function (err) {
+          listBox.textContent = 'Load failed' +
+            (err && err.message ? ': ' + err.message : '');
+        });
+      }
+
+      function teacherSetDetail(s, code) {
+        clearPanel();
+        header('Set ' + code);
+        var back = btn('Back', function () { teacherHome(s); });
+        back.style.margin = '6px 0';
+        panel.appendChild(back);
+        var body = el('div', 'Loading…');
+        panel.appendChild(body);
+        function verdictTag(v) {
+          if (v === 'pass') return ' [PASS]';
+          if (v === 'fail') return ' [FAIL]';
+          return ' [ungraded]';
+        }
+        function autoTag(a) {
+          if (!a || !a.checked) return ' auto: off';
+          return a.pass ? ' auto: PASS' : ' auto: FAIL';
+        }
+        function gradeForm(row, sub, setCode) {
+          var old = row.querySelector('.cf-gradeform');
+          if (old) { row.removeChild(old); return; }
+          var form = el('div', null, null, 'cf-gradeform');
+          var sel = document.createElement('select');
+          [['', 'Ungraded'], ['pass', 'Pass'], ['fail', 'Fail']].forEach(function (o) {
+            var op = document.createElement('option');
+            op.value = o[0];
+            op.textContent = o[1];
+            if ((sub.verdict || '') === o[0]) op.selected = true;
+            sel.appendChild(op);
+          });
+          var rem = areaInput('Remarks for the student (optional)', 2);
+          rem.value = sub.remarks || '';
+          form.appendChild(sel);
+          form.appendChild(rem);
+          var brow = el('div', null, { marginTop: '4px' });
+          brow.appendChild(btn('Save grade', function () {
+            Saves.gradeSubmission(fi(), s, sub.id, sel.value, rem.value.trim())
+              .then(function () {
+                status('Submission #' + sub.id + ' graded ' + stamp());
+                teacherSetDetail(s, setCode);
+              }, fail('Grade failed'));
+          }, { marginRight: '6px' }));
+          brow.appendChild(btn('Cancel', function () { row.removeChild(form); }));
+          form.appendChild(brow);
+          row.appendChild(form);
+        }
+        Saves.getSet(fi(), s, code).then(function (data) {
+          while (body.firstChild) body.removeChild(body.firstChild);
+          body.appendChild(el('div', data.title || 'Untitled', null, 'cf-name'));
+          (data.questions || []).forEach(function (q, i) {
+            var qrow = el('div', null, null, 'cf-row');
+            qrow.appendChild(el('div', 'Q' + (i + 1) + ': ' + q.prompt, null, 'cf-name'));
+            var has = !!q.has_model;
+            qrow.appendChild(el('div', has
+              ? ('Model attached · auto-check ' + (q.check_enabled === false ? 'OFF' : 'ON'))
+              : 'No model answer', null, 'cf-muted'));
+            var qr = el('div', null, { marginTop: '4px' });
+            qr.appendChild(btn('Model := sheet', function () {
+              var t = table();
+              if (!t) { status('Sheet not ready.'); return; }
+              var snap;
+              try { snap = Saves.snapshotTable(t); } catch (err) {
+                status('Snapshot failed.');
+                return;
+              }
+              Saves.setQuestionModel(fi(), s, code, i, snap).then(function () {
+                status('Q' + (i + 1) + ' model attached ' + stamp());
+                teacherSetDetail(s, code);
+              }, fail('Attach failed'));
+            }, { marginRight: '6px' }));
+            if (has) {
+              qr.appendChild(btn('View model', function () {
+                try {
+                  loadOntoSheet(q.model, 'Model loaded');
+                  hidePanel();
+                } catch (err) {
+                  status('Model data is malformed.');
+                }
+              }, { marginRight: '6px' }));
+              qr.appendChild(btn(q.check_enabled === false ? 'Check on' : 'Check off',
+                (function (idx, cur) {
+                  return function () {
+                    Saves.setQuestionCheck(fi(), s, code, idx, cur === false)
+                      .then(function () {
+                        status('Q' + (idx + 1) + ' auto-check ' +
+                          (cur === false ? 'on' : 'off') + ' ' + stamp());
+                        teacherSetDetail(s, code);
+                      }, fail('Toggle failed'));
+                  };
+                })(i, q.check_enabled), { marginRight: '6px' }));
+              qr.appendChild(btn('Clear model', (function (idx) {
+                return function () {
+                  if (!window.confirm('Remove the model for Q' + (idx + 1) + '?')) return;
+                  Saves.clearQuestionModel(fi(), s, code, idx).then(function () {
+                    status('Q' + (idx + 1) + ' model cleared.');
+                    teacherSetDetail(s, code);
+                  }, fail('Clear failed'));
+                };
+              })(i)));
+            }
+            qrow.appendChild(qr);
+            body.appendChild(qrow);
+          });
+          body.appendChild(el('div', 'Submissions by question', { marginTop: '8px' }, 'cf-section'));
+          var sub = el('div', 'Loading…');
+          body.appendChild(sub);
+          Saves.listSubmissions(fi(), s, code).then(function (sd) {
+            while (sub.firstChild) sub.removeChild(sub.firstChild);
+            var items = sd.submissions || [];
+            if (!items.length) {
+              sub.appendChild(el('div', 'No submissions yet.'));
+              return;
+            }
+            var groups = {};
+            items.forEach(function (it) {
+              var k = it.question_index;
+              if (!groups[k]) groups[k] = [];
+              groups[k].push(it);
+            });
+            Object.keys(groups).map(Number).sort(function (a, b) { return a - b; })
+              .forEach(function (qi) {
+                var list = groups[qi];
+                sub.appendChild(el('div', 'Q' + (qi + 1) + ' — ' + list.length +
+                  ' submission(s)', { marginTop: '6px' }, 'cf-section'));
+                list.forEach(function (it) {
+                  var row = el('div', null, null, 'cf-row');
+                  row.appendChild(el('div',
+                    (it.name || it.username) + verdictTag(it.verdict) + autoTag(it.auto),
+                    null, 'cf-name'));
+                  if (it.note) row.appendChild(el('div', 'Student note: ' + it.note));
+                  if (it.remarks) row.appendChild(el('div', 'Remarks: ' + it.remarks));
+                  row.appendChild(el('div', fmtDate(it.created_at), null, 'cf-muted'));
+                  var br = el('div', null, { marginTop: '4px' });
+                  br.appendChild(btn('Inspect on sheet', function () {
+                    if (!window.confirm('Load this submission onto the sheet? ' +
+                        'The current sheet will be replaced.')) {
+                      return;
+                    }
+                    Saves.getSubmission(fi(), s, it.id).then(function (full) {
+                      try {
+                        loadOntoSheet(full.data, 'Submission loaded');
+                        hidePanel();
+                      } catch (err) {
+                        status('Submission data is malformed.');
+                      }
+                    }, fail('Inspect failed'));
+                  }, { marginRight: '6px' }));
+                  br.appendChild(btn('Grade', function () {
+                    gradeForm(row, it, code);
+                  }));
+                  row.appendChild(br);
+                  sub.appendChild(row);
+                });
+              });
+          }, function (err) {
+            sub.textContent = 'Load failed' +
+              (err && err.message ? ': ' + err.message : '');
+          });
+        }, fail('Load failed'));
+      }
+
+      // ---- student views ----
+      function studentHome(s) {
+        clearPanel();
+        header('Question sets');
+        panel.appendChild(el('div', 'Open a set by code', { marginTop: '6px' }, 'cf-section'));
+        var codeIn = textInput('Set code, e.g. geo-101');
+        panel.appendChild(codeIn);
+        var open = btn('Open', function () {
+          var code = codeIn.value.trim();
+          if (!code) {
+            status('Enter a set code first.');
+            return;
+          }
+          studentSetDetail(s, code);
+        });
+        open.style.marginTop = '6px';
+        panel.appendChild(open);
+        panel.appendChild(el('div', 'My submissions', null, 'cf-section'));
+        var mine = el('div', 'Loading…');
+        panel.appendChild(mine);
+        Saves.listMySubmissions(fi(), s).then(function (data) {
+          while (mine.firstChild) mine.removeChild(mine.firstChild);
+          var items = data.submissions || [];
+          if (!items.length) {
+            mine.appendChild(el('div', 'Nothing submitted yet.'));
+            return;
+          }
+          items.forEach(function (it) {
+            var row = el('div', null,
+              null, 'cf-row');
+            var tag = '';
+            if (it.verdict === 'pass') tag = ' [PASS]';
+            else if (it.verdict === 'fail') tag = ' [FAIL]';
+            if (it.auto && it.auto.checked) tag += it.auto.pass ? ' auto: PASS' : ' auto: FAIL';
+            row.appendChild(el('div',
+              it.set_code + ' · Q' + (it.question_index + 1) + tag,
+              null, 'cf-name'));
+            if (it.remarks) row.appendChild(el('div', 'Teacher: ' + it.remarks));
+            row.appendChild(el('div', fmtDate(it.created_at),
+              null, 'cf-muted'));
+            var rel = btn('Reload', function () {
+              if (!window.confirm('Load your submission onto the sheet? ' +
+                  'The current sheet will be replaced.')) {
+                return;
+              }
+              Saves.getSubmission(fi(), s, it.id).then(function (full) {
+                try {
+                  loadOntoSheet(full.data, 'Submission loaded');
+                  hidePanel();
+                } catch (err) {
+                  status('Submission data is malformed.');
+                }
+              }, fail('Reload failed'));
+            });
+            rel.style.marginTop = '4px';
+            row.appendChild(rel);
+            mine.appendChild(row);
+          });
+        }, function (err) {
+          mine.textContent = 'Load failed' +
+            (err && err.message ? ': ' + err.message : '');
+        });
+      }
+
+      function studentSetDetail(s, code) {
+        clearPanel();
+        header('Set ' + code);
+        var back = btn('Back', function () { studentHome(s); });
+        back.style.margin = '6px 0';
+        panel.appendChild(back);
+        var body = el('div', 'Loading…');
+        panel.appendChild(body);
+        Saves.getSet(fi(), s, code).then(function (data) {
+          while (body.firstChild) body.removeChild(body.firstChild);
+          body.appendChild(el('div', data.title || 'Untitled', null, 'cf-name'));
+          if (data.owner) {
+            body.appendChild(el('div', 'By ' + data.owner,
+              null, 'cf-muted'));
+          }
+          (data.questions || []).forEach(function (q, i) {
+            var row = el('div', null,
+              null, 'cf-row');
+            row.appendChild(el('div', 'Q' + (i + 1) + ': ' + q.prompt,
+              null, 'cf-name'));
+            var checkNote = el('div', null, { marginTop: '2px' }, 'cf-muted');
+            if (q.has_model && q.check_enabled !== false) {
+              checkNote.textContent = 'Strict auto-check is on: Verify tells pass/fail only.';
+            } else if (q.has_model) {
+              checkNote.textContent = 'Auto-check is off for this question.';
+            } else {
+              checkNote.textContent = 'No auto-check for this question.';
+            }
+            row.appendChild(checkNote);
+            var verdictLine = el('div', null, { marginTop: '2px' });
+            verdictLine.hidden = true;
+            row.appendChild(verdictLine);
+            function showAuto(auto) {
+              verdictLine.hidden = false;
+              while (verdictLine.firstChild) verdictLine.removeChild(verdictLine.firstChild);
+              if (!auto || !auto.checked) {
+                verdictLine.textContent = 'Auto-check unavailable for this question.';
+                return;
+              }
+              var d = auto.details || {};
+              var msg = auto.pass ? 'AUTO-CHECK: PASS ✓' : 'AUTO-CHECK: FAIL ✗';
+              if (d.matched !== undefined) {
+                msg += ' — ' + d.matched + '/' + d.model_count + ' matched';
+                if (d.missing) msg += ', ' + d.missing + ' missing';
+                if (d.extra) msg += ', ' + d.extra + ' extra';
+              }
+              if (typeof auto.score === 'number') {
+                msg += ' (score ' + Math.round(auto.score * 100) + '%)';
+              }
+              verdictLine.textContent = msg;
+            }
+            if (q.hint) {
+              var hintBtn = btn('Hint', function () {
+                hintText.hidden = !hintText.hidden;
+              }, { link: true });
+              hintBtn.style.marginTop = '4px';
+              row.appendChild(hintBtn);
+              var hintText = el('div', q.hint,
+                { marginTop: '2px' }, 'cf-muted');
+              hintText.hidden = true;
+              row.appendChild(hintText);
+            }
+            var br = el('div', null, { marginTop: '4px' });
+            if (q.starter) {
+              br.appendChild(btn('Load starter', function () {
+                if (!window.confirm('Load the starter onto the sheet? ' +
+                    'The current sheet will be replaced.')) {
+                  return;
+                }
+                try {
+                  loadOntoSheet(q.starter, 'Starter loaded');
+                } catch (err) {
+                  status('Starter data is malformed.');
+                }
+              }, { marginRight: '6px' }));
+            }
+            if (q.has_model && q.check_enabled !== false) {
+              br.appendChild(btn('Verify my sheet', function () {
+                var t = table();
+                if (!t) {
+                  status('Sheet not ready.');
+                  return;
+                }
+                var snap;
+                try {
+                  snap = Saves.snapshotTable(t);
+                } catch (err) {
+                  status('Snapshot failed.');
+                  return;
+                }
+                status('Verifying Q' + (i + 1) + '…');
+                Saves.verifySolution(fi(), s, code, i, snap).then(function (r) {
+                  showAuto(r);
+                  if (!r.checked) {
+                    status('Q' + (i + 1) + ': auto-check unavailable.');
+                  } else if (r.pass) {
+                    status('Q' + (i + 1) + ': AUTO-CHECK PASS ✓ ' + stamp());
+                  } else {
+                    status('Q' + (i + 1) + ': AUTO-CHECK FAIL ✗ — ' +
+                      'the model stays hidden; fix your drawing and verify again. ' +
+                      stamp());
+                  }
+                }, fail('Verify failed'));
+              }, { marginRight: '6px' }));
+            }
+            br.appendChild(btn('Submit my sheet', function () {
+              var t = table();
+              if (!t) {
+                status('Sheet not ready.');
+                return;
+              }
+              var snap;
+              try {
+                snap = Saves.snapshotTable(t);
+              } catch (err) {
+                status('Snapshot failed.');
+                return;
+              }
+              var note = window.prompt('Note for your teacher (optional):', '');
+              if (note === null) return;
+              Saves.submitSolution(fi(), s, code, i, snap, note || '').then(function (r) {
+                showAuto(r && r.auto);
+                if (r && r.auto && r.auto.checked && !r.auto.pass) {
+                  status('Submitted Q' + (i + 1) + ' — AUTO-CHECK FAIL ✗ ' + stamp());
+                } else if (r && r.auto && r.auto.checked) {
+                  status('Submitted Q' + (i + 1) + ' — AUTO-CHECK PASS ✓ ' + stamp());
+                } else {
+                  status('Submitted Q' + (i + 1) + ' ' + stamp());
+                }
+              }, fail('Submit failed'));
+            }));
+            row.appendChild(br);
+            body.appendChild(row);
+          });
+        }, function (err) {
+          body.textContent = (err && err.status === 404)
+            ? 'No set with that code.'
+            : 'Load failed' + (err && err.message ? ': ' + err.message : '');
+        });
+      }
+
+      var setsBtn = $('btn-sets');
+      if (setsBtn) setsBtn.addEventListener('click', function () {
+        var s = Saves.currentSession();
+        if (Saves.isGuest(s)) {
+          status('Log in to use question sets (guest is local-only).');
+          return;
+        }
+        if (!panel.hidden) {
+          hidePanel();
+          return;
+        }
+        hideDrawings();
+        panel.hidden = false;
+        if (isTeacherRole(s)) teacherHome(s);
+        else studentHome(s);
+      });
+    })();
+  </script>
+
+  <script>
+    // Deep links from the studio and workspace. ?submission=<id> reviews
+    // a submission (teachers and academics land in read-only View mode,
+    // students get an editable copy); ?solve=<code>&q=<i> loads a
+    // question starter for solving; ?drawing=<id> opens a saved drawing;
+    // ?model=<code>&q=<i> loads the model answer for editing (teachers
+    // only — students never receive the model payload).
+    // ?draw=1 is a bare sheet (lets teachers past the studio gate).
+    (function deepLink() {
+      if (typeof window.EduCADSaves === 'undefined') return;
+      var Saves = window.EduCADSaves;
+      function $(id) { return document.getElementById(id); }
+      function params() {
+        var out = {};
+        var q = String(window.location.search || '').replace(/^\?/, '');
+        q.split('&').forEach(function (kv) {
+          if (!kv) return;
+          var i = kv.indexOf('=');
+          var k = i === -1 ? kv : kv.slice(0, i);
+          var v = i === -1 ? '' : kv.slice(i + 1);
+          try {
+            out[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, ' '));
+          } catch (err) { /* keep going on bad escapes */ }
+        });
+        return out;
+      }
+      function table() {
+        var h = window.educadHandle;
+        return (h && h.table) || null;
+      }
+      function setMode(mode) {
+        if (typeof window.educadSetSheetMode === 'function') {
+          window.educadSetSheetMode(mode);
+          return;
+        }
+        var b = $(mode === 'view' ? 'btn-mode-view' : 'btn-mode-edit');
+        if (b && b.click) b.click();
+      }
+      var statusEl = $('save-status');
+      function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
+      function fmtDate(ts) {
+        try { return new Date(ts * 1000).toLocaleString(); }
+        catch (err) { return ''; }
+      }
+      function loadOntoSheet(data) {
+        var t = table();
+        if (!t || !window.EduCADEntities) {
+          status('Sheet not ready.');
+          return -1;
+        }
+        var count = Saves.restoreTable(window.EduCADEntities, t, data);
+        var h = window.educadHandle;
+        if (h && h.sel && window.EduCADCanvas &&
+            typeof window.EduCADCanvas.deselect === 'function') {
+          try { window.EduCADCanvas.deselect(h.sel); } catch (err) {}
+        }
+        return count;
+      }
+
+      var p = params();
+      var s = Saves.currentSession();
+      if (Saves.isGuest(s)) {
+        if (p.submission || p.solve || p.drawing || p.model) {
+          status('Log in to open shared sheets (guest is local-only).');
+        }
+        return;
+      }
+      var fi = window.fetch.bind(window);
+      if (p.submission) {
+        var id = parseInt(p.submission, 10);
+        if (!(id > 0)) { status('Bad submission link.'); return; }
+        Saves.getSubmission(fi, s, id).then(function (full) {
+          var count;
+          try {
+            count = loadOntoSheet(full.data);
+          } catch (err) {
+            status('Submission data is malformed.');
+            return;
+          }
+          if (count < 0) return;
+          var label = (full.name || full.username || 'Submission') + ' · ' +
+            (full.set_code || 'set') + ' Q' + ((full.question_index || 0) + 1);
+          if (s.role === 'teacher' || s.role === 'academics') {
+            setMode('view');
+            status(label + ' · ' + fmtDate(full.created_at) + ' (view only)');
+          } else {
+            setMode('edit');
+            status(label + ' loaded as an editable copy.');
+          }
+        }, function (err) {
+          status('Submission failed to load' +
+            (err && err.message ? ': ' + err.message : ''));
+        });
+        return;
+      }
+      if (p.solve) {
+        var qi = parseInt(p.q || '0', 10);
+        if (!(qi >= 0)) qi = 0;
+        Saves.getSet(fi, s, p.solve).then(function (data) {
+          var qs = data.questions || [];
+          if (qi >= qs.length) { status('No such question.'); return; }
+          var q = qs[qi];
+          setMode('edit');
+          if (q.starter) {
+            var count;
+            try {
+              count = loadOntoSheet(q.starter);
+            } catch (err) {
+              status('Starter data is malformed.');
+              return;
+            }
+            if (count < 0) return;
+            status('Q' + (qi + 1) + ': ' + q.prompt + ' (starter loaded)');
+          } else {
+            status('Q' + (qi + 1) + ': ' + q.prompt);
+          }
+        }, function (err) {
+          status('Set failed to load' +
+            (err && err.message ? ': ' + err.message : ''));
+        });
+        return;
+      }
+      if (p.model) {
+        if (s.role !== 'teacher' && s.role !== 'academics') {
+          status('Model answers are hidden from students.');
+          return;
+        }
+        var mqi = parseInt(p.q || '0', 10);
+        if (!(mqi >= 0)) mqi = 0;
+        Saves.getSet(fi, s, p.model).then(function (data) {
+          var qs = data.questions || [];
+          if (mqi >= qs.length || !qs[mqi].model) {
+            status('No model answer for that question.');
+            return;
+          }
+          var count;
+          try {
+            count = loadOntoSheet(qs[mqi].model);
+          } catch (err) {
+            status('Model data is malformed.');
+            return;
+          }
+          if (count < 0) return;
+          setMode('edit');
+          status('Model for ' + p.model + ' Q' + (mqi + 1) +
+            ' loaded as an editable copy (' + count + ' entities). ' +
+            'Re-attach via the Sets panel to update it.');
+        }, function (err) {
+          status('Set failed to load' +
+            (err && err.message ? ': ' + err.message : ''));
+        });
+        return;
+      }
+      if (p.drawing) {
+        var did = parseInt(p.drawing, 10);
+        if (!(did > 0)) { status('Bad drawing link.'); return; }
+        Saves.getDrawing(fi, s, did).then(function (data) {
+          var count;
+          try {
+            count = loadOntoSheet(data.data);
+          } catch (err) {
+            status('Drawing data is malformed.');
+            return;
+          }
+          if (count < 0) return;
+          if (typeof window.educadNoteDrawing === 'function') {
+            window.educadNoteDrawing(data.id, data.title);
+          }
+          setMode('edit');
+          status('Opened "' + (data.title || 'Untitled') + '" (' +
+            count + ' entities)');
+        }, function (err) {
+          status('Drawing failed to load' +
+            (err && err.message ? ': ' + err.message : ''));
+        });
+      }
     })();
   </script>
 </body>

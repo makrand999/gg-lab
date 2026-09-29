@@ -6,7 +6,7 @@ var assert = require('assert');
 var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
 var S = require('../mirror/files/www.geogebra.org/educad-saves.js');
 
-var TOTAL = 16;
+var TOTAL = 20;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -45,7 +45,9 @@ async function main() {
   eq(S.SESSION_KEY, 'educad_session');
   ['currentSession', 'isGuest', 'snapshotTable', 'restoreTable', 'apiRequest',
    'listDrawings', 'createDrawing', 'getDrawing', 'updateDrawing',
-   'deleteDrawing', 'listProgress', 'putProgress',
+   'deleteDrawing', 'listSets', 'createSet', 'getSet', 'deleteSet',
+   'submitSolution', 'listSubmissions', 'getSubmission', 'listMySubmissions',
+   'listProgress', 'putProgress',
    'recordProgress', 'fetchProgress'].forEach(function (k) {
     eq(typeof S[k], 'function', k);
   });
@@ -234,6 +236,73 @@ async function main() {
   ok(html.indexOf('id="btn-save"') !== -1, 'save button ships');
   ok(html.indexOf('id="btn-drawings"') !== -1, 'drawings button ships');
   pass('saves ui ships');
+
+  // 17 sets wrappers hit method + path with the create body shape
+  var f17 = stubFetch({
+    'POST api/sets': { status: 201, body: { ok: true, id: 3, code: 'geo-1' } },
+    'GET api/sets': { status: 200, body: { ok: true, sets: [] } },
+    'GET api/sets/geo-1': { status: 200, body: { ok: true, code: 'geo-1' } },
+    'DELETE api/sets/geo-1': { status: 200, body: { ok: true } }
+  });
+  var s17 = session('teacher', 't');
+  var qs = [{ prompt: 'Draw a cube.' }];
+  eq((await S.createSet(f17, s17, 'geo-1', 'Cubes', qs)).id, 3);
+  deep(JSON.parse(f17.calls[0].init.body),
+    { code: 'geo-1', title: 'Cubes', questions: qs });
+  await S.listSets(f17, s17);
+  await S.getSet(f17, s17, 'geo-1');
+  await S.deleteSet(f17, s17, 'geo-1');
+  deep(f17.calls.map(function (c) { return c.init.method + ' ' + c.path; }), [
+    'POST api/sets', 'GET api/sets', 'GET api/sets/geo-1', 'DELETE api/sets/geo-1'
+  ]);
+  pass('saves sets wrappers');
+
+  // 18 submissions wrappers hit method + path with the submit body shape
+  var f18 = stubFetch({
+    'POST api/sets/geo-1/submissions': { status: 201, body: { ok: true, id: 9 } },
+    'GET api/sets/geo-1/submissions': { status: 200, body: { ok: true, submissions: [] } },
+    'GET api/submissions/9': { status: 200, body: { ok: true, id: 9 } },
+    'GET api/submissions/mine': { status: 200, body: { ok: true, submissions: [] } }
+  });
+  var s18 = session('student', 't');
+  var snap18 = { version: 1, entities: [] };
+  eq((await S.submitSolution(f18, s18, 'geo-1', 0, snap18, 'done')).id, 9);
+  deep(JSON.parse(f18.calls[0].init.body),
+    { question_index: 0, data: snap18, note: 'done' });
+  await S.listSubmissions(f18, s18, 'geo-1');
+  await S.getSubmission(f18, s18, 9);
+  await S.listMySubmissions(f18, s18);
+  deep(f18.calls.map(function (c) { return c.init.method + ' ' + c.path; }), [
+    'POST api/sets/geo-1/submissions', 'GET api/sets/geo-1/submissions',
+    'GET api/submissions/9', 'GET api/submissions/mine'
+  ]);
+  pass('saves submissions wrappers');
+
+  // 19 guests never reach the sets endpoints
+  var f19 = stubFetch({});
+  await S.createSet(f19, session('guest', 'guest'), 'g', 't', []).then(function () {
+    throw new Error('guest must reject');
+  }, function (err) {
+    ok(/guest/.test(err.message), 'guest error');
+  });
+  await S.listMySubmissions(f19, null).then(function () {
+    throw new Error('null session must reject');
+  }, function () { /* expected */ });
+  eq(f19.calls.length, 0);
+  pass('saves sets guest blocked');
+
+  // 20 sets UI ships: session-bar button + panel + role views
+  var html2 = fs.readFileSync(path.join(__dirname, '..', 'mirror', 'index.html'), 'utf8');
+  ok(html2.indexOf('id="btn-sets"') !== -1, 'sets button ships');
+  ok(html2.indexOf('id="sets-panel"') !== -1, 'sets panel ships');
+  ok(html2.indexOf('class="cf-panel"') !== -1, 'panels share login theme');
+  ok(html2.indexOf('.cf-panel .demo-btn') !== -1, 'cf button theme ships');
+  ok(html2.indexOf('Verdana, Geneva, Tahoma') !== -1, 'cf font ships');
+  ok(html2.indexOf('teacherSetDetail') !== -1, 'teacher view ships');
+  ok(html2.indexOf('studentSetDetail') !== -1, 'student view ships');
+  ok(html2.indexOf("addEventListener(t, function (e) { e.stopPropagation(); })") !== -1,
+    'key isolation ships');
+  pass('saves sets ui ships');
 
   assert.strictEqual(n, TOTAL);
   console.log('OK ' + TOTAL + '/' + TOTAL + ' saves tests passed');

@@ -140,6 +140,79 @@
   function deleteDrawing(fetchImpl, session, id) {
     return apiRequest(fetchImpl, 'DELETE', 'api/drawings/' + id, session);
   }
+  function listSets(fetchImpl, session) {
+    return apiRequest(fetchImpl, 'GET', 'api/sets', session);
+  }
+  function createSet(fetchImpl, session, code, title, questions, classCode) {
+    var body = { code: code, title: title, questions: questions };
+    if (classCode) body.class_code = classCode;
+    return apiRequest(fetchImpl, 'POST', 'api/sets', session, body);
+  }
+  function listClasses(fetchImpl, session) {
+    return apiRequest(fetchImpl, 'GET', 'api/classes', session);
+  }
+  function createClass(fetchImpl, session, code, title) {
+    return apiRequest(fetchImpl, 'POST', 'api/classes', session,
+      { code: code, title: title });
+  }
+  function getClass(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'GET', 'api/classes/' + code, session);
+  }
+  function deleteClass(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'DELETE', 'api/classes/' + code, session);
+  }
+  function joinClass(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'POST', 'api/classes/' + code + '/join', session, {});
+  }
+  function leaveClass(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'POST', 'api/classes/' + code + '/leave', session, {});
+  }
+  function listMembers(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'GET', 'api/classes/' + code + '/members', session);
+  }
+  function listClassSets(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'GET', 'api/classes/' + code + '/sets', session);
+  }
+  function getSet(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'GET', 'api/sets/' + code, session);
+  }
+  function deleteSet(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'DELETE', 'api/sets/' + code, session);
+  }
+  function submitSolution(fetchImpl, session, code, questionIndex, data, note) {
+    return apiRequest(fetchImpl, 'POST', 'api/sets/' + code + '/submissions', session,
+      { question_index: questionIndex, data: data, note: note });
+  }
+  function verifySolution(fetchImpl, session, code, questionIndex, data) {
+    return apiRequest(fetchImpl, 'POST', 'api/sets/' + code + '/verify', session,
+      { question_index: questionIndex, data: data });
+  }
+  function setQuestionModel(fetchImpl, session, code, qi, data) {
+    return apiRequest(fetchImpl, 'PUT',
+      'api/sets/' + code + '/questions/' + qi + '/model', session, { data: data });
+  }
+  function clearQuestionModel(fetchImpl, session, code, qi) {
+    return apiRequest(fetchImpl, 'DELETE',
+      'api/sets/' + code + '/questions/' + qi + '/model', session);
+  }
+  function setQuestionCheck(fetchImpl, session, code, qi, enabled) {
+    return apiRequest(fetchImpl, 'PUT',
+      'api/sets/' + code + '/questions/' + qi + '/check', session,
+      { enabled: !!enabled });
+  }
+  function gradeSubmission(fetchImpl, session, id, verdict, remarks) {
+    return apiRequest(fetchImpl, 'PUT', 'api/submissions/' + id + '/grade', session,
+      { verdict: verdict, remarks: remarks });
+  }
+  function listSubmissions(fetchImpl, session, code) {
+    return apiRequest(fetchImpl, 'GET', 'api/sets/' + code + '/submissions', session);
+  }
+  function getSubmission(fetchImpl, session, id) {
+    return apiRequest(fetchImpl, 'GET', 'api/submissions/' + id, session);
+  }
+  function listMySubmissions(fetchImpl, session) {
+    return apiRequest(fetchImpl, 'GET', 'api/submissions/mine', session);
+  }
   function listProgress(fetchImpl, session) {
     return apiRequest(fetchImpl, 'GET', 'api/progress', session);
   }
@@ -185,6 +258,16 @@
     listDrawings: listDrawings, createDrawing: createDrawing,
     getDrawing: getDrawing, updateDrawing: updateDrawing,
     deleteDrawing: deleteDrawing,
+    listSets: listSets, createSet: createSet, getSet: getSet,
+    deleteSet: deleteSet,
+    listClasses: listClasses, createClass: createClass, getClass: getClass,
+    deleteClass: deleteClass, joinClass: joinClass, leaveClass: leaveClass,
+    listMembers: listMembers, listClassSets: listClassSets,
+    submitSolution: submitSolution, verifySolution: verifySolution,
+    setQuestionModel: setQuestionModel, clearQuestionModel: clearQuestionModel,
+    setQuestionCheck: setQuestionCheck, gradeSubmission: gradeSubmission,
+    listSubmissions: listSubmissions, getSubmission: getSubmission,
+    listMySubmissions: listMySubmissions,
     listProgress: listProgress, putProgress: putProgress,
     recordProgress: recordProgress, fetchProgress: fetchProgress
   };

@@ -279,7 +279,7 @@ pass('phase20 check panel wiring');
 // 25 README lists the phase20 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase20`') !== -1, 'phase20 row');
-ok(readme.indexOf('baseline + phases 1–29 (862 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
   'grand total 789');
 pass('phase20 readme suite row');
 

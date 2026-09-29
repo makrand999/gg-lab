@@ -46,6 +46,9 @@ then the [Appendix](#13-appendix-developer-reference).
 | Place a point measured off a line | [§4.6 plotting](#46-line-referenced-plotting-perpendicular-offset-point) |
 | Load a demo lesson | [§9.1 demos](#91-demo-buttons-guided-walkthroughs) |
 | Log in or continue as guest | [§3.8 login](#38-login-session-chip-and-desktop-gate) |
+| Create a class (teacher) | [§3.10 classes](#310-classes-and-question-sets-teachers-post-students-submit) |
+| Join a class (student) | [§3.10 classes](#310-classes-and-question-sets-teachers-post-students-submit) |
+| Review a submitted sheet | [§3.10 inspect](#310-classes-and-question-sets-teachers-post-students-submit) |
 | Grade my hidden verdicts | [§9.3b Check](#93b-competing-points-verdicts-and-check) |
 | Replay a guided tutorial | [§9.4 square](#94-tutorial-square-scripted-user) · [§9.5 prism](#95-tutorial-prism-scripted-user) |
 | Measure without editing anything | [§3.9 modes](#39-edit-and-view-modes) |
@@ -405,15 +408,19 @@ Three things stand around the sheet itself:
   `login.html` before any canvas loads. Pick a role tab (Academics /
   Teacher / Student), enter that tab's demo account, and the server checks
   it against its demo list; **Continue as guest** skips the server and
-  signs you in as `Guest (guest)`. The session lives in the browser's
-  `localStorage`, so closing the tab keeps you logged in — and so does a
-  reload. Guests keep nothing else: reload and the sheet is gone. Logged-in
-  users can **Save** the sheet to their account from the session chip and
-  reopen it later from **Drawings** (the first save asks for a title,
-  later saves update the same drawing); the C++ backend also records
-  finished tutorials, which earn a ✓ on the lesson button next visit.
+  signs you in as `Guest (guest)`. Each role lands on its own home:
+  teachers (and academics) on the **Teacher studio** (`teacher.html`),
+  students on the **Student workspace** (`student.html`), guests on the
+  bare sheet. The session lives in the browser's `localStorage`, so
+  closing the tab keeps you logged in — and so does a reload. Guests keep
+  nothing else: reload and the sheet is gone. Logged-in users can **Save**
+  the sheet to their account from the session chip and reopen it later
+  from **Drawings** (the first save asks for a title, later saves update
+  the same drawing); the C++ backend also records finished tutorials,
+  which earn a ✓ on the lesson button next visit.
 - **Session chip** (bottom-left). Shows who is logged in as `name (role)`
-  plus **Save**, **Drawings**, and **Logout** buttons and a status line.
+  plus **Save**, **Drawings**, **Sets**, a **Studio**/**Workspace** home
+  link, and **Logout** buttons and a status line.
   Clicks here never draw (the chip swallows all pointer gestures).
   **Logout** clears the session and returns to the login page. It sits
   outside the demo bar, so `Manual` stays the bar's last child.
@@ -454,6 +461,49 @@ is nothing to change by accident. Panning, zooming, the 3D glass, and
 `Check hidden` all keep working, and starting a tutorial returns the
 sheet to Edit. The readout lives on the overlay layer only: it is never
 an entity, never saved, and never reconstructed.
+
+### 3.10 Classes and question sets (teachers post, students submit)
+
+The studio and workspace run the assignment loop around classes.
+Teachers create classes and post coded sets to a class or as open sets;
+students join classes, solve by drawing, and submit; teachers review
+each submitted sheet in read-only View mode:
+
+- **Create a class (teacher, in the studio).** Enter a class code
+  (`be-a-2026`: 3–24 letters, digits, dashes; codes are unique) and a
+  title. **Create class** publishes it; share the code with students.
+  Opening a class shows its member list and the sets posted to it.
+  Deleting a class drops its memberships and turns its sets into open
+  sets (nothing submitted is lost).
+- **Post (teacher).** Enter a set code (`geo-101`: same code rules,
+  unique) and a title, pick a class or leave it an open set, then add
+  questions one by one: a prompt and an optional hint. **Create set**
+  publishes it. A class set is listed for that class only; an open set
+  is solvable by any logged-in student with the code. Starters still
+  attach from the sheet: open the **Sheet**, draw, then post via the
+  session bar's **Sets** panel (**Attach current sheet as starter**).
+- **Join (student, in the workspace).** Enter the class code the
+  teacher shared. Joining lists the class and its sets; leaving drops
+  them from your feed (your submissions stay).
+- **Solve (student).** **Sets to solve** merges your class sets with
+  open sets, or open any set by code. Each question shows its prompt
+  with a **Hint** toggle where the teacher left one; **Solve on sheet**
+  opens the sheet with the starter loaded (when the teacher attached
+  one). Draw the answer, then **Submit my sheet** from the sheet's
+  **Sets** panel with an optional note. **My submissions** lists what
+  you sent, with **Reload in sheet** to load one back as an editable
+  copy. **My drawings** reopens anything you **Save**d, and **Tutorial
+  progress** ticks off finished lessons.
+- **Inspect (teacher).** Opening a set shows every submission with the
+  student's name, question number, note, and date. **View sheet** opens
+  the submitted drawing on the sheet in read-only **View** mode
+  (measure, never edit); deleting a set removes its submissions too.
+
+Guests see none of this: the studio and workspace send guests back to
+the login page, and no class, set, or submission call ever leaves the
+browser without a session token. Classes, sets, and saves need the C++
+backend (`npm run start:cpp`); the minimal Node demo server only logs
+you in.
 
 ---
 

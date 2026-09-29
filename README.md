@@ -33,7 +33,17 @@ source: after editing `docs/MANUAL.md`, run `npm run build:manual`.
 Opening the app redirects to [`mirror/login.html`](mirror/login.html):
 pick the **Academics**, **Teacher**, or **Student** tab and log in, or
 **Continue as guest** (guest skips the server entirely: no saves, the
-sheet stays local). Demo credentials:
+sheet stays local). Each role lands on its own home: teachers and
+academics on the **Teacher studio** ([`mirror/teacher.html`](mirror/teacher.html):
+create classes, post question sets (single, bulk text, or file upload)
+to a class or as open sets, attach model-answer drawings per question
+with a strict auto-check toggle, review submissions grouped by question
+in read-only View mode, and grade with remarks and pass/fail), students
+on the **Student workspace** ([`mirror/student.html`](mirror/student.html):
+join classes, solve sets, verify drawings against the hidden model
+answer (pass/fail only, the model is never shown), manage drawings,
+track submissions, grades and tutorial progress),
+guests on the bare sheet. Demo credentials:
 
 | Role | Username | Password |
 |------|----------|----------|
@@ -54,14 +64,17 @@ page works against either):
 
 The session chip (bottom-left) shows who is logged in; **Save** stores
 the sheet to your account (first save asks for a title, later saves
-update), **Drawings** lists/loads/deletes saved sheets, and **Logout**
-clears the session and returns to the login page. Finishing a tutorial
-records progress and earns its lesson button a ✓ next visit.
+update), **Drawings** lists/loads/deletes saved sheets, **Sets** runs
+the teacher/student question loop (coded sets, drawing submissions),
+**Studio**/**Workspace** returns to your home page, and **Logout**
+clears the session and returns to the login page.
+Finishing a tutorial records progress and earns its lesson button
+a ✓ next visit.
 
 ## Test
 
 ```sh
-npm test       # full suite: baseline + phases 1–29 (862 checks)
+npm test       # full suite: baseline + phases 1–30 (880 checks)
 ```
 
 | Command | Suite |
@@ -96,9 +109,11 @@ npm test       # full suite: baseline + phases 1–29 (862 checks)
 | `npm run test:phase27` | Pick bank: Ctrl banks, plain click finalizes (12) |
 | `npm run test:phase28` | View mode: Edit/View toggle, select-and-measure inspect (12) |
 | `npm run test:phase29` | View dimensions: drafting-style overlay (extension lines, leaders) (12) |
+| `npm run test:phase30` | Model + grade: model answers, strict verify, remarks, pass/fail (18) |
 | `npm run test:login` | Login: 3 roles + guest, minimal `/api/login`, gate ships (15) |
-| `npm run test:cpp` | C++ backend: static parity, auth, drawings/progress, restart proof (26) |
-| `npm run test:saves` | Saves module: snapshot/restore, API client, guest gate, UI ships (16) |
+| `npm run test:lab` | Lab: studio + workspace pages, role routing, deep links, class client (14) |
+| `npm run test:cpp` | C++ backend: static parity, auth, drawings/progress, question sets, classes (42) |
+| `npm run test:saves` | Saves module: snapshot/restore, API client incl. sets, guest gate, UI ships (20) |
 
 App entry point: [`mirror/index.html`](mirror/index.html).
 Library modules: [`mirror/files/www.geogebra.org/`](mirror/files/www.geogebra.org/).

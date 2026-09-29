@@ -212,7 +212,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase24`') !== -1, 'phase24 row');
 ok(readme.indexOf('Typed distance: select point, type mm, Enter stakes') !== -1,
   'phase24 label');
-ok(readme.indexOf('baseline + phases 1–29 (862 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
   'grand total 801');
 pass('phase24 manual readme suite row');
 

@@ -238,7 +238,7 @@ pass('phase19 3view truth passthrough');
 // 23 README lists the phase19 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase19`') !== -1, 'phase19 row');
-ok(readme.indexOf('baseline + phases 1–29 (862 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
   'grand total 789');
 pass('phase19 readme suite row');
 

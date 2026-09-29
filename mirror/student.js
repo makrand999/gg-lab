@@ -46,7 +46,7 @@
       return;
     }
     if (/failed to fetch|load failed|not found/i.test(msg) || !err.status) {
-      flash(what + ': lab server unreachable. Run `npm run start:cpp` ' +
+      flash(what + ': lab server unreachable. Run `npm start` ' +
         'for classes, sets and saves.', 'error');
       return;
     }

@@ -1,8 +1,8 @@
 'use strict';
-// C++ backend black-box test: static parity with tools/serve.js plus the
-// auth API (Track A). Spawns backend/build/educad-server on a free port
-// with a throwaway seeded database. Run: `npm run test:cpp`
-// (Track B extends this file with drawings/progress checks.)
+// C++ backend black-box test: static file serving plus the full JSON API
+// (auth, drawings, progress, sets, classes). Spawns
+// backend/build/educad-server on free ports with a throwaway seeded
+// database. Run: `npm run test:cpp`
 var assert = require('assert');
 var child = require('child_process');
 var fs = require('fs');
@@ -17,7 +17,7 @@ var SEED = path.join(ROOT, 'backend', 'build', 'educad-seed');
 var USERS = path.join(__dirname, 'users.json');
 var MIRROR = path.join(ROOT, 'mirror');
 
-var TOTAL = 42;
+var TOTAL = 43;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -192,6 +192,11 @@ async function main() {
     var r12font = await req(port, 'GET', '/fonts/cuprum-latin.woff2');
     eq(r12font.status, 200);
     ok(String(r12font.headers['content-type']).indexOf('font/woff2') !== -1, 'font type');
+    var r12boot = await req(port, 'GET', '/files/www.geogebra.org/educad-boot.js');
+    eq(r12boot.status, 200);
+    ok(String(r12boot.headers['content-type']).indexOf('text/javascript') !== -1,
+      'boot js type');
+    ok(r12boot.body.indexOf('EduCADBoot') !== -1, 'boot body');
     pass('cpp login page static types');
 
     // 13 /geometry alias + directory index + listing + HEAD
@@ -246,7 +251,7 @@ async function main() {
     eq(r17.json, null);
     pass('cpp missing file 404');
 
-    // 18 busy port retries upward (serve.js startNextAvailable parity)
+    // 18 busy port retries upward
     var port2 = await freePort();
     var srv2 = child.spawn(SERVER, [String(port2)], {
       env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
@@ -808,6 +813,92 @@ async function main() {
     eq((await req(port, 'POST', '/api/classes/mm-100/members', {}, undefined,
       auth(teacher))).status, 404);
     pass('cpp class methods');
+
+    // 43 port precedence: argv beats $PORT, bogus values fall back to 8124
+    var src43 = fs.readFileSync(path.join(ROOT, 'backend', 'src', 'main.cpp'), 'utf8');
+    ok(/const int kDefaultPort = 8124;/.test(src43), 'default 8124');
+    ok(/const char \*kHost = "127\.0\.0\.1";/.test(src43), 'localhost host');
+    var pA = await freePort();
+    var holder = net.createServer();
+    await new Promise(function (resolve, reject) {
+      holder.once('error', reject);
+      holder.listen(pA, '127.0.0.1', resolve);
+    });
+    var pB = await freePort();
+    ok(pB !== pA, 'distinct ports ' + pA + '/' + pB);
+    var srv43a = child.spawn(SERVER, [String(pB)], {
+      env: Object.assign({}, process.env,
+        { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: String(pA) }),
+      stdio: ['ignore', 'ignore', 'pipe']
+    });
+    var err43a = '';
+    srv43a.stderr.on('data', function (c) { err43a += c; });
+    try {
+      await waitReady(pB, srv43a, 10000);
+      ok(err43a.indexOf('busy') === -1, 'no busy detour: ' + err43a);
+    } finally {
+      srv43a.kill('SIGTERM');
+      await new Promise(function (res) { srv43a.on('exit', res); });
+    }
+    await new Promise(function (resolve) { holder.close(resolve); });
+    var pC = await freePort();
+    var srv43b = child.spawn(SERVER, [], {
+      env: Object.assign({}, process.env,
+        { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: String(pC) }),
+      stdio: ['ignore', 'ignore', 'ignore']
+    });
+    try {
+      await waitReady(pC, srv43b, 10000);
+    } finally {
+      srv43b.kill('SIGTERM');
+      await new Promise(function (res) { srv43b.on('exit', res); });
+    }
+    var pD = await freePort();
+    var srv43c = child.spawn(SERVER, [String(pD)], {
+      env: Object.assign({}, process.env,
+        { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: 'bogus' }),
+      stdio: ['ignore', 'ignore', 'ignore']
+    });
+    try {
+      await waitReady(pD, srv43c, 10000);
+    } finally {
+      srv43c.kill('SIGTERM');
+      await new Promise(function (res) { srv43c.on('exit', res); });
+    }
+    var env43d = Object.assign({}, process.env,
+      { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR });
+    delete env43d.PORT;
+    var srv43d = child.spawn(SERVER, [], {
+      env: env43d, stdio: ['ignore', 'pipe', 'pipe']
+    });
+    var out43d = '';
+    var err43d = '';
+    srv43d.stdout.on('data', function (c) { out43d += c; });
+    srv43d.stderr.on('data', function (c) { err43d += c; });
+    var actual43d = 0;
+    try {
+      var t43 = Date.now();
+      await new Promise(function (resolve, reject) {
+        (function poll() {
+          var m = /educad serve http:\/\/127\.0\.0\.1:(\d+)\//.exec(out43d);
+          if (m) { actual43d = parseInt(m[1], 10); return resolve(); }
+          if (srv43d.exitCode !== null) return reject(new Error('server exited early'));
+          if (Date.now() - t43 > 10000) return reject(new Error('no serve line'));
+          setTimeout(poll, 100);
+        })();
+      });
+      if (actual43d === 8124) {
+        ok(err43d.indexOf('busy') === -1, 'clean 8124 bind');
+      } else {
+        ok(/busy, using/.test(err43d), 'busy notice for ' + actual43d);
+      }
+      var r43d = await req(actual43d, 'GET', '/login.html');
+      eq(r43d.status, 200);
+    } finally {
+      srv43d.kill('SIGTERM');
+      await new Promise(function (res) { srv43d.on('exit', res); });
+    }
+    pass('cpp port precedence');
   } finally {
     srv.kill('SIGTERM');
     await new Promise(function (resolve) { srv.on('exit', resolve); });

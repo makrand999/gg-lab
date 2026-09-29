@@ -1,14 +1,23 @@
 'use strict';
 // Lab: teacher studio + student workspace shipping checks. Static file
-// assertions plus live static serving on an ephemeral Node demo server.
-// Standalone: `npm run test:lab` (not in `npm test`, like test:login).
+// assertions plus live static serving on an ephemeral C++ server.
+// Standalone: `npm run test:lab` (builds the backend first; not in
+// `npm test`, like test:login).
 var assert = require('assert');
+var child = require('child_process');
 var fs = require('fs');
 var http = require('http');
+var net = require('net');
+var os = require('os');
 var path = require('path');
 
-var Serve = require('./serve.js');
 var Saves = require('../mirror/files/www.geogebra.org/educad-saves.js');
+
+var ROOT = path.join(__dirname, '..');
+var SERVER = path.join(ROOT, 'backend', 'build', 'educad-server');
+var SEED = path.join(ROOT, 'backend', 'build', 'educad-seed');
+var USERS = path.join(__dirname, 'users.json');
+var MIRROR = path.join(ROOT, 'mirror');
 
 var TOTAL = 15;
 var n = 0;
@@ -20,15 +29,32 @@ function readMirror(f) {
   return fs.readFileSync(path.join(__dirname, '..', 'mirror', f), 'utf8');
 }
 
-function onceListening(srv) {
+function freePort() {
   return new Promise(function (resolve, reject) {
-    srv.once('listening', resolve);
-    srv.once('error', reject);
+    var s = net.createServer();
+    s.once('error', reject);
+    s.listen(0, '127.0.0.1', function () {
+      var p = s.address().port;
+      s.close(function () { resolve(p); });
+    });
   });
 }
 
-function closeServer(srv) {
-  return new Promise(function (resolve) { srv.close(function () { resolve(); }); });
+function waitReady(port, srv, timeoutMs) {
+  var start = Date.now();
+  return new Promise(function (resolve, reject) {
+    (function poll() {
+      get(port, '/teacher.html').then(function (r) {
+        if (r.status === 200) return resolve();
+        if (Date.now() - start > timeoutMs) return reject(new Error('server not ready'));
+        setTimeout(poll, 100);
+      }, function () {
+        if (srv.exitCode !== null) return reject(new Error('server exited early'));
+        if (Date.now() - start > timeoutMs) return reject(new Error('server not ready'));
+        setTimeout(poll, 100);
+      });
+    })();
+  });
 }
 
 function get(port, urlPath) {
@@ -177,10 +203,18 @@ async function main() {
   });
   pass('lab saves class wrappers');
 
-  var srv = Serve.start(0, '127.0.0.1');
-  await onceListening(srv);
+  ok(fs.existsSync(SERVER), 'educad-server built');
+  var tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'educad-lab-'));
+  var db = path.join(tmp, 'educad.db');
+  var seed = child.spawnSync(SEED, [USERS, db], { encoding: 'utf8' });
+  eq(seed.status, 0, 'seed exit 0: ' + (seed.stderr || ''));
+  var port = await freePort();
+  var srv = child.spawn(SERVER, [String(port)], {
+    env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+    stdio: ['ignore', 'ignore', 'ignore']
+  });
   try {
-    var port = srv.address().port;
+    await waitReady(port, srv, 10000);
 
     // 12 studio + workspace pages serve with html type
     var r12a = await get(port, '/teacher.html');
@@ -212,7 +246,9 @@ async function main() {
     ok(r14.body.indexOf('id="btn-home"') !== -1, 'home ships');
     pass('lab sheet buttons kept');
   } finally {
-    await closeServer(srv);
+    srv.kill('SIGTERM');
+    await new Promise(function (resolve) { srv.on('exit', resolve); });
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 
   // 15 success flashes survive the follow-up rerender: every render*

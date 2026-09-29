@@ -17,12 +17,15 @@ reconstructs the drawn views.
 ## Run
 
 ```sh
-npm start      # serve mirror/ on http://127.0.0.1:8124/ (localhost only)
+npm start      # build + seed + serve on http://127.0.0.1:8124/ (localhost only)
 ```
 
-Open the printed URL in a browser. If port 8124 is busy the server picks
-the next free port and prints it; `npm start -- <port>` or `PORT=<port>`
-overrides the port.
+`npm start` compiles the C++ backend on first run (needs CMake, a C++17
+compiler and libsodium headers — see Development below), seeds the demo
+accounts into `backend/data/educad.db`, and serves `mirror/` plus the
+JSON API. Open the printed URL in a browser. If port 8124 is busy the
+server picks the next free port and prints it; `npm start -- <port>` or
+`PORT=<port>` overrides the port.
 
 The demo bar (top-right) has a **Manual** button that opens the in-app
 user manual in a new tab. The manual page is generated from the Markdown
@@ -51,16 +54,11 @@ guests on the bare sheet. Demo credentials:
 | Teacher | `teacher` | `teach123` |
 | Student | `student` | `learn123` |
 
-Two servers implement the same `POST /api/login` contract (the login
-page works against either):
-
-- `npm start` — minimal Node demo server (`tools/serve.js`): checks
-  plain-text demo users in `tools/users.json` (outside the served root,
-  never sent to browsers). Login only, no saves.
-- `npm run start:cpp` — C++ backend (`backend/`, vendored httplib/JSON/
-  SQLite + libsodium): `educad-seed` hashes the demo passwords into
-  SQLite once per database, sessions are server-side tokens with 24 h
-  expiry, and logged-in users get drawing saves plus tutorial progress.
+The server is the C++ backend (`backend/`, vendored httplib/JSON/SQLite
++ libsodium): `educad-seed` hashes the demo passwords from
+`tools/users.json` (outside the served root, never sent to browsers)
+into SQLite, sessions are server-side tokens with 24 h expiry, and
+logged-in users get drawing saves plus tutorial progress.
 
 The session chip (bottom-left) shows who is logged in; **Save** stores
 the sheet to your account (first save asks for a title, later saves
@@ -74,7 +72,7 @@ a ✓ next visit.
 ## Test
 
 ```sh
-npm test       # full suite: baseline + phases 1–30 (880 checks)
+npm test       # full suite: baseline + phases 1–30 (874 checks)
 ```
 
 | Command | Suite |
@@ -86,7 +84,7 @@ npm test       # full suite: baseline + phases 1–30 (880 checks)
 | `npm run test:phase4` | Solver: line rotation, loci, traces, LM fallback (64) |
 | `npm run test:phase5` | Instruments + snapping: ruler/compass, 6-tier snap (32) |
 | `npm run test:phase6` | Curriculum: quadrant/line/plane/solid lessons (23) |
-| `npm run test:phase7` | Production audit: boot, server, budgets, mount (33) |
+| `npm run test:phase7` | Production audit: boot, budgets, mount (27) |
 | `npm run test:phase8` | Labels: 3-tier layout + leader fallback (28) |
 | `npm run test:phase9` | Solid widget: iso render, orbit/zoom, hidden edges (55) |
 | `npm run test:phase10` | Reconstruction: classes A/B/C, failures, live sync (53) |
@@ -105,15 +103,32 @@ npm test       # full suite: baseline + phases 1–30 (880 checks)
 | `npm run test:phase23` | Tutorial: hex-prism lesson, 88 steps, honest solid (20) |
 | `npm run test:phase24` | Typed distance: select point, type mm, Enter stakes (12) |
 | `npm run test:phase25` | Typed plot offset: focus line, type mm, Enter stakes (12) |
-| `npm run test:phase26` | Ground-line plotting: Alt+click fold, type mm, Enter stakes (12) |
+| `npm run test:phase26` | Ground-line plotting: Alt+click fold, type mm, Enter stakes (13) |
 | `npm run test:phase27` | Pick bank: Ctrl banks, plain click finalizes (12) |
 | `npm run test:phase28` | View mode: Edit/View toggle, select-and-measure inspect (12) |
 | `npm run test:phase29` | View dimensions: drafting-style overlay (extension lines, leaders) (12) |
 | `npm run test:phase30` | Model + grade: model answers, strict verify, remarks, pass/fail (18) |
-| `npm run test:login` | Login: 3 roles + guest, minimal `/api/login`, gate ships (15) |
-| `npm run test:lab` | Lab: studio + workspace pages, role routing, deep links, class client (14) |
-| `npm run test:cpp` | C++ backend: static parity, auth, drawings/progress, question sets, classes (42) |
+| `npm run test:login` | Login: 3 roles + guest, `/api/login`, gate ships (15) |
+| `npm run test:lab` | Lab: studio + workspace pages, role routing, deep links, class client (15) |
+| `npm run test:cpp` | C++ backend: static serving, auth, drawings/progress, question sets, classes (43) |
 | `npm run test:saves` | Saves module: snapshot/restore, API client incl. sets, guest gate, UI ships (20) |
 
 App entry point: [`mirror/index.html`](mirror/index.html).
 Library modules: [`mirror/files/www.geogebra.org/`](mirror/files/www.geogebra.org/).
+
+## Development
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contributor guide.
+Short version:
+
+- Prerequisites: Node.js 22 (`.nvmrc`), CMake ≥ 3.16, a C++17 compiler,
+  and libsodium headers (`sudo apt-get install -y cmake g++ libsodium-dev`
+  on Ubuntu). No `npm install` needed — zero npm dependencies.
+- Layout: `mirror/` app, `tools/` tests, `backend/` C++ server, `docs/`
+  manual source.
+- `npm test` builds the backend, then runs baseline + phases 1–30
+  (874 checks); CI additionally runs the login/lab/saves/cpp suites on
+  every PR.
+- `mirror/manual.html` is generated — edit `docs/MANUAL.md` and run
+  `npm run build:manual`.
+- License: MIT — see [`LICENSE`](LICENSE).

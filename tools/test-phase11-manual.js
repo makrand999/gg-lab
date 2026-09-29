@@ -1,13 +1,19 @@
 'use strict';
 var assert = require('assert');
+var child = require('child_process');
 var fs = require('fs');
 var path = require('path');
 var http = require('http');
+var net = require('net');
+var os = require('os');
 
 var Build = require('./build-manual.js');
-var Serve = require('./serve.js');
 
 var ROOT = path.join(__dirname, '..');
+var SERVER = path.join(ROOT, 'backend', 'build', 'educad-server');
+var SEED = path.join(ROOT, 'backend', 'build', 'educad-seed');
+var USERS = path.join(ROOT, 'tools', 'users.json');
+var MIRROR = path.join(ROOT, 'mirror');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
 var HTML_PATH = path.join(ROOT, 'mirror', 'manual.html');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
@@ -35,15 +41,32 @@ function get(port, urlPath) {
   });
 }
 
-function onceListening(srv) {
+function freePort() {
   return new Promise(function (resolve, reject) {
-    srv.once('listening', resolve);
-    srv.once('error', reject);
+    var s = net.createServer();
+    s.once('error', reject);
+    s.listen(0, '127.0.0.1', function () {
+      var p = s.address().port;
+      s.close(function () { resolve(p); });
+    });
   });
 }
 
-function closeServer(srv) {
-  return new Promise(function (resolve) { srv.close(function () { resolve(); }); });
+function waitReady(port, srv, timeoutMs) {
+  var start = Date.now();
+  return new Promise(function (resolve, reject) {
+    (function poll() {
+      get(port, '/manual.html').then(function (r) {
+        if (r.status === 200) return resolve();
+        if (Date.now() - start > timeoutMs) return reject(new Error('server not ready'));
+        setTimeout(poll, 100);
+      }, function () {
+        if (srv.exitCode !== null) return reject(new Error('server exited early'));
+        if (Date.now() - start > timeoutMs) return reject(new Error('server not ready'));
+        setTimeout(poll, 100);
+      });
+    })();
+  });
 }
 
 async function main() {
@@ -115,8 +138,8 @@ async function main() {
   });
   ok(html.indexOf('href="index.html"') !== -1, 'mirror prefix stripped');
   ok(html.indexOf('href="files/www.geogebra.org/"') !== -1, 'dir target kept');
-  ok(html.indexOf('<code>tools/serve.js</code>') !== -1, 'outside text kept');
-  eq(html.indexOf('href="../tools/serve.js"'), -1, 'outside target unlinked');
+  ok(html.indexOf('<code>backend/src/main.cpp</code>') !== -1, 'outside text kept');
+  eq(html.indexOf('href="../backend/src/main.cpp"'), -1, 'outside target unlinked');
   pass('phase11 link rules served root');
 
   // 10 every Markdown heading produced a heading with an id
@@ -243,17 +266,26 @@ async function main() {
   pass('phase11 quote rules');
 
   // 22 served check on an ephemeral port: manual.html 200 + text/html
-  var srv = Serve.start(0, '127.0.0.1');
-  await onceListening(srv);
+  ok(fs.existsSync(SERVER), 'educad-server built');
+  var tmp22 = fs.mkdtempSync(path.join(os.tmpdir(), 'educad-manual-'));
+  var db22 = path.join(tmp22, 'educad.db');
+  var seed22 = child.spawnSync(SEED, [USERS, db22], { encoding: 'utf8' });
+  eq(seed22.status, 0, 'seed exit 0: ' + (seed22.stderr || ''));
+  var port22 = await freePort();
+  var srv = child.spawn(SERVER, [String(port22)], {
+    env: Object.assign({}, process.env, { EDUCAD_DB: db22, EDUCAD_ROOT: MIRROR }),
+    stdio: ['ignore', 'ignore', 'ignore']
+  });
   try {
-    var port22 = srv.address().port;
-    ok(port22 > 0 && port22 < 65536, 'ephemeral port ' + port22);
+    await waitReady(port22, srv, 10000);
     var r22 = await get(port22, '/manual.html');
     eq(r22.status, 200);
     ok(String(r22.headers['content-type']).indexOf('text/html') !== -1, 'html type');
     ok(r22.body.indexOf('EduCAD User Manual') !== -1, 'served title');
   } finally {
-    await closeServer(srv);
+    srv.kill('SIGTERM');
+    await new Promise(function (resolve) { srv.on('exit', resolve); });
+    fs.rmSync(tmp22, { recursive: true, force: true });
   }
   pass('phase11 served manual');
 

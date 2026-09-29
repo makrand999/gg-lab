@@ -150,7 +150,7 @@ pass('phase17 manual documents cascade');
 // 11 README lists the phase17 suite with the new grand total.
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase17`') !== -1, 'phase17 row');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–30 (874 checks)') !== -1,
   'grand total 789');
 pass('phase17 readme suite row');
 

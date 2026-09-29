@@ -197,7 +197,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase29`') !== -1, 'phase29 row');
 ok(readme.indexOf('View dimensions: drafting-style overlay (extension lines, leaders)') !== -1,
   'phase29 label');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–30 (874 checks)') !== -1,
   'grand total 880');
 pass('phase29 readme suite row');
 

@@ -122,7 +122,7 @@ pass('phase15 manual sync');
 // 13 README.md lists the phase15 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('npm run test:phase15') !== -1, 'readme lists phase15');
-ok(readme.indexOf('(880 checks)') !== -1, 'readme grand total');
+ok(readme.indexOf('(874 checks)') !== -1, 'readme grand total');
 pass('phase15 readme sync');
 
 // 14 package.json chains the phase15 suite after phase14

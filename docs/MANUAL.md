@@ -153,15 +153,16 @@ two-view engineering-drawing sheet with a front view (elevation) and a top view
 - **A live 3D sketch.** A transparent full-window 3D layer reconstructs a wireframe
   from your two views every time the drawing changes, or tells you plainly why
   it cannot (see [The 3D view](#8-the-3d-view)).
-- **Zero dependencies, plain Node + browser.** No build step for the app,
-  no frameworks. (The in-app manual page is the one generated file:
+- **Zero npm dependencies, no frameworks.** The app is static files plus
+  a C++ server (one CMake build; httplib/JSON/SQLite vendored, libsodium
+  from the system). (The in-app manual page is a generated file:
   `mirror/manual.html` is built from `docs/MANUAL.md` with
   `npm run build:manual`.)
 
 ### How to run the app
 
 1. Open a terminal in the repository root.
-2. Start the server: `npm start`.
+2. Start the server: `npm start` (first run compiles the C++ backend).
 3. Open **http://127.0.0.1:8124/** in your browser.
 4. Log in: pick the **Academics**, **Teacher**, or **Student** tab and enter
    its demo account (shown on the page), or choose **Continue as guest**
@@ -175,8 +176,8 @@ What to expect:
   and prints `educad serve: port 8124 busy, using <port>` — open the URL it
   prints instead. You can also force a port: `npm start -- <port>` or
   `PORT=<port> npm start`.
-- The server binds to localhost only; it serves the `mirror/` folder plus the
-  tiny demo-login endpoint. Stop it with `Ctrl+C` when you are done.
+- The server binds to localhost only; it serves the `mirror/` folder plus
+  the JSON API. Stop it with `Ctrl+C` when you are done.
 - The **Manual** button in the demo bar (top-right) opens this guide in a
   new tab at `manual.html`.
 - Touch-only phones and small tablets get a **Desktop required** overlay
@@ -501,9 +502,8 @@ each submitted sheet in read-only View mode:
 
 Guests see none of this: the studio and workspace send guests back to
 the login page, and no class, set, or submission call ever leaves the
-browser without a session token. Classes, sets, and saves need the C++
-backend (`npm run start:cpp`); the minimal Node demo server only logs
-you in.
+browser without a session token. Classes, sets, and saves all run
+against the single app server (`npm start`).
 
 ---
 
@@ -1783,7 +1783,7 @@ priority order within 14 px wins):
 | `Desktop required` overlay, no canvas | Touch-only small screen blocked by the desktop gate | Open on a desktop/laptop; the overlay links the tutorials sheet (§3.8) |
 | Clicks won't draw anything | View mode is on: it measures, never edits | Switch back to Edit (§3.9) |
 | Server prints `port 8124 busy, using N` | Port occupied (another server or runaway process) | Open the printed port; stop the other server if it is yours |
-| `npm start` fails immediately | Node missing or port range exhausted | Install Node; free ports 8124–8133 |
+| `npm start` fails immediately | Build tools/libsodium missing, or port range exhausted | Install Node, CMake, a C++ compiler and libsodium-dev; free ports 8124–8133 |
 
 ---
 
@@ -1837,12 +1837,13 @@ it, and (unless noted) no remnant wires it to the screen.
     (`[unverified]` if you need them: try before teaching with them).
     Touch-only small screens are blocked outright by the desktop gate
     (§3.8), so there is no mobile layout to claim.
-19. No browser-driven tests inside `npm test` (plain Node only); browser
-    behavior beyond one obscura smoke check is `[unverified]`, and no
-    specific browser versions are claimed.
+19. No browser-driven tests inside `npm test` (Node plus a local
+    throwaway C++ server only); browser behavior beyond one obscura
+    smoke check is `[unverified]`, and no specific browser versions
+    are claimed.
 20. Demo-only accounts (three roles + guest, `localStorage` session, no
-    real security — see §3.8). The Node demo server keeps a plaintext
-    demo list; the C++ backend hashes passwords into SQLite. No sharing,
+    real security — see §3.8). Demo passwords ship in `tools/users.json`
+    and `educad-seed` hashes them into SQLite on first run. No sharing,
     printing pipeline, or print-accurate (mm-true) output; print/export
     scaling helpers exist only as code functions.
 
@@ -1876,11 +1877,12 @@ rendering, and event handling). Library modules in
 | `educad-measure.js` | Edit/View mode state, single-click inspect readouts (coords, L/Δ/∠, r/Ø), View hit-testing | Yes |
 | `edugraphics-hud.css` | HUD/menu/glass positioning | Yes |
 
-Server: [`tools/serve.js`](../tools/serve.js) (`npm start`, 127.0.0.1:8124,
-plus the demo `POST /api/login` endpoint).
+Server: [`backend/src/main.cpp`](../backend/src/main.cpp) (`npm start`
+builds and runs `educad-server`, 127.0.0.1:8124, static files plus the
+JSON API).
 Manual page: `tools/build-manual.js` (`npm run build:manual` renders
 `docs/MANUAL.md` → `mirror/manual.html`, opened from the demo bar).
-Tests: [`tools/test-*.js`](../tools/) (850 checks, all green at writing
+Tests: [`tools/test-*.js`](../tools/) (874 checks, all green at writing
 time — see the repo README for the per-phase list), including
 `tools/test-phase11-manual.js` (manual build, in-app link, freshness),
 `tools/test-phase12-reconstruct-3view.js` (side-view reconstruction),
@@ -1959,8 +1961,8 @@ demo buttons remain the only in-app lesson loaders.
 | 1 | mm world; px ephemeral | `educad-viewport.js:9-11`; `test-phase2` #38–39 |
 | 2 | elev.x == plan.x, eps 1e-9 | `educad-viewport.js:110-114`; `test-baseline` #28 |
 | 3 | First-angle layout (plan below, elev above) | `index.html:375-376`; fixtures `layout: monge-first-angle` |
-| 4 | `npm start` → 127.0.0.1:8124 | `tools/serve.js:9-10`; `package.json` scripts |
-| 5 | Port busy → next port + message | `tools/serve.js:189-202` |
+| 4 | `npm start` → 127.0.0.1:8124 | `backend/src/main.cpp:56,2596-2603`; `package.json` scripts |
+| 5 | Port busy → next port + message | `backend/src/main.cpp:2619-2625`; `test-cpp-backend` #18 |
 | 6 | HUD labels + pill rule y>=0 | `index.html:61-64`, `:659-666` |
 | 7 | Demo-bar button labels (10, Manual last) | `index.html:205-215`; `test-phase11` #18, `test-phase20` #22 |
 | 8 | Zoom labels `+ - Home`, ×1.25, home s=2 | `edugraphics-common.js:27`; `educad-canvas.js:143-151` |

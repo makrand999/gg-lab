@@ -1,5 +1,5 @@
 // EduCAD C++ backend: static file server for mirror/ + JSON API.
-// Mirrors tools/serve.js behavior (routes, status codes, JSON shapes).
+// Serves mirror/ plus the JSON API (login, drawings, progress, sets, classes).
 //
 //   educad-server [port]   (default 8124; $PORT fallback; +10 busy retry)
 //   env: EDUCAD_ROOT (default <exe>/../../mirror)
@@ -72,7 +72,7 @@ std::string trimWs(const std::string &s) {
   return s.substr(a, b - a);
 }
 
-// Percent-decode; false on invalid encoding (serve.js resolvePath: 400).
+// Percent-decode; false on invalid encoding (caller answers 400).
 bool pctDecode(const std::string &in, std::string *out) {
   out->clear();
   out->reserve(in.size());
@@ -146,7 +146,7 @@ std::string contentTypeFor(const std::string &ext0) {
   return "application/octet-stream";
 }
 
-// URL-safe base64 without padding (same alphabet as serve.js makeToken).
+// URL-safe base64 without padding, for opaque session tokens.
 std::string base64UrlNoPad(const unsigned char *data, size_t len) {
   static const char *kB64 =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -1422,7 +1422,7 @@ json submissionAutoJson(const Db::Submission &b) {
   return o;
 }
 
-// Static file serving, mirroring serve.js resolvePath + listDir.
+// Static file serving: resolve inside root, directory index or listing.
 void handleStatic(const fs::path &root, const httplib::Request &req,
                   httplib::Response &res) {
   if (req.path.rfind("/api/", 0) == 0) {  // guarded by pre-routing; be safe
@@ -1461,7 +1461,7 @@ void handleStatic(const fs::path &root, const httplib::Request &req,
     if (fs::is_regular_file(idx, ec) && !ec) {
       abs = idx;
     } else {
-      // Directory listing (serve.js listDir).
+      // Directory listing.
       std::vector<std::string> entries;
       for (const auto &e : fs::directory_iterator(abs, ec)) {
         if (ec) break;
@@ -1577,7 +1577,7 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
   using HR = httplib::Server::HandlerResponse;
   // httplib defaults to SO_REUSEPORT, which lets a second server share a busy
   // port instead of failing. Use plain SO_REUSEADDR so EADDRINUSE surfaces and
-  // the serve.js-style busy-port retry in main() works.
+  // the busy-port retry in main() works.
   svr.set_socket_options([](auto sock) {
 #ifndef _WIN32
     int one = 1;

@@ -140,12 +140,12 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <li><strong>Millimetre world.</strong> Every coordinate is stored in <strong>mm</strong>. Zooming never changes the stored geometry; screen pixels are only a temporary rendering.</li>
 <li><strong>The projector invariant.</strong> The elevation and plan of the same point always share the same x-coordinate: <strong>elevation.x == plan.x</strong>. On the sheet this is why projectors are exactly vertical. The app checks this invariant with a tolerance of <code>1e-9</code> mm.</li>
 <li><strong>A live 3D sketch.</strong> A transparent full-window 3D layer reconstructs a wireframe from your two views every time the drawing changes, or tells you plainly why it cannot (see <a href="#8-the-3d-view">The 3D view</a>).</li>
-<li><strong>Zero dependencies, plain Node + browser.</strong> No build step for the app, no frameworks. (The in-app manual page is the one generated file: <code>mirror/manual.html</code> is built from <code>docs/MANUAL.md</code> with <code>npm run build:manual</code>.)</li>
+<li><strong>Zero npm dependencies, no frameworks.</strong> The app is static files plus a C++ server (one CMake build; httplib/JSON/SQLite vendored, libsodium from the system). (The in-app manual page is a generated file: <code>mirror/manual.html</code> is built from <code>docs/MANUAL.md</code> with <code>npm run build:manual</code>.)</li>
 </ul>
 <h3 id="how-to-run-the-app">How to run the app</h3>
 <ol>
 <li>Open a terminal in the repository root.</li>
-<li>Start the server: <code>npm start</code>.</li>
+<li>Start the server: <code>npm start</code> (first run compiles the C++ backend).</li>
 <li>Open <strong>http://127.0.0.1:8124/</strong> in your browser.</li>
 <li>Log in: pick the <strong>Academics</strong>, <strong>Teacher</strong>, or <strong>Student</strong> tab and enter its demo account (shown on the page), or choose <strong>Continue as guest</strong> (guest skips the server entirely). Without a session the app sends you back to this login page.</li>
 </ol>
@@ -153,7 +153,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <ul>
 <li>The server prints <code>educad serve http://127.0.0.1:8124/ -&gt; &lt;repo&gt;/mirror</code>.</li>
 <li>If port 8124 is busy, the server picks the next free port (up to 10 tries) and prints <code>educad serve: port 8124 busy, using &lt;port&gt;</code> — open the URL it prints instead. You can also force a port: <code>npm start -- &lt;port&gt;</code> or <code>PORT=&lt;port&gt; npm start</code>.</li>
-<li>The server binds to localhost only; it serves the <code>mirror/</code> folder plus the tiny demo-login endpoint. Stop it with <code>Ctrl+C</code> when you are done.</li>
+<li>The server binds to localhost only; it serves the <code>mirror/</code> folder plus the JSON API. Stop it with <code>Ctrl+C</code> when you are done.</li>
 <li>The <strong>Manual</strong> button in the demo bar (top-right) opens this guide in a new tab at <code>manual.html</code>.</li>
 <li>Touch-only phones and small tablets get a <strong>Desktop required</strong> overlay instead of the canvas, with a link to the tutorials sheet (§3.8).</li>
 </ul>
@@ -308,7 +308,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <li><strong>Solve (student).</strong> <strong>Sets to solve</strong> merges your class sets with open sets, or open any set by code. Each question shows its prompt with a <strong>Hint</strong> toggle where the teacher left one; <strong>Solve on sheet</strong> opens the sheet with the starter loaded (when the teacher attached one). Draw the answer, then <strong>Submit my sheet</strong> from the sheet's <strong>Sets</strong> panel with an optional note. <strong>My submissions</strong> lists what you sent, with <strong>Reload in sheet</strong> to load one back as an editable copy. <strong>My drawings</strong> reopens anything you <strong>Save</strong>d, and <strong>Tutorial progress</strong> ticks off finished lessons.</li>
 <li><strong>Inspect (teacher).</strong> Opening a set shows every submission with the student's name, question number, note, and date. <strong>View sheet</strong> opens the submitted drawing on the sheet in read-only <strong>View</strong> mode (measure, never edit); deleting a set removes its submissions too.</li>
 </ul>
-<p>Guests see none of this: the studio and workspace send guests back to the login page, and no class, set, or submission call ever leaves the browser without a session token. Classes, sets, and saves need the C++ backend (<code>npm run start:cpp</code>); the minimal Node demo server only logs you in.</p>
+<p>Guests see none of this: the studio and workspace send guests back to the login page, and no class, set, or submission call ever leaves the browser without a session token. Classes, sets, and saves all run against the single app server (<code>npm start</code>).</p>
 <hr>
 <h2 id="4-drawing-tool-by-tool">4. Drawing, tool by tool</h2>
 <p>Tools have no buttons: each one is a click sequence on the sheet. The tools that exist in the UI are: <strong>place point</strong>, <strong>select</strong>, <strong>line/segment</strong>, <strong>BIS line-type popup</strong>, <strong>polar point</strong>, <strong>line-referenced plotting</strong>, and <strong>three-point circle</strong>. Everything else in this section is marked <strong>not reachable from the UI</strong> where that is the case — read those notes before hunting for a button that does not exist.</p>
@@ -1066,7 +1066,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <tr><td><code>Desktop required</code> overlay, no canvas</td><td>Touch-only small screen blocked by the desktop gate</td><td>Open on a desktop/laptop; the overlay links the tutorials sheet (§3.8)</td></tr>
 <tr><td>Clicks won't draw anything</td><td>View mode is on: it measures, never edits</td><td>Switch back to Edit (§3.9)</td></tr>
 <tr><td>Server prints <code>port 8124 busy, using N</code></td><td>Port occupied (another server or runaway process)</td><td>Open the printed port; stop the other server if it is yours</td></tr>
-<tr><td><code>npm start</code> fails immediately</td><td>Node missing or port range exhausted</td><td>Install Node; free ports 8124–8133</td></tr>
+<tr><td><code>npm start</code> fails immediately</td><td>Build tools/libsodium missing, or port range exhausted</td><td>Install Node, CMake, a C++ compiler and libsodium-dev; free ports 8124–8133</td></tr>
 </tbody>
 </table>
 <hr>
@@ -1098,8 +1098,8 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <p><strong>Platform &amp; workflow.</strong></p>
 <ol>
 <li>No touch/pen input on desktop and no accessibility claims — untested (<code>[unverified]</code> if you need them: try before teaching with them). Touch-only small screens are blocked outright by the desktop gate (§3.8), so there is no mobile layout to claim.</li>
-<li>No browser-driven tests inside <code>npm test</code> (plain Node only); browser behavior beyond one obscura smoke check is <code>[unverified]</code>, and no specific browser versions are claimed.</li>
-<li>Demo-only accounts (three roles + guest, <code>localStorage</code> session, no real security — see §3.8). The Node demo server keeps a plaintext demo list; the C++ backend hashes passwords into SQLite. No sharing, printing pipeline, or print-accurate (mm-true) output; print/export scaling helpers exist only as code functions.</li>
+<li>No browser-driven tests inside <code>npm test</code> (Node plus a local throwaway C++ server only); browser behavior beyond one obscura smoke check is <code>[unverified]</code>, and no specific browser versions are claimed.</li>
+<li>Demo-only accounts (three roles + guest, <code>localStorage</code> session, no real security — see §3.8). Demo passwords ship in <code>tools/users.json</code> and <code>educad-seed</code> hashes them into SQLite on first run. No sharing, printing pipeline, or print-accurate (mm-true) output; print/export scaling helpers exist only as code functions.</li>
 </ol>
 <hr>
 <h2 id="13-appendix-developer-reference">13. Appendix (developer reference)</h2>
@@ -1129,7 +1129,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <tr><td><code>edugraphics-hud.css</code></td><td>HUD/menu/glass positioning</td><td>Yes</td></tr>
 </tbody>
 </table>
-<p>Server: <code>tools/serve.js</code> (<code>npm start</code>, 127.0.0.1:8124, plus the demo <code>POST /api/login</code> endpoint). Manual page: <code>tools/build-manual.js</code> (<code>npm run build:manual</code> renders <code>docs/MANUAL.md</code> → <code>mirror/manual.html</code>, opened from the demo bar). Tests: <code>tools/test-*.js</code> (850 checks, all green at writing time — see the repo README for the per-phase list), including <code>tools/test-phase11-manual.js</code> (manual build, in-app link, freshness), <code>tools/test-phase12-reconstruct-3view.js</code> (side-view reconstruction), <code>tools/test-phase13-curves.js</code> (Class D cylinders/cones, circle gesture), <code>tools/test-phase14-glass.js</code> (fullscreen 3D glass, aura, gestures), <code>tools/test-phase15-demo-3view.js</code> (3-view demo button wiring), <code>tools/test-phase16-line-circle.js</code> (bank + finalizer clicks), <code>tools/test-phase17-point-cascade.js</code> (point-delete line cascade), <code>tools/test-phase18-two-point-line.js</code> (two-point line property), <code>tools/test-phase19-multi-caption.js</code> (competing captions), <code>tools/test-phase20-claims-verify.js</code> (Check hidden grading), <code>tools/test-phase21-tutorial.js</code> + <code>tools/test-phase23-prism-tutorial.js</code> (scripted tutorials), <code>tools/test-phase22-claimed-lamina.js</code> (Class E), <code>tools/test-phase24-typed-distance.js</code> / <code>tools/test-phase25-plot-typed.js</code> / <code>tools/test-phase26-ground-plot.js</code> (typed entry + ground-line datum), <code>tools/test-phase27-pick-bank.js</code> (two-slot bank), <code>tools/test-phase28-view-measure.js</code> (Edit/View toggle, select-and-measure inspect), and <code>tools/test-login.js</code> (demo roles + guest gate).</p>
+<p>Server: <code>backend/src/main.cpp</code> (<code>npm start</code> builds and runs <code>educad-server</code>, 127.0.0.1:8124, static files plus the JSON API). Manual page: <code>tools/build-manual.js</code> (<code>npm run build:manual</code> renders <code>docs/MANUAL.md</code> → <code>mirror/manual.html</code>, opened from the demo bar). Tests: <code>tools/test-*.js</code> (874 checks, all green at writing time — see the repo README for the per-phase list), including <code>tools/test-phase11-manual.js</code> (manual build, in-app link, freshness), <code>tools/test-phase12-reconstruct-3view.js</code> (side-view reconstruction), <code>tools/test-phase13-curves.js</code> (Class D cylinders/cones, circle gesture), <code>tools/test-phase14-glass.js</code> (fullscreen 3D glass, aura, gestures), <code>tools/test-phase15-demo-3view.js</code> (3-view demo button wiring), <code>tools/test-phase16-line-circle.js</code> (bank + finalizer clicks), <code>tools/test-phase17-point-cascade.js</code> (point-delete line cascade), <code>tools/test-phase18-two-point-line.js</code> (two-point line property), <code>tools/test-phase19-multi-caption.js</code> (competing captions), <code>tools/test-phase20-claims-verify.js</code> (Check hidden grading), <code>tools/test-phase21-tutorial.js</code> + <code>tools/test-phase23-prism-tutorial.js</code> (scripted tutorials), <code>tools/test-phase22-claimed-lamina.js</code> (Class E), <code>tools/test-phase24-typed-distance.js</code> / <code>tools/test-phase25-plot-typed.js</code> / <code>tools/test-phase26-ground-plot.js</code> (typed entry + ground-line datum), <code>tools/test-phase27-pick-bank.js</code> (two-slot bank), <code>tools/test-phase28-view-measure.js</code> (Edit/View toggle, select-and-measure inspect), and <code>tools/test-login.js</code> (demo roles + guest gate).</p>
 <h3 id="132-behavior-anchors-fileline">13.2 Behavior anchors (file:line)</h3>
 <p>Key behaviors and where they live (line numbers at writing time; older rows predate the tutorial / Check / login additions and may have drifted — the demo-bar, gate, and session rows were re-verified for this revision).</p>
 <ul>
@@ -1172,8 +1172,8 @@ lesson.steps.forEach(function (s) { console.log(s); });</code></pre>
 <tr><td>1</td><td>mm world; px ephemeral</td><td><code>educad-viewport.js:9-11</code>; <code>test-phase2</code> #38–39</td></tr>
 <tr><td>2</td><td>elev.x == plan.x, eps 1e-9</td><td><code>educad-viewport.js:110-114</code>; <code>test-baseline</code> #28</td></tr>
 <tr><td>3</td><td>First-angle layout (plan below, elev above)</td><td><code>index.html:375-376</code>; fixtures <code>layout: monge-first-angle</code></td></tr>
-<tr><td>4</td><td><code>npm start</code> → 127.0.0.1:8124</td><td><code>tools/serve.js:9-10</code>; <code>package.json</code> scripts</td></tr>
-<tr><td>5</td><td>Port busy → next port + message</td><td><code>tools/serve.js:189-202</code></td></tr>
+<tr><td>4</td><td><code>npm start</code> → 127.0.0.1:8124</td><td><code>backend/src/main.cpp:56,2596-2603</code>; <code>package.json</code> scripts</td></tr>
+<tr><td>5</td><td>Port busy → next port + message</td><td><code>backend/src/main.cpp:2619-2625</code>; <code>test-cpp-backend</code> #18</td></tr>
 <tr><td>6</td><td>HUD labels + pill rule y&gt;=0</td><td><code>index.html:61-64</code>, <code>:659-666</code></td></tr>
 <tr><td>7</td><td>Demo-bar button labels (10, Manual last)</td><td><code>index.html:205-215</code>; <code>test-phase11</code> #18, <code>test-phase20</code> #22</td></tr>
 <tr><td>8</td><td>Zoom labels <code>+ - Home</code>, ×1.25, home s=2</td><td><code>edugraphics-common.js:27</code>; <code>educad-canvas.js:143-151</code></td></tr>

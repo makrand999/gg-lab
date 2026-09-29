@@ -46,9 +46,9 @@
       window.location.replace('login.html');
       return;
     }
-    // The minimal Node demo server has no lab API at all.
+    // Without the app server there is no lab API at all.
     if (/failed to fetch|load failed|not found/i.test(msg) || !err.status) {
-      flash(what + ': lab server unreachable. Run `npm run start:cpp` ' +
+      flash(what + ': lab server unreachable. Run `npm start` ' +
         'for classes, sets and saves.', 'error');
       return;
     }

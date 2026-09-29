@@ -1,0 +1,189 @@
+/* EduCAD login: Codeforces look. Menu copies CF's main menu + lava hover. */
+@font-face {
+  font-family: 'Cuprum';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(fonts/cuprum-latin.woff2) format('woff2');
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #e5e5e5; }
+body {
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #222;
+}
+a { color: #0645ad; }
+a:hover { color: #003d99; }
+
+.cf-page {
+  max-width: 980px;
+  margin: 0 auto;
+  background: #fff;
+  border-left: 1px solid #c8c8c8;
+  border-right: 1px solid #c8c8c8;
+  min-height: 100vh;
+}
+
+.cf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 22px 10px;
+}
+.cf-logo {
+  font-size: 26px;
+  font-weight: bold;
+  color: #222;
+  text-decoration: none;
+  letter-spacing: 0.5px;
+}
+.cf-logo span { color: #b00000; }
+.cf-head-right { font-size: 11.5px; color: #777; }
+
+/* CF main menu, same-to-same: white roundbox, 1px #b9b9b9 border,
+   black uppercase Cuprum links, active item underlined #3B5998. */
+.cf-menu {
+  background: #fff;
+  border: 1px solid #b9b9b9;
+  border-radius: 6px;
+  margin: 0 8px;
+}
+.menu-list-container { margin: 0; }
+.menu-list {
+  position: relative;
+  list-style: none;
+  margin: 0 0 0 16px;
+  padding: 0;
+  display: flex;
+}
+.menu-list li {
+  font-family: 'Cuprum', 'Arial Narrow', sans-serif;
+  list-style: none;
+  margin-right: 18px;
+  padding: 9px 0 8px;
+  position: relative;
+}
+.menu-list li:last-child { margin-right: 0; }
+.menu-list li a,
+.menu-list li a:link,
+.menu-list li a:visited,
+.menu-list li a:hover,
+.menu-list li a:active {
+  font-weight: normal;
+  font-size: 15px;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: #000;
+  outline: none;
+  display: block;
+  line-height: 22px;
+  height: 22px;
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+  border: none;
+}
+.menu-list li.current {
+  border-bottom: 3px solid #3B5998;
+  padding-bottom: 5px;
+}
+/* CF lava hover, pasted from codeforces second-level-menu.css: the pill
+   is two image slices — leftLava stretches, backLava caps the right.
+   Motion is driven frame-by-frame in menu-lava.js (CF easeOutBack,
+   700ms) — no CSS transition here, it would fight the tween. */
+.menu-list li.backLava {
+  background: url(images/menu/lava-right.png) no-repeat top right;
+  width: 9px;
+  height: 20px;
+  z-index: 8;
+  position: absolute;
+  margin: 0;
+  padding: 0;
+}
+.menu-list li.backLava .leftLava {
+  background: url(images/menu/lava-left.png) no-repeat top left;
+  height: 20px;
+  margin-right: 9px;
+}
+
+.cf-content { padding: 22px 28px 30px; }
+.cf-content h1 {
+  font-size: 17px;
+  font-weight: bold;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ddd;
+}
+
+.cf-tabs { margin: 14px 0 4px; }
+.cf-tabs button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  font-size: 13px;
+  color: #0645ad;
+  padding: 6px 2px;
+  margin-right: 20px;
+  cursor: pointer;
+}
+.cf-tabs button:hover { color: #003d99; }
+.cf-tabs button.active {
+  color: #222;
+  font-weight: bold;
+  border-bottom-color: #b00000;
+}
+
+.cf-form { border-collapse: collapse; margin-top: 10px; }
+.cf-form td { padding: 5px 6px; vertical-align: middle; }
+.cf-form .lbl { text-align: right; color: #555; width: 92px; }
+.cf-form input {
+  width: 250px;
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid #b9b9b9;
+  background: #fff;
+  color: #222;
+}
+.cf-form input:focus { border-color: #0645ad; outline: none; }
+
+.cf-btn {
+  font: inherit;
+  background: #f0f0f0;
+  border: 1px solid #999;
+  padding: 4px 20px;
+  cursor: pointer;
+  color: #222;
+}
+.cf-btn:hover { background: #e2e2e2; }
+.cf-btn:disabled { color: #999; cursor: default; }
+
+.cf-error { color: #b00000; font-size: 12px; margin-left: 10px; }
+.cf-hint { color: #777; font-size: 12px; margin-top: 12px; }
+.cf-hint code {
+  font-family: Consolas, Menlo, monospace;
+  background: #f4f4f4;
+  padding: 0 4px;
+}
+
+.cf-guest {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+  color: #555;
+}
+
+.cf-footer {
+  border-top: 1px solid #ddd;
+  padding: 12px 28px 20px;
+  color: #888;
+  font-size: 11.5px;
+}
+
+@media (max-width: 600px) {
+  .cf-head-right { display: none; }
+  .cf-form input { width: 100%; }
+  .cf-form .lbl { width: auto; }
+}

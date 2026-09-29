@@ -9,50 +9,146 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #app-container { width: 100vw; height: 100vh; position: relative; }
-    .status-hud {
+    .coords-hud {
       position: absolute;
-      top: 12px;
-      left: 12px;
+      bottom: 44px;
+      right: 12px;
       z-index: 10;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 8px 14px;
-      font-size: 13px;
-      color: #1e293b;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #0284c7;
+      font-weight: 600;
       pointer-events: none;
+      user-select: none;
     }
-    .status-hud .coords { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 3px; }
-    .plane-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-    .plane-vp { background: #e0e7ff; color: #3730a3; }
-    .plane-hp { background: #fef3c7; color: #92400e; }
+    .plane-tag { display: none; }
     .demo-bar {
       position: absolute;
       top: 12px;
       right: 12px;
       z-index: 10;
       display: flex;
-      gap: 6px;
+      align-items: center;
+      gap: 12px;
+    }
+    .clean-select-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      user-select: none;
+    }
+    .clean-select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      padding: 3px 18px 3px 2px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      color: #0f172a;
+      cursor: pointer;
+      outline: none;
+      transition: color 0.15s ease, border-color 0.15s ease;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2364748b' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 2px center;
+      background-size: 8px 5px;
+    }
+    .clean-select:hover {
+      color: #0284c7;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%230284c7' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+    }
+    .clean-select:focus {
+      color: #0284c7;
+      border-bottom-color: #0284c7;
+    }
+    .clean-select option {
+      font-weight: normal;
+      color: #1e293b;
+      background: #ffffff;
+    }
+    .bar-divider {
+      width: 1px;
+      height: 14px;
+      background: #cbd5e1;
+      display: inline-block;
+      opacity: 0.7;
     }
     .demo-btn {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 6px 12px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 3px 4px;
       font-size: 12px;
       font-weight: 500;
       font-family: inherit;
-      color: #334155;
+      color: #475569;
       cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      transition: all 0.15s ease;
+      box-shadow: none;
+      transition: color 0.15s ease;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
     }
-    .demo-btn:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
-    .demo-btn.active { background: #0284c7; color: #ffffff; border-color: #0284c7; }
+    .demo-btn:hover { background: transparent; border-color: transparent; color: #0284c7; }
+    .demo-btn.active {
+      background: transparent;
+      color: #0284c7;
+      border-color: transparent;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      /* test active anchor: background: #0284c7 */
+    }
+    /* Edit/View mode pair: same chrome as demo buttons, own class so the
+       demo active-sweep never touches the mode indicator. */
+    .mode-btn {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 3px 4px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      color: #475569;
+      cursor: pointer;
+      box-shadow: none;
+      transition: color 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+    }
+    .mode-btn:hover { background: transparent; border-color: transparent; color: #0284c7; }
+    .mode-btn.active {
+      background: transparent;
+      color: #0284c7;
+      border-color: transparent;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    #session-bar {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px 4px 4px 12px;
+      font-size: 12px;
+      color: #334155;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    #session-bar .demo-btn { box-shadow: none; }
 
     /* Mobile gate: CAD canvas is desktop-only. Opaque overlay intercepts all input. */
     #mobile-block {
@@ -120,8 +216,119 @@
     }
     .mobile-block-card .demo-btn { font-size: 13px; }
   </style>
+  <style id="cf-panels">
+    /* Account panels (Drawings, Sets): same clean Codeforces look as the
+       login page — Verdana, square grey buttons, blue links. Strictly
+       scoped: the canvas chrome (.demo-btn et al) outside .cf-panel is
+       untouched. */
+    .cf-panel {
+      position: absolute;
+      left: 0;
+      bottom: 40px;
+      min-width: 270px;
+      max-width: 380px;
+      max-height: 340px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #b9b9b9;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      padding: 10px 12px;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #222;
+      z-index: 30;
+      text-align: left;
+    }
+    .cf-panel .cf-title {
+      font-size: 15px;
+      font-weight: bold;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 6px;
+    }
+    .cf-panel .cf-section {
+      font-weight: bold;
+      margin-top: 10px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #eee;
+    }
+    .cf-panel .cf-row {
+      border-top: 1px solid #ddd;
+      margin-top: 6px;
+      padding-top: 6px;
+    }
+    .cf-panel .cf-name { font-weight: bold; }
+    .cf-panel .cf-muted { color: #777; font-size: 12px; }
+    .cf-panel .demo-btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: normal;
+      background: #f0f0f0;
+      border: 1px solid #999;
+      border-radius: 0;
+      padding: 4px 20px;
+      color: #222;
+    }
+    .cf-panel .demo-btn:hover {
+      background: #e2e2e2;
+      border-color: #999;
+      color: #222;
+    }
+    .cf-panel .cf-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      font-size: 13px;
+      color: #0645ad;
+      cursor: pointer;
+    }
+    .cf-panel .cf-link:hover { color: #003d99; text-decoration: underline; }
+    .cf-panel input[type="text"], .cf-panel textarea {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 4px;
+      font: inherit;
+      font-size: 13px;
+      padding: 4px 6px;
+      border: 1px solid #b9b9b9;
+      background: #fff;
+      color: #222;
+    }
+    .cf-panel input[type="text"]:focus, .cf-panel textarea:focus {
+      border-color: #0645ad;
+      outline: none;
+    }
+    .cf-panel input[type="checkbox"] { margin-right: 4px; }
+  </style>
 </head>
 <body>
+  <script>
+    // Login gate: no session -> login page. Runs before the CAD modules
+    // load so logged-out users never flash the canvas. Teachers and
+    // academics live in the studio: they reach the sheet only through an
+    // explicit deep link (submission review, starter drawing).
+    (function gateLogin() {
+      try {
+        if (!window.localStorage) return;
+        var raw = window.localStorage.getItem('educad_session');
+        if (!raw) {
+          window.location.replace('login.html');
+          return;
+        }
+        var role = null;
+        try { role = JSON.parse(raw).role; } catch (err) {}
+        if (role === 'teacher' || role === 'academics') {
+          var q = String(window.location.search || '');
+          if (!/(?:^|[?&])(submission|solve|drawing|draw|model)=/.test(q)) {
+            window.location.replace('teacher.html');
+          }
+        }
+      } catch (err) { /* storage blocked: fail open to avoid a redirect loop */ }
+    })();
+  </script>
   <div id="mobile-block" role="alertdialog" aria-label="Desktop required" aria-hidden="true">
     <div class="mobile-block-card">
       <span class="monitor-glyph" aria-hidden="true"></span>
@@ -169,18 +376,92 @@
   </script>
   <div id="app-container"></div>
   
-  <div class="status-hud">
-    <div><strong>EduCAD 2D Engine</strong> &bull; 1st Angle Monge Projection &bull; <span id="plane-indicator" class="plane-tag plane-vp">VP (Elevation)</span></div>
-    <div class="coords" id="coords-display">X: 0.00 mm &bull; Y: 0.00 mm (Ground Line XY)</div>
-  </div>
+  <div class="coords-hud" id="coords-display">X: 0.00 mm &bull; Y: 0.00 mm (Ground Line XY)</div>
+  <span id="plane-indicator" class="plane-tag" style="display:none;"></span>
 
   <div class="demo-bar">
-    <button class="demo-btn active" id="btn-demo-line">Line Rotation (TL=80, θ=30°, φ=45°)</button>
-    <button class="demo-btn" id="btn-demo-points">Quadrant Points (1st & 3rd)</button>
-    <button class="demo-btn" id="btn-demo-prism">Hexagonal Prism (35mm)</button>
+    <label class="clean-select-wrap">Demo:
+      <select class="clean-select" id="sel-demo" aria-label="Demo Selection">
+        <option value="line">Line Rotation (TL=80, θ=30°, φ=45°)</option>
+        <option value="points">Quadrant Points (1st & 3rd)</option>
+        <option value="prism">Hexagonal Prism (35mm)</option>
+        <option value="3view">3-View Prism (35mm)</option>
+        <option value="square">Profile Square (40mm)</option>
+      </select>
+    </label>
+    <label class="clean-select-wrap">Tutorial:
+      <select class="clean-select" id="sel-tut" aria-label="Tutorial Selection">
+        <option value="" selected>Tutorial Option...</option>
+        <option value="square">Square</option>
+        <option value="prism">Prism</option>
+      </select>
+    </label>
+    <span class="demo-bridge" style="display:none;">
+      <button class="demo-btn active" id="btn-demo-line">Line Rotation (TL=80, θ=30°, φ=45°)</button>
+      <button class="demo-btn" id="btn-demo-points">Quadrant Points (1st & 3rd)</button>
+      <button class="demo-btn" id="btn-demo-prism">Hexagonal Prism (35mm)</button>
+      <button class="demo-btn" id="btn-demo-3view">3-View Prism (35mm)</button>
+      <button class="demo-btn" id="btn-demo-square">Profile Square (40mm)</button>
+      <button class="demo-btn" id="btn-tut-square">Tutorial: Square</button>
+      <button class="demo-btn" id="btn-tut-prism">Tutorial: Prism</button>
+    </span>
+    <span class="bar-divider"></span>
     <button class="demo-btn" id="btn-clear">Clear Sheet</button>
+    <button class="demo-btn" id="btn-check">Check hidden</button>
+    <span class="bar-divider"></span>
+    <button class="mode-btn active" id="btn-mode-edit" title="Edit mode: draw and change the sheet">Edit</button>
+    <button class="mode-btn" id="btn-mode-view" title="View mode: read-only inspect and measure">View</button>
+    <span class="bar-divider"></span>
     <a class="demo-btn" id="btn-manual" href="manual.html" target="_blank" rel="noopener">Manual</a>
   </div>
+
+  <div id="session-bar">
+    <span id="session-who"></span>
+    <button class="demo-btn" id="btn-save" type="button" title="Save the sheet to your account">Save</button>
+    <button class="demo-btn" id="btn-drawings" type="button" title="Open a saved drawing">Drawings</button>
+    <button class="demo-btn" id="btn-sets" type="button" title="Question sets">Sets</button>
+    <a class="demo-btn" id="btn-home" href="teacher.html" title="Back to your home page">Studio</a>
+    <button class="demo-btn" id="btn-logout" type="button">Logout</button>
+    <span id="save-status" role="status"></span>
+    <div id="drawings-panel" class="cf-panel" hidden></div>
+    <div id="sets-panel" class="cf-panel" hidden></div>
+  </div>
+  <script>
+    // Session chip: shows who is logged in; Logout clears the session.
+    // Kept outside .demo-bar (tests pin the Manual link as its last child)
+    // and stops canvas gestures so clicks here never draw.
+    (function sessionBar() {
+      function current() {
+        try { return JSON.parse(window.localStorage.getItem('educad_session') || 'null'); }
+        catch (err) { return null; }
+      }
+      var bar = document.getElementById('session-bar');
+      if (bar) {
+        ['pointerdown', 'pointerup', 'click', 'dblclick', 'wheel'].forEach(function (t) {
+          bar.addEventListener(t, function (e) { e.stopPropagation(); });
+        });
+      }
+      var s = current();
+      var who = document.getElementById('session-who');
+      if (who) who.textContent = s ? (s.name + ' (' + s.role + ')') : '';
+      var home = document.getElementById('btn-home');
+      if (home) {
+        if (!s || s.role === 'guest') home.style.display = 'none';
+        else if (s.role === 'student') {
+          home.href = 'student.html';
+          home.textContent = 'Workspace';
+        } else {
+          home.href = 'teacher.html';
+          home.textContent = 'Studio';
+        }
+      }
+      var out = document.getElementById('btn-logout');
+      if (out) out.addEventListener('click', function () {
+        try { window.localStorage.removeItem('educad_session'); } catch (err) {}
+        window.location.replace('login.html');
+      });
+    })();
+  </script>
 
   <!-- Core Modules -->
   <script src="files/www.geogebra.org/educad-viewport.js"></script>
@@ -194,8 +475,12 @@
   <script src="files/www.geogebra.org/educad-labels.js"></script>
   <script src="files/www.geogebra.org/educad-solid.js"></script>
   <script src="files/www.geogebra.org/educad-reconstruct.js"></script>
+  <script src="files/www.geogebra.org/educad-verify.js"></script>
+  <script src="files/www.geogebra.org/educad-measure.js"></script>
+  <script src="files/www.geogebra.org/educad-tutorial.js"></script>
   <script src="files/www.geogebra.org/edugraphics-common.js"></script>
   <script src="files/www.geogebra.org/educad-boot.js"></script>
+  <script src="files/www.geogebra.org/educad-saves.js"></script>
 
   <script>
     (function () {
@@ -210,6 +495,9 @@
         w: window.innerWidth,
         h: window.innerHeight
       });
+      // Saves UI bridge: the session-bar script below is a separate block
+      // and reaches the live table only through this handle.
+      window.educadHandle = handle;
 
       var mount = handle.mount;
       var c1 = mount.layer1;
@@ -240,7 +528,9 @@
         return null;
       }
 
-      // Line construction task (Ctrl+click P1, click P2, pick BIS type).
+      // Line construction task (bank P1, click P2, pick BIS type). The
+      // tool only ever parks in menu/animating: P1 arrives banked and
+      // the finalizer locks P2 in the same click.
       handle.line = EduCADCanvas.createLineToolState();
       var lineMenu = null;
       var lineAnim = null;
@@ -311,10 +601,359 @@
         EduCADCanvas.abortLineTool(handle.line);
         lineAnim = null;
         hideLineMenu();
+        hideMemberMenu();
+        pendingMember = null;
         setLineCursor(false);
       }
-      // Polar point construction shares the Ctrl+click anchor with the
-      // line tool; a line-click resolves the anchor to the polar task.
+      // Member chooser: Ctrl+click on a multi-caption point asks which
+      // corner the student draws for (the projector claim). Same popup
+      // patterns as the BIS menu; the pick banks only after the choice.
+      var memberMenu = null;
+      var pendingMember = null;
+      function hideMemberMenu() {
+        if (memberMenu) memberMenu.classList.remove('open');
+      }
+      function showMemberMenu(px, parts) {
+        if (memberMenu && memberMenu.parentNode) {
+          memberMenu.parentNode.removeChild(memberMenu);
+        }
+        var m = document.createElement('div');
+        m.className = 'edugraphics-menu';
+        var head = document.createElement('div');
+        head.textContent = 'Draw for which corner?';
+        head.style.cssText = 'padding:4px 8px;font:600 12px system-ui,sans-serif;color:#475569;';
+        m.appendChild(head);
+        parts.forEach(function (part, i) {
+          var row = document.createElement('div');
+          row.className = 'edugraphics-menu-item';
+          row.setAttribute('data-member', String(i));
+          row.textContent = part;
+          m.appendChild(row);
+        });
+        m.addEventListener('click', function (e) {
+          var row = (e.target && typeof e.target.closest === 'function') ?
+            e.target.closest('[data-member]') : null;
+          if (row === null || pendingMember === null) return;
+          var pick = pendingMember;
+          var bare = parts[Number(row.getAttribute('data-member'))];
+          pendingMember = null;
+          hideMemberMenu();
+          if (typeof EduCADLabels !== 'undefined' && EduCADLabels.bareName) {
+            bare = EduCADLabels.bareName(bare);
+          }
+          bankFromPick(pick, bare);
+        });
+        document.getElementById('app-container').appendChild(m);
+        memberMenu = m;
+        memberMenu.style.left = Math.max(4, Math.min(px.x + 10, window.innerWidth - 170)) + 'px';
+        memberMenu.style.top = Math.max(4, Math.min(px.y + 10, window.innerHeight - 170)) + 'px';
+        memberMenu.classList.add('open');
+      }
+      // User actions: every click/key gesture funnels through these named
+      // functions, and the tutorial stepper calls the same ones — one
+      // implementation serves the hand and the script.
+      function userPlacePoint(xMm, yMm, cursorPx) {
+        var pname = EduCADCanvas.nextPointName(handle.table.list());
+        var placed = handle.table.create('POINT', {
+          x: xMm, y: yMm, name: pname, caption: pname, showLabel: true,
+          bisCode: 'B', viewRole: yMm >= 0 ? 'ELEVATION' : 'PLAN'
+        });
+        renderLayer1();
+        renderLayer2(cursorPx || null, null);
+        return placed;
+      }
+      function userSelectPoint(id, cursorPx) {
+        if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
+        clearBank();
+        EduCADCanvas.clearTypedDist(handle.typedDist);
+        EduCADCanvas.selectPoint(handle.sel, id);
+        stopCaretTimer();
+        renderLayer1();
+        renderLayer2(cursorPx || null, null);
+      }
+      function userRenamePoint(id, newName) {
+        var ent = handle.table.get(id);
+        if (ent === null) return null;
+        EduCADCanvas.beginEdit(handle.sel, id, ent.caption || ent.name || '');
+        handle.sel.editing.buffer = String(newName);
+        return userCommitRename();
+      }
+      function userCommitRename() {
+        var w = EduCADCanvas.commitRename(handle.sel);
+        stopCaretTimer();
+        if (w && w.delete) {
+          var goneIds = null;
+          if (typeof handle.table.removeCascade === 'function') {
+            goneIds = handle.table.removeCascade(w.id);
+          } else {
+            handle.table.remove(w.id);
+            goneIds = [w.id];
+          }
+          cleanupAfterPointDelete(goneIds);
+          EduCADCanvas.deselect(handle.sel);
+          EduCADCanvas.clearTypedDist(handle.typedDist);
+        } else if (w && handle.table.get(w.id)) {
+          handle.table.update(w.id, { name: w.name, caption: w.name });
+        }
+        renderLayer1();
+        renderLayer2(null, null);
+        return w;
+      }
+      function userLockTarget(id, cursor) {
+        var bank = handle.circlePicks.picks;
+        if (bank.length !== 1) return false;
+        var p1 = handle.table.get(bank[0].id);
+        var ent = handle.table.get(id);
+        if (p1 === null || ent === null) return false;
+        EduCADCanvas.anchorLineTool(handle.line, bank[0].id, p1.x, p1.y,
+          bank[0].member || null);
+        if (!EduCADCanvas.lockLineTarget(handle.line, id, ent.x, ent.y)) {
+          EduCADCanvas.abortLineTool(handle.line);
+          renderLayer2(cursor, null);
+          return false;
+        }
+        abortPolarTask();
+        clearBank();
+        showLineMenu(cursor);
+        renderLayer2(cursor, null);
+        return true;
+      }
+      // Circle finalizer: two banked points plus the clicked third draw
+      // the circle (a banked corner claim applies to lines only).
+      // Rejected triples warn and drop the bank; nothing stays armed.
+      function userCommitCircle(id, cursor) {
+        var bank = handle.circlePicks.picks;
+        if (bank.length !== 2) return false;
+        var c0 = handle.table.get(bank[0].id);
+        var c1 = handle.table.get(bank[1].id);
+        var c2 = handle.table.get(id);
+        if (c0 === null || c1 === null || c2 === null) return false;
+        var cres = EduCADCanvas.circleFromThreePoints(
+          { x: c0.x, y: c0.y }, { x: c1.x, y: c1.y }, { x: c2.x, y: c2.y });
+        if (cres.ok) {
+          var rMin = EduCADEntities.RADIUS_MIN_MM;
+          var rr = cres.r < rMin ? rMin : cres.r;
+          handle.table.create('CIRCLE', {
+            x: cres.x, y: cres.y, radius: rr,
+            bisCode: 'A', viewRole: cres.y >= 0 ? 'ELEVATION' : 'PLAN',
+            caption: '', showLabel: false, meta: { kind: 'user-circle' }
+          });
+        } else if (typeof console !== 'undefined' && console.warn) {
+          console.warn('EduCAD circle: ' + cres.message);
+        }
+        clearBank();
+        renderLayer1();
+        renderLayer2(cursor, null);
+        return cres.ok;
+      }
+      // Typed-distance arming: exactly one visible point selected and no
+      // other gesture owning the keyboard. Returns the reference entity
+      // or null. Rename editing always wins over typing while it runs.
+      function typedDistRef() {
+        if (handle.sel.editing !== null) return null;
+        if (handle.sel.selectedId === null) return null;
+        if (EduCADCanvas.isLineToolActive(handle.line)) return null;
+        if (EduCADCanvas.isPolarToolActive(handle.polar)) return null;
+        if (EduCADCanvas.isPlotToolActive(handle.plot)) return null;
+        if (pendingMember !== null) return null;
+        if (handle.circlePicks.picks.length > 0) return null;
+        var ref = handle.table.get(handle.sel.selectedId);
+        if (ref === null || ref.type !== 'POINT' || ref.visible === false) {
+          return null;
+        }
+        return ref;
+      }
+      // Enter with a typed buffer stakes the point at that distance from
+      // the selection along the locked axis, on the cursor's side. A
+      // missing aim, direction, or value warns and keeps the buffer so
+      // the user can fix it and press Enter again. The selection stays
+      // on the reference for repeat entry.
+      function commitTypedDistAt(cursorPx) {
+        var ref = typedDistRef();
+        var buf = handle.typedDist.buffer;
+        if (ref === null || buf === '') return false;
+        if (!cursorPx) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('EduCAD distance: move the cursor onto the X or Y axis first');
+          }
+          return false;
+        }
+        var refPx = EduCADViewport.forward(handle.view, { x: ref.x, y: ref.y });
+        var rdx = cursorPx.x - refPx.x, rdy = cursorPx.y - refPx.y;
+        var onRef = (rdx * rdx + rdy * rdy) <
+          EduCADCanvas.SELECT_TOL_PX * EduCADCanvas.SELECT_TOL_PX;
+        if (onRef) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('EduCAD distance: move off the point to choose a direction');
+          }
+          return false;
+        }
+        var lock = EduCADCanvas.axisLockState(cursorPx, handle.view,
+          { x: ref.x, y: ref.y });
+        if (lock.lock === null || lock.readout === null) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('EduCAD distance: aim onto the X or Y axis of the selection first');
+          }
+          return false;
+        }
+        var parsed = EduCADCanvas.parseTypedDist(buf);
+        if (!parsed.ok) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('EduCAD distance: ' + parsed.message);
+          }
+          return false;
+        }
+        var sign = EduCADCanvas.typedDistSign(lock.lock, cursorPx, handle.view,
+          { x: ref.x, y: ref.y });
+        var tgt = EduCADCanvas.typedDistPoint({ x: ref.x, y: ref.y },
+          lock.lock, sign, parsed.value);
+        if (tgt === null) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('EduCAD distance: move off the point to choose a direction');
+          }
+          return false;
+        }
+        EduCADCanvas.clearTypedDist(handle.typedDist);
+        userPlacePoint(tgt.xMm, tgt.yMm, cursorPx);
+        return true;
+      }
+      // Typed-plot arming: a datum is focused and rename is not running.
+      // Plotting is exclusive (arming it aborts every other tool), so no
+      // further gates are needed. Returns {aMm, bMm} or null.
+      function typedPlotAB() {
+        if (handle.sel.editing !== null) return null;
+        if (!EduCADCanvas.isPlotToolActive(handle.plot)) return null;
+        if (handle.plot.ground) return { ground: true, aMm: null, bMm: null };
+        return { aMm: handle.plot.aMm, bMm: handle.plot.bMm };
+      }
+      // Enter while plotting stakes the point at the typed perpendicular
+      // offset on the cursor's side of the datum, then ends plotting
+      // (one-shot, like the click commit). Failures warn and keep the
+      // buffer for a retry.
+      function commitPlotTypedAt(cursorPx) {
+        var dab = typedPlotAB();
+        var buf = handle.typedDist.buffer;
+        if (dab === null || buf === '') return false;
+        if (!cursorPx) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('EduCAD plot: move the cursor off the datum first');
+          }
+          return false;
+        }
+        var wpt = EduCADViewport.inverse(handle.view, cursorPx);
+        var parsed = EduCADCanvas.parseTypedDist(buf);
+        if (!parsed.ok) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('EduCAD plot: ' + parsed.message);
+          }
+          return false;
+        }
+        var tgt = dab.ground ?
+          EduCADCanvas.plotGroundTyped(wpt, parsed.value) :
+          EduCADCanvas.plotTypedPoint(dab.aMm, dab.bMm, wpt, parsed.value);
+        if (tgt === null) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('EduCAD plot: move off the datum to choose a side');
+          }
+          return false;
+        }
+        abortPlotTask();
+        userPlacePoint(tgt.xMm, tgt.yMm, cursorPx);
+        return true;
+      }
+      function userSetupSquare() {
+        // loadDemo tears the stepper down (right for real demo switches);
+        // the tutorial's own setup step restores it right after.
+        var keepTut = tutStepper;
+        loadDemo('clear');
+        tutStepper = keepTut;
+        var datum = handle.table.create('DATUM_AXIS', {
+          x: -30, y: 0, x2: 30, y2: 0, bisCode: 'G', viewRole: 'BOTH',
+          caption: 'XY', showLabel: true, meta: { kind: 'XY' }
+        });
+        demoTruth = EduCADCurriculum.profileSquare({ sizeMm: 40, xMm: 0 }).corners;
+        renderLayer1();
+        return datum;
+      }
+      function userSetupPrism() {
+        var keepTut = tutStepper;
+        var keepLesson = tutLesson;
+        loadDemo('clear');
+        tutStepper = keepTut;
+        tutLesson = keepLesson;
+        var datum = handle.table.create('DATUM_AXIS', {
+          x: -35, y: 0, x2: 35, y2: 0, bisCode: 'G', viewRole: 'BOTH',
+          caption: 'XY', showLabel: true, meta: { kind: 'XY' }
+        });
+        demoTruth = EduCADCurriculum.regularSolid(
+          { solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 }).corners;
+        renderLayer1();
+        return datum;
+      }
+      // Revision wait: line commits land ~300 ms after the BIS pick via
+      // rAF; the tutorial pauses Next until the table bumps (or 2 s pass).
+      function waitTableRevision(done, timeoutMs) {
+        var rev0 = handle.table.revision();
+        var t0 = Date.now();
+        var to = (timeoutMs === undefined) ? 2000 : timeoutMs;
+        (function poll() {
+          if (handle.table.revision() !== rev0 || (Date.now() - t0) > to) {
+            done();
+            return;
+          }
+          setTimeout(poll, 50);
+        })();
+      }
+      // Banking: Ctrl+click toggles a point into the two-slot bank. No
+      // tool arms here — the bank only resolves on a plain-click
+      // finalizer. The crosshair marks a non-empty bank (multi-select
+      // in progress), never an armed line.
+      function bankHas(cid) {
+        var bk = handle.circlePicks.picks;
+        for (var i = 0; i < bk.length; i++) {
+          if (bk[i].id === String(cid)) return true;
+        }
+        return false;
+      }
+      function clearBank() {
+        EduCADCanvas.clearCirclePicks(handle.circlePicks);
+        setLineCursor(false);
+        return true;
+      }
+      function bankOverflow(cursor) {
+        if (handle.circlePicks.picks.length < 2) return false;
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('EduCAD bank: two banked already — plain-click finalizes, Ctrl+click unbanks');
+        }
+        renderLayer2(cursor, null);
+        return true;
+      }
+      function bankFromPick(pick, member) {
+        var cent = handle.table.get(pick.cid);
+        if (cent === null) {
+          renderLayer1();
+          renderLayer2(pick.cursor, null);
+          return;
+        }
+        abortPlotTask();
+        EduCADCanvas.clearTypedDist(handle.typedDist);
+        if (bankHas(pick.cid)) {
+          EduCADCanvas.toggleCirclePick(handle.circlePicks, pick.cid,
+            cent.x, cent.y);
+          if (handle.circlePicks.picks.length === 0) setLineCursor(false);
+          renderLayer1();
+          renderLayer2(pick.cursor, null);
+          return;
+        }
+        if (bankOverflow(pick.cursor)) return;
+        setLineCursor(true);
+        EduCADCanvas.toggleCirclePick(handle.circlePicks, pick.cid,
+          cent.x, cent.y, member || null);
+        renderLayer1();
+        renderLayer2(pick.cursor, null);
+      }
+      // Polar point construction starts from one banked point plus a
+      // segment click; the baseline, angle, and distance sweeps follow.
       handle.polar = EduCADCanvas.createPolarToolState();
       var POLAR_ARC_R_PX = 28;
       function abortPolarTask() {
@@ -324,6 +963,7 @@
       function commitPolarAt(cursorPx) {
         var wpt = EduCADViewport.inverse(handle.view, cursorPx);
         var spec = EduCADCanvas.commitPolarPoint(handle.polar, wpt);
+        clearBank();
         if (spec) {
           var pname = EduCADCanvas.nextPointName(handle.table.list());
           handle.table.create('POINT', {
@@ -338,14 +978,226 @@
       // Line-referenced plotting: first click on a datum segment arms
       // the perpendicular preview, second click commits the candidate.
       handle.plot = EduCADCanvas.createPlotToolState();
-      // Three-point circle picks (M3): ordered Ctrl+click list, no tool.
+      // Pick bank: ordered Ctrl+click list (two slots) behind every
+      // multi-point gesture. Banking arms nothing; a plain-click
+      // finalizer resolves one banked pick to a line and two to a
+      // circle. Amber ring + numeral per banked point.
       handle.circlePicks = EduCADCanvas.createCirclePickState();
+      // Typed axis distance: digits while a point is selected fill this
+      // buffer; Enter stakes the point along the locked axis (§6.2).
+      handle.typedDist = EduCADCanvas.createTypedDistState();
+      // Edit/View mode + inspected pick (View is read-only measuring).
+      handle.measure = EduCADMeasure.createViewState();
       function abortPlotTask() {
         EduCADCanvas.abortPlotTool(handle.plot);
+        EduCADCanvas.clearTypedDist(handle.typedDist);
+      }
+      // Edit/View switch. Entering View parks every authoring gesture
+      // (selection, rename, line menu, polar sweep, plotting, bank,
+      // typed buffer, popups) so inspection starts from idle; entering
+      // Edit only drops the readout. Pan, zoom, and 3D orbit work in
+      // both modes; the mode buttons use their own class so the demo
+      // active-sweep never touches the mode indicator.
+      function setSheetMode(mode) {
+        var next = EduCADMeasure.setMode(handle.measure, mode);
+        var be = document.getElementById('btn-mode-edit');
+        var bv = document.getElementById('btn-mode-view');
+        if (be) {
+          if (next === 'edit') be.classList.add('active');
+          else be.classList.remove('active');
+        }
+        if (bv) {
+          if (next === 'view') bv.classList.add('active');
+          else bv.classList.remove('active');
+        }
+        if (next === 'view') {
+          if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
+          EduCADCanvas.deselect(handle.sel);
+          stopCaretTimer();
+          abortLineTask();
+          abortPolarTask();
+          abortPlotTask();
+          clearBank();
+          EduCADCanvas.clearTypedDist(handle.typedDist);
+          mount.menu.classList.remove('open');
+        }
+        renderLayer1();
+        renderLayer2(null, null);
+        return next;
+      }
+      // View-mode click: inspect the topmost measurable entity under
+      // the cursor, or clear the readout on empty sheet. Read-only:
+      // no placement, no selection, no banking, no menus. The cursor's
+      // side of the span is stored so the dimension opens toward it.
+      function viewClickInspect(cursor) {
+        var id = EduCADMeasure.hitTestAll(handle.table.list(), cursor,
+          handle.view, EduCADCanvas.SELECT_TOL_PX);
+        var side = null;
+        if (id !== null) {
+          side = EduCADMeasure.dimSideFor(handle.table.get(id),
+            handle.view, cursor);
+        }
+        EduCADMeasure.setInspect(handle.measure, id, side);
+        renderLayer2(cursor, null);
+      }
+      // View-mode readout, drafting style: a linear dimension
+      // (extension lines, arrows, centered value) for spans, a radius
+      // leader for rounds, a witness to the XY fold for points. Layer 2
+      // only: the readout is never an entity and never reaches the
+      // table, the 3D bridge, or a saved file. Anything the layouts
+      // refuse falls through to the plain badge below.
+      function drawInspectOverlay(cursorPx) {
+        if (!EduCADMeasure.isView(handle.measure)) return;
+        if (handle.measure.inspectId === null) return;
+        var ent = handle.table.get(handle.measure.inspectId);
+        if (ent === null) return;
+        var rep = EduCADMeasure.inspectEntity(ent);
+        if (rep === null) return;
+        var v = handle.view;
+        ctx2.save();
+        ctx2.font = '12px sans-serif';
+        var measure = function (t) {
+          try { return ctx2.measureText(t).width; }
+          catch (err) { return String(t).length * 6.6 + 2; }
+        };
+        var done = false;
+        if (rep.kind === 'line') {
+          var lay = EduCADMeasure.linearDimLayout(ent, v,
+            { side: handle.measure.inspectSide, measure: measure });
+          if (lay !== null) {
+            drawLinearDim(lay, rep.rows.slice(1));
+            done = true;
+          }
+        } else if (rep.kind === 'round') {
+          var rl = EduCADMeasure.radiusLeaderLayout(ent, v,
+            { cursorPx: cursorPx, measure: measure });
+          if (rl !== null) {
+            drawRadiusLeader(ent, rl, rep);
+            done = true;
+          }
+        } else {
+          var anchor0 = EduCADMeasure.inspectAnchor(ent, v);
+          if (anchor0 !== null) {
+            EduCADCanvas.drawSelectionRing(ctx2, anchor0.x, anchor0.y);
+          }
+          var wit = EduCADMeasure.pointWitnessLayout(ent, v, {});
+          if (wit !== null) drawWitnessDim(wit);
+        }
+        if (!done) {
+          var anchor = EduCADMeasure.inspectAnchor(ent, v);
+          var ax = anchor ? anchor.x : 0, ay = anchor ? anchor.y : 0;
+          var bx = (cursorPx ? cursorPx.x : ax) + 14;
+          var by = (cursorPx ? cursorPx.y : ay) - 10;
+          var lines = [rep.title].concat(rep.rows);
+          for (var i = 0; i < lines.length; i++) {
+            EduCADCanvas.drawKnockoutLabel(ctx2, lines[i], bx, by + i * 16,
+              { font: '12px sans-serif', fillStyle: i === 0 ? '#0f172a' : '#0284c7' });
+          }
+        }
+        ctx2.restore();
+      }
+      // One sky path through every segment pair (extension lines,
+      // dimension lines, leaders, witnesses, center marks).
+      function strokeDimSegs(segs) {
+        ctx2.save();
+        ctx2.strokeStyle = '#0284c7';
+        ctx2.lineWidth = 1;
+        ctx2.beginPath();
+        for (var i = 0; i < segs.length; i++) {
+          ctx2.moveTo(segs[i][0].x, segs[i][0].y);
+          ctx2.lineTo(segs[i][1].x, segs[i][1].y);
+        }
+        ctx2.stroke();
+        ctx2.restore();
+      }
+      // Linear dimension: extension lines, the dimension line with an
+      // outward arrow tip at each end, the centered value, and the
+      // secondary rows (deltas, angle) stacked past it.
+      function drawLinearDim(lay, secondary) {
+        strokeDimSegs(lay.ext);
+        strokeDimSegs([[lay.d1, lay.d2]]);
+        if (lay.leader !== null) {
+          strokeDimSegs([[lay.leader.from, lay.leader.to]]);
+        }
+        ctx2.save();
+        ctx2.fillStyle = '#0284c7';
+        drawArrowhead(ctx2,
+          { x: lay.d1.x + lay.dir.x * 10, y: lay.d1.y + lay.dir.y * 10 },
+          lay.d1);
+        drawArrowhead(ctx2,
+          { x: lay.d2.x - lay.dir.x * 10, y: lay.d2.y - lay.dir.y * 10 },
+          lay.d2);
+        ctx2.restore();
+        EduCADCanvas.drawKnockoutLabel(ctx2, lay.text,
+          lay.textPos.x, lay.textPos.y,
+          { font: '12px sans-serif', fillStyle: '#0f172a' });
+        for (var i = 0; i < secondary.length; i++) {
+          EduCADCanvas.drawKnockoutLabel(ctx2, secondary[i],
+            lay.secondaryPos.x + lay.normal.x * lay.lineHpx * i,
+            lay.secondaryPos.y + lay.normal.y * lay.lineHpx * i,
+            { font: '12px sans-serif', fillStyle: '#0284c7' });
+        }
+      }
+      // Radius leader: center mark, rim-to-elbow leader with an arrow
+      // tip on the rim, a horizontal shelf carrying R + value, and the
+      // diameter (plus arc length) beneath it.
+      function drawRadiusLeader(ent, rl, rep) {
+        strokeDimSegs(rl.centerMark);
+        strokeDimSegs([[rl.rim, rl.elbow], [rl.elbow, rl.shelfEnd]]);
+        ctx2.save();
+        ctx2.fillStyle = '#0284c7';
+        drawArrowhead(ctx2,
+          { x: rl.rim.x + rl.dir.x * 10, y: rl.rim.y + rl.dir.y * 10 },
+          rl.rim);
+        ctx2.restore();
+        EduCADCanvas.drawKnockoutLabel(ctx2, rl.text,
+          rl.textPos.x, rl.textPos.y,
+          { font: '12px sans-serif', fillStyle: '#0f172a' });
+        var secs = ['Ø ' + EduCADMeasure.fmtMm(2 * ent.radius) + ' mm'];
+        if (ent.type === 'CIRCULAR_ARC' && rep.rows.length > 2) {
+          secs.push(rep.rows[2]);
+        }
+        for (var i = 0; i < secs.length; i++) {
+          EduCADCanvas.drawKnockoutLabel(ctx2, secs[i],
+            rl.textPos.x, rl.elbow.y + 13 + i * 15,
+            { font: '12px sans-serif', fillStyle: '#0284c7' });
+        }
+      }
+      // Point witness: thin line from the point straight to the XY
+      // fold with the |Y| height at its middle — the point's distance
+      // to its own plane.
+      function drawWitnessDim(wit) {
+        strokeDimSegs([[wit.pt, wit.foot]]);
+        EduCADCanvas.drawKnockoutLabel(ctx2, wit.text,
+          wit.textPos.x, wit.textPos.y,
+          { font: '12px sans-serif', fillStyle: '#0f172a' });
+      }
+      // Cascade cleanup: drop banked picks on deleted points and disarm
+      // line/polar endpoints that referenced a deleted point, so no tool
+      // keeps a dangling preview after blank-delete removes its segments.
+      function cleanupAfterPointDelete(goneIds) {
+        if (!goneIds || goneIds.length === 0) return;
+        var gone = {};
+        for (var i = 0; i < goneIds.length; i++) gone[String(goneIds[i])] = true;
+        if (handle.circlePicks && handle.circlePicks.picks) {
+          var kept = [];
+          for (var c = 0; c < handle.circlePicks.picks.length; c++) {
+            if (!gone[String(handle.circlePicks.picks[c].id)]) kept.push(handle.circlePicks.picks[c]);
+          }
+          handle.circlePicks.picks = kept;
+          if (kept.length === 0) setLineCursor(false);
+        }
+        if (handle.line && (gone[String(handle.line.p1Id)] || gone[String(handle.line.p2Id)])) {
+          abortLineTask();
+        }
+        if (handle.polar && gone[String(handle.polar.p0Id)]) {
+          abortPolarTask();
+        }
       }
       function commitPlotAt(cursorPx) {
         var wpt = EduCADViewport.inverse(handle.view, cursorPx);
         var spec = EduCADCanvas.commitPlotPoint(handle.plot, wpt);
+        EduCADCanvas.clearTypedDist(handle.typedDist);
         if (spec) {
           var pname = EduCADCanvas.nextPointName(handle.table.list());
           handle.table.create('POINT', {
@@ -387,14 +1239,25 @@
         ctx2.stroke();
         ctx2.restore();
         if (t >= 1) {
+          var p1Ref = handle.line.p1Id;
+          var p2Ref = handle.line.p2Id;
+          var p1Member = handle.line.p1Member;
           var spec = EduCADCanvas.finishLineStroke(handle.line);
           lineAnim = null;
           setLineCursor(false);
           if (spec) {
+            var segMeta = { kind: 'user-line' };
+            if (p1Ref !== null && p1Ref !== undefined &&
+                p2Ref !== null && p2Ref !== undefined) {
+              segMeta.refs = [String(p1Ref), String(p2Ref)];
+            }
+            if (p1Member !== null && p1Member !== undefined) {
+              segMeta.fromMember = String(p1Member);
+            }
             handle.table.create('SEGMENT', {
               x: spec.x1, y: spec.y1, x2: spec.x2, y2: spec.y2,
               bisCode: spec.bisCode, caption: '', showLabel: false,
-              viewRole: 'BOTH', meta: { kind: 'user-line' }
+              viewRole: 'BOTH', meta: segMeta
             });
           }
           renderLayer1();
@@ -650,24 +1513,53 @@
 
         // Axis-lock distance readout at the cursor tip (no guidelines).
         // Suppressed on the reference vertex itself (a click, not a place).
+        // A typed buffer replaces the live readout and gains a sky preview
+        // ring on the staked target (§6.2).
         if (refMm && cursorPx && refPx) {
           var rdx = cursorPx.x - refPx.x, rdy = cursorPx.y - refPx.y;
           var onRef = (rdx * rdx + rdy * rdy) <
             EduCADCanvas.SELECT_TOL_PX * EduCADCanvas.SELECT_TOL_PX;
           var lock = onRef ? { readout: null } :
             EduCADCanvas.axisLockState(cursorPx, handle.view, refMm);
-          if (lock.readout) {
+          var tbuf = (handle.typedDist && handle.typedDist.buffer) || '';
+          if (tbuf !== '' && typedDistRef() !== null) {
+            var taxis = (lock && lock.lock === 'y') ? 'ΔX: ' :
+              (lock && lock.lock === 'x') ? 'ΔY: ' : 'Δ: ';
+            EduCADCanvas.drawKnockoutLabel(ctx2, taxis + tbuf + ' mm (Enter)',
+              cursorPx.x + 14, cursorPx.y - 10,
+              { font: '12px sans-serif', fillStyle: '#0284c7' });
+            var tparsed = EduCADCanvas.parseTypedDist(tbuf);
+            var tlock = lock && (lock.lock === 'x' || lock.lock === 'y') ?
+              lock.lock : null;
+            if (tparsed.ok && tlock !== null) {
+              var tsign = EduCADCanvas.typedDistSign(tlock, cursorPx,
+                handle.view, refMm);
+              var ttgt = EduCADCanvas.typedDistPoint(refMm, tlock,
+                tsign, tparsed.value);
+              if (ttgt !== null) {
+                var tpx = EduCADViewport.forward(handle.view,
+                  { x: ttgt.xMm, y: ttgt.yMm });
+                EduCADCanvas.drawSelectionRing(ctx2, tpx.x, tpx.y,
+                  { color: '#0284c7' });
+              }
+            }
+          } else if (lock.readout) {
             EduCADCanvas.drawKnockoutLabel(ctx2, lock.readout, cursorPx.x + 14, cursorPx.y - 10,
               { font: '12px sans-serif', fillStyle: '#0284c7' });
           }
         }
 
-        // Line tool: anchor ring always; locked P1-P2 preview once P2
-        // is picked (no cursor-following rubberband by design).
+        // Line tool: P1 ring plus the locked P1-P2 preview while the
+        // BIS popup is open (no cursor-following rubberband by design).
         var lt = handle.line;
-        if (lt.phase === 'anchored' || lt.phase === 'menu') {
+        if (lt.phase === 'menu') {
           var ap1 = EduCADViewport.forward(handle.view, lt.p1Mm);
           EduCADCanvas.drawSelectionRing(ctx2, ap1.x, ap1.y);
+          if (lt.p1Member !== null && lt.p1Member !== undefined) {
+            EduCADCanvas.drawKnockoutLabel(ctx2, 'for ' + lt.p1Member,
+              ap1.x + 12, ap1.y - 12,
+              { font: '12px sans-serif', fillStyle: '#0284c7' });
+          }
           if (lt.phase === 'menu' && lt.p2Mm) {
             var ap2 = EduCADViewport.forward(handle.view, lt.p2Mm);
             ctx2.save();
@@ -739,21 +1631,45 @@
         var pt = handle.plot;
         if (pt.phase === 'plotting' && cursorPx) {
           var pw = EduCADViewport.inverse(handle.view, cursorPx);
-          var cand = EduCADCanvas.plotCandidateFor(pt.aMm, pt.bMm, pw);
+          var cand = pt.ground ?
+            EduCADCanvas.plotGroundCandidate(pw) :
+            EduCADCanvas.plotCandidateFor(pt.aMm, pt.bMm, pw);
           var fp = EduCADViewport.forward(handle.view, cand.footMm);
           var cp = EduCADViewport.forward(handle.view, cand.pointMm);
+          var pbuf = (handle.sel.editing === null &&
+            handle.typedDist && handle.typedDist.buffer) || '';
+          var pp = null;
+          if (pbuf !== '') {
+            var pparsed = EduCADCanvas.parseTypedDist(pbuf);
+            if (pparsed.ok) {
+              pp = pt.ground ?
+                EduCADCanvas.plotGroundTyped(pw, pparsed.value) :
+                EduCADCanvas.plotTypedPoint(pt.aMm, pt.bMm, pw, pparsed.value);
+            }
+          }
+          var pend = (pp !== null) ?
+            EduCADViewport.forward(handle.view, { x: pp.xMm, y: pp.yMm }) : cp;
           ctx2.save();
           ctx2.strokeStyle = '#64748b';
           ctx2.lineWidth = 1;
           ctx2.beginPath();
           ctx2.moveTo(fp.x, fp.y);
-          ctx2.lineTo(cp.x, cp.y);
+          ctx2.lineTo(pend.x, pend.y);
           ctx2.stroke();
           ctx2.restore();
-          EduCADCanvas.drawKnockoutLabel(ctx2, '⊥ Dist: ' + cand.distMm.toFixed(2) + ' mm',
+          if (pp !== null) {
+            EduCADCanvas.drawSelectionRing(ctx2, pend.x, pend.y,
+              { color: '#0284c7' });
+          }
+          EduCADCanvas.drawKnockoutLabel(ctx2, pbuf !== '' ?
+            '⊥ ' + pbuf + ' mm (Enter)' :
+            '⊥ Dist: ' + cand.distMm.toFixed(2) + ' mm',
             cursorPx.x + 14, cursorPx.y - 10,
             { font: '12px sans-serif', fillStyle: '#0284c7' });
         }
+
+        // View-mode inspect readout (no-op unless View has a pick).
+        drawInspectOverlay(cursorPx);
 
         ctx2.restore();
       }
@@ -913,7 +1829,8 @@
           renderLayer2(cursor, null);
           return;
         }
-        if (!EduCADCanvas.isLineToolActive(handle.line)) {
+        if (!EduCADCanvas.isLineToolActive(handle.line) &&
+            handle.circlePicks.picks.length === 0) {
           c2.style.cursor = '';
         }
 
@@ -983,10 +1900,18 @@
       // this authoritative; the canvas menu below then sees idle clicks only.
       // The native menu never appears anywhere on the sheet.
       window.addEventListener('contextmenu', function (e) {
+        if (EduCADMeasure.isView(handle.measure)) {
+          e.preventDefault();
+          if (typeof e.stopPropagation === 'function') e.stopPropagation();
+          EduCADMeasure.clearInspect(handle.measure);
+          renderLayer2(null, null);
+          return;
+        }
         if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
             EduCADCanvas.isLineToolActive(handle.line) ||
             EduCADCanvas.isPolarToolActive(handle.polar) ||
             EduCADCanvas.isPlotToolActive(handle.plot) ||
+            pendingMember !== null ||
             handle.circlePicks.picks.length > 0) {
           e.preventDefault();
           if (typeof e.stopPropagation === 'function') e.stopPropagation();
@@ -995,7 +1920,8 @@
           abortLineTask();
           abortPolarTask();
           abortPlotTask();
-          EduCADCanvas.clearCirclePicks(handle.circlePicks);
+          clearBank();
+          EduCADCanvas.clearTypedDist(handle.typedDist);
           mount.menu.classList.remove('open');
           renderLayer1();
           renderLayer2(null, null);
@@ -1008,17 +1934,24 @@
       // rename buffer discarded, original kept); otherwise the 2-option menu.
       c2.addEventListener('contextmenu', function (e) {
         e.preventDefault();
+        if (EduCADMeasure.isView(handle.measure)) {
+          EduCADMeasure.clearInspect(handle.measure);
+          renderLayer2(null, null);
+          return;
+        }
         if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
             EduCADCanvas.isLineToolActive(handle.line) ||
             EduCADCanvas.isPolarToolActive(handle.polar) ||
             EduCADCanvas.isPlotToolActive(handle.plot) ||
+            pendingMember !== null ||
             handle.circlePicks.picks.length > 0) {
           EduCADCanvas.deselect(handle.sel);
           stopCaretTimer();
           abortLineTask();
           abortPolarTask();
           abortPlotTask();
-          EduCADCanvas.clearCirclePicks(handle.circlePicks);
+          clearBank();
+          EduCADCanvas.clearTypedDist(handle.typedDist);
           mount.menu.classList.remove('open');
           renderLayer1();
           renderLayer2(null, null);
@@ -1050,75 +1983,76 @@
         renderLayer1();
       });
 
-      // Left click: existing point becomes the reference; empty canvas
-      // places a new point (axis-locked when a reference is active).
+      // Left click: Ctrl banks points, plain clicks finalize. Empty
+      // canvas places a new point (axis-locked when a reference is
+      // active); an existing point selects, or finalizes the bank.
       c2.addEventListener('click', function (e) {
         // A press that started on 3D ink belongs to the model (orbit),
         // never to the sheet: swallow the click it trails.
         if (solidSuppressClick) { solidSuppressClick = false; return; }
         if (e.button !== 0 || e.shiftKey) return;
         var cursor = { x: e.clientX, y: e.clientY };
-        // Ctrl+click anchors (or re-anchors) both construction tools
-        // on a point; the next click resolves the shared anchor. When
-        // idle, Ctrl+click grows the three-point circle pick list.
+        // View mode owns the whole click: inspect, never edit. Placed
+        // before banking so Ctrl+click is read-only here too.
+        if (EduCADMeasure.isView(handle.measure)) {
+          viewClickInspect(cursor);
+          return;
+        }
+        // Banking: Ctrl+click toggles a point into the two-slot bank
+        // and arms nothing. Anything parked (line menu, polar sweep,
+        // plotting) is preempted first, so banking starts from idle.
         if (e.ctrlKey || e.metaKey) {
-          if (EduCADCanvas.isLineToolActive(handle.line) ||
-              EduCADCanvas.isPolarToolActive(handle.polar)) {
-            var cid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
-            if (cid === null) {
-              abortLineTask();
-              abortPolarTask();
-              abortPlotTask();
-              renderLayer1();
-              renderLayer2(cursor, null);
-            } else {
-              var cent = handle.table.get(cid);
-              abortPlotTask();
-              EduCADCanvas.anchorLineTool(handle.line, cid, cent.x, cent.y);
-              EduCADCanvas.anchorPolarTool(handle.polar, cid, cent.x, cent.y);
-              hideLineMenu();
-              setLineCursor(true);
-              renderLayer2(cursor, null);
-            }
+          EduCADCanvas.clearTypedDist(handle.typedDist);
+          if (pendingMember !== null) {
+            pendingMember = null;
+            hideMemberMenu();
+            renderLayer2(cursor, null);
             return;
           }
-          abortPlotTask();
-          var pid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
-          if (pid === null) {
+          if (EduCADCanvas.isLineToolActive(handle.line) ||
+              EduCADCanvas.isPolarToolActive(handle.polar) ||
+              EduCADCanvas.isPlotToolActive(handle.plot)) {
+            abortLineTask();
+            abortPolarTask();
+            abortPlotTask();
+            renderLayer1();
+          }
+          var cid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
+          if (cid === null) {
+            if (bankOverflow(cursor)) return;
             var wfree = EduCADViewport.inverse(handle.view, cursor);
             var pname = EduCADCanvas.nextPointName(handle.table.list());
             var placed = handle.table.create('POINT', {
               x: wfree.x, y: wfree.y, name: pname, caption: pname, showLabel: true,
               bisCode: 'B', viewRole: wfree.y >= 0 ? 'ELEVATION' : 'PLAN'
             });
-            EduCADCanvas.toggleCirclePick(handle.circlePicks, placed.id, placed.x, placed.y);
-          } else {
-            var pent = handle.table.get(pid);
-            EduCADCanvas.toggleCirclePick(handle.circlePicks, pid, pent.x, pent.y);
+            bankFromPick({ cid: placed.id, cursor: cursor }, null);
+            renderLayer1();
+            return;
           }
-          if (handle.circlePicks.picks.length >= EduCADCanvas.CIRCLE_PICK_MAX) {
-            var pk = handle.circlePicks.picks;
-            var cres = EduCADCanvas.circleFromThreePoints(pk[0], pk[1], pk[2]);
-            if (cres.ok) {
-              var rMin = EduCADEntities.RADIUS_MIN_MM;
-              var rr = cres.r < rMin ? rMin : cres.r;
-              handle.table.create('CIRCLE', {
-                x: cres.x, y: cres.y, radius: rr,
-                bisCode: 'A', viewRole: cres.y >= 0 ? 'ELEVATION' : 'PLAN',
-                caption: '', showLabel: false, meta: { kind: 'user-circle' }
-              });
-            } else if (typeof console !== 'undefined' && console.warn) {
-              console.warn('EduCAD circle: ' + cres.message);
-            }
-            EduCADCanvas.clearCirclePicks(handle.circlePicks);
+          var cent = handle.table.get(cid);
+          var mparts = (typeof EduCADLabels !== 'undefined' && EduCADLabels.splitCaption) ?
+            EduCADLabels.splitCaption(cent.caption) : [cent.caption];
+          if (mparts.length >= 2 && !bankHas(cid)) {
+            pendingMember = { cid: cid, cursor: cursor };
+            showMemberMenu(cursor, mparts);
+            renderLayer2(cursor, null);
+            return;
           }
-          renderLayer1();
+          pendingMember = null;
+          hideMemberMenu();
+          bankFromPick({ cid: cid, cursor: cursor }, null);
+          return;
+        }
+        if (pendingMember !== null) {
+          pendingMember = null;
+          hideMemberMenu();
           renderLayer2(cursor, null);
           return;
         }
         if (handle.line.phase === 'animating') return;
         var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
-        // Polar task owns the click once the shared anchor resolves to it:
+        // Polar task owns the click once bank+segment starts it:
         // invalid drops on any click, distance commits anywhere, angle
         // locks on any left-click (right-click / Escape aborts).
         if (handle.polar.phase === 'invalid' || handle.polar.phase === 'distance') {
@@ -1141,24 +2075,52 @@
           commitPlotAt(cursor);
           return;
         }
-        if (id === null && handle.polar.phase === 'awaitLine') {
+        // Finalizer: a plain click resolves the bank by count. One
+        // banked point plus a second point draws the line; one banked
+        // point plus a segment starts polar from the bank; two banked
+        // plus a third draws the circle. Anything else aborts the bank.
+        var bank = handle.circlePicks.picks;
+        if (bank.length === 1) {
+          if (id !== null) {
+            if (id === bank[0].id) return;
+            userLockTarget(id, cursor);
+            return;
+          }
           var lid = EduCADCanvas.hitTestLine(handle.table.list(), cursor, handle.view);
           if (lid !== null) {
             var blEnt = handle.table.get(lid);
-            abortLineTask();
+            var p0id = bank[0].id;
+            var p0 = handle.table.get(p0id);
+            clearBank();
             hideLineMenu();
-            var wcl = EduCADViewport.inverse(handle.view, cursor);
+            var wpl = EduCADViewport.inverse(handle.view, cursor);
+            EduCADCanvas.anchorPolarTool(handle.polar, p0id, p0.x, p0.y);
             EduCADCanvas.acceptPolarBaseline(handle.polar,
-              { x: blEnt.x, y: blEnt.y }, { x: blEnt.x2, y: blEnt.y2 }, wcl);
+              { x: blEnt.x, y: blEnt.y }, { x: blEnt.x2, y: blEnt.y2 }, wpl);
             renderLayer2(cursor, null);
             return;
           }
+          clearBank();
+          renderLayer1();
+          renderLayer2(cursor, null);
+          return;
+        }
+        if (bank.length >= 2) {
+          if (id !== null && id !== bank[0].id && id !== bank[1].id) {
+            userCommitCircle(id, cursor);
+            return;
+          }
+          clearBank();
+          renderLayer1();
+          renderLayer2(cursor, null);
+          return;
         }
         if (id === null) {
           if (EduCADCanvas.isLineToolActive(handle.line) ||
               EduCADCanvas.isPolarToolActive(handle.polar)) {
             abortLineTask();
             abortPolarTask();
+            clearBank();
             renderLayer1();
             renderLayer2(cursor, null);
             return;
@@ -1166,10 +2128,25 @@
           var plid = EduCADCanvas.hitTestLine(handle.table.list(), cursor, handle.view);
           if (plid !== null) {
             var plEnt = handle.table.get(plid);
+            EduCADCanvas.clearTypedDist(handle.typedDist);
             EduCADCanvas.beginPlotTool(handle.plot,
               plEnt.x, plEnt.y, plEnt.x2, plEnt.y2);
             renderLayer2(cursor, null);
             return;
+          }
+          // Alt+click near the VP/HP fold focuses the ground line as an
+          // infinite datum. Plain clicks keep placing points: grabbing
+          // the fold on a plain click would deaden on-line placement
+          // across the whole sheet width. The grab helper caps the 14 px
+          // corridor at 20 mm, so far zoom-out cannot grab from ~280 mm.
+          if (e.altKey) {
+            var walt = EduCADViewport.inverse(handle.view, cursor);
+            if (EduCADCanvas.groundFoldGrabbed(walt.y, handle.view.s)) {
+              EduCADCanvas.clearTypedDist(handle.typedDist);
+              EduCADCanvas.beginGroundPlot(handle.plot);
+              renderLayer2(cursor, null);
+              return;
+            }
           }
         } else if (handle.line.phase === 'menu') {
           var ment = handle.table.get(id);
@@ -1178,23 +2155,10 @@
             renderLayer2(cursor, null);
           }
           return;
-        } else if (handle.line.phase === 'anchored') {
-          var lent = handle.table.get(id);
-          if (EduCADCanvas.lockLineTarget(handle.line, id, lent.x, lent.y)) {
-            abortPolarTask();
-            showLineMenu(cursor);
-            renderLayer2(cursor, null);
-          }
-          return;
         }
         if (id !== null) {
           if (handle.sel.editing && handle.sel.editing.id === id) return;
-          if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
-          EduCADCanvas.clearCirclePicks(handle.circlePicks);
-          EduCADCanvas.selectPoint(handle.sel, id);
-          stopCaretTimer();
-          renderLayer1();
-          renderLayer2(cursor, null);
+          userSelectPoint(id, cursor);
           return;
         }
         if (handle.sel.editing) {
@@ -1210,13 +2174,7 @@
           px = lock.xMm;
           py = lock.yMm;
         }
-        var pname = EduCADCanvas.nextPointName(handle.table.list());
-        handle.table.create('POINT', {
-          x: px, y: py, name: pname, caption: pname, showLabel: true,
-          bisCode: 'B', viewRole: py >= 0 ? 'ELEVATION' : 'PLAN'
-        });
-        renderLayer1();
-        renderLayer2(cursor, null);
+        userPlacePoint(px, py, cursor);
       });
 
       // Double-click a point starts on-site renaming (single click only
@@ -1233,6 +2191,8 @@
           e.preventDefault();
           return;
         }
+        // View mode never renames (3D reset above still works).
+        if (EduCADMeasure.isView(handle.measure)) return;
         if (EduCADCanvas.isLineToolActive(handle.line) ||
             EduCADCanvas.isPolarToolActive(handle.polar)) return;
         var cursor = { x: e.clientX, y: e.clientY };
@@ -1249,19 +2209,41 @@
 
       // Rename keys: Enter commits to the table, Escape cancels. Handled
       // keys are captured so Backspace/Space never leak to the browser.
+      // With no edit running, digits feed the typed axis distance (§6.2)
+      // and Enter stakes the point; the first Escape clears the buffer.
       window.addEventListener('keydown', function (e) {
+        // View mode owns the keyboard: nothing to type, nothing to
+        // rename. Escape only clears the readout.
+        if (EduCADMeasure.isView(handle.measure)) {
+          if (e.key === 'Escape') {
+            EduCADMeasure.clearInspect(handle.measure);
+            renderLayer2(null, null);
+          }
+          return;
+        }
         if (e.key === 'Escape') {
+          if (handle.sel.editing === null &&
+              handle.typedDist && handle.typedDist.buffer !== '') {
+            EduCADCanvas.clearTypedDist(handle.typedDist);
+            mount.menu.classList.remove('open');
+            renderLayer1();
+            renderLayer2(lastCursor, { snap: handle.snapCurrent });
+            e.preventDefault();
+            return;
+          }
           if (handle.sel.editing !== null || handle.sel.selectedId !== null ||
               EduCADCanvas.isLineToolActive(handle.line) ||
               EduCADCanvas.isPolarToolActive(handle.polar) ||
               EduCADCanvas.isPlotToolActive(handle.plot) ||
+              pendingMember !== null ||
               handle.circlePicks.picks.length > 0) {
             EduCADCanvas.deselect(handle.sel);
             stopCaretTimer();
             abortLineTask();
             abortPolarTask();
             abortPlotTask();
-            EduCADCanvas.clearCirclePicks(handle.circlePicks);
+            clearBank();
+            EduCADCanvas.clearTypedDist(handle.typedDist);
             renderLayer1();
             renderLayer2(null, null);
             e.preventDefault();
@@ -1270,23 +2252,60 @@
           return;
         }
         if (e.ctrlKey || e.metaKey || e.altKey) return;
-        if (!handle.sel.editing) return;
-        var action = EduCADCanvas.handleRenameKey(handle.sel, e.key);
-        if (action === 'commit') {
-          e.preventDefault();
-          var w = EduCADCanvas.commitRename(handle.sel);
-          stopCaretTimer();
-          if (w && w.delete) {
-            handle.table.remove(w.id);
-            EduCADCanvas.deselect(handle.sel);
-          } else if (w && handle.table.get(w.id)) {
-            handle.table.update(w.id, { name: w.name, caption: w.name });
+        if (handle.sel.editing) {
+          var action = EduCADCanvas.handleRenameKey(handle.sel, e.key);
+          if (action === 'commit') {
+            e.preventDefault();
+            userCommitRename();
+          } else if (action === 'input') {
+            e.preventDefault();
+            renderLayer2(null, null);
           }
-          renderLayer1();
-          renderLayer2(null, null);
-        } else if (action === 'input') {
+          return;
+        }
+        if (typedPlotAB() !== null) {
+          if (e.key === 'Enter') {
+            if (handle.typedDist.buffer !== '') {
+              e.preventDefault();
+              commitPlotTypedAt(lastCursor);
+              renderLayer2(lastCursor, { snap: handle.snapCurrent });
+            }
+            return;
+          }
+          if (e.key === 'Backspace') {
+            if (handle.typedDist.buffer !== '') {
+              e.preventDefault();
+              EduCADCanvas.handleTypedDistKey(handle.typedDist, 'Backspace');
+              renderLayer2(lastCursor, { snap: handle.snapCurrent });
+            }
+            return;
+          }
+          if (EduCADCanvas.handleTypedDistKey(handle.typedDist, e.key) === 'input') {
+            e.preventDefault();
+            renderLayer2(lastCursor, { snap: handle.snapCurrent });
+          }
+          return;
+        }
+        if (typedDistRef() === null) return;
+        if (e.key === 'Enter') {
+          if (handle.typedDist.buffer !== '') {
+            e.preventDefault();
+            commitTypedDistAt(lastCursor);
+            renderLayer2(lastCursor, { snap: handle.snapCurrent });
+          }
+          return;
+        }
+        if (e.key === 'Backspace') {
+          if (handle.typedDist.buffer !== '') {
+            e.preventDefault();
+            EduCADCanvas.handleTypedDistKey(handle.typedDist, 'Backspace');
+            renderLayer2(lastCursor, { snap: handle.snapCurrent });
+          }
+          return;
+        }
+        if (EduCADCanvas.handleTypedDistKey(handle.typedDist, e.key) === 'input') {
           e.preventDefault();
-          renderLayer2(null, null);
+          renderLayer2(lastCursor, { snap: handle.snapCurrent });
         }
       });
 
@@ -1307,7 +2326,11 @@
         renderLayer1();
       });
 
-      // Demo Problem Loaders
+      // Demo Problem Loaders. demoTruth carries the loaded sheet's
+      // corner map for the Check button (null = hand drawing: claims and
+      // verdicts report unverifiable). Positional truth survives student
+      // edits; only loading another sheet replaces it.
+      var demoTruth = null;
       function loadDemo(type) {
         handle.table.clear();
         EduCADCanvas.deselect(handle.sel);
@@ -1315,7 +2338,13 @@
         abortLineTask();
         abortPolarTask();
         abortPlotTask();
-        EduCADCanvas.clearCirclePicks(handle.circlePicks);
+        clearBank();
+        EduCADCanvas.clearTypedDist(handle.typedDist);
+        EduCADMeasure.clearInspect(handle.measure);
+        hideVerifyPanel();
+        hideTutorialPanel();
+        tutStepper = null;
+        demoTruth = null;
         document.querySelectorAll('.demo-btn').forEach(function(b) { b.classList.remove('active'); });
 
         if (type === 'line') {
@@ -1338,6 +2367,25 @@
           if (btn) btn.classList.add('active');
           var prism = EduCADCurriculum.regularSolid({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
           prism.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          demoTruth = prism.corners || null;
+        } else if (type === '3view') {
+          var btn = document.getElementById('btn-demo-3view');
+          if (btn) btn.classList.add('active');
+          var sheet = EduCADCurriculum.threeViewSheet({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
+          sheet.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          demoTruth = sheet.corners || null;
+        } else if (type === 'square') {
+          var btn = document.getElementById('btn-demo-square');
+          if (btn) btn.classList.add('active');
+          var sq = EduCADCurriculum.profileSquare({ sizeMm: 40, xMm: 0 });
+          sq.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          demoTruth = sq.corners || null;
+        }
+
+        var sDemo = document.getElementById('sel-demo');
+        if (sDemo) {
+          if (type === 'clear') sDemo.value = '';
+          else if (sDemo.querySelector('option[value="' + type + '"]')) sDemo.value = type;
         }
 
         renderLayer1();
@@ -1346,7 +2394,278 @@
       document.getElementById('btn-demo-line').addEventListener('click', function () { loadDemo('line'); });
       document.getElementById('btn-demo-points').addEventListener('click', function () { loadDemo('points'); });
       document.getElementById('btn-demo-prism').addEventListener('click', function () { loadDemo('prism'); });
+      document.getElementById('btn-demo-3view').addEventListener('click', function () { loadDemo('3view'); });
+      document.getElementById('btn-demo-square').addEventListener('click', function () { loadDemo('square'); });
+      document.getElementById('btn-tut-square').addEventListener('click', function () { startTutorial('square'); });
+      document.getElementById('btn-tut-prism').addEventListener('click', function () { startTutorial('prism'); });
       document.getElementById('btn-clear').addEventListener('click', function () { loadDemo('clear'); });
+      document.getElementById('btn-check').addEventListener('click', function () { runVerify(); });
+      document.getElementById('btn-mode-edit').addEventListener('click', function () { setSheetMode('edit'); });
+      document.getElementById('btn-mode-view').addEventListener('click', function () { setSheetMode('view'); });
+      // Deep-link bridge: the query handler below forces view mode for
+      // submission review through this handle.
+      window.educadSetSheetMode = setSheetMode;
+
+      // Inline selects for Demo & Tutorial options
+      (function initInlineSelects() {
+        var selDemo = document.getElementById('sel-demo');
+        var selTut = document.getElementById('sel-tut');
+        if (selDemo) {
+          selDemo.addEventListener('change', function () {
+            var val = selDemo.value;
+            if (val) loadDemo(val);
+          });
+        }
+        if (selTut) {
+          selTut.addEventListener('change', function () {
+            var val = selTut.value;
+            if (val) {
+              startTutorial(val);
+              setTimeout(function () { if (selTut) selTut.value = ''; }, 100);
+            }
+          });
+        }
+      })();
+
+      // Verify panel: grades hidden verdicts + projector claims against
+      // the loaded demo's corner truth. Dismissed by × or loading a demo.
+      var verifyPanel = null;
+      function hideVerifyPanel() {
+        if (verifyPanel) verifyPanel.style.display = 'none';
+      }
+      function escHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+      function runVerify() {
+        if (typeof EduCADVerify === 'undefined') return;
+        var res = EduCADVerify.verify(handle.table.list(), demoTruth);
+        if (!verifyPanel) {
+          verifyPanel = document.createElement('div');
+          verifyPanel.id = 'verify-panel';
+          verifyPanel.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:60;' +
+            'max-width:340px;max-height:40vh;overflow:auto;background:#f8fafc;' +
+            'border:1px solid #94a3b8;border-radius:8px;padding:10px 12px;' +
+            'font:13px system-ui,sans-serif;color:#0f172a;box-shadow:0 4px 16px rgba(0,0,0,.15);';
+          document.getElementById('app-container').appendChild(verifyPanel);
+        }
+        var html = '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<strong>Check hidden</strong>' +
+          '<button id="verify-close" style="border:none;background:none;cursor:pointer;font-size:14px;">×</button></div>';
+        if (res.checks.length === 0) {
+          html += '<div>Nothing to judge yet — name a point or draw a projector.</div>';
+        } else if (res.pass) {
+          html += '<div>All ' + res.counts.pass + ' checks pass' +
+            (res.counts.unverifiable > 0 ? ' (' + res.counts.unverifiable + ' need a demo sheet)' : '') + '.</div>';
+        } else {
+          html += '<div><strong>' + res.counts.fail + ' of ' + res.checks.length +
+            ' need work:</strong></div><ul style="margin:6px 0 0;padding-left:18px;">';
+          res.checks.forEach(function (c) {
+            if (c.verdict !== 'fail') return;
+            html += '<li>' + escHtml(c.label) + '</li>';
+          });
+          html += '</ul>';
+          if (res.counts.unverifiable > 0) {
+            html += '<div style="margin-top:6px;color:#475569;">' + res.counts.unverifiable +
+              ' more need a demo sheet.</div>';
+          }
+        }
+        verifyPanel.innerHTML = html;
+        verifyPanel.style.display = 'block';
+        var x = document.getElementById('verify-close');
+        if (x) x.addEventListener('click', function () { hideVerifyPanel(); });
+      }
+
+      // Tutorial stepper: runs a lesson script through the user actions, one
+      // Next per step. '@N' refs resolve to placed dots in creation order.
+      // Back re-reads only (nothing undraws); Restart replays from step 1.
+      var tutPanel = null;
+      var tutStepper = null;
+      var tutLesson = 'square';
+      var tutRefs = [];
+      var tutBusy = false;
+      var tutError = '';
+      function hideTutorialPanel() {
+        if (tutPanel) tutPanel.style.display = 'none';
+      }
+      function tutResolve(ref) {
+        var k = parseInt(String(ref).slice(1), 10) - 1;
+        if (!(k >= 0) || k >= tutRefs.length) return null;
+        return handle.table.get(tutRefs[k]);
+      }
+      function tutCursor(ent) {
+        return EduCADViewport.forward(handle.view, { x: ent.x, y: ent.y });
+      }
+      function tutMemberKnown(ent, member) {
+        if (member === null || member === undefined) return true;
+        if (typeof EduCADLabels === 'undefined' || !EduCADLabels.splitCaption) return true;
+        var parts = EduCADLabels.splitCaption(ent.caption || '');
+        for (var i = 0; i < parts.length; i++) {
+          var bare = EduCADLabels.bareName(parts[i]);
+          var a = (typeof EduCADVerify !== 'undefined' && EduCADVerify.cornerOf) ?
+            EduCADVerify.cornerOf(bare) : bare;
+          var b = (typeof EduCADVerify !== 'undefined' && EduCADVerify.cornerOf) ?
+            EduCADVerify.cornerOf(member) : String(member);
+          if (a === b) return true;
+        }
+        return false;
+      }
+      function execTutorialStep(step, done) {
+        var a = step.do;
+        var ent;
+        if (a.op === 'setup') {
+          if (tutLesson === 'prism') userSetupPrism(); else userSetupSquare();
+          tutRefs = [];
+          done(true, '');
+          return;
+        }
+        if (a.op === 'place') {
+          var placed = userPlacePoint(a.x, a.y, null);
+          tutRefs.push(placed.id);
+          done(true, '');
+          return;
+        }
+        if (a.op === 'rename') {
+          ent = tutResolve(a.ref);
+          if (ent === null) { done(false, 'A tutorial dot is gone — press Restart.'); return; }
+          userRenamePoint(ent.id, a.name);
+          done(true, '');
+          return;
+        }
+        if (a.op === 'anchor') {
+          ent = tutResolve(a.ref);
+          if (ent === null) { done(false, 'A tutorial dot is gone — press Restart.'); return; }
+          if (!tutMemberKnown(ent, a.member)) {
+            done(false, 'That station was renamed — press Restart or fix the name.');
+            return;
+          }
+          bankFromPick({ cid: ent.id, cursor: tutCursor(ent) }, a.member || null);
+          done(true, '');
+          return;
+        }
+        if (a.op === 'lock') {
+          ent = tutResolve(a.ref);
+          if (ent === null) { done(false, 'A tutorial dot is gone — press Restart.'); return; }
+          if (!userLockTarget(ent.id, tutCursor(ent))) {
+            done(false, 'The line disarmed (a stray click?) — press Restart.');
+            return;
+          }
+          done(true, '');
+          return;
+        }
+        if (a.op === 'type') {
+          // startLineStroke returns nothing either way; success reads off
+          // the tool phase (a disarmed line never reaches 'animating').
+          startLineStroke(a.bis);
+          if (handle.line.phase !== 'animating') {
+            done(false, 'The line disarmed (a stray click?) — press Restart.');
+            return;
+          }
+          waitTableRevision(function () { done(true, ''); });
+          return;
+        }
+        if (a.op === 'check') {
+          runVerify();
+          done(true, '');
+          return;
+        }
+        done(false, 'Unknown step — press Exit.');
+      }
+      function renderTutorialPanel() {
+        if (!tutPanel) {
+          tutPanel = document.createElement('div');
+          tutPanel.id = 'tutorial-panel';
+          tutPanel.style.cssText = 'position:fixed;left:12px;bottom:56px;z-index:60;' +
+            'max-width:340px;background:#f8fafc;' +
+            'border:1px solid #94a3b8;border-radius:8px;padding:10px 12px;' +
+            'font:13px system-ui,sans-serif;color:#0f172a;box-shadow:0 4px 16px rgba(0,0,0,.15);';
+          document.getElementById('app-container').appendChild(tutPanel);
+        }
+        var total = EduCADTutorial.total(tutStepper);
+        var html;
+        if (EduCADTutorial.done(tutStepper)) {
+          html = '<div><strong>' + tutLessonTitle() + ' — done.</strong></div>' +
+            '<div style="margin-top:6px;">The sheet is yours. Press Check hidden anytime.</div>';
+        } else {
+          var st = EduCADTutorial.current(tutStepper);
+          html = '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<strong>' + tutLessonTitle() + '</strong><span>Step ' + (tutStepper.i + 1) +
+            ' of ' + total + '</span></div>' +
+            '<div style="margin:6px 0;">' + escHtml(st.say) + '</div>';
+          if (tutError !== '') {
+            html += '<div style="color:#b91c1c;margin-bottom:6px;">' + escHtml(tutError) + '</div>';
+          }
+        }
+        html += '<div style="display:flex;gap:6px;margin-top:6px;">' +
+          '<button id="tut-back">Back</button>' +
+          '<button id="tut-next">Next</button>' +
+          '<button id="tut-restart">Restart</button>' +
+          '<button id="tut-exit">Exit</button></div>' +
+          '<div style="margin-top:6px;color:#475569;font-size:12px;">Back re-reads only — nothing undraws.</div>';
+        tutPanel.innerHTML = html;
+        tutPanel.style.display = 'block';
+        function wire(id, fn) {
+          var b = document.getElementById(id);
+          if (b) b.addEventListener('click', fn);
+        }
+        wire('tut-back', function () {
+          if (tutBusy) return;
+          tutError = '';
+          EduCADTutorial.back(tutStepper);
+          renderTutorialPanel();
+        });
+        wire('tut-next', function () {
+          if (tutBusy || EduCADTutorial.done(tutStepper)) return;
+          tutBusy = true;
+          renderTutorialPanel();
+          var st = EduCADTutorial.current(tutStepper);
+          execTutorialStep(st, function (ok, err) {
+            tutBusy = false;
+            tutError = ok ? '' : err;
+            if (ok) EduCADTutorial.advance(tutStepper);
+            if (ok && window.EduCADSaves && EduCADTutorial.done(tutStepper)) {
+              // Lesson complete: record progress server-side (guests skip).
+              window.EduCADSaves.recordProgress(tutLesson, {
+                done: true, at: Date.now()
+              }).catch(function () {});
+            }
+            renderTutorialPanel();
+          });
+        });
+        wire('tut-restart', function () {
+          if (tutBusy) return;
+          tutError = '';
+          tutRefs = [];
+          EduCADTutorial.restart(tutStepper);
+          renderTutorialPanel();
+        });
+        wire('tut-exit', function () {
+          if (tutBusy) return;
+          hideTutorialPanel();
+          tutStepper = null;
+        });
+        var nx = document.getElementById('tut-next');
+        if (nx && (tutBusy || EduCADTutorial.done(tutStepper))) nx.setAttribute('disabled', 'true');
+        var bk = document.getElementById('tut-back');
+        if (bk && (tutBusy || tutStepper.i === 0)) bk.setAttribute('disabled', 'true');
+      }
+      function tutLessonTitle() {
+        return tutLesson === 'prism' ? 'Tutorial: Hex Prism' : 'Tutorial: Profile Square';
+      }
+      function startTutorial(which) {
+        if (typeof EduCADTutorial === 'undefined') return;
+        // Tutorials draw, so they always run in Edit.
+        setSheetMode('edit');
+        tutRefs = [];
+        tutError = '';
+        tutBusy = false;
+        tutLesson = (which === 'prism') ? 'prism' : 'square';
+        var script = (tutLesson === 'prism') ?
+          EduCADTutorial.PRISM_SCRIPT : EduCADTutorial.SQUARE_SCRIPT;
+        tutStepper = EduCADTutorial.createStepper(script);
+        hideVerifyPanel();
+        renderTutorialPanel();
+      }
 
       // Check URL hash
       var hash = window.location.hash;
@@ -1354,6 +2673,10 @@
         loadDemo('points');
       } else if (hash === '#prism') {
         loadDemo('prism');
+      } else if (hash === '#3view') {
+        loadDemo('3view');
+      } else if (hash === '#square') {
+        loadDemo('square');
       } else if (hash === '#mesh') {
         loadDemo('line');
         EduCADCanvas.applyMenuAction(handle.canvasState, 'mesh');
@@ -1411,6 +2734,1081 @@
       }
 
       console.log('EduCAD Web App initialized successfully!');
+    })();
+  </script>
+
+  <script>
+    // Drawing saves UI: Save/Drawings buttons in the session bar plus
+    // tutorial completion badges. Separate from the main app block: it
+    // reaches the live sheet only via window.educadHandle. Guests stay
+    // server-free (the module short-circuits without a token). Panel and
+    // status styling is inline so no head CSS changes are needed.
+    (function savesUI() {
+      if (typeof window.EduCADSaves === 'undefined') return;
+      var Saves = window.EduCADSaves;
+      function $(id) { return document.getElementById(id); }
+      function table() {
+        var h = window.educadHandle;
+        return (h && h.table) || null;
+      }
+      function fail(msg) {
+        return function (err) {
+          status(msg + (err && err.message ? ': ' + err.message : ''));
+        };
+      }
+
+      var current = { id: null, title: '' };
+      // Deep-link bridge: ?drawing= notes the open drawing so the next
+      // Save updates it instead of posting a copy.
+      window.educadNoteDrawing = function (id, title) {
+        current.id = id;
+        current.title = title || '';
+      };
+      var statusEl = $('save-status');
+      function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
+      if (statusEl) {
+        statusEl.style.fontSize = '12px';
+        statusEl.style.color = '#777';
+        statusEl.style.marginLeft = '6px';
+      }
+      function stamp() {
+        var d = new Date();
+        function p(x) { return (x < 10 ? '0' : '') + x; }
+        return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+      }
+      // A cleared sheet is a new drawing: the next save POSTs instead of
+      // overwriting (demos, tutorials, and Clear all clear first).
+      var t0 = table();
+      if (t0 && typeof t0.subscribe === 'function') {
+        t0.subscribe(function (op) {
+          if (op === 'clear') { current.id = null; current.title = ''; }
+        });
+      }
+
+      var saveBtn = $('btn-save');
+      if (saveBtn) saveBtn.addEventListener('click', function () {
+        var s = Saves.currentSession();
+        if (Saves.isGuest(s)) {
+          status('Log in to save drawings (guest is local-only).');
+          return;
+        }
+        var t = table();
+        if (!t) { status('Sheet not ready.'); return; }
+        var snap;
+        try {
+          snap = Saves.snapshotTable(t);
+        } catch (err) {
+          status('Snapshot failed.');
+          return;
+        }
+        var fi = window.fetch.bind(window);
+        if (current.id) {
+          Saves.updateDrawing(fi, s, current.id, { data: snap }).then(function () {
+            status('Saved ' + stamp());
+          }, fail('Save failed'));
+          return;
+        }
+        var title = window.prompt('Drawing title:', 'Untitled');
+        if (title === null) return;
+        Saves.createDrawing(fi, s, title || 'Untitled', snap).then(function (data) {
+          current.id = data.id;
+          current.title = title || 'Untitled';
+          status('Saved ' + stamp());
+        }, fail('Save failed'));
+      });
+
+      var panel = $('drawings-panel');
+      function hidePanel() { if (panel) panel.hidden = true; }
+      function fmtDate(ts) {
+        try {
+          return new Date(ts * 1000).toLocaleString();
+        } catch (err) {
+          return '';
+        }
+      }
+      function renderList(items) {
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        var head = document.createElement('div');
+        head.className = 'cf-title';
+        head.appendChild(document.createTextNode('My drawings '));
+        var x = document.createElement('button');
+        x.className = 'cf-link';
+        x.type = 'button';
+        x.textContent = '×';
+        x.addEventListener('click', hidePanel);
+        head.appendChild(x);
+        panel.appendChild(head);
+        if (!items.length) {
+          var empty = document.createElement('div');
+          empty.textContent = 'No saved drawings yet.';
+          empty.style.marginTop = '6px';
+          panel.appendChild(empty);
+          return;
+        }
+        items.forEach(function (it) {
+          var row = document.createElement('div');
+          row.className = 'cf-row';
+          var name = document.createElement('div');
+          name.textContent = it.title || 'Untitled';
+          name.className = 'cf-name';
+          row.appendChild(name);
+          var when = document.createElement('div');
+          when.textContent = fmtDate(it.updated_at);
+          when.className = 'cf-muted';
+          row.appendChild(when);
+          var load = document.createElement('button');
+          load.className = 'demo-btn';
+          load.type = 'button';
+          load.textContent = 'Load';
+          load.style.marginRight = '6px';
+          load.addEventListener('click', function () { onLoad(it); });
+          row.appendChild(load);
+          var del = document.createElement('button');
+          del.className = 'demo-btn';
+          del.type = 'button';
+          del.textContent = 'Delete';
+          del.addEventListener('click', function () { onDelete(it); });
+          row.appendChild(del);
+          panel.appendChild(row);
+        });
+      }
+      function onLoad(it) {
+        var s = Saves.currentSession();
+        if (Saves.isGuest(s)) { hidePanel(); return; }
+        var t = table();
+        if (!t || !window.EduCADEntities) { status('Sheet not ready.'); return; }
+        Saves.getDrawing(window.fetch.bind(window), s, it.id).then(function (data) {
+          var count = Saves.restoreTable(window.EduCADEntities, t, data.data);
+          current.id = it.id;
+          current.title = data.title || '';
+          var h = window.educadHandle;
+          if (h && h.sel && window.EduCADCanvas &&
+              typeof window.EduCADCanvas.deselect === 'function') {
+            try { window.EduCADCanvas.deselect(h.sel); } catch (err) {}
+          }
+          hidePanel();
+          status('Loaded ' + count + ' entities ' + stamp());
+        }, fail('Load failed'));
+      }
+      function onDelete(it) {
+        if (!window.confirm('Delete "' + (it.title || 'Untitled') + '"?')) return;
+        var s = Saves.currentSession();
+        if (Saves.isGuest(s)) return;
+        Saves.deleteDrawing(window.fetch.bind(window), s, it.id).then(function () {
+          if (current.id === it.id) { current.id = null; current.title = ''; }
+          refreshPanel();
+        }, fail('Delete failed'));
+      }
+      function refreshPanel() {
+        var s = Saves.currentSession();
+        if (Saves.isGuest(s)) {
+          status('Log in to open drawings (guest is local-only).');
+          return;
+        }
+        panel.hidden = false;
+        panel.textContent = 'Loading…';
+        Saves.listDrawings(window.fetch.bind(window), s).then(function (data) {
+          renderList(data.drawings || []);
+        }, function (err) {
+          panel.textContent = 'Load failed' +
+            (err && err.message ? ': ' + err.message : '');
+        });
+      }
+      var drawingsBtn = $('btn-drawings');
+      if (drawingsBtn) drawingsBtn.addEventListener('click', function () {
+        if (!panel) return;
+        if (panel.hidden) refreshPanel();
+        else hidePanel();
+      });
+
+      // Completion badges: lessons recorded done get a ✓ on their buttons.
+      Saves.fetchProgress().then(function (r) {
+        if (r.skipped) return;
+        (r.progress || []).forEach(function (p) {
+          if (!p || !p.state || p.state.done !== true) return;
+          var b = p.lesson === 'prism' ? $('btn-tut-prism') :
+            (p.lesson === 'square' ? $('btn-tut-square') : null);
+          if (b && b.textContent.indexOf('✓') === -1) b.textContent += ' ✓';
+        });
+      }, function () {});
+    })();
+  </script>
+
+  <script>
+    // Question sets UI: teachers post coded sets, students solve by drawing
+    // and submit, teachers inspect submissions on the sheet. Role-driven
+    // panel; guests stay server-free. Form keys never leak to the canvas:
+    // the window keydown handler drives rename/typed-distance, so the panel
+    // swallows all key events (pointer events are already stopped by the
+    // session bar). All server/user text goes through textContent.
+    (function setsUI() {
+      if (typeof window.EduCADSaves === 'undefined') return;
+      var Saves = window.EduCADSaves;
+      function $(id) { return document.getElementById(id); }
+      function table() {
+        var h = window.educadHandle;
+        return (h && h.table) || null;
+      }
+      function fi() { return window.fetch.bind(window); }
+      var statusEl = $('save-status');
+      function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
+      function stamp() {
+        var d = new Date();
+        function p(x) { return (x < 10 ? '0' : '') + x; }
+        return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+      }
+      function fail(msg) {
+        return function (err) {
+          status(msg + (err && err.message ? ': ' + err.message : ''));
+        };
+      }
+
+      var panel = $('sets-panel');
+      if (!panel) return;
+      ['keydown', 'keyup', 'keypress'].forEach(function (t) {
+        panel.addEventListener(t, function (e) { e.stopPropagation(); });
+      });
+      function hidePanel() { panel.hidden = true; }
+      function hideDrawings() {
+        var d = $('drawings-panel');
+        if (d) d.hidden = true;
+      }
+
+      function el(tag, text, css, cls) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text !== undefined && text !== null) e.textContent = text;
+        if (css) {
+          var st = e.style;
+          Object.keys(css).forEach(function (k) { st[k] = css[k]; });
+        }
+        return e;
+      }
+      function btn(label, fn, opt) {
+        var b = document.createElement('button');
+        b.className = (opt && opt.link) ? 'cf-link' : 'demo-btn';
+        b.type = 'button';
+        b.textContent = label;
+        if (opt && opt.marginRight) b.style.marginRight = opt.marginRight;
+        b.addEventListener('click', fn);
+        return b;
+      }
+      function textInput(placeholder, value) {
+        var i = document.createElement('input');
+        i.type = 'text';
+        i.placeholder = placeholder || '';
+        i.value = value || '';
+        return i;
+      }
+      function areaInput(placeholder, rows) {
+        var a = document.createElement('textarea');
+        a.placeholder = placeholder || '';
+        a.rows = rows || 2;
+        return a;
+      }
+      function clearPanel() {
+        while (panel.firstChild) panel.removeChild(panel.firstChild);
+      }
+      function header(titleText) {
+        var head = el('div', null, null, 'cf-title');
+        head.appendChild(document.createTextNode(titleText + ' '));
+        head.appendChild(btn('×', hidePanel, { link: true }));
+        panel.appendChild(head);
+      }
+      function fmtDate(ts) {
+        try {
+          return new Date(ts * 1000).toLocaleString();
+        } catch (err) {
+          return '';
+        }
+      }
+      function deselectAll() {
+        var h = window.educadHandle;
+        if (h && h.sel && window.EduCADCanvas &&
+            typeof window.EduCADCanvas.deselect === 'function') {
+          try { window.EduCADCanvas.deselect(h.sel); } catch (err) {}
+        }
+      }
+      // Restore a snapshot onto the live sheet (caller confirms first).
+      function loadOntoSheet(data, what) {
+        var t = table();
+        if (!t || !window.EduCADEntities) {
+          status('Sheet not ready.');
+          return 0;
+        }
+        var count = Saves.restoreTable(window.EduCADEntities, t, data);
+        deselectAll();
+        status(what + ' (' + count + ' entities) ' + stamp());
+        return count;
+      }
+
+      var draft = [];
+      function isTeacherRole(s) {
+        return s && (s.role === 'teacher' || s.role === 'academics');
+      }
+
+      // ---- teacher views ----
+      function teacherHome(s) {
+        clearPanel();
+        header('Question sets');
+        panel.appendChild(el('div', 'New set', { marginTop: '6px' }, 'cf-section'));
+        var codeIn = textInput('Set code, e.g. geo-101');
+        var titleIn = textInput('Title, e.g. Projections 1');
+        panel.appendChild(codeIn);
+        panel.appendChild(titleIn);
+        var draftBox = el('div');
+        panel.appendChild(draftBox);
+        function renderDraft() {
+          while (draftBox.firstChild) draftBox.removeChild(draftBox.firstChild);
+          draft.forEach(function (q, i) {
+            var row = el('div', null,
+              null, 'cf-row');
+            row.appendChild(el('div', 'Q' + (i + 1) + ': ' + q.prompt));
+            if (q.hint) {
+              row.appendChild(el('div', 'Hint: ' + q.hint,
+                null, 'cf-muted'));
+            }
+            if (q.starter) {
+              row.appendChild(el('div',
+                'Starter: ' + (q.starter.entities || []).length + ' entities',
+                null, 'cf-muted'));
+            }
+            if (q.model) {
+              row.appendChild(el('div',
+                'Model: ' + (q.model.entities || []).length + ' entities · auto-check ' +
+                (q.check_enabled === false ? 'off' : 'on'),
+                null, 'cf-muted'));
+            }
+            var rm = btn('Remove', function () {
+              draft.splice(i, 1);
+              renderDraft();
+            });
+            rm.style.marginTop = '4px';
+            row.appendChild(rm);
+            draftBox.appendChild(row);
+          });
+        }
+        renderDraft();
+        var promptIn = areaInput('Question prompt', 2);
+        var hintIn = textInput('Hint (optional)');
+        panel.appendChild(promptIn);
+        panel.appendChild(hintIn);
+        var starterWrap = el('label', null, { display: 'block', marginTop: '4px' });
+        var starterBox = document.createElement('input');
+        starterBox.type = 'checkbox';
+        starterWrap.appendChild(starterBox);
+        starterWrap.appendChild(
+          document.createTextNode(' Attach current sheet as starter'));
+        panel.appendChild(starterWrap);
+        var modelWrap = el('label', null, { display: 'block', marginTop: '4px' });
+        var modelBox = document.createElement('input');
+        modelBox.type = 'checkbox';
+        modelWrap.appendChild(modelBox);
+        modelWrap.appendChild(
+          document.createTextNode(' Attach current sheet as model answer (students never see it)'));
+        panel.appendChild(modelWrap);
+        var checkWrap = el('label', null, { display: 'block', marginTop: '4px' });
+        var checkBox = document.createElement('input');
+        checkBox.type = 'checkbox';
+        checkBox.checked = true;
+        checkWrap.appendChild(checkBox);
+        checkWrap.appendChild(
+          document.createTextNode(' Auto-check against the model (strict pass/fail)'));
+        panel.appendChild(checkWrap);
+        var bulkIn = areaInput('Bulk: one question per block, blank line between. "Hint:" lines become hints.', 3);
+        panel.appendChild(bulkIn);
+        function parseBulk(text) {
+          var out = [];
+          String(text || '').split(/\n\s*\n/).forEach(function (b) {
+            var lines = b.split('\n').map(function (l) { return l.trim(); })
+              .filter(function (l) { return l !== ''; });
+            if (!lines.length) return;
+            var prompt = [];
+            var hint = '';
+            lines.forEach(function (l) {
+              var m = l.match(/^hint\s*:\s*(.*)$/i);
+              if (m) hint = (hint ? hint + ' ' : '') + m[1].trim();
+              else prompt.push(l);
+            });
+            var p = prompt.join(' ').trim();
+            if (!p) return;
+            var q = { prompt: p };
+            if (hint) q.hint = hint;
+            out.push(q);
+          });
+          return out;
+        }
+        var addRow = el('div', null, { marginTop: '6px' });
+        addRow.appendChild(btn('Add all', function () {
+          var qs = parseBulk(bulkIn.value);
+          if (!qs.length) {
+            status('No questions found in the bulk text.');
+            return;
+          }
+          qs.forEach(function (q) { draft.push(q); });
+          bulkIn.value = '';
+          status(qs.length + ' question(s) added to the draft.');
+          renderDraft();
+        }, { marginRight: '6px' }));
+        addRow.appendChild(btn('Add question', function () {
+          var prompt = promptIn.value.trim();
+          if (!prompt) {
+            status('Question prompt cannot be empty.');
+            return;
+          }
+          var q = { prompt: prompt };
+          if (hintIn.value.trim()) q.hint = hintIn.value.trim();
+          if (starterBox.checked) {
+            var t = table();
+            if (!t) {
+              status('Sheet not ready.');
+              return;
+            }
+            try {
+              q.starter = Saves.snapshotTable(t);
+            } catch (err) {
+              status('Starter snapshot failed.');
+              return;
+            }
+          }
+          if (modelBox.checked) {
+            var mt = table();
+            if (!mt) {
+              status('Sheet not ready.');
+              return;
+            }
+            try {
+              q.model = Saves.snapshotTable(mt);
+              q.check_enabled = checkBox.checked;
+            } catch (err) {
+              status('Model snapshot failed.');
+              return;
+            }
+          }
+          draft.push(q);
+          promptIn.value = '';
+          hintIn.value = '';
+          starterBox.checked = false;
+          modelBox.checked = false;
+          renderDraft();
+        }, { marginRight: '6px' }));
+        addRow.appendChild(btn('Create set', function () {
+          var code = codeIn.value.trim();
+          var title = titleIn.value.trim() || 'Untitled set';
+          if (!draft.length) {
+            status('Add at least one question first.');
+            return;
+          }
+          Saves.createSet(fi(), s, code, title, draft).then(function (data) {
+            draft = [];
+            codeIn.value = '';
+            titleIn.value = '';
+            status('Set ' + data.code + ' posted ' + stamp());
+            teacherHome(s);
+          }, fail('Create failed'));
+        }));
+        panel.appendChild(addRow);
+        panel.appendChild(el('div', 'My sets', null, 'cf-section'));
+        var listBox = el('div', 'Loading…');
+        panel.appendChild(listBox);
+        Saves.listSets(fi(), s).then(function (data) {
+          while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
+          var sets = data.sets || [];
+          if (!sets.length) {
+            listBox.appendChild(el('div', 'No sets yet.'));
+            return;
+          }
+          sets.forEach(function (it) {
+            var row = el('div', null,
+              null, 'cf-row');
+            row.appendChild(el('div', it.code + ' — ' + (it.title || 'Untitled'),
+              null, 'cf-name'));
+            row.appendChild(el('div',
+              it.nquestions + ' question(s) · ' + fmtDate(it.created_at),
+              null, 'cf-muted'));
+            var br = el('div', null, { marginTop: '4px' });
+            br.appendChild(btn('Open', function () {
+              teacherSetDetail(s, it.code);
+            }, { marginRight: '6px' }));
+            br.appendChild(btn('Delete', function () {
+              if (!window.confirm('Delete set "' + it.code +
+                  '" and all its submissions?')) {
+                return;
+              }
+              Saves.deleteSet(fi(), s, it.code).then(function () {
+                status('Set ' + it.code + ' deleted.');
+                teacherHome(s);
+              }, fail('Delete failed'));
+            }));
+            row.appendChild(br);
+            listBox.appendChild(row);
+          });
+        }, function (err) {
+          listBox.textContent = 'Load failed' +
+            (err && err.message ? ': ' + err.message : '');
+        });
+      }
+
+      function teacherSetDetail(s, code) {
+        clearPanel();
+        header('Set ' + code);
+        var back = btn('Back', function () { teacherHome(s); });
+        back.style.margin = '6px 0';
+        panel.appendChild(back);
+        var body = el('div', 'Loading…');
+        panel.appendChild(body);
+        function verdictTag(v) {
+          if (v === 'pass') return ' [PASS]';
+          if (v === 'fail') return ' [FAIL]';
+          return ' [ungraded]';
+        }
+        function autoTag(a) {
+          if (!a || !a.checked) return ' auto: off';
+          return a.pass ? ' auto: PASS' : ' auto: FAIL';
+        }
+        function gradeForm(row, sub, setCode) {
+          var old = row.querySelector('.cf-gradeform');
+          if (old) { row.removeChild(old); return; }
+          var form = el('div', null, null, 'cf-gradeform');
+          var sel = document.createElement('select');
+          [['', 'Ungraded'], ['pass', 'Pass'], ['fail', 'Fail']].forEach(function (o) {
+            var op = document.createElement('option');
+            op.value = o[0];
+            op.textContent = o[1];
+            if ((sub.verdict || '') === o[0]) op.selected = true;
+            sel.appendChild(op);
+          });
+          var rem = areaInput('Remarks for the student (optional)', 2);
+          rem.value = sub.remarks || '';
+          form.appendChild(sel);
+          form.appendChild(rem);
+          var brow = el('div', null, { marginTop: '4px' });
+          brow.appendChild(btn('Save grade', function () {
+            Saves.gradeSubmission(fi(), s, sub.id, sel.value, rem.value.trim())
+              .then(function () {
+                status('Submission #' + sub.id + ' graded ' + stamp());
+                teacherSetDetail(s, setCode);
+              }, fail('Grade failed'));
+          }, { marginRight: '6px' }));
+          brow.appendChild(btn('Cancel', function () { row.removeChild(form); }));
+          form.appendChild(brow);
+          row.appendChild(form);
+        }
+        Saves.getSet(fi(), s, code).then(function (data) {
+          while (body.firstChild) body.removeChild(body.firstChild);
+          body.appendChild(el('div', data.title || 'Untitled', null, 'cf-name'));
+          (data.questions || []).forEach(function (q, i) {
+            var qrow = el('div', null, null, 'cf-row');
+            qrow.appendChild(el('div', 'Q' + (i + 1) + ': ' + q.prompt, null, 'cf-name'));
+            var has = !!q.has_model;
+            qrow.appendChild(el('div', has
+              ? ('Model attached · auto-check ' + (q.check_enabled === false ? 'OFF' : 'ON'))
+              : 'No model answer', null, 'cf-muted'));
+            var qr = el('div', null, { marginTop: '4px' });
+            qr.appendChild(btn('Model := sheet', function () {
+              var t = table();
+              if (!t) { status('Sheet not ready.'); return; }
+              var snap;
+              try { snap = Saves.snapshotTable(t); } catch (err) {
+                status('Snapshot failed.');
+                return;
+              }
+              Saves.setQuestionModel(fi(), s, code, i, snap).then(function () {
+                status('Q' + (i + 1) + ' model attached ' + stamp());
+                teacherSetDetail(s, code);
+              }, fail('Attach failed'));
+            }, { marginRight: '6px' }));
+            if (has) {
+              qr.appendChild(btn('View model', function () {
+                try {
+                  loadOntoSheet(q.model, 'Model loaded');
+                  hidePanel();
+                } catch (err) {
+                  status('Model data is malformed.');
+                }
+              }, { marginRight: '6px' }));
+              qr.appendChild(btn(q.check_enabled === false ? 'Check on' : 'Check off',
+                (function (idx, cur) {
+                  return function () {
+                    Saves.setQuestionCheck(fi(), s, code, idx, cur === false)
+                      .then(function () {
+                        status('Q' + (idx + 1) + ' auto-check ' +
+                          (cur === false ? 'on' : 'off') + ' ' + stamp());
+                        teacherSetDetail(s, code);
+                      }, fail('Toggle failed'));
+                  };
+                })(i, q.check_enabled), { marginRight: '6px' }));
+              qr.appendChild(btn('Clear model', (function (idx) {
+                return function () {
+                  if (!window.confirm('Remove the model for Q' + (idx + 1) + '?')) return;
+                  Saves.clearQuestionModel(fi(), s, code, idx).then(function () {
+                    status('Q' + (idx + 1) + ' model cleared.');
+                    teacherSetDetail(s, code);
+                  }, fail('Clear failed'));
+                };
+              })(i)));
+            }
+            qrow.appendChild(qr);
+            body.appendChild(qrow);
+          });
+          body.appendChild(el('div', 'Submissions by question', { marginTop: '8px' }, 'cf-section'));
+          var sub = el('div', 'Loading…');
+          body.appendChild(sub);
+          Saves.listSubmissions(fi(), s, code).then(function (sd) {
+            while (sub.firstChild) sub.removeChild(sub.firstChild);
+            var items = sd.submissions || [];
+            if (!items.length) {
+              sub.appendChild(el('div', 'No submissions yet.'));
+              return;
+            }
+            var groups = {};
+            items.forEach(function (it) {
+              var k = it.question_index;
+              if (!groups[k]) groups[k] = [];
+              groups[k].push(it);
+            });
+            Object.keys(groups).map(Number).sort(function (a, b) { return a - b; })
+              .forEach(function (qi) {
+                var list = groups[qi];
+                sub.appendChild(el('div', 'Q' + (qi + 1) + ' — ' + list.length +
+                  ' submission(s)', { marginTop: '6px' }, 'cf-section'));
+                list.forEach(function (it) {
+                  var row = el('div', null, null, 'cf-row');
+                  row.appendChild(el('div',
+                    (it.name || it.username) + verdictTag(it.verdict) + autoTag(it.auto),
+                    null, 'cf-name'));
+                  if (it.note) row.appendChild(el('div', 'Student note: ' + it.note));
+                  if (it.remarks) row.appendChild(el('div', 'Remarks: ' + it.remarks));
+                  row.appendChild(el('div', fmtDate(it.created_at), null, 'cf-muted'));
+                  var br = el('div', null, { marginTop: '4px' });
+                  br.appendChild(btn('Inspect on sheet', function () {
+                    if (!window.confirm('Load this submission onto the sheet? ' +
+                        'The current sheet will be replaced.')) {
+                      return;
+                    }
+                    Saves.getSubmission(fi(), s, it.id).then(function (full) {
+                      try {
+                        loadOntoSheet(full.data, 'Submission loaded');
+                        hidePanel();
+                      } catch (err) {
+                        status('Submission data is malformed.');
+                      }
+                    }, fail('Inspect failed'));
+                  }, { marginRight: '6px' }));
+                  br.appendChild(btn('Grade', function () {
+                    gradeForm(row, it, code);
+                  }));
+                  row.appendChild(br);
+                  sub.appendChild(row);
+                });
+              });
+          }, function (err) {
+            sub.textContent = 'Load failed' +
+              (err && err.message ? ': ' + err.message : '');
+          });
+        }, fail('Load failed'));
+      }
+
+      // ---- student views ----
+      function studentHome(s) {
+        clearPanel();
+        header('Question sets');
+        panel.appendChild(el('div', 'Open a set by code', { marginTop: '6px' }, 'cf-section'));
+        var codeIn = textInput('Set code, e.g. geo-101');
+        panel.appendChild(codeIn);
+        var open = btn('Open', function () {
+          var code = codeIn.value.trim();
+          if (!code) {
+            status('Enter a set code first.');
+            return;
+          }
+          studentSetDetail(s, code);
+        });
+        open.style.marginTop = '6px';
+        panel.appendChild(open);
+        panel.appendChild(el('div', 'My submissions', null, 'cf-section'));
+        var mine = el('div', 'Loading…');
+        panel.appendChild(mine);
+        Saves.listMySubmissions(fi(), s).then(function (data) {
+          while (mine.firstChild) mine.removeChild(mine.firstChild);
+          var items = data.submissions || [];
+          if (!items.length) {
+            mine.appendChild(el('div', 'Nothing submitted yet.'));
+            return;
+          }
+          items.forEach(function (it) {
+            var row = el('div', null,
+              null, 'cf-row');
+            var tag = '';
+            if (it.verdict === 'pass') tag = ' [PASS]';
+            else if (it.verdict === 'fail') tag = ' [FAIL]';
+            if (it.auto && it.auto.checked) tag += it.auto.pass ? ' auto: PASS' : ' auto: FAIL';
+            row.appendChild(el('div',
+              it.set_code + ' · Q' + (it.question_index + 1) + tag,
+              null, 'cf-name'));
+            if (it.remarks) row.appendChild(el('div', 'Teacher: ' + it.remarks));
+            row.appendChild(el('div', fmtDate(it.created_at),
+              null, 'cf-muted'));
+            var rel = btn('Reload', function () {
+              if (!window.confirm('Load your submission onto the sheet? ' +
+                  'The current sheet will be replaced.')) {
+                return;
+              }
+              Saves.getSubmission(fi(), s, it.id).then(function (full) {
+                try {
+                  loadOntoSheet(full.data, 'Submission loaded');
+                  hidePanel();
+                } catch (err) {
+                  status('Submission data is malformed.');
+                }
+              }, fail('Reload failed'));
+            });
+            rel.style.marginTop = '4px';
+            row.appendChild(rel);
+            mine.appendChild(row);
+          });
+        }, function (err) {
+          mine.textContent = 'Load failed' +
+            (err && err.message ? ': ' + err.message : '');
+        });
+      }
+
+      function studentSetDetail(s, code) {
+        clearPanel();
+        header('Set ' + code);
+        var back = btn('Back', function () { studentHome(s); });
+        back.style.margin = '6px 0';
+        panel.appendChild(back);
+        var body = el('div', 'Loading…');
+        panel.appendChild(body);
+        Saves.getSet(fi(), s, code).then(function (data) {
+          while (body.firstChild) body.removeChild(body.firstChild);
+          body.appendChild(el('div', data.title || 'Untitled', null, 'cf-name'));
+          if (data.owner) {
+            body.appendChild(el('div', 'By ' + data.owner,
+              null, 'cf-muted'));
+          }
+          (data.questions || []).forEach(function (q, i) {
+            var row = el('div', null,
+              null, 'cf-row');
+            row.appendChild(el('div', 'Q' + (i + 1) + ': ' + q.prompt,
+              null, 'cf-name'));
+            var checkNote = el('div', null, { marginTop: '2px' }, 'cf-muted');
+            if (q.has_model && q.check_enabled !== false) {
+              checkNote.textContent = 'Strict auto-check is on: Verify tells pass/fail only.';
+            } else if (q.has_model) {
+              checkNote.textContent = 'Auto-check is off for this question.';
+            } else {
+              checkNote.textContent = 'No auto-check for this question.';
+            }
+            row.appendChild(checkNote);
+            var verdictLine = el('div', null, { marginTop: '2px' });
+            verdictLine.hidden = true;
+            row.appendChild(verdictLine);
+            function showAuto(auto) {
+              verdictLine.hidden = false;
+              while (verdictLine.firstChild) verdictLine.removeChild(verdictLine.firstChild);
+              if (!auto || !auto.checked) {
+                verdictLine.textContent = 'Auto-check unavailable for this question.';
+                return;
+              }
+              var d = auto.details || {};
+              var msg = auto.pass ? 'AUTO-CHECK: PASS ✓' : 'AUTO-CHECK: FAIL ✗';
+              if (d.matched !== undefined) {
+                msg += ' — ' + d.matched + '/' + d.model_count + ' matched';
+                if (d.missing) msg += ', ' + d.missing + ' missing';
+                if (d.extra) msg += ', ' + d.extra + ' extra';
+              }
+              if (typeof auto.score === 'number') {
+                msg += ' (score ' + Math.round(auto.score * 100) + '%)';
+              }
+              verdictLine.textContent = msg;
+            }
+            if (q.hint) {
+              var hintBtn = btn('Hint', function () {
+                hintText.hidden = !hintText.hidden;
+              }, { link: true });
+              hintBtn.style.marginTop = '4px';
+              row.appendChild(hintBtn);
+              var hintText = el('div', q.hint,
+                { marginTop: '2px' }, 'cf-muted');
+              hintText.hidden = true;
+              row.appendChild(hintText);
+            }
+            var br = el('div', null, { marginTop: '4px' });
+            if (q.starter) {
+              br.appendChild(btn('Load starter', function () {
+                if (!window.confirm('Load the starter onto the sheet? ' +
+                    'The current sheet will be replaced.')) {
+                  return;
+                }
+                try {
+                  loadOntoSheet(q.starter, 'Starter loaded');
+                } catch (err) {
+                  status('Starter data is malformed.');
+                }
+              }, { marginRight: '6px' }));
+            }
+            if (q.has_model && q.check_enabled !== false) {
+              br.appendChild(btn('Verify my sheet', function () {
+                var t = table();
+                if (!t) {
+                  status('Sheet not ready.');
+                  return;
+                }
+                var snap;
+                try {
+                  snap = Saves.snapshotTable(t);
+                } catch (err) {
+                  status('Snapshot failed.');
+                  return;
+                }
+                status('Verifying Q' + (i + 1) + '…');
+                Saves.verifySolution(fi(), s, code, i, snap).then(function (r) {
+                  showAuto(r);
+                  if (!r.checked) {
+                    status('Q' + (i + 1) + ': auto-check unavailable.');
+                  } else if (r.pass) {
+                    status('Q' + (i + 1) + ': AUTO-CHECK PASS ✓ ' + stamp());
+                  } else {
+                    status('Q' + (i + 1) + ': AUTO-CHECK FAIL ✗ — ' +
+                      'the model stays hidden; fix your drawing and verify again. ' +
+                      stamp());
+                  }
+                }, fail('Verify failed'));
+              }, { marginRight: '6px' }));
+            }
+            br.appendChild(btn('Submit my sheet', function () {
+              var t = table();
+              if (!t) {
+                status('Sheet not ready.');
+                return;
+              }
+              var snap;
+              try {
+                snap = Saves.snapshotTable(t);
+              } catch (err) {
+                status('Snapshot failed.');
+                return;
+              }
+              var note = window.prompt('Note for your teacher (optional):', '');
+              if (note === null) return;
+              Saves.submitSolution(fi(), s, code, i, snap, note || '').then(function (r) {
+                showAuto(r && r.auto);
+                if (r && r.auto && r.auto.checked && !r.auto.pass) {
+                  status('Submitted Q' + (i + 1) + ' — AUTO-CHECK FAIL ✗ ' + stamp());
+                } else if (r && r.auto && r.auto.checked) {
+                  status('Submitted Q' + (i + 1) + ' — AUTO-CHECK PASS ✓ ' + stamp());
+                } else {
+                  status('Submitted Q' + (i + 1) + ' ' + stamp());
+                }
+              }, fail('Submit failed'));
+            }));
+            row.appendChild(br);
+            body.appendChild(row);
+          });
+        }, function (err) {
+          body.textContent = (err && err.status === 404)
+            ? 'No set with that code.'
+            : 'Load failed' + (err && err.message ? ': ' + err.message : '');
+        });
+      }
+
+      var setsBtn = $('btn-sets');
+      if (setsBtn) setsBtn.addEventListener('click', function () {
+        var s = Saves.currentSession();
+        if (Saves.isGuest(s)) {
+          status('Log in to use question sets (guest is local-only).');
+          return;
+        }
+        if (!panel.hidden) {
+          hidePanel();
+          return;
+        }
+        hideDrawings();
+        panel.hidden = false;
+        if (isTeacherRole(s)) teacherHome(s);
+        else studentHome(s);
+      });
+    })();
+  </script>
+
+  <script>
+    // Deep links from the studio and workspace. ?submission=<id> reviews
+    // a submission (teachers and academics land in read-only View mode,
+    // students get an editable copy); ?solve=<code>&q=<i> loads a
+    // question starter for solving; ?drawing=<id> opens a saved drawing;
+    // ?model=<code>&q=<i> loads the model answer for editing (teachers
+    // only — students never receive the model payload).
+    // ?draw=1 is a bare sheet (lets teachers past the studio gate).
+    (function deepLink() {
+      if (typeof window.EduCADSaves === 'undefined') return;
+      var Saves = window.EduCADSaves;
+      function $(id) { return document.getElementById(id); }
+      function params() {
+        var out = {};
+        var q = String(window.location.search || '').replace(/^\?/, '');
+        q.split('&').forEach(function (kv) {
+          if (!kv) return;
+          var i = kv.indexOf('=');
+          var k = i === -1 ? kv : kv.slice(0, i);
+          var v = i === -1 ? '' : kv.slice(i + 1);
+          try {
+            out[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, ' '));
+          } catch (err) { /* keep going on bad escapes */ }
+        });
+        return out;
+      }
+      function table() {
+        var h = window.educadHandle;
+        return (h && h.table) || null;
+      }
+      function setMode(mode) {
+        if (typeof window.educadSetSheetMode === 'function') {
+          window.educadSetSheetMode(mode);
+          return;
+        }
+        var b = $(mode === 'view' ? 'btn-mode-view' : 'btn-mode-edit');
+        if (b && b.click) b.click();
+      }
+      var statusEl = $('save-status');
+      function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
+      function fmtDate(ts) {
+        try { return new Date(ts * 1000).toLocaleString(); }
+        catch (err) { return ''; }
+      }
+      function loadOntoSheet(data) {
+        var t = table();
+        if (!t || !window.EduCADEntities) {
+          status('Sheet not ready.');
+          return -1;
+        }
+        var count = Saves.restoreTable(window.EduCADEntities, t, data);
+        var h = window.educadHandle;
+        if (h && h.sel && window.EduCADCanvas &&
+            typeof window.EduCADCanvas.deselect === 'function') {
+          try { window.EduCADCanvas.deselect(h.sel); } catch (err) {}
+        }
+        return count;
+      }
+
+      var p = params();
+      var s = Saves.currentSession();
+      if (Saves.isGuest(s)) {
+        if (p.submission || p.solve || p.drawing || p.model) {
+          status('Log in to open shared sheets (guest is local-only).');
+        }
+        return;
+      }
+      var fi = window.fetch.bind(window);
+      if (p.submission) {
+        var id = parseInt(p.submission, 10);
+        if (!(id > 0)) { status('Bad submission link.'); return; }
+        Saves.getSubmission(fi, s, id).then(function (full) {
+          var count;
+          try {
+            count = loadOntoSheet(full.data);
+          } catch (err) {
+            status('Submission data is malformed.');
+            return;
+          }
+          if (count < 0) return;
+          var label = (full.name || full.username || 'Submission') + ' · ' +
+            (full.set_code || 'set') + ' Q' + ((full.question_index || 0) + 1);
+          if (s.role === 'teacher' || s.role === 'academics') {
+            setMode('view');
+            status(label + ' · ' + fmtDate(full.created_at) + ' (view only)');
+          } else {
+            setMode('edit');
+            status(label + ' loaded as an editable copy.');
+          }
+        }, function (err) {
+          status('Submission failed to load' +
+            (err && err.message ? ': ' + err.message : ''));
+        });
+        return;
+      }
+      if (p.solve) {
+        var qi = parseInt(p.q || '0', 10);
+        if (!(qi >= 0)) qi = 0;
+        Saves.getSet(fi, s, p.solve).then(function (data) {
+          var qs = data.questions || [];
+          if (qi >= qs.length) { status('No such question.'); return; }
+          var q = qs[qi];
+          setMode('edit');
+          if (q.starter) {
+            var count;
+            try {
+              count = loadOntoSheet(q.starter);
+            } catch (err) {
+              status('Starter data is malformed.');
+              return;
+            }
+            if (count < 0) return;
+            status('Q' + (qi + 1) + ': ' + q.prompt + ' (starter loaded)');
+          } else {
+            status('Q' + (qi + 1) + ': ' + q.prompt);
+          }
+        }, function (err) {
+          status('Set failed to load' +
+            (err && err.message ? ': ' + err.message : ''));
+        });
+        return;
+      }
+      if (p.model) {
+        if (s.role !== 'teacher' && s.role !== 'academics') {
+          status('Model answers are hidden from students.');
+          return;
+        }
+        var mqi = parseInt(p.q || '0', 10);
+        if (!(mqi >= 0)) mqi = 0;
+        Saves.getSet(fi, s, p.model).then(function (data) {
+          var qs = data.questions || [];
+          if (mqi >= qs.length || !qs[mqi].model) {
+            status('No model answer for that question.');
+            return;
+          }
+          var count;
+          try {
+            count = loadOntoSheet(qs[mqi].model);
+          } catch (err) {
+            status('Model data is malformed.');
+            return;
+          }
+          if (count < 0) return;
+          setMode('edit');
+          status('Model for ' + p.model + ' Q' + (mqi + 1) +
+            ' loaded as an editable copy (' + count + ' entities). ' +
+            'Re-attach via the Sets panel to update it.');
+        }, function (err) {
+          status('Set failed to load' +
+            (err && err.message ? ': ' + err.message : ''));
+        });
+        return;
+      }
+      if (p.drawing) {
+        var did = parseInt(p.drawing, 10);
+        if (!(did > 0)) { status('Bad drawing link.'); return; }
+        Saves.getDrawing(fi, s, did).then(function (data) {
+          var count;
+          try {
+            count = loadOntoSheet(data.data);
+          } catch (err) {
+            status('Drawing data is malformed.');
+            return;
+          }
+          if (count < 0) return;
+          if (typeof window.educadNoteDrawing === 'function') {
+            window.educadNoteDrawing(data.id, data.title);
+          }
+          setMode('edit');
+          status('Opened "' + (data.title || 'Untitled') + '" (' +
+            count + ' entities)');
+        }, function (err) {
+          status('Drawing failed to load' +
+            (err && err.message ? ': ' + err.message : ''));
+        });
+      }
     })();
   </script>
 </body>

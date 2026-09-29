@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Golden-loop demo - EduCAD</title>
+  <link rel="stylesheet" href="../login.css">
+  <style>
+    .demo-video { width: 100%; max-width: 960px; height: auto; background: #000; }
+    .demo-chapters { margin: 12px 0 0 18px; }
+    .demo-chapters li { margin: 3px 0; }
+    .demo-chapters a { text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="cf-page">
+    <header class="cf-header">
+      <a class="cf-logo" href="../login.html">Edu<span>CAD</span></a>
+      <div class="cf-head-right">Engineering Graphics &middot; First-Angle Monge Projection</div>
+    </header>
+    <nav class="cf-menu">
+      <div class="menu-list-container">
+        <ul class="menu-list">
+          <li><a href="../index.html">Home</a></li>
+          <li><a href="../tutorials.html">Tutorials</a></li>
+          <li><a href="../manual.html">Manual</a></li>
+          <li><a href="../login.html">Login</a></li>
+        </ul>
+      </div>
+    </nav>
+    <main class="cf-content">
+      <h1>Golden-loop demo: assign &rarr; solve &rarr; confirm</h1>
+      <p>A complete assignment lifecycle on EduCAD, recorded end to end:
+        a teacher posts a question set with a model answer, a student joins
+        the class, constructs the geometry on the sheet, verifies against
+        the hidden model and submits &mdash; then the teacher inspects the
+        submission and grades it PASS with remarks.</p>
+      <video class="demo-video" controls preload="metadata" poster="poster.png">
+        <source src="educad-golden-loop.mp4" type="video/mp4">
+        Your browser cannot play this video.
+        <a href="educad-golden-loop.mp4">Download it instead</a>.
+      </video>
+      <h2>Chapters</h2>
+      <ul class="demo-chapters">
+        <li><a href="educad-golden-loop.mp4#t=2">0:02</a> Teacher logs in</li>
+        <li><a href="educad-golden-loop.mp4#t=13">0:13</a> Teacher creates class + question set</li>
+        <li><a href="educad-golden-loop.mp4#t=25">0:25</a> Teacher draws + attaches model answer</li>
+        <li><a href="educad-golden-loop.mp4#t=47">0:47</a> Student joins class, opens set</li>
+        <li><a href="educad-golden-loop.mp4#t=71">1:11</a> Student constructs triangle on canvas</li>
+        <li><a href="educad-golden-loop.mp4#t=79">1:19</a> Student verifies + submits</li>
+        <li><a href="educad-golden-loop.mp4#t=83">1:23</a> Teacher inspects submission</li>
+        <li><a href="educad-golden-loop.mp4#t=102">1:42</a> Teacher confirms: PASS + remarks</li>
+      </ul>
+      <p class="cf-guest">Try it yourself: <a href="../login.html">log in</a>
+        (teacher <code>teacher</code> / <code>teach123</code>,
+        student <code>student</code> / <code>learn123</code>).</p>
+    </main>
+    <footer class="cf-footer">EduCAD &middot; zero-dependency teaching CAD &middot; demo login, no real security</footer>
+  </div>
+  <script src="../menu-lava.js"></script>
+</body>
+</html>

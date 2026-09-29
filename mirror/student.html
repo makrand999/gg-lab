@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student workspace - EduCAD</title>
+  <link rel="stylesheet" href="login.css">
+  <link rel="stylesheet" href="lab.css">
+</head>
+<body>
+  <div class="cf-page">
+    <header class="cf-header">
+      <a class="cf-logo" href="student.html">Edu<span>CAD</span></a>
+      <div class="cf-head-right">Engineering Graphics &middot; Student workspace</div>
+    </header>
+    <nav class="cf-menu">
+      <div class="menu-list-container">
+        <ul class="menu-list">
+          <li class="current"><a href="student.html">Workspace</a></li>
+          <li><a href="index.html">Sheet</a></li>
+          <li><a href="tutorials.html">Tutorials</a></li>
+          <li><a href="manual.html">Manual</a></li>
+        </ul>
+      </div>
+    </nav>
+    <main class="cf-content">
+      <p class="lab-who"><span id="lab-who"></span><a href="login.html" id="lab-logout">Logout</a></p>
+      <h1>Student workspace</h1>
+      <p class="lab-flash" id="lab-flash" role="status"></p>
+      <div id="lab-root"><p class="lab-muted">Loading&hellip;</p></div>
+    </main>
+    <footer class="cf-footer">EduCAD &middot; zero-dependency teaching CAD &middot; demo login, no real security</footer>
+  </div>
+  <script src="menu-lava.js"></script>
+  <script src="files/www.geogebra.org/educad-saves.js"></script>
+  <script src="student.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+#pragma once
+// Generated from schema.sql by CMake. Do not edit.
+static const char *kEducadSchema = R"EDUCAD_SCHEMA(
+@SCHEMA_SQL@
+)EDUCAD_SCHEMA";

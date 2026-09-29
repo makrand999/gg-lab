@@ -28,7 +28,7 @@
   // reported, never guessed; deterministic tie-breaks prefer max coverage,
   // then min total edge length.
   var WORLD_UNITS = 'mm';
-  var VERSION = '10.0.0-educad';
+  var VERSION = '10.1.0-educad';
   var WELD_MIN_MM = 1e-6;
   var WELD_REL = 1e-4;
   var WELD_MAX_MM = 0.5;
@@ -43,12 +43,18 @@
     'no-closed-profile': 'no closed profile found in either view',
     'unsupported-curves': 'curves not supported yet',
     'x-mismatch': 'plan/elevation x stations differ beyond eps',
+    'name-mismatch': 'plan/elevation labels name different points',
     'ambiguous-pairing': 'ambiguous pairing across views',
     'non-convex-profile': 'non-convex profile (M1 covers convex only)',
     'unmatched-edge': 'a drawn edge fits no interpretation',
     'unmatched-point': 'a drawn point fits no interpretation',
     'non-manifold': 'degenerate solid (zero height or area)',
-    'coverage-failed': 'round-trip coverage below gate'
+    'coverage-failed': 'round-trip coverage below gate',
+    'hint-conflict': 'projector claims contradict each other',
+    'hint-loose-foot': 'a claim foot lands off drawn vertices',
+    'duplicate-corners': 'two corners lift to one 3D point',
+    'corners-not-coplanar': 'claimed corners leave the profile plane',
+    'non-convex-corners': 'claimed corners bound no convex face'
   };
 
   function assertFinite() {
@@ -88,7 +94,11 @@
   }
 
   function crossesXY(e) {
-    return (e.y > 0 && e.y2 < 0) || (e.y < 0 && e.y2 > 0);
+    // Strict crossing, plus touching-from-below: a vertical from a base
+    // station (y = 0) into the plan half is a projector just the same.
+    // Single-sided verticals (plan or elevation outlines) never match.
+    var lo = Math.min(e.y, e.y2), hi = Math.max(e.y, e.y2);
+    return lo < 0 && hi >= 0;
   }
 
   function filterEntities(list) {
@@ -1397,6 +1407,131 @@
     return s1 < s2 ? s1 + '-' + s2 : s2 + '-' + s1;
   }
 
+  // --- Pair-by-name: display names are absolute. Plan `a`, elevation
+  // `a'`, and profile `a''` share base `a` and name one 3D point; pairing
+  // follows the shared base while the projector (same x-station within
+  // eps) still validates the pair. Only genuine POINT entities name a
+  // vertex; segment captions (edge names like `ab`) never do. Unlabeled
+  // vertices keep the legacy geometric reading.
+  function baseNameOf(caption) {
+    var s = (caption === undefined || caption === null) ? '' : String(caption);
+    s = s.replace(/^\s+|\s+$/g, '');
+    while (s.length > 0) {
+      var ch = s.charAt(s.length - 1);
+      if (ch === "'" || ch === '′' || ch === '’') s = s.slice(0, -1);
+      else break;
+    }
+    return s;
+  }
+
+  // Base-name SET of one caption: multi-caption parts split on commas,
+  // one wrapping paren pair (the student's hidden verdict) stripped per
+  // part, then prime ticks stripped. Verdicts are invisible to the gate:
+  // typing parens never breaks reconstruction. 'h,(b\')' -> ['h','b'].
+  function captionBases(caption) {
+    var s = (caption === undefined || caption === null) ? '' : String(caption);
+    var raw = s.split(',');
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var t = raw[i].replace(/^\s+|\s+$/g, '');
+      if (t.length >= 2 && t.charAt(0) === '(' && t.charAt(t.length - 1) === ')') {
+        t = t.slice(1, -1).replace(/^\s+|\s+$/g, '');
+      }
+      var b = baseNameOf(t);
+      if (b !== '' && out.indexOf(b) === -1) out.push(b);
+    }
+    return out;
+  }
+
+  function vertBases(graph) {
+    var per = [];
+    for (var i = 0; i < graph.verts.length; i++) per.push([]);
+    for (var j = 0; j < graph.points.length; j++) {
+      var p = graph.points[j];
+      if (!p.item || p.item.type !== 'POINT') continue;
+      var bs = captionBases(p.item.caption);
+      for (var k = 0; k < bs.length; k++) {
+        if (per[p.v].indexOf(bs[k]) === -1) per[p.v].push(bs[k]);
+      }
+    }
+    return per;
+  }
+
+  function shareBase(a, b) {
+    for (var i = 0; i < a.length; i++) {
+      if (b.indexOf(a[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  function namesCompatible(pb, eb) {
+    if (pb.length === 0 || eb.length === 0) return true;
+    return shareBase(pb, eb);
+  }
+
+  // Cross-view label contradiction detector (all classes): at any shared
+  // x-station where both views carry POINT labels, the base sets must
+  // meet; a profile label must name a plan/elevation base. Returns a
+  // `name-mismatch` fail or null. Unlabeled drawings always pass.
+  function checkNameGate(planG, elevG, eps, profG) {
+    var pb = vertBases(planG), eb = vertBases(elevG);
+    var U = unionStations(planG, elevG, eps);
+    var planAt = {}, elevAt = {}, i, st;
+    for (i = 0; i < U.planSt.length; i++) {
+      st = U.planSt[i];
+      if (!planAt[st]) planAt[st] = [];
+      planAt[st].push(i);
+    }
+    for (i = 0; i < U.elevSt.length; i++) {
+      st = U.elevSt[i];
+      if (!elevAt[st]) elevAt[st] = [];
+      elevAt[st].push(i);
+    }
+    function unionOf(per, verts) {
+      var seen = {}, out = [];
+      for (var k = 0; k < verts.length; k++) {
+        var arr = per[verts[k]];
+        for (var m = 0; m < arr.length; m++) {
+          if (!seen[arr[m]]) { seen[arr[m]] = 1; out.push(arr[m]); }
+        }
+      }
+      return out;
+    }
+    for (var sk in planAt) {
+      if (!Object.prototype.hasOwnProperty.call(planAt, sk)) continue;
+      if (!elevAt[sk]) continue;
+      var pB = unionOf(pb, planAt[sk]);
+      var eB = unionOf(eb, elevAt[sk]);
+      if (pB.length === 0 || eB.length === 0) continue;
+      if (!shareBase(pB, eB)) {
+        return fail('name-mismatch', 'plan "' + pB[0] + '" vs elevation "' +
+          eB[0] + '" at x=' + U.stations[Number(sk)] +
+          ' share a projector but name different points', 0);
+      }
+    }
+    if (profG) {
+      var known = {}, anyKnown = false, q, w;
+      var all = pb.concat(eb);
+      for (i = 0; i < all.length; i++) {
+        for (q = 0; q < all[i].length; q++) {
+          known[all[i][q]] = 1;
+          anyKnown = true;
+        }
+      }
+      if (!anyKnown) return null;
+      var qb = vertBases(profG);
+      for (i = 0; i < qb.length; i++) {
+        for (w = 0; w < qb[i].length; w++) {
+          if (!known[qb[i][w]]) {
+            return fail('name-mismatch', 'profile "' + qb[i][w] +
+              '" names no plan/elevation point', 0);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   function nearDrawnPoint(graph, px, py, tol) {
     for (var j = 0; j < graph.points.length; j++) {
       var v = graph.verts[graph.points[j].v];
@@ -1495,10 +1630,16 @@
     return { pass: true, coverage: cov };
   }
 
-  // --- Class C: lifted wireframe. Vertices pair across views by station;
-  // edges need both projections (degenerate point+segment pins excepted).
-  function tryWireframe(planG, elevG, eps, tol, profG) {
+  // --- Class C: lifted wireframe. Vertices pair across views by name
+  // first (shared base at one station), then geometrically; edges need
+  // both projections (degenerate point+segment pins excepted).
+  // strictOpt === false restores the legacy pure-geometric pairing.
+  function tryWireframe(planG, elevG, eps, tol, profG, strictOpt) {
+    var strict = strictOpt !== false;
     var stol = Math.max(tol, eps);
+    var planBases = strict ? vertBases(planG) : null;
+    var elevBases = strict ? vertBases(elevG) : null;
+    var planOwners = {}, elevOwners = {};
     var U = unionStations(planG, elevG, eps);
     var planSt = U.planSt, elevSt = U.elevSt;
     var P2E = {}, E2P = {};
@@ -1538,12 +1679,55 @@
       segUsersE[elevG.segs[i].b] = 1;
     }
     function lonePointVert(users, idx) { return !users[idx]; }
+    // Pass 0: pair by name. A plan vertex and an elevation vertex at one
+    // station pair when each shares bases with exactly that one mate;
+    // multi-labeled end-on dots fall through to the pin pass below.
+    function distinctMates(owners, bases) {
+      var out = [];
+      for (var k = 0; k < bases.length; k++) {
+        var own = owners[bases[k]] || [];
+        for (var o = 0; o < own.length; o++) {
+          if (out.indexOf(own[o]) === -1) out.push(own[o]);
+        }
+      }
+      return out;
+    }
+    if (strict) {
+      var vi, bi;
+      for (vi = 0; vi < planBases.length; vi++) {
+        for (bi = 0; bi < planBases[vi].length; bi++) {
+          var pkk = planBases[vi][bi];
+          if (!planOwners[pkk]) planOwners[pkk] = [];
+          if (planOwners[pkk].indexOf(vi) === -1) planOwners[pkk].push(vi);
+        }
+      }
+      for (vi = 0; vi < elevBases.length; vi++) {
+        for (bi = 0; bi < elevBases[vi].length; bi++) {
+          var ekk = elevBases[vi][bi];
+          if (!elevOwners[ekk]) elevOwners[ekk] = [];
+          if (elevOwners[ekk].indexOf(vi) === -1) elevOwners[ekk].push(vi);
+        }
+      }
+      for (vi = 0; vi < planG.verts.length; vi++) {
+        if (planBases[vi].length === 0 || P2E[vi] !== undefined) continue;
+        var mates = distinctMates(elevOwners, planBases[vi]);
+        if (mates.length !== 1) continue;
+        var mq = mates[0];
+        if (E2P[mq] !== undefined) continue;
+        if (planSt[vi] !== elevSt[mq]) continue;
+        if (distinctMates(planOwners, elevBases[mq]).length !== 1) continue;
+        pairUp(vi, mq);
+      }
+    }
     // Pass 1: 1:1 stations.
     var sk;
     for (sk in byStP) {
       if (!Object.prototype.hasOwnProperty.call(byStP, sk)) continue;
       if (byStP[sk].length === 1 && byStE[sk] && byStE[sk].length === 1) {
-        pairUp(byStP[sk][0], byStE[sk][0]);
+        var p0 = byStP[sk][0], q0 = byStE[sk][0];
+        if (!strict || namesCompatible(planBases[p0], elevBases[q0])) {
+          pairUp(p0, q0);
+        }
       }
     }
     // Pass 2: segment-guided matching by station span (fixed plan-driven
@@ -1579,11 +1763,17 @@
         var endAtS1 = stB[c.a] === s1 ? c.a : c.b;
         var endAtS2 = stB[c.a] === s1 ? c.b : c.a;
         if (flip) {
-          pairUp(endAtS1, a);
-          pairUp(endAtS2, b);
+          if (!strict || (namesCompatible(planBases[endAtS1], elevBases[a]) &&
+              namesCompatible(planBases[endAtS2], elevBases[b]))) {
+            pairUp(endAtS1, a);
+            pairUp(endAtS2, b);
+          }
         } else {
-          pairUp(a, endAtS1);
-          pairUp(b, endAtS2);
+          if (!strict || (namesCompatible(planBases[a], elevBases[endAtS1]) &&
+              namesCompatible(planBases[b], elevBases[endAtS2]))) {
+            pairUp(a, endAtS1);
+            pairUp(b, endAtS2);
+          }
         }
       }
     }
@@ -1604,7 +1794,10 @@
           return E2P[v] === undefined;
         });
         if (freeP.length === 1 && freeE.length === 1) {
-          pairUp(freeP[0], freeE[0]);
+          if (!strict ||
+              namesCompatible(planBases[freeP[0]], elevBases[freeE[0]])) {
+            pairUp(freeP[0], freeE[0]);
+          }
         }
       }
       if (Object.keys(P2E).length !== before) changed = true;
@@ -1651,13 +1844,20 @@
       var loneE = loneVertsAt(elevG, segUsersE, elevSt, want, E2P);
       var segP = sameStationSegs(planG, planSt, want, P2E);
       var segE = sameStationSegs(elevG, elevSt, want, E2P);
-      if (loneP.length === 1 && segE.length === 1 && loneE.length === 0) {
+      var pinOkV = loneP.length === 1 && segE.length === 1 &&
+        loneE.length === 0 && (!strict || namesCompatible(
+          planBases[loneP[0]],
+          elevBases[segE[0].a].concat(elevBases[segE[0].b])));
+      var pinOkD = loneE.length === 1 && segP.length === 1 &&
+        loneP.length === 0 && (!strict || namesCompatible(
+          planBases[segP[0].a].concat(planBases[segP[0].b]),
+          elevBases[loneE[0]]));
+      if (pinOkV) {
         pins.push({ p: loneP[0], seg: segE[0], dir: 'vertical' });
         P2E[loneP[0]] = -1;
         E2P[segE[0].a] = -2;
         E2P[segE[0].b] = -2;
-      } else if (loneE.length === 1 && segP.length === 1 &&
-          loneP.length === 0) {
+      } else if (pinOkD) {
         pins.push({ q: loneE[0], seg: segP[0], dir: 'depth' });
         E2P[loneE[0]] = -1;
         P2E[segP[0].a] = -2;
@@ -1668,7 +1868,8 @@
       }
     }
     // Leftover analysis: ambiguity residue stays silent; near misses are
-    // x-mismatch; the rest are unmatched points/edges.
+    // x-mismatch; the rest are unmatched points/edges. In strict mode a
+    // named vertex first blames duplicates, then its name-selected mate.
     var failInfo = null;
     function noteFail(reason, label) {
       if (!failInfo) failInfo = { reason: reason, label: label };
@@ -1681,9 +1882,52 @@
       }
       return best;
     }
+    function compatStationMates(ownBases, ownSt, otherAtSt, otherBases) {
+      var list = otherAtSt[ownSt];
+      if (!list) return 0;
+      var n = 0;
+      for (var c = 0; c < list.length; c++) {
+        if (namesCompatible(ownBases, otherBases[list[c]])) n++;
+      }
+      return n;
+    }
+    function duplicateBase(bases, owners) {
+      for (var k = 0; k < bases.length; k++) {
+        if ((owners[bases[k]] || []).length > 1) return bases[k];
+      }
+      return null;
+    }
+    function namedMate(bases, owners, verts) {
+      var best = null;
+      for (var k = 0; k < bases.length; k++) {
+        var own = owners[bases[k]] || [];
+        for (var o = 0; o < own.length; o++) {
+          if (best === null || verts[own[o]].x < best.x) {
+            best = { base: bases[k], x: verts[own[o]].x };
+          }
+        }
+      }
+      return best;
+    }
     for (i = 0; i < planG.verts.length; i++) {
       if (P2E[i] !== undefined) continue;
-      if (byStE[planSt[i]] && byStE[planSt[i]].length > 0) {
+      if (strict) {
+        if (compatStationMates(planBases[i], planSt[i], byStE, elevBases) > 0) {
+          noteAmb('plan vertex has several elevation mates');
+          continue;
+        }
+        var dupP = duplicateBase(planBases[i], planOwners);
+        if (dupP !== null) {
+          noteAmb('plan label "' + dupP + '" marks two dots');
+          continue;
+        }
+        var mateP = namedMate(planBases[i], elevOwners, elevG.verts);
+        if (mateP !== null) {
+          noteFail('x-mismatch', 'label "' + mateP.base + '" reads x=' +
+            planG.verts[i].x + ' in plan but x=' + mateP.x + ' in elevation');
+          continue;
+        }
+      } else if (byStE[planSt[i]] && byStE[planSt[i]].length > 0) {
         noteAmb('plan vertex has several elevation mates');
         continue;
       }
@@ -1693,7 +1937,9 @@
           planG.verts[i].x + ' misses its mate beyond eps');
       } else if (lonePointVert(segUsersP, i)) {
         noteFail('unmatched-point',
-          'plan point near x=' + planG.verts[i].x + ' has no mate');
+          strict && planBases[i].length > 0 ?
+            'plan "' + planBases[i][0] + '" has no mate in elevation' :
+            'plan point near x=' + planG.verts[i].x + ' has no mate');
       } else {
         noteFail('unmatched-edge',
           'plan vertex near x=' + planG.verts[i].x + ' has no mate');
@@ -1701,7 +1947,23 @@
     }
     for (i = 0; i < elevG.verts.length; i++) {
       if (E2P[i] !== undefined) continue;
-      if (byStP[elevSt[i]] && byStP[elevSt[i]].length > 0) {
+      if (strict) {
+        if (compatStationMates(elevBases[i], elevSt[i], byStP, planBases) > 0) {
+          noteAmb('elevation vertex has several plan mates');
+          continue;
+        }
+        var dupE = duplicateBase(elevBases[i], elevOwners);
+        if (dupE !== null) {
+          noteAmb('elevation label "' + dupE + '" marks two dots');
+          continue;
+        }
+        var mateE = namedMate(elevBases[i], planOwners, planG.verts);
+        if (mateE !== null) {
+          noteFail('x-mismatch', 'label "' + mateE.base + '" reads x=' +
+            elevG.verts[i].x + ' in elevation but x=' + mateE.x + ' in plan');
+          continue;
+        }
+      } else if (byStP[elevSt[i]] && byStP[elevSt[i]].length > 0) {
         noteAmb('elevation vertex has several plan mates');
         continue;
       }
@@ -1711,7 +1973,9 @@
           elevG.verts[i].x + ' misses its mate beyond eps');
       } else if (lonePointVert(segUsersE, i)) {
         noteFail('unmatched-point',
-          'elevation point near x=' + elevG.verts[i].x + ' has no mate');
+          strict && elevBases[i].length > 0 ?
+            'elevation "' + elevBases[i][0] + '" has no mate in plan' :
+            'elevation point near x=' + elevG.verts[i].x + ' has no mate');
       } else {
         noteFail('unmatched-edge',
           'elevation vertex near x=' + elevG.verts[i].x + ' has no mate');
@@ -1931,6 +2195,200 @@
       outC.profileMap = profMapC;
     }
     return outC;
+  }
+
+  // --- Class E: claimed corner-lift lamina (M5). Class C pairs whole
+  // vertices 1:1, which cannot express coincident corners (one elevation
+  // dot yielding two corners at different plan feet). Where C fails, the
+  // student's projector claims identify corners explicitly: one claim =
+  // one 3D corner lifted from its plan + elevation feet. v1 builds
+  // profile laminae only: all corners share x, and the face is the
+  // convex hull in (depth, height), so a wrong pairing fails loudly
+  // (duplicate corners, broken hull, uncovered ink) instead of guessing.
+  // Claims apply always — hand drawings have no Check truth to gate on.
+  // Returns null when no claims exist (no attempt, old behavior intact).
+  function tryClaimedCorners(planG, elevG, eps, tol, claimLines, byId) {
+    if (!claimLines || claimLines.length === 0) return null;
+    function nearVert(verts, x, y) {
+      for (var v = 0; v < verts.length; v++) {
+        var dx = verts[v].x - x, dy = verts[v].y - y;
+        if (dx * dx + dy * dy <= eps * eps) return true;
+      }
+      return false;
+    }
+    var corners = [];
+    for (var li = 0; li < claimLines.length; li++) {
+      var line = claimLines[li];
+      var m = baseNameOf(String(line.meta.fromMember));
+      if (m === '') {
+        return fail('hint-conflict', 'a claim names no corner', 0);
+      }
+      var refs = line.meta.refs;
+      var S = refs && refs.length > 0 ? byId[refs[0]] : null;
+      var F = refs && refs.length > 1 ? byId[refs[1]] : null;
+      if (!S || S.type !== 'POINT' || !F || F.type !== 'POINT') {
+        return fail('hint-loose-foot', 'claim ' + m + ' has no resolvable feet', 0);
+      }
+      if (captionBases(S.caption).indexOf(m) === -1) {
+        return fail('hint-conflict', 'claim ' + m + ' left its station', 0);
+      }
+      var sPlan = S.y < 0, fPlan = F.y < 0;
+      if (sPlan === fPlan) {
+        return fail('hint-conflict', 'claim ' + m + ' stays in one view', 0);
+      }
+      var P = sPlan ? S : F, E = sPlan ? F : S;
+      if (Math.abs(P.x - E.x) > eps) {
+        return fail('hint-conflict', 'claim ' + m + ' feet disagree in x', 0);
+      }
+      if (!nearVert(planG.verts, P.x, P.y) || !nearVert(elevG.verts, E.x, E.y)) {
+        return fail('hint-loose-foot', 'claim ' + m + ' foot lands off drawn vertices', 0);
+      }
+      var dup = false;
+      for (var ci = 0; ci < corners.length; ci++) {
+        if (corners[ci].member !== m) continue;
+        var c0 = corners[ci];
+        if (Math.abs(c0.px - P.x) <= eps && Math.abs(c0.py - P.y) <= eps &&
+            Math.abs(c0.ex - E.x) <= eps && Math.abs(c0.ey - E.y) <= eps) {
+          dup = true;
+          break;
+        }
+        return fail('hint-conflict', 'claim ' + m + ' pairs two ways', 0);
+      }
+      if (!dup) corners.push({ member: m, px: P.x, py: P.y, ex: E.x, ey: E.y });
+    }
+    if (corners.length < 3) {
+      return fail('non-convex-corners', corners.length + ' corners cannot bound a face', 0);
+    }
+    corners.sort(function (a, b) {
+      return a.member < b.member ? -1 : a.member > b.member ? 1 : 0;
+    });
+    var k;
+    for (k = 0; k < corners.length; k++) {
+      corners[k].x = (corners[k].px + corners[k].ex) / 2;
+      corners[k].d = -corners[k].py;
+      corners[k].h = corners[k].ey;
+    }
+    for (var i = 0; i < corners.length; i++) {
+      for (var j = i + 1; j < corners.length; j++) {
+        var ddx = corners[i].x - corners[j].x;
+        var ddh = corners[i].h - corners[j].h;
+        var ddz = corners[i].d - corners[j].d;
+        if (ddx * ddx + ddh * ddh + ddz * ddz <= eps * eps) {
+          return fail('duplicate-corners', '"' + corners[i].member + '" and "' +
+            corners[j].member + '" lift to one point', 0);
+        }
+      }
+    }
+    var x0 = corners[0].x;
+    for (k = 0; k < corners.length; k++) {
+      if (Math.abs(corners[k].x - x0) > eps) {
+        return fail('corners-not-coplanar', 'claimed corners leave the profile plane', 0);
+      }
+    }
+    // Convex hull in (depth, height): monotone chain, deterministic.
+    var order = corners.map(function (c, idx) { return idx; });
+    order.sort(function (a, b) {
+      if (corners[a].d !== corners[b].d) return corners[a].d - corners[b].d;
+      if (corners[a].h !== corners[b].h) return corners[a].h - corners[b].h;
+      return a - b;
+    });
+    function cross(o, a, b) {
+      return (corners[a].d - corners[o].d) * (corners[b].h - corners[o].h) -
+        (corners[a].h - corners[o].h) * (corners[b].d - corners[o].d);
+    }
+    var lower = [];
+    for (k = 0; k < order.length; k++) {
+      while (lower.length >= 2 &&
+          cross(lower[lower.length - 2], lower[lower.length - 1], order[k]) <= 0) {
+        lower.pop();
+      }
+      lower.push(order[k]);
+    }
+    var upper = [];
+    for (k = order.length - 1; k >= 0; k--) {
+      while (upper.length >= 2 &&
+          cross(upper[upper.length - 2], upper[upper.length - 1], order[k]) <= 0) {
+        upper.pop();
+      }
+      upper.push(order[k]);
+    }
+    lower.pop();
+    upper.pop();
+    var hull = lower.concat(upper);
+    var onHull = {};
+    for (k = 0; k < hull.length; k++) onHull[hull[k]] = 1;
+    for (k = 0; k < corners.length; k++) {
+      if (!onHull[k]) {
+        return fail('non-convex-corners', hull.length <= 2 ?
+          'claimed corners are collinear' :
+          '"' + corners[k].member + '" lies inside the claimed face', 0);
+      }
+    }
+    var verts = corners.map(function (c) { return { x: c.x, y: c.h, z: c.d }; });
+    var edges = [];
+    for (k = 0; k < hull.length; k++) {
+      edges.push([hull[k], hull[(k + 1) % hull.length]]);
+    }
+    // Coverage both directions, per view, against drawn A/B ink.
+    function inkSegs(graph) {
+      var segs = [];
+      for (var s = 0; s < graph.segs.length; s++) {
+        var it = graph.segs[s];
+        if (it.item.bisCode !== 'A' && it.item.bisCode !== 'B') continue;
+        segs.push({ ax: graph.verts[it.a].x, ay: graph.verts[it.a].y,
+          bx: graph.verts[it.b].x, by: graph.verts[it.b].y });
+      }
+      return segs;
+    }
+    function ptSegDist2(px, py, s) {
+      var dx = s.bx - s.ax, dy = s.by - s.ay;
+      var len2 = dx * dx + dy * dy;
+      var t = len2 > 0 ? ((px - s.ax) * dx + (py - s.ay) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      var qx = px - (s.ax + t * dx), qy = py - (s.ay + t * dy);
+      return qx * qx + qy * qy;
+    }
+    function fracCovered(probes, ink) {
+      var hit = 0, n = 0;
+      for (var s = 0; s < probes.length; s++) {
+        for (var jj = 0; jj < 5; jj++) {
+          var t = jj / 4;
+          var px = probes[s].ax + (probes[s].bx - probes[s].ax) * t;
+          var py = probes[s].ay + (probes[s].by - probes[s].ay) * t;
+          n++;
+          for (var u = 0; u < ink.length; u++) {
+            if (ptSegDist2(px, py, ink[u]) <= tol * tol) { hit++; break; }
+          }
+        }
+      }
+      return n === 0 ? 1 : hit / n;
+    }
+    var planInk = inkSegs(planG), elevInk = inkSegs(elevG);
+    var planLift = [], elevLift = [];
+    for (k = 0; k < edges.length; k++) {
+      var cA = corners[edges[k][0]], cB = corners[edges[k][1]];
+      planLift.push({ ax: cA.px, ay: cA.py, bx: cB.px, by: cB.py });
+      elevLift.push({ ax: cA.ex, ay: cA.ey, bx: cB.ex, by: cB.ey });
+    }
+    var covPlan = Math.min(fracCovered(planInk, planLift), fracCovered(planLift, planInk));
+    var covElev = Math.min(fracCovered(elevInk, elevLift), fracCovered(elevLift, elevInk));
+    var cov = Math.min(covPlan, covElev);
+    if (cov < COVERAGE_GATE) {
+      return fail('coverage-failed', 'claimed lamina round-trip coverage ' + cov.toFixed(3), cov);
+    }
+    // Both windings: a lamina has no interior, so single-sidedness would
+    // show all-dashed from behind and teach nothing. Faces only feed
+    // hidden classification (edges are stroked, never filled); exactly
+    // edge-on both faces turn away and the outline honestly dashes.
+    var loop2 = hull.slice().reverse();
+    return {
+      pass: true, class: 'E', coverage: cov,
+      totalLength: totalLength(verts, edges),
+      geometry: { name: 'claimed-lamina', vertices: verts, edges: edges,
+        faces: [hull.slice(), loop2] },
+      coveragePlan: covPlan, coverageElev: covElev,
+      canonical: canonicalOf(verts, edges)
+    };
   }
 
   // --- Class D: vertical-axis solids of revolution (M3 curves). ---
@@ -2550,7 +3008,9 @@
   }
 
   var FAIL_PRIORITY = [
-    'missing-view', 'unsupported-curves', 'x-mismatch',
+    'missing-view', 'unsupported-curves', 'x-mismatch', 'name-mismatch',
+    'hint-conflict', 'hint-loose-foot', 'duplicate-corners',
+    'corners-not-coplanar', 'non-convex-corners',
     'non-convex-profile', 'unmatched-point', 'unmatched-edge',
     'non-manifold', 'ambiguous-pairing', 'no-closed-profile',
     'coverage-failed'
@@ -2563,6 +3023,7 @@
 
   // Top-level reconstruction. entities: spec or table rows (any order).
   // opts.eps overrides the x-station match tolerance (mm).
+  // opts.strictNames === false disables pair-by-name (legacy geometry).
   function reconstruct(entities, opts) {
     opts = opts || {};
     var eps = opts.eps === undefined ? MATCH_EPS_MM : opts.eps;
@@ -2571,6 +3032,25 @@
     var list = Array.isArray(entities) ? entities.slice() : [];
     var warnings = [];
     var f = filterEntities(list);
+    // Class E inputs: claimed projectors never survive the helper filter,
+    // so they are collected from the raw list (deterministic id order).
+    var byId = {};
+    for (var bi = 0; bi < list.length; bi++) {
+      if (list[bi] && typeof list[bi].id === 'string') byId[list[bi].id] = list[bi];
+    }
+    var claimLines = [];
+    for (var qi = 0; qi < list.length; qi++) {
+      var qe = list[qi];
+      if (!qe || qe.visible === false) continue;
+      if (qe.type !== 'SEGMENT' && qe.type !== 'LINE' && qe.type !== 'RAY') continue;
+      var qm = qe.meta && qe.meta.fromMember;
+      if (qm === undefined || qm === null || String(qm) === '') continue;
+      if (!isSheetVertical(qe) || !crossesXY(qe)) continue;
+      claimLines.push(qe);
+    }
+    claimLines.sort(function (a, b) {
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
     var cls = classifyViews(sortStable(f.kept), undefined, f.curves);
     var tol = weldTolerance(cls.plan, cls.elev, cls.profile);
     var stats = {
@@ -2630,6 +3110,16 @@
       var elevG = buildViewGraph(sortStable(variant.elev), tol);
       var profG = variant.profile.length > 0 ?
         buildViewGraph(sortStable(variant.profile), tol) : null;
+      var strictNames = opts.strictNames !== false;
+      if (strictNames) {
+        var ng = checkNameGate(planG, elevG, eps, profG);
+        if (ng) {
+          return {
+            tag: variant.tag, planLoop: null, attempts: [],
+            win: null, fail: ng
+          };
+        }
+      }
       var planLoop = convexLoop(planG, tol);
       var attempts = [];
       var ra = tryPrism(planG, elevG, planLoop, eps, tol, profG);
@@ -2642,7 +3132,7 @@
         attempts.push({ class: 'B', pass: !!rb.pass,
           coverage: rb.coverage || 0, reason: rb.reason || null });
       }
-      var rc = tryWireframe(planG, elevG, eps, tol, profG);
+      var rc = tryWireframe(planG, elevG, eps, tol, profG, strictNames);
       attempts.push({ class: 'C', pass: !!rc.pass,
         coverage: rc.coverage || 0, reason: rc.reason || null });
       var rd = tryRevolved(planG, elevG, planLoop, f.curves, eps, tol, profG);
@@ -2650,7 +3140,16 @@
         attempts.push({ class: 'D', pass: !!rd.pass,
           coverage: rd.coverage || 0, reason: rd.reason || null });
       }
-      var passing = [ra, rb, rc, rd].filter(function (r) { return r && r.pass; });
+      // Class E rescues ambiguity/failure only: hints never compete with
+      // a geometric success, and legacy geometry mode skips them outright.
+      var re = null;
+      var anyPass = (ra && ra.pass) || (rb && rb.pass) || (rc && rc.pass) || (rd && rd.pass);
+      if (!anyPass && claimLines.length > 0 && strictNames) {
+        re = tryClaimedCorners(planG, elevG, eps, tol, claimLines, byId);
+        attempts.push({ class: 'E', pass: !!re.pass,
+          coverage: re.coverage || 0, reason: re.reason || null });
+      }
+      var passing = [ra, rb, rc, rd, re].filter(function (r) { return r && r.pass; });
       passing.sort(function (a, b) {
         if (a.coverage !== b.coverage) return b.coverage - a.coverage;
         return a.totalLength - b.totalLength;
@@ -2676,7 +3175,7 @@
         sol.fail = rd;
         return sol;
       }
-      var fails = [ra, rb, rc, rd].filter(function (r) { return r && !r.pass; });
+      var fails = [ra, rb, rc, rd, re].filter(function (r) { return r && !r.pass; });
       fails.sort(function (a, b) {
         return failRank(a.reason) - failRank(b.reason);
       });
@@ -2784,6 +3283,7 @@
     tryRevolved: tryRevolved,
     RIM_K: RIM_K,
     projectToViews: projectToViews,
+    baseNameOf: baseNameOf, captionBases: captionBases,
     reconstruct: reconstruct
   };
 });

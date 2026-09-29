@@ -1,0 +1,11 @@
+{
+  "academics": [
+    { "username": "academics", "password": "admin123", "name": "Academic Office" }
+  ],
+  "teacher": [
+    { "username": "teacher", "password": "teach123", "name": "Demo Teacher" }
+  ],
+  "student": [
+    { "username": "student", "password": "learn123", "name": "Demo Student" }
+  ]
+}

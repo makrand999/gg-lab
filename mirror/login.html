@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login - EduCAD</title>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <div class="cf-page">
+    <header class="cf-header">
+      <a class="cf-logo" href="login.html">Edu<span>CAD</span></a>
+      <div class="cf-head-right">Engineering Graphics &middot; First-Angle Monge Projection</div>
+    </header>
+    <nav class="cf-menu">
+      <div class="menu-list-container">
+        <ul class="menu-list">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="tutorials.html">Tutorials</a></li>
+          <li><a href="manual.html">Manual</a></li>
+          <li class="current"><a href="login.html">Login</a></li>
+        </ul>
+      </div>
+    </nav>
+    <main class="cf-content">
+      <h1>Login to EduCAD</h1>
+      <div class="cf-tabs">
+        <button type="button" data-role="academics" class="active">Academics</button>
+        <button type="button" data-role="teacher">Teacher</button>
+        <button type="button" data-role="student">Student</button>
+      </div>
+      <form id="login-form" action="api/login" method="post" autocomplete="off">
+        <table class="cf-form">
+          <tr>
+            <td class="lbl"><label for="username">Username:</label></td>
+            <td><input id="username" name="username" type="text" maxlength="64"></td>
+          </tr>
+          <tr>
+            <td class="lbl"><label for="password">Password:</label></td>
+            <td><input id="password" name="password" type="password" maxlength="64"></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>
+              <button type="submit" class="cf-btn">Login</button>
+              <span id="login-error" class="cf-error" hidden></span>
+            </td>
+          </tr>
+        </table>
+        <p class="cf-hint" id="demo-hint"></p>
+      </form>
+      <p class="cf-guest">Just looking around? <a href="index.html" id="guest-link">Continue as guest</a></p>
+    </main>
+    <footer class="cf-footer">EduCAD &middot; zero-dependency teaching CAD &middot; demo login, no real security</footer>
+  </div>
+  <script src="menu-lava.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>

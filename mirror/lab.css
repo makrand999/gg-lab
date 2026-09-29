@@ -1,0 +1,112 @@
+/* EduCAD lab pages: Codeforces-clean look shared by teacher.html and
+   student.html. Loaded after login.css; reuses its page/header/menu.
+   No boxed buttons anywhere: every action is a plain text link. */
+.lab-who {
+  text-align: right;
+  color: #555;
+  font-size: 12px;
+  margin: -8px 0 0;
+  padding: 0 0 6px;
+}
+.lab-who a { margin-left: 12px; }
+
+.cf-content h2 {
+  font-size: 15px;
+  font-weight: bold;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #ddd;
+  margin: 22px 0 8px;
+}
+.cf-content h2:first-child { margin-top: 0; }
+
+.lab-muted { color: #777; font-size: 12px; }
+.lab-error { color: #b00000; font-size: 12px; }
+.lab-ok { color: #006400; font-size: 12px; }
+.lab-flash { margin: 6px 0 0; min-height: 18px; }
+
+/* Rows: title link + muted meta + trailing text actions, hairline split. */
+.lab-list { margin: 4px 0 0; }
+.lab-row {
+  padding: 7px 0;
+  border-bottom: 1px solid #eee;
+}
+.lab-row:last-child { border-bottom: none; }
+.lab-row .lab-title { font-size: 13px; }
+.lab-row .lab-meta { color: #777; font-size: 12px; margin-top: 1px; }
+.lab-row .lab-acts { margin-top: 2px; font-size: 12px; }
+.lab-tag {
+  color: #777;
+  font-size: 11px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 0 5px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+/* Text actions: links and buttons look identical, no boxes. */
+a.lab-act, button.lab-act {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: #0645ad;
+  cursor: pointer;
+  text-decoration: none;
+  margin-right: 12px;
+  white-space: nowrap;
+}
+a.lab-act:last-child, button.lab-act:last-child { margin-right: 0; }
+a.lab-act:hover, button.lab-act:hover { color: #003d99; text-decoration: underline; }
+button.lab-act:disabled { color: #999; cursor: default; text-decoration: none; }
+.lab-act.lab-danger { color: #b00000; }
+.lab-act.lab-danger:hover { color: #7a0000; }
+.lab-act.lab-primary { font-weight: bold; }
+
+/* Inline forms: label + field rows, link submit. */
+.lab-form { margin: 8px 0 0; }
+.lab-form .lab-field { margin: 6px 0; }
+.lab-form label.lab-lbl {
+  display: inline-block;
+  min-width: 92px;
+  color: #555;
+  vertical-align: top;
+  padding-top: 4px;
+}
+.lab-form input[type="text"], .lab-form textarea, .lab-form select {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid #b9b9b9;
+  background: #fff;
+  color: #222;
+  width: 280px;
+  max-width: 100%;
+}
+.lab-form textarea { width: 100%; max-width: 560px; resize: vertical; }
+.lab-form input:focus, .lab-form textarea:focus, .lab-form select:focus {
+  border-color: #0645ad;
+  outline: none;
+}
+.lab-form .lab-submit { margin-top: 8px; }
+.lab-hint { color: #777; font-size: 12px; margin-top: 6px; }
+.lab-hint code {
+  font-family: Consolas, Menlo, monospace;
+  background: #f4f4f4;
+  padding: 0 4px;
+}
+
+.lab-back { font-size: 12px; }
+.lab-questions { margin: 6px 0 0 18px; }
+.lab-questions li { margin: 3px 0; }
+.lab-stub {
+  font-family: Consolas, Menlo, monospace;
+  font-size: 12px;
+  color: #555;
+}
+
+@media (max-width: 600px) {
+  .lab-form label.lab-lbl { display: block; min-width: 0; }
+  .lab-form input[type="text"], .lab-form select { width: 100%; }
+}

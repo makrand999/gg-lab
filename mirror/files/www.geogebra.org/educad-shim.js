@@ -122,12 +122,22 @@
   function fallbackValidType(t) { return FALLBACK_TYPES.indexOf(t) !== -1; }
 
   function FallbackTable() { this._map = {}; this._order = []; }
+  var FALLBACK_TWO_POINT = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION',
+    'DATUM_AXIS'];
   FallbackTable.prototype.create = function (type, opts) {
     opts = opts || {};
     if (!fallbackValidType(type)) throw new Error('bad type ' + type);
     var id = String(opts.id || '');
     if (id === '') throw new Error('id needed');
     if (this._map[id] !== undefined) throw new Error('dup id ' + id);
+    if (FALLBACK_TWO_POINT.indexOf(type) !== -1) {
+      var fx = opts.x || 0, fy = opts.y || 0;
+      var fx2 = opts.x2 || 0, fy2 = opts.y2 || 0;
+      var fdx = fx2 - fx, fdy = fy2 - fy;
+      if (Math.sqrt(fdx * fdx + fdy * fdy) <= 1e-6) {
+        throw new Error(type + ' needs two distinct points');
+      }
+    }
     var e = {
       id: id, name: String(opts.name === undefined ? id : opts.name),
       type: type, x: opts.x || 0, y: opts.y || 0,
@@ -553,6 +563,89 @@
       return { p: { x: e.x, y: e.y }, d: d };
     }
 
+    // Local cascade for the fallback store (mirrors
+    // EduCADEntities.collectCascadeDeleteIds): point delete drops
+    // referencing/coincident line-likes plus transitive refs dependents.
+    var SHIM_CASCADE_LINES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION'];
+    var SHIM_COINCIDENT_TOL = 1e-6;
+
+    function shimCoincides(ax, ay, bx, by) {
+      var dx = ax - bx, dy = ay - by;
+      return Math.sqrt(dx * dx + dy * dy) <= SHIM_COINCIDENT_TOL;
+    }
+
+    function shimCascadeIds(list, rootId) {
+      var byId = {};
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && typeof list[i].id === 'string') byId[list[i].id] = list[i];
+      }
+      if (!byId[rootId]) return [];
+      var doomed = {};
+      doomed[rootId] = true;
+      var order = [rootId];
+      var deadPoints = [];
+      if (byId[rootId].type === 'POINT') {
+        deadPoints.push({ x: byId[rootId].x, y: byId[rootId].y });
+      }
+      var changed = true;
+      while (changed) {
+        changed = false;
+        for (var j = 0; j < list.length; j++) {
+          var c = list[j];
+          if (!c || doomed[c.id]) continue;
+          if (c.locked) continue;
+          if (c.type === 'DATUM_AXIS') continue;
+          var m = c.meta || {};
+          var hit = false;
+          if (!hit && typeof m.polygon === 'string' && m.polygon !== '' &&
+              doomed[m.polygon]) {
+            hit = true;
+          }
+          if (!hit && Array.isArray(m.refs)) {
+            for (var r = 0; r < m.refs.length; r++) {
+              if (doomed[m.refs[r]]) { hit = true; break; }
+            }
+          }
+          if (!hit && Array.isArray(m.vertices)) {
+            for (var v = 0; v < m.vertices.length; v++) {
+              if (doomed[m.vertices[v]]) { hit = true; break; }
+            }
+          }
+          if (!hit && deadPoints.length > 0 &&
+              SHIM_CASCADE_LINES.indexOf(c.type) !== -1) {
+            for (var d = 0; d < deadPoints.length; d++) {
+              var px = deadPoints[d].x, py = deadPoints[d].y;
+              if (shimCoincides(c.x, c.y, px, py) ||
+                  shimCoincides(c.x2, c.y2, px, py)) {
+                hit = true;
+                break;
+              }
+            }
+          }
+          if (hit) {
+            doomed[c.id] = true;
+            order.push(c.id);
+            if (c.type === 'POINT') {
+              deadPoints.push({ x: c.x, y: c.y });
+            }
+            changed = true;
+          }
+        }
+      }
+      return order;
+    }
+
+    function cascadeIdsFor(list, rootId) {
+      if (E && typeof E.collectCascadeDeleteIds === 'function') {
+        try {
+          var ids = E.collectCascadeDeleteIds(list, rootId);
+          if (Array.isArray(ids) && ids.length > 0) return ids;
+          if (Array.isArray(ids)) return ids;
+        } catch (e) { /* fall through to local */ }
+      }
+      return shimCascadeIds(list, rootId);
+    }
+
     function insertEntity(type, opts) {
       var created = null;
       try {
@@ -620,8 +713,13 @@
       return { names: [id] };
     }
 
-    function segEnds(a, nums, refs) {
+    function segEnds(a, nums, refs, what) {
+      var label = what || 'Segment';
       if (a.length === 4) {
+        if (shimCoincides(nums[0], nums[1], nums[2], nums[3])) {
+          return { err: label + ' needs two distinct points',
+            off: a[2].offset };
+        }
         return { x1: nums[0], y1: nums[1], x2: nums[2], y2: nums[3],
           dep: null, off: 0 };
       }
@@ -635,12 +733,16 @@
         return { err: '"' + refs[1].name + '" is not a point',
           off: refs[1].offset };
       }
+      if (shimCoincides(p1.x, p1.y, p2.x, p2.y)) {
+        return { err: label + ' needs two distinct points',
+          off: refs[1].offset };
+      }
       return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
         dep: [refs[0].name, refs[1].name], off: 0 };
     }
 
     function buildSegLike(id, type, a, nums, refs, p) {
-      var ends = segEnds(a, nums, refs);
+      var ends = segEnds(a, nums, refs, type === 'LINE' ? 'Line' : 'Segment');
       if (ends.err) return { fail: ends.err, offset: ends.off };
       var o = baseOpts(id, { ggbType: type === 'LINE' ? 'line' : 'segment' });
       if (ends.dep !== null) o.meta.refs = ends.dep;
@@ -778,7 +880,7 @@
     }
 
     function buildMeasure(id, which, a, nums, refs, p) {
-      var ends = segEnds(a, nums, refs);
+      var ends = segEnds(a, nums, refs, which);
       if (ends.err) return { fail: ends.err, offset: ends.off };
       var len = distMm(ends.x1, ends.y1, ends.x2, ends.y2);
       var o = baseOpts(id, { ggbType: which === 'Distance' ? 'numeric' :
@@ -854,6 +956,7 @@
       }
       var made = [id];
       var okAll = true;
+      var edgeFail = 'polygon edge clash';
       for (var k = 0; k < pts.length; k++) {
         var eid = id + '_e' + (k + 1);
         if (table.has(eid)) {
@@ -868,13 +971,14 @@
         eo.bisCode = 'A';
         if (insertEntity('SEGMENT', eo) === null) {
           okAll = false;
+          edgeFail = 'polygon needs distinct points';
           break;
         }
         made.push(eid);
       }
       if (!okAll) {
         for (var r = 0; r < made.length; r++) table.remove(made[r]);
-        return { fail: 'polygon edge clash', offset: p.cmdOffset };
+        return { fail: edgeFail, offset: p.cmdOffset };
       }
       return { names: made };
     }
@@ -1225,6 +1329,12 @@
           warn('setCoords "' + name + '" is locked');
           return false;
         }
+        if ((SHIM_CASCADE_LINES.indexOf(e.type) !== -1 ||
+            e.type === 'DATUM_AXIS') &&
+            shimCoincides(x, y, e.x2, e.y2)) {
+          warn('setCoords "' + name + '" needs two distinct points');
+          return false;
+        }
         pushUndo();
         e.x = x;
         e.y = y;
@@ -1446,7 +1556,9 @@
       }
     };
 
-    // deleteObject(name): remove row (+ polygon edges). True/false(+warn).
+    // deleteObject(name): remove row (+ cascade: polygon edges, refs
+    // dependents, and line-likes coincident with a deleted point).
+    // True/false(+warn).
     applet.deleteObject = function (name) {
       try {
         var e = needObj(name);
@@ -1455,12 +1567,8 @@
           return false;
         }
         pushUndo();
-        var gone = [name];
-        var list = table.list();
-        for (var i = 0; i < list.length; i++) {
-          var m = list[i].meta || {};
-          if (m.polygon === name && list[i].id !== name) gone.push(list[i].id);
-        }
+        var gone = cascadeIdsFor(table.list(), name);
+        if (gone.length === 0) gone = [name];
         for (var k = 0; k < gone.length; k++) table.remove(gone[k]);
         for (var r = 0; r < gone.length; r++) fire(remL, gone[r]);
         return true;

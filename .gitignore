@@ -1,2 +1,4 @@
 dustbin/
 node_modules/
+backend/build/
+backend/data/

@@ -303,6 +303,214 @@
     }
     .cf-panel input[type="checkbox"] { margin-right: 4px; }
   </style>
+  <style id="cmd-styles">
+    /* Slash command line (bottom-center) + Settings panel (top-right).
+       Scoped to #cmd-bar / #settings-panel: canvas chrome untouched. */
+    #cmd-bar[hidden] { display: none; }
+    #cmd-bar {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 12px;
+      width: min(560px, 62vw);
+      z-index: 50;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 13px;
+    }
+    #cmd-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      outline: none;
+    }
+    #cmd-input:focus { border-color: #0284c7; }
+    #cmd-suggest {
+      max-height: 216px;
+      overflow-y: auto;
+      margin: 0 0 6px;
+      padding: 4px;
+      background: #0f172a;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+    .cmd-sug-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      color: #e2e8f0;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .cmd-sug-row .cmd-sug-hint {
+      color: #94a3b8;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cmd-sug-row canvas.cmd-sug-line { align-self: center; flex: none; }
+    .cmd-sug-row.active { background: #0284c7; color: #fff; }
+    .cmd-sug-row.active .cmd-sug-hint { color: #e0f2fe; }
+    #cmd-preview {
+      margin: 0 0 6px;
+      padding: 6px 10px;
+      color: #475569;
+      background: rgba(241, 245, 249, 0.96);
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #cmd-status {
+      margin: 0 0 6px;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    #cmd-status.ok { color: #166534; border-color: #86efac; }
+    #cmd-status.err { color: #b91c1c; border-color: #fca5a5; }
+    #settings-panel {
+      position: fixed;
+      top: 44px;
+      right: 12px;
+      min-width: 270px;
+      max-width: 340px;
+      z-index: 60;
+      background: #fff;
+      border: 1px solid #b9b9b9;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      padding: 10px 12px;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #222;
+      text-align: left;
+    }
+    #settings-panel .cmd-settings-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 15px;
+      font-weight: bold;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 6px;
+    }
+    #settings-panel .cmd-settings-head button {
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: #222;
+    }
+    #settings-panel .cmd-settings-section {
+      font-weight: bold;
+      margin-top: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #eee;
+    }
+    #settings-panel label.cmd-settings-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      cursor: pointer;
+    }
+    #settings-panel input[type="checkbox"] { margin: 0; }
+    #settings-panel #settings-reset {
+      font-family: inherit;
+      font-size: 13px;
+      background: #f0f0f0;
+      border: 1px solid #999;
+      border-radius: 0;
+      padding: 4px 20px;
+      color: #222;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    #settings-panel #settings-reset:hover { background: #e2e2e2; }
+    /* Pose mode HUD: plain canvas ink, no box. Everything reads as text
+       written on the sheet itself: serif italic like the sheet labels, a
+       soft knockout halo for legibility, click-through except the two
+       text actions. Scoped to #pose-panel: canvas chrome untouched. */
+    #pose-panel[hidden] { display: none; }
+    #pose-panel {
+      position: fixed;
+      top: 44px;
+      left: 12px;
+      max-width: 340px;
+      z-index: 60;
+      background: none;
+      border: none;
+      box-shadow: none;
+      padding: 0;
+      margin: 0;
+      font-family: Cambria, "Times New Roman", serif;
+      font-style: italic;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #1e293b;
+      text-align: left;
+      text-shadow: 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff;
+      pointer-events: none;
+    }
+    #pose-panel .pose-head {
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    #pose-panel .pose-head button {
+      border: none;
+      background: none;
+      padding: 0 0 0 8px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 15px;
+      color: inherit;
+      text-shadow: inherit;
+      pointer-events: auto;
+    }
+    #pose-panel .pose-readout {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-style: normal;
+      font-size: 12px;
+      white-space: pre-wrap;
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0 0 4px 0;
+    }
+    #pose-panel .pose-axes {
+      margin-bottom: 4px;
+    }
+    #pose-panel .pose-axes span + span { margin-left: 12px; }
+    #pose-panel .pose-hints { margin-bottom: 4px; }
+    #pose-panel .pose-actions button {
+      font: inherit;
+      font-size: 13px;
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0 16px 0 0;
+      color: inherit;
+      text-shadow: inherit;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    #pose-panel .pose-actions button:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
   <script>
@@ -411,7 +619,9 @@
     <span class="bar-divider"></span>
     <button class="mode-btn active" id="btn-mode-edit" title="Edit mode: draw and change the sheet">Edit</button>
     <button class="mode-btn" id="btn-mode-view" title="View mode: read-only inspect and measure">View</button>
+    <button class="mode-btn" id="btn-mode-pose" title="Pose mode: move the 3D model, watch the 2D views follow">Pose</button>
     <span class="bar-divider"></span>
+    <button class="demo-btn" id="btn-settings" title="Settings: command line and sheet preferences">Settings</button>
     <a class="demo-btn" id="btn-manual" href="manual.html" target="_blank" rel="noopener">Manual</a>
   </div>
 
@@ -425,6 +635,32 @@
     <span id="save-status" role="status"></span>
     <div id="drawings-panel" class="cf-panel" hidden></div>
     <div id="sets-panel" class="cf-panel" hidden></div>
+  </div>
+
+  <div id="cmd-bar" hidden>
+    <div id="cmd-suggest" hidden></div>
+    <div id="cmd-preview" hidden></div>
+    <div id="cmd-status" role="status" hidden></div>
+    <input id="cmd-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+      placeholder="Type / for commands — draw without the mouse" aria-label="Sheet command line">
+  </div>
+
+  <div id="settings-panel" hidden>
+    <div class="cmd-settings-head"><span>Settings</span><button id="settings-close" type="button" aria-label="Close settings">×</button></div>
+    <div class="cmd-settings-section">Preferences</div>
+    <div id="settings-rows"></div>
+    <button id="settings-reset" type="button">Reset to defaults</button>
+  </div>
+
+  <div id="pose-panel" hidden>
+    <div class="pose-head"><span>Pose — 3D → 2D preview</span><button id="pose-close" type="button" aria-label="Exit pose mode">×</button></div>
+    <div id="pose-readout" class="pose-readout"></div>
+    <div class="pose-axes"><span style="color: #e03232;">X right</span><span style="color: #2f9e44;">Y up</span><span style="color: #3b82f6;">Z toward you</span></div>
+    <div class="pose-hints">G move · R rotate · S scale · X/Y/Z lock axis · Ctrl snap · 1/3/7 views · Enter confirm · Esc cancel · Tab exit</div>
+    <div class="pose-actions">
+      <button id="pose-reset" type="button">Reset pose</button>
+      <button id="pose-exit" type="button">Exit pose</button>
+    </div>
   </div>
   <script>
     // Session chip: shows who is logged in; Logout clears the session.
@@ -481,6 +717,10 @@
   <script src="files/www.geogebra.org/edugraphics-common.js"></script>
   <script src="files/www.geogebra.org/educad-boot.js"></script>
   <script src="files/www.geogebra.org/educad-saves.js"></script>
+  <script src="files/www.geogebra.org/educad-settings.js"></script>
+  <script src="files/www.geogebra.org/educad-command.js"></script>
+  <script src="files/www.geogebra.org/educad-pose.js"></script>
+  <script src="files/www.geogebra.org/educad-project.js"></script>
 
   <script>
     (function () {
@@ -498,6 +738,88 @@
       // Saves UI bridge: the session-bar script below is a separate block
       // and reaches the live table only through this handle.
       window.educadHandle = handle;
+
+      // Sheet undo (Ctrl+Z): snapshot history over the live table. The
+      // subscriber records the pre-batch sheet: mutations landing in one
+      // synchronous run (cascade deletes, demo loads, restores) finalize
+      // as a single undo step on microtask, so one Ctrl+Z reverses one
+      // user gesture. Depth 50; undo only, no redo stack.
+      var UNDO_MAX = 50;
+      var undoStack = [];
+      var undoRestoring = false;
+      var undoPending = false;
+      function snapshotSheet() {
+        return JSON.parse(JSON.stringify(handle.table.list()));
+      }
+      var undoBase = snapshotSheet();
+      function finalizeUndoBatch() {
+        if (!undoPending) return;
+        undoPending = false;
+        if (undoRestoring) return;
+        undoStack.push(undoBase);
+        if (undoStack.length > UNDO_MAX) undoStack.shift();
+        undoBase = snapshotSheet();
+      }
+      function queueUndoBatch() {
+        if (undoPending) return;
+        undoPending = true;
+        if (typeof window.Promise === 'function') {
+          window.Promise.resolve().then(finalizeUndoBatch, finalizeUndoBatch);
+        } else {
+          setTimeout(finalizeUndoBatch, 0);
+        }
+      }
+      handle.table.subscribe(function () {
+        if (undoRestoring) return;
+        queueUndoBatch();
+      });
+      // userUndo: restore the previous sheet snapshot (Ctrl+Z). Returns
+      // false on an empty stack. Drops selection/inspect/tools parked on
+      // entities the restore removed, then redraws both layers; the live
+      // 2D->3D bridge rebuilds off the same table events.
+      function userUndo() {
+        if (typeof EduCADSaves === 'undefined' ||
+            typeof EduCADEntities === 'undefined') {
+          return false;
+        }
+        if (undoPending) {
+          undoPending = false;
+          undoStack.push(undoBase);
+          if (undoStack.length > UNDO_MAX) undoStack.shift();
+        }
+        if (undoStack.length === 0) return false;
+        var snap = undoStack.pop();
+        var beforeIds = {};
+        var before = handle.table.list();
+        for (var bi = 0; bi < before.length; bi++) {
+          beforeIds[String(before[bi].id)] = true;
+        }
+        undoRestoring = true;
+        try {
+          EduCADSaves.restoreTable(EduCADEntities, handle.table,
+            { entities: snap });
+        } finally {
+          undoRestoring = false;
+        }
+        undoBase = snapshotSheet();
+        var gone = [];
+        for (var gid in beforeIds) {
+          if (Object.prototype.hasOwnProperty.call(beforeIds, gid) &&
+              !handle.table.has(gid)) {
+            gone.push(gid);
+          }
+        }
+        if (gone.length > 0) cleanupAfterPointDelete(gone);
+        if (handle.sel.selectedId !== null &&
+            handle.table.get(handle.sel.selectedId) === null) {
+          EduCADCanvas.deselect(handle.sel);
+          stopCaretTimer();
+        }
+        EduCADMeasure.clearInspect(handle.measure);
+        renderLayer1();
+        renderLayer2(null, null);
+        return true;
+      }
 
       var mount = handle.mount;
       var c1 = mount.layer1;
@@ -601,53 +923,66 @@
         EduCADCanvas.abortLineTool(handle.line);
         lineAnim = null;
         hideLineMenu();
-        hideMemberMenu();
+        hideDotMenu();
         pendingMember = null;
         setLineCursor(false);
       }
-      // Member chooser: Ctrl+click on a multi-caption point asks which
-      // corner the student draws for (the projector claim). Same popup
-      // patterns as the BIS menu; the pick banks only after the choice.
-      var memberMenu = null;
+      // Dot-menu parking: Ctrl+click on a geometric stack parks the
+      // candidate ids here until the student picks one (phase39: the
+      // old member chooser is retired — drawn Type G projectors declare
+      // correspondence, so banking never asks which corner).
+      var dotMenu = null;
       var pendingMember = null;
-      function hideMemberMenu() {
-        if (memberMenu) memberMenu.classList.remove('open');
+      function hideDotMenu() {
+        if (dotMenu) dotMenu.classList.remove('open');
       }
-      function showMemberMenu(px, parts) {
-        if (memberMenu && memberMenu.parentNode) {
-          memberMenu.parentNode.removeChild(memberMenu);
+      // Dot chooser: Ctrl+click on a geometric stack (two or more
+      // distinct dots in tolerance) asks which dot to bank. Choosing
+      // a banked dot unbanks it; anything else banks the dot itself.
+      // Correspondence is declared by drawn Type G projectors, never
+      // by the bank, so no member is attached here.
+      function showDotMenu(px, ids) {
+        if (dotMenu && dotMenu.parentNode) {
+          dotMenu.parentNode.removeChild(dotMenu);
         }
         var m = document.createElement('div');
         m.className = 'edugraphics-menu';
         var head = document.createElement('div');
-        head.textContent = 'Draw for which corner?';
+        head.textContent = 'Bank which dot?';
         head.style.cssText = 'padding:4px 8px;font:600 12px system-ui,sans-serif;color:#475569;';
         m.appendChild(head);
-        parts.forEach(function (part, i) {
+        ids.forEach(function (id, i) {
+          var ent = handle.table.get(id);
           var row = document.createElement('div');
           row.className = 'edugraphics-menu-item';
-          row.setAttribute('data-member', String(i));
-          row.textContent = part;
+          row.setAttribute('data-dot', String(i));
+          row.textContent = (ent && (ent.caption || ent.name)) || String(id);
           m.appendChild(row);
         });
         m.addEventListener('click', function (e) {
           var row = (e.target && typeof e.target.closest === 'function') ?
-            e.target.closest('[data-member]') : null;
+            e.target.closest('[data-dot]') : null;
           if (row === null || pendingMember === null) return;
           var pick = pendingMember;
-          var bare = parts[Number(row.getAttribute('data-member'))];
+          var chosen = handle.table.get(
+            ids[Number(row.getAttribute('data-dot'))]);
           pendingMember = null;
-          hideMemberMenu();
-          if (typeof EduCADLabels !== 'undefined' && EduCADLabels.bareName) {
-            bare = EduCADLabels.bareName(bare);
+          hideDotMenu();
+          if (chosen === null) {
+            renderLayer2(pick.cursor, null);
+            return;
           }
-          bankFromPick(pick, bare);
+          if (bankHas(chosen.id)) {
+            bankFromPick({ cid: chosen.id, cursor: pick.cursor }, null);
+            return;
+          }
+          bankFromPick({ cid: chosen.id, cursor: pick.cursor }, null);
         });
         document.getElementById('app-container').appendChild(m);
-        memberMenu = m;
-        memberMenu.style.left = Math.max(4, Math.min(px.x + 10, window.innerWidth - 170)) + 'px';
-        memberMenu.style.top = Math.max(4, Math.min(px.y + 10, window.innerHeight - 170)) + 'px';
-        memberMenu.classList.add('open');
+        dotMenu = m;
+        dotMenu.style.left = Math.max(4, Math.min(px.x + 10, window.innerWidth - 170)) + 'px';
+        dotMenu.style.top = Math.max(4, Math.min(px.y + 10, window.innerHeight - 170)) + 'px';
+        dotMenu.classList.add('open');
       }
       // User actions: every click/key gesture funnels through these named
       // functions, and the tutorial stepper calls the same ones — one
@@ -998,10 +1333,357 @@
       // Edit only drops the readout. Pan, zoom, and 3D orbit work in
       // both modes; the mode buttons use their own class so the demo
       // active-sweep never touches the mode indicator.
+      // Pose mode: grab the 3D model Blender-style and the
+      // already-drawn 2D Monge views ride along in real time.
+      // Visualization only: the table is never written here, so there
+      // is nothing to undo. poseState is null outside pose mode.
+      var poseState = null;
+      var poseSavedMode = 'edit';
+      // Riding ink fades under the exact projection overlay so the
+      // true stance reads first; annotations keep their context.
+      var POSE_FADE = 0.35;
+
+      function poseStatus(msg) {
+        var el = document.getElementById('save-status');
+        if (el) el.textContent = msg;
+      }
+
+      function enterPose() {
+        if (typeof EduCADPose === 'undefined' ||
+            typeof EduCADSolid === 'undefined') {
+          return false;
+        }
+        if (handle.measure.mode === 'pose' && poseState !== null) return true;
+        var st = (handle.solid && handle.solid.state) ? handle.solid.state : null;
+        if (!handle.solid || !handle.solidMm || !st ||
+            !EduCADSolid.statusOf(st).available) {
+          poseStatus('Pose needs a point — draw a point in both views first.');
+          return false;
+        }
+        poseSavedMode = (handle.measure.mode === 'view') ? 'view' : 'edit';
+        var rest = EduCADSolid.normalizeGeometry(handle.solidMm).transform;
+        var restMm = {
+          vertices: handle.solidMm.vertices.map(function (v) {
+            return { x: v.x, y: v.y, z: v.z };
+          }),
+          edges: (handle.solidMm.edges || []).map(function (e) {
+            return [e[0], e[1]];
+          }),
+          faces: (handle.solidMm.faces || []).map(function (f) {
+            return f.slice();
+          })
+        };
+        poseState = {
+          mm: restMm,
+          center: EduCADPose.bboxCenter(handle.solidMm.vertices),
+          rest: rest,
+          rest2D: EduCADPose.reproject(restMm.vertices, restMm.edges),
+          pose: EduCADPose.createPose(),
+          sims: null, limited: false,
+          gesture: null, gestureStart: null,
+          gestureFrom: null, gestureCur: null
+        };
+        var panel = document.getElementById('pose-panel');
+        if (panel) panel.hidden = false;
+        poseStatus('');
+        updatePoseView();
+        return true;
+      }
+
+      function exitPose() {
+        if (!poseState) return;
+        poseState = null;
+        var panel = document.getElementById('pose-panel');
+        if (panel) panel.hidden = true;
+        c2.style.cursor = '';
+        if (handle.solid && handle.solidMm) {
+          EduCADSolid.setGeometry(handle.solid, handle.solidMm);
+        }
+        if (typeof handle.rebuildSolid === 'function') handle.rebuildSolid();
+        renderLayer1();
+        renderLayer2(null, null);
+      }
+
+      function poseCamState() {
+        return (handle.solid && handle.solid.state) ? handle.solid.state : null;
+      }
+
+      function posePxPerMm() {
+        var st = poseCamState();
+        if (!st || !poseState) return 1;
+        return Math.max(0.001,
+          EduCADSolid.projectionRadius(st) * poseState.rest.scale);
+      }
+
+      // Per-view follow maps for a pose: the best 2D carry from
+      // each rest projection to the posed one, plus the posed verts
+      // and their exact reprojection for the datum clamp.
+      function poseSimsFor(pose) {
+        return EduCADPose.simsForPose(poseState.mm.vertices,
+          poseState.mm.edges, pose, poseState.center, poseState.rest2D);
+      }
+
+      // Render copies of one entity: datum-ambiguous geometry draws
+      // once per view (its plan and elevation readings coincide at
+      // rest), everything else draws once. Ink sitting on solid
+      // vertices rides those vertices exactly (splitting across
+      // coincident vertices when the pose separates them), so dots,
+      // labels, and projector feet stay glued to the exact overlay;
+      // all other ink rides the fitted similarities as before.
+      function poseDrawCopies(ent) {
+        if (!poseState || !poseState.sims || ent.type === 'DATUM_AXIS') {
+          return [ent];
+        }
+        var sims = poseState.sims;
+        var out = [];
+        EduCADPose.routeCopies(ent).forEach(function (force) {
+          var copies = (poseState.exactIndex &&
+            typeof EduCADPose.poseCopies === 'function') ?
+            EduCADPose.poseCopies(ent, sims.elev, sims.plan, force,
+              poseState.exactIndex) :
+            [EduCADPose.poseEntity(ent, sims.elev, sims.plan, force)];
+          // Stack-split captions ride with the distribution: each parted
+          // copy keeps only the corner name it stands on (mate-matched
+          // through the other view; unresolvable keeps the full stack).
+          if (poseState.exactIndex &&
+              typeof EduCADPose.splitStackCaption === 'function' &&
+              typeof EduCADLabels !== 'undefined' &&
+              EduCADLabels.splitCaption) {
+            var cornerOf = (typeof EduCADVerify !== 'undefined' &&
+              EduCADVerify.cornerOf) ? EduCADVerify.cornerOf :
+              function (s) { return String(s).replace(/'+$/, ''); };
+            EduCADPose.splitStackCaption(ent, copies, force, {
+              index: poseState.exactIndex,
+              restPoints: poseState.restPoints || [],
+              splitCaption: EduCADLabels.splitCaption,
+              bareName: EduCADLabels.bareName,
+              cornerOf: cornerOf
+            });
+          }
+          for (var i = 0; i < copies.length; i++) out.push(copies[i]);
+        });
+        return out;
+      }
+
+      // Every contact pair a pose is measured against: the exact
+      // reprojected vertices bound to their own view's side, plus
+      // every drawn copy's anchor, second endpoint, and rim extremes.
+      function posePairsFor(pose) {
+        var sims = poseSimsFor(pose);
+        var pairs = EduCADPose.projectionPairs(poseState.rest2D, sims.now);
+        var list = handle.table.visibleEntities();
+        for (var i = 0; i < list.length; i++) {
+          var forces = EduCADPose.routeCopies(list[i]);
+          for (var k = 0; k < forces.length; k++) {
+            var pts = EduCADPose.contactPoints(list[i], sims.elev,
+              sims.plan, forces[k]);
+            for (var j = 0; j < pts.length; j++) pairs.push(pts[j]);
+          }
+        }
+        return { sims: sims, pairs: pairs };
+      }
+
+      // Datum wall: VP stays above the XY line, HP below — no exact
+      // projection point and no drawn point may cross to the other
+      // view's side, so the projections can never crash into each
+      // other. Gain room for big rotations by sliding up in Y first
+      // (and sinking the plan in Z for out-of-plane spins).
+      function poseHoldsSides(pose) {
+        var found = posePairsFor(pose);
+        for (var i = 0; i < found.pairs.length; i++) {
+          var pt = found.pairs[i];
+          if (!EduCADPose.holdsSide(pt.ry, pt.py, pt.side)) return false;
+        }
+        return true;
+      }
+
+      // Clearance in mm: how close either projection body comes to
+      // the XY line under a pose (Infinity when nothing is drawn).
+      function poseClearance(pose) {
+        var found = posePairsFor(pose);
+        var gap = Infinity;
+        for (var i = 0; i < found.pairs.length; i++) {
+          var d = Math.abs(found.pairs[i].py);
+          if (d < gap) gap = d;
+        }
+        return gap;
+      }
+
+      // Exact per-view projection of the posed solid: fitted maps
+      // move existing ink but can never split coincident geometry
+      // (the two hexagons of a spun prism), so the overlay projects
+      // the solid itself — visible solid, hidden dashed. Ephemeral:
+      // the table never sees it, and its endpoints are clamped posed
+      // verts, so it needs no clamp of its own.
+      function poseProjectedEdges(posed) {
+        var faces = poseState.mm.faces || [];
+        return {
+          front: EduCADProject.projectSolid(posed, poseState.mm.edges,
+            faces, 'front'),
+          top: EduCADProject.projectSolid(posed, poseState.mm.edges,
+            faces, 'top')
+        };
+      }
+
+      function updatePoseView() {
+        if (!poseState || !handle.solid) return;
+        var posed = EduCADPose.applyPose(poseState.mm.vertices, poseState.pose,
+          poseState.center);
+        var stage = EduCADPose.stageWithRest(posed, poseState.rest);
+        var geom = EduCADSolid.createGeometry({ name: 'posed', vertices: stage,
+          edges: poseState.mm.edges, faces: poseState.mm.faces });
+        EduCADSolid.setGeometry(handle.solid, geom, { normalize: false });
+        poseState.sims = poseSimsFor(poseState.pose);
+        poseState.overlay = (typeof EduCADProject !== 'undefined') ?
+          poseProjectedEdges(posed) : null;
+        poseState.exactIndex =
+          EduCADPose.exactIndex(poseState.rest2D, poseState.sims.now,
+            poseState.mm.edges);
+        poseState.restPoints = handle.table.list().filter(function (e) {
+          return e.type === 'POINT';
+        });
+        updatePoseHud();
+        renderLayer1();
+      }
+
+      function updatePoseHud() {
+        var el = document.getElementById('pose-readout');
+        if (!el || !poseState) return;
+        var p = poseState.pose;
+        var e = EduCADPose.eulerXYZOf(p.rm);
+        var f = function (n) {
+          return (Math.round(n * 100) / 100).toFixed(2);
+        };
+        var op = poseState.gesture ?
+          ('op: ' + poseState.gesture.op +
+            (poseState.gesture.axis ? ' [' + poseState.gesture.axis + ']' : ' [free]')) :
+          'op: — (G/R/S to start)';
+        if (poseState.limited) op += ' · at view limit';
+        el.textContent =
+          'Location  ' + f(p.t[0]) + '  ' + f(p.t[1]) + '  ' + f(p.t[2]) + ' mm\n' +
+          'Rotation  ' + f(e[0]) + '°  ' + f(e[1]) + '°  ' + f(e[2]) + '°\n' +
+          'Scale     ' + (Math.round(p.s * 1000) / 1000).toFixed(3) + '\n' +
+          op;
+      }
+
+      function startPoseGesture(op) {
+        if (!poseState || poseState.gesture) return;
+        poseState.limited = false;
+        poseState.gesture = EduCADPose.startGesture(op);
+        poseState.gestureStart = EduCADPose.clonePose(poseState.pose);
+        var at = (typeof lastCursor !== 'undefined' && lastCursor) ?
+          lastCursor : { x: 0, y: 0 };
+        poseState.gestureFrom = { x: at.x, y: at.y };
+        poseState.gestureCur = { x: at.x, y: at.y };
+        c2.style.cursor = 'move';
+        updatePoseHud();
+      }
+
+      function poseGestureMove(clientX, clientY, snap) {
+        if (!poseState || !poseState.gesture) return;
+        poseState.gestureCur = { x: clientX, y: clientY };
+        var st = poseCamState();
+        var cam = st ? { yaw: st.yaw, pitch: st.pitch } : { yaw: 0, pitch: 0 };
+        var dx = clientX - poseState.gestureFrom.x;
+        var dy = clientY - poseState.gestureFrom.y;
+        var start = poseState.gestureStart;
+        var gest = poseState.gesture;
+        var ppm = posePxPerMm();
+        var sn = !!snap;
+        var at = function (f) {
+          return EduCADPose.applyGesture(start, gest, dx * f, dy * f, cam,
+            { pxPerMm: ppm, snap: sn });
+        };
+        var f = EduCADPose.limitFraction(at, poseHoldsSides);
+        poseState.pose = at(f);
+        poseState.limited = f < 0.999;
+        updatePoseView();
+      }
+
+      function confirmPoseGesture() {
+        if (!poseState || !poseState.gesture) return;
+        poseState.gesture = null;
+        poseState.gestureStart = null;
+        c2.style.cursor = '';
+        updatePoseHud();
+      }
+
+      function cancelPoseGesture() {
+        if (!poseState || !poseState.gesture) return;
+        poseState.pose = poseState.gestureStart;
+        poseState.gesture = null;
+        poseState.gestureStart = null;
+        c2.style.cursor = '';
+        updatePoseView();
+      }
+
+      function poseSetView(which) {
+        var st = poseCamState();
+        if (!st || !handle.solid) return;
+        var pr = EduCADPose.VIEW_PRESETS[which];
+        if (!pr) return;
+        st.yaw = pr.yaw;
+        st.pitch = pr.pitch;
+        if (typeof handle.solid.scheduleDraw === 'function') {
+          handle.solid.scheduleDraw();
+        } else if (typeof handle.solid.draw === 'function') {
+          handle.solid.draw();
+        }
+      }
+
+      function poseKey(e) {
+        if (!poseState) return;
+        var action = EduCADPose.keyAction(e.key, e.code,
+          { ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey, shift: e.shiftKey });
+        if (action === null) return;
+        e.preventDefault();
+        if (action === 'grab' || action === 'rotate' || action === 'scale') {
+          startPoseGesture(action);
+          return;
+        }
+        if (action === 'axis-x' || action === 'axis-y' || action === 'axis-z') {
+          if (!poseState.gesture) return;
+          EduCADPose.setGestureAxis(poseState.gesture,
+            action.slice(-1).toUpperCase());
+          poseGestureMove(poseState.gestureCur.x, poseState.gestureCur.y,
+            e.ctrlKey || e.metaKey);
+          return;
+        }
+        if (action === 'confirm') { confirmPoseGesture(); return; }
+        if (action === 'cancel') {
+          if (poseState.gesture) cancelPoseGesture();
+          else setSheetMode(poseSavedMode);
+          return;
+        }
+        if (action === 'exit-pose') { setSheetMode(poseSavedMode); return; }
+        if (action === 'clear-t' || action === 'clear-r' || action === 'clear-s') {
+          if (poseState.gesture) return;
+          var beforeClear = EduCADPose.clonePose(poseState.pose);
+          if (action === 'clear-t') EduCADPose.clearTranslation(poseState.pose);
+          if (action === 'clear-r') EduCADPose.clearRotation(poseState.pose);
+          if (action === 'clear-s') EduCADPose.clearScale(poseState.pose);
+          if (!poseHoldsSides(poseState.pose)) {
+            poseState.pose = beforeClear;
+            poseState.limited = true;
+          } else {
+            poseState.limited = false;
+          }
+          updatePoseView();
+          return;
+        }
+        if (action.indexOf('view-') === 0) { poseSetView(action.slice(5)); return; }
+      }
+
       function setSheetMode(mode) {
+        if (mode === 'pose' && handle.measure.mode !== 'pose') {
+          if (!enterPose()) return handle.measure.mode;
+        } else if (mode !== 'pose' && handle.measure.mode === 'pose') {
+          exitPose();
+        }
         var next = EduCADMeasure.setMode(handle.measure, mode);
         var be = document.getElementById('btn-mode-edit');
         var bv = document.getElementById('btn-mode-view');
+        var bp = document.getElementById('btn-mode-pose');
         if (be) {
           if (next === 'edit') be.classList.add('active');
           else be.classList.remove('active');
@@ -1010,7 +1692,11 @@
           if (next === 'view') bv.classList.add('active');
           else bv.classList.remove('active');
         }
-        if (next === 'view') {
+        if (bp) {
+          if (next === 'pose') bp.classList.add('active');
+          else bp.classList.remove('active');
+        }
+        if (next === 'view' || next === 'pose') {
           if (handle.sel.editing) EduCADCanvas.cancelEdit(handle.sel);
           EduCADCanvas.deselect(handle.sel);
           stopCaretTimer();
@@ -1356,9 +2042,46 @@
           ctx1.restore();
         }
 
-        // 3. Render Committed Entities from CadEntityTable (geometry only)
-        for (var i = 0; i < visible.length; i++) {
-          renderEntity(ctx1, v, visible[i]);
+        // 3. Render Committed Entities from CadEntityTable (geometry
+        // only). In pose mode the already-drawn views ride the 3D pose:
+        // each entity draws from a posed copy (datum pinned), so
+        // projectors, hidden lines, and dimensions move with their
+        // view while the table underneath never changes.
+        var drawList = visible;
+        if (poseState && poseState.sims && typeof EduCADPose !== 'undefined') {
+          drawList = [];
+          for (var pi = 0; pi < visible.length; pi++) {
+            var copies = poseDrawCopies(visible[pi]);
+            for (var pj = 0; pj < copies.length; pj++) {
+              drawList.push(copies[pj]);
+            }
+          }
+        }
+        var fading = poseState && poseState.sims && poseState.overlay &&
+          typeof EduCADPose !== 'undefined';
+        if (fading) {
+          ctx1.save();
+          ctx1.globalAlpha = POSE_FADE;
+        }
+        for (var i = 0; i < drawList.length; i++) {
+          renderEntity(ctx1, v, drawList[i]);
+        }
+        if (fading) {
+          ctx1.restore();
+        }
+        if (poseState && poseState.overlay) {
+          var ovLists = [poseState.overlay.front, poseState.overlay.top];
+          for (var pass = 0; pass < 2; pass++) {
+            for (var li = 0; li < ovLists.length; li++) {
+              for (var oi = 0; oi < ovLists[li].length; oi++) {
+                var seg = ovLists[li][oi];
+                if ((seg.hidden ? 0 : 1) !== pass) continue;
+                renderEntity(ctx1, v, { id: 'pose-ov', type: 'SEGMENT',
+                  x: seg.ax, y: seg.ay, x2: seg.bx, y2: seg.by,
+                  bisCode: seg.hidden ? 'E' : 'A', viewRole: 'BOTH' });
+              }
+            }
+          }
         }
 
         // 4. Label pass: 3-tier layout (Tier 1 semantic filter, Tier 2
@@ -1367,7 +2090,7 @@
         // sits at the true label position) but is not drawn here.
         if (typeof EduCADLabels !== 'undefined') {
           ctx1.font = EduCADCanvas.LABEL_FONT;
-          var labelResult = EduCADLabels.resolve(visible, v, {
+          var labelResult = EduCADLabels.resolve(drawList, v, {
             measure: function (t) {
               var m = ctx1.measureText(t);
               return { w: m.width, h: 13 * 1.15 };
@@ -1401,15 +2124,31 @@
         var dash = EduCADEntities.cosmeticDashPx(style.dashMm);
         if (dash.length > 0) ctx.setLineDash(dash);
 
-        if (ent.type === 'SEGMENT' || ent.type === 'LINE') {
+        if (ent.type === 'SEGMENT' || ent.type === 'LINE' ||
+            ent.type === 'RAY' || ent.type === 'DIMENSION') {
           var p1 = EduCADViewport.forward(v, { x: ent.x, y: ent.y });
           var p2 = EduCADViewport.forward(v, { x: ent.x2, y: ent.y2 });
+          // Construction geometry spans the sheet: LINE extends both
+          // ways, RAY extends past its second point (the canvas clips
+          // the excess, so one long stroke covers every viewport).
+          if (ent.type === 'LINE' || ent.type === 'RAY') {
+            var rdx = p2.x - p1.x, rdy = p2.y - p1.y;
+            var rlen = Math.sqrt(rdx * rdx + rdy * rdy);
+            if (rlen > 1e-9) {
+              var reach = Math.sqrt(v.w * v.w + v.h * v.h) + 4;
+              var rux = rdx / rlen, ruy = rdy / rlen;
+              if (ent.type === 'LINE') {
+                p1 = { x: p1.x - rux * reach, y: p1.y - ruy * reach };
+              }
+              p2 = { x: p2.x + rux * reach, y: p2.y + ruy * reach };
+            }
+          }
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
           ctx.stroke();
 
-          // If dimension line, draw 3:1 arrowheads
+          // Dimension lines carry 3:1 arrowheads at both ends.
           if (ent.type === 'DIMENSION' || (ent.meta && ent.meta.dimension)) {
             drawArrowhead(ctx, p1, p2);
             drawArrowhead(ctx, p2, p1);
@@ -1426,9 +2165,12 @@
           if (ent.type === 'CIRCLE') {
             ctx.arc(center.x, center.y, rPx, 0, 2 * Math.PI);
           } else {
-            // Y-flip angle inversion for Cartesian upward Y
-            var sa = -ent.endAngle;
-            var ea = -ent.startAngle;
+            // Y-flip angle inversion for Cartesian upward Y. Stored
+            // angles are degrees CCW (y-up); canvas wants radians
+            // clockwise (y-down), so negate and convert. Drawing from
+            // -a2 to -a1 CCW on screen matches a1-to-a2 CCW in world.
+            var sa = -ent.endAngle * Math.PI / 180;
+            var ea = -ent.startAngle * Math.PI / 180;
             ctx.arc(center.x, center.y, rPx, sa, ea, false);
           }
           ctx.stroke();
@@ -1722,6 +2464,12 @@
 
       window.addEventListener('pointerdown', function (e) {
         if (e.target.closest('.edugraphics-hud') || e.target.closest('.demo-bar') || e.target.closest('.edugraphics-menu')) return;
+        // A live pose gesture owns the press: no orbit, no pan, no
+        // sheet tool starts under it (click confirms, menu cancels).
+        if (poseState && poseState.gesture) {
+          e.preventDefault();
+          return;
+        }
         // Dismiss menu
         if (EduCADCanvas.shouldDismissMenu(e)) {
           mount.menu.classList.remove('open');
@@ -1789,6 +2537,12 @@
           planeInd.className = 'plane-tag plane-hp';
         }
 
+        // Pose gesture: bare mouse motion drives the live transform.
+        if (poseState && poseState.gesture) {
+          poseGestureMove(e.clientX, e.clientY, e.ctrlKey || e.metaKey);
+          c2.style.cursor = 'move';
+          return;
+        }
         if (solidOrbiting) {
           var odx = e.clientX - solidLast.x, ody = e.clientY - solidLast.y;
           if (odx !== 0 || ody !== 0) {
@@ -1900,6 +2654,7 @@
       // this authoritative; the canvas menu below then sees idle clicks only.
       // The native menu never appears anywhere on the sheet.
       window.addEventListener('contextmenu', function (e) {
+        if (poseState && poseState.gesture) { e.preventDefault(); e.stopPropagation(); cancelPoseGesture(); return; }
         if (EduCADMeasure.isView(handle.measure)) {
           e.preventDefault();
           if (typeof e.stopPropagation === 'function') e.stopPropagation();
@@ -1991,6 +2746,8 @@
         // never to the sheet: swallow the click it trails.
         if (solidSuppressClick) { solidSuppressClick = false; return; }
         if (e.button !== 0 || e.shiftKey) return;
+        // Pose gesture: click confirms the live transform.
+        if (poseState && poseState.gesture) { confirmPoseGesture(); return; }
         var cursor = { x: e.clientX, y: e.clientY };
         // View mode owns the whole click: inspect, never edit. Placed
         // before banking so Ctrl+click is read-only here too.
@@ -2005,7 +2762,7 @@
           EduCADCanvas.clearTypedDist(handle.typedDist);
           if (pendingMember !== null) {
             pendingMember = null;
-            hideMemberMenu();
+            hideDotMenu();
             renderLayer2(cursor, null);
             return;
           }
@@ -2017,8 +2774,8 @@
             abortPlotTask();
             renderLayer1();
           }
-          var cid = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
-          if (cid === null) {
+          var cids = EduCADCanvas.hitTestPointAll(handle.table.list(), cursor, handle.view);
+          if (cids.length === 0) {
             if (bankOverflow(cursor)) return;
             var wfree = EduCADViewport.inverse(handle.view, cursor);
             var pname = EduCADCanvas.nextPointName(handle.table.list());
@@ -2030,23 +2787,21 @@
             renderLayer1();
             return;
           }
-          var cent = handle.table.get(cid);
-          var mparts = (typeof EduCADLabels !== 'undefined' && EduCADLabels.splitCaption) ?
-            EduCADLabels.splitCaption(cent.caption) : [cent.caption];
-          if (mparts.length >= 2 && !bankHas(cid)) {
-            pendingMember = { cid: cid, cursor: cursor };
-            showMemberMenu(cursor, mparts);
+          if (cids.length >= 2) {
+            pendingMember = { cids: cids, cursor: cursor };
+            showDotMenu(cursor, cids);
             renderLayer2(cursor, null);
             return;
           }
+          var cid = cids[0];
           pendingMember = null;
-          hideMemberMenu();
+          hideDotMenu();
           bankFromPick({ cid: cid, cursor: cursor }, null);
           return;
         }
         if (pendingMember !== null) {
           pendingMember = null;
-          hideMemberMenu();
+          hideDotMenu();
           renderLayer2(cursor, null);
           return;
         }
@@ -2212,13 +2967,38 @@
       // With no edit running, digits feed the typed axis distance (§6.2)
       // and Enter stakes the point; the first Escape clears the buffer.
       window.addEventListener('keydown', function (e) {
+        // Pose mode owns the keyboard: Blender map, nothing else.
+        if (EduCADMeasure.isPose(handle.measure)) {
+          poseKey(e);
+          return;
+        }
         // View mode owns the keyboard: nothing to type, nothing to
-        // rename. Escape only clears the readout.
+        // rename. Escape only clears the readout; Tab steps into pose.
         if (EduCADMeasure.isView(handle.measure)) {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            setSheetMode('pose');
+            return;
+          }
           if (e.key === 'Escape') {
             EduCADMeasure.clearInspect(handle.measure);
             renderLayer2(null, null);
           }
+          return;
+        }
+        // Tab steps into pose mode from edit (never from inside a real
+        // field; the command bar stops its own Tab first).
+        if (e.key === 'Tab') {
+          var tae = (typeof document !== 'undefined') ? document.activeElement : null;
+          if (tae !== null && tae !== undefined &&
+              (tae.tagName === 'INPUT' || tae.tagName === 'TEXTAREA' ||
+               tae.tagName === 'SELECT' || tae.isContentEditable)) {
+            return;
+          }
+          var midRename = handle.sel.editing !== null;
+          if (midRename) return;
+          e.preventDefault();
+          setSheetMode('pose');
           return;
         }
         if (e.key === 'Escape') {
@@ -2249,6 +3029,26 @@
             e.preventDefault();
           }
           mount.menu.classList.remove('open');
+          return;
+        }
+        // Ctrl+Z / Cmd+Z: undo the last sheet change. Edit mode only
+        // (the view-mode guard above already returned); never steals
+        // keystrokes from real text fields, and never fires mid-rename
+        // (Escape exits the editor first). Shift is excluded: undo
+        // only, no redo.
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey &&
+            (e.key === 'z' || e.key === 'Z' ||
+             (e.code !== undefined && e.code === 'KeyZ'))) {
+          var ae = (typeof document !== 'undefined') ?
+            document.activeElement : null;
+          if (ae !== null && ae !== undefined &&
+              (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' ||
+               ae.tagName === 'SELECT' || ae.isContentEditable)) {
+            return;
+          }
+          if (handle.sel.editing !== null) return;
+          e.preventDefault();
+          userUndo();
           return;
         }
         if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -2402,6 +3202,37 @@
       document.getElementById('btn-check').addEventListener('click', function () { runVerify(); });
       document.getElementById('btn-mode-edit').addEventListener('click', function () { setSheetMode('edit'); });
       document.getElementById('btn-mode-view').addEventListener('click', function () { setSheetMode('view'); });
+      document.getElementById('btn-mode-pose').addEventListener('click', function () {
+        if (handle.measure.mode === 'pose') setSheetMode(poseSavedMode);
+        else setSheetMode('pose');
+      });
+      (function posePanel() {
+        var panel = document.getElementById('pose-panel');
+        if (panel) {
+          ['pointerdown', 'pointerup', 'click', 'dblclick', 'wheel'].forEach(function (t) {
+            panel.addEventListener(t, function (e) { e.stopPropagation(); });
+          });
+        }
+        var bReset = document.getElementById('pose-reset');
+        if (bReset) {
+          bReset.addEventListener('click', function () {
+            if (!poseState) return;
+            poseState.gesture = null;
+            poseState.gestureStart = null;
+            poseState.limited = false;
+            EduCADPose.resetPose(poseState.pose);
+            updatePoseView();
+          });
+        }
+        var bExit = document.getElementById('pose-exit');
+        if (bExit) {
+          bExit.addEventListener('click', function () { setSheetMode(poseSavedMode); });
+        }
+        var bClose = document.getElementById('pose-close');
+        if (bClose) {
+          bClose.addEventListener('click', function () { setSheetMode(poseSavedMode); });
+        }
+      })();
       // Deep-link bridge: the query handler below forces view mode for
       // submission review through this handle.
       window.educadSetSheetMode = setSheetMode;
@@ -2715,14 +3546,20 @@
           var rebuildQueued = false;
           function rebuildSolid() {
             rebuildQueued = false;
-            var res = EduCADReconstruct.reconstruct(
+            // Pose mode owns the widget: the table cannot change under
+            // it, and rebuilds must not wipe the live pose.
+            if (EduCADMeasure.isPose(handle.measure)) return;
+            var res = EduCADReconstruct.reconstructLive(
               handle.table.visibleEntities());
             if (res.status === 'ok') {
+              handle.solidMm = res.geometry;
               EduCADSolid.setGeometry(solid3d, res.geometry);
             } else {
+              handle.solidMm = null;
               EduCADSolid.setUnavailable(solid3d, res.reason, res.label);
             }
           }
+          handle.solidMm = null;
           handle.rebuildSolid = rebuildSolid;
           handle.table.subscribe(function () {
             if (rebuildQueued) return;
@@ -2732,6 +3569,569 @@
           rebuildSolid();
         })();
       }
+
+      // Slash command line + Settings. Users and agents draw without the
+      // mouse via Minecraft-style /<cmd> with autocomplete; Settings holds
+      // the Preferences that tune the bar and the sheet. Guarded: the sheet
+      // works untouched when either module failed to load.
+      (function commandLine() {
+        if (typeof EduCADSettings === 'undefined' ||
+            typeof EduCADCommand === 'undefined') {
+          return;
+        }
+        var settingsStore = EduCADSettings.load(
+          (typeof window.localStorage !== 'undefined') ? window.localStorage : null);
+        var cmdInput = document.getElementById('cmd-input');
+        var cmdSuggest = document.getElementById('cmd-suggest');
+        var cmdPreview = document.getElementById('cmd-preview');
+        var cmdStatus = document.getElementById('cmd-status');
+        var cmdBar = document.getElementById('cmd-bar');
+        var settingsPanel = document.getElementById('settings-panel');
+        var settingsRows = document.getElementById('settings-rows');
+        var sugActive = 0;
+        var sugOpen = [];
+        var cmdHistory = [];
+        var histIdx = -1;
+        var statusTimer = null;
+
+        // applySettings: every preference takes effect immediately and is
+        // persisted. Demos/tutorials hide their pickers; the command
+        // executor reads the same store through its gates.
+        function applySettings() {
+          var demos = EduCADSettings.get(settingsStore, 'showDemos');
+          var tuts = EduCADSettings.get(settingsStore, 'showTutorials');
+          var coords = EduCADSettings.get(settingsStore, 'coordsHud');
+          var selDemo = document.getElementById('sel-demo');
+          if (selDemo && selDemo.parentNode) {
+            selDemo.parentNode.style.display = demos ? '' : 'none';
+          }
+          var selTut = document.getElementById('sel-tut');
+          if (selTut && selTut.parentNode) {
+            selTut.parentNode.style.display = tuts ? '' : 'none';
+          }
+          var coordsEl = document.getElementById('coords-display');
+          if (coordsEl) coordsEl.style.display = coords ? '' : 'none';
+          try {
+            if (typeof window.localStorage !== 'undefined') {
+              EduCADSettings.save(window.localStorage, settingsStore);
+            }
+          } catch (err) { /* private mode: prefs stay session-only */ }
+          refreshCmdAssist();
+        }
+        function buildSettingsRows() {
+          if (!settingsRows) return;
+          settingsRows.innerHTML = '';
+          EduCADSettings.KEYS.forEach(function (key) {
+            var row = document.createElement('label');
+            row.className = 'cmd-settings-row';
+            var box = document.createElement('input');
+            box.type = 'checkbox';
+            box.checked = EduCADSettings.get(settingsStore, key);
+            box.setAttribute('data-settings-key', key);
+            box.addEventListener('change', function () {
+              EduCADSettings.set(settingsStore, key, box.checked);
+              applySettings();
+            });
+            var lab = document.createElement('span');
+            lab.textContent = EduCADSettings.labelFor(key);
+            row.appendChild(box);
+            row.appendChild(lab);
+            settingsRows.appendChild(row);
+          });
+        }
+        function hideSettings() {
+          if (settingsPanel) settingsPanel.hidden = true;
+        }
+        var btnSettings = document.getElementById('btn-settings');
+        if (btnSettings) {
+          btnSettings.addEventListener('click', function () {
+            if (!settingsPanel) return;
+            settingsPanel.hidden = !settingsPanel.hidden;
+          });
+        }
+        var btnSettingsClose = document.getElementById('settings-close');
+        if (btnSettingsClose) btnSettingsClose.addEventListener('click', hideSettings);
+        var btnSettingsReset = document.getElementById('settings-reset');
+        if (btnSettingsReset) {
+          btnSettingsReset.addEventListener('click', function () {
+            EduCADSettings.reset(settingsStore);
+            buildSettingsRows();
+            applySettings();
+          });
+        }
+        if (settingsPanel) {
+          ['pointerdown', 'pointerup', 'click', 'dblclick', 'wheel'].forEach(function (t) {
+            settingsPanel.addEventListener(t, function (e) { e.stopPropagation(); });
+          });
+        }
+        buildSettingsRows();
+
+        // cmdPoints: display-name -> {x,y} over live POINTs for
+        // completion, length readouts, and unknown-point hints. Labels
+        // come from captions (the letters on the sheet), never E-ids.
+        function cmdPoints() {
+          return EduCADCommand.pointMap(handle.table.list());
+        }
+        function cmdEntities() {
+          return EduCADCommand.entityMap(handle.table.list());
+        }
+        function hideCmdStatus() {
+          if (cmdStatus) cmdStatus.hidden = true;
+          if (statusTimer !== null) {
+            clearTimeout(statusTimer);
+            statusTimer = null;
+          }
+        }
+        // The bar stays hidden until / opens it (Minecraft chat). Enter
+        // dismisses wins, Escape dismisses everything, errors keep the
+        // bar open with the line intact for fixing.
+        function openCmdBar() {
+          if (!cmdBar || !cmdInput) return;
+          cmdBar.hidden = false;
+          if (cmdInput.value === '') cmdInput.value = '/';
+          cmdInput.focus();
+          try {
+            cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length);
+          } catch (err) { /* headless: caret ops unsupported */ }
+          refreshCmdAssist();
+        }
+        function closeCmdBar() {
+          if (!cmdBar || !cmdInput) return;
+          closeSuggest();
+          hideCmdStatus();
+          cmdInput.value = '';
+          cmdBar.hidden = true;
+          cmdInput.blur();
+        }
+        function showCmdStatus(ok, message) {
+          if (!cmdStatus) return;
+          if (statusTimer !== null) {
+            clearTimeout(statusTimer);
+            statusTimer = null;
+          }
+          cmdStatus.textContent = message;
+          cmdStatus.className = ok ? 'ok' : 'err';
+          cmdStatus.id = 'cmd-status';
+          cmdStatus.hidden = false;
+          // Short wins fade; errors and long reads (/help) stay put.
+          if (ok && message.length < 120) {
+            statusTimer = setTimeout(hideCmdStatus, 5000);
+          }
+        }
+        function closeSuggest() {
+          sugOpen = [];
+          sugActive = 0;
+          if (cmdSuggest) {
+            cmdSuggest.innerHTML = '';
+            cmdSuggest.hidden = true;
+          }
+        }
+        var BIS_STYLE_NAMES = {
+          A: 'Continuous Thick', B: 'Continuous Thin', E: 'Dashed Thin',
+          G: 'Chain Thin', H: 'Chain Thick Ends', K: 'Double-Dash Chain'
+        };
+        function bisStyleName(code) {
+          return BIS_STYLE_NAMES[code] || 'BIS type';
+        }
+        function bisSampleCanvas(code) {
+          var cv = document.createElement('canvas');
+          var lw = 90, lh = 12;
+          cv.className = 'cmd-sug-line';
+          cv.width = Math.max(1, Math.round(lw * dpr));
+          cv.height = Math.max(1, Math.round(lh * dpr));
+          cv.style.width = lw + 'px';
+          cv.style.height = lh + 'px';
+          try {
+            var g = cv.getContext('2d');
+            var st = EduCADEntities.BIS_STYLES[code];
+            if (g && st && typeof g.setTransform === 'function') {
+              g.setTransform(dpr, 0, 0, dpr, 0, 0);
+              g.strokeStyle = '#e2e8f0';
+              g.lineWidth = EduCADEntities.cosmeticWidthPx(st.widthMm);
+              g.setLineDash(EduCADEntities.cosmeticDashPx(st.dashMm));
+              g.beginPath();
+              g.moveTo(2, 6);
+              g.lineTo(lw - 2, 6);
+              g.stroke();
+            }
+          } catch (err) { /* headless: letter + name still show */ }
+          return cv;
+        }
+        function paintSuggest() {
+          if (!cmdSuggest) return;
+          cmdSuggest.innerHTML = '';
+          if (sugOpen.length === 0) {
+            cmdSuggest.hidden = true;
+            return;
+          }
+          for (var i = 0; i < sugOpen.length; i++) {
+            (function (entry, idx) {
+              var row = document.createElement('div');
+              row.className = 'cmd-sug-row' + (idx === sugActive ? ' active' : '');
+              var name = document.createElement('span');
+              name.textContent = entry.display;
+              row.appendChild(name);
+              // BIS rows draw the style's dash sample next to its letter,
+              // same ink as the line-type popup, so the letter means
+              // something before it is picked.
+              if (entry.kind === 'bis-code' && typeof EduCADEntities !== 'undefined') {
+                row.appendChild(bisSampleCanvas(entry.display));
+              }
+              var hint = document.createElement('span');
+              hint.className = 'cmd-sug-hint';
+              hint.textContent = (entry.kind === 'bis-code') ?
+                bisStyleName(entry.display) : (entry.hint || '');
+              row.appendChild(hint);
+              row.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                acceptSuggest(idx);
+              });
+              cmdSuggest.appendChild(row);
+            })(sugOpen[i], i);
+          }
+          cmdSuggest.hidden = false;
+        }
+        function acceptSuggest(idx) {
+          if (sugOpen.length === 0 || !cmdInput) return;
+          var pick = sugOpen[(idx === undefined) ? sugActive : idx];
+          if (!pick) return;
+          cmdInput.value = pick.text;
+          histIdx = -1;
+          refreshCmdAssist();
+          cmdInput.focus();
+          try {
+            cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length);
+          } catch (err) { /* headless: caret ops unsupported */ }
+        }
+        // refreshCmdAssist: recompute suggestions + preview for the current
+        // line. Each half obeys its own preference switch.
+        function refreshCmdAssist() {
+          if (!cmdInput) return;
+          var line = cmdInput.value;
+          if (EduCADSettings.get(settingsStore, 'commandSuggestions')) {
+            try {
+              sugOpen = EduCADCommand.suggest(line,
+                { points: cmdPoints(), entities: cmdEntities() });
+            } catch (err) {
+              sugOpen = [];
+            }
+            // /auto lives outside the sync registry (it draws over the
+            // network): complete its name by hand when nothing else fits.
+            var one = /^\/(\S*)$/.exec(line);
+            if (one && one[1].length >= 1 && sugOpen.length === 0 &&
+                '/auto'.indexOf('/' + one[1]) === 0) {
+              sugOpen = [{ text: '/auto ', display: '/auto',
+                hint: 'Draw from words (teachers)', kind: 'command' }];
+            }
+            sugActive = 0;
+            paintSuggest();
+          } else {
+            closeSuggest();
+          }
+          if (cmdPreview) {
+            if (EduCADSettings.get(settingsStore, 'commandPreview')) {
+              var text = '';
+              if (isAutoLine(line)) {
+                text = 'Describe the model — Enter draws it (teachers).';
+              } else if (EduCADCommand.isNaturalRequest(line)) {
+                text = 'Describe the drawing in words — Enter interprets it.';
+              } else {
+                try {
+                  text = EduCADCommand.preview(line,
+                    { points: cmdPoints(), entities: cmdEntities() });
+                } catch (err) {
+                  text = '';
+                }
+              }
+              cmdPreview.textContent = text;
+              cmdPreview.hidden = (text === '');
+            } else {
+              cmdPreview.hidden = true;
+            }
+          }
+        }
+        function cmdEnv() {
+          return {
+            table: handle.table,
+            clear: function () { loadDemo('clear'); },
+            loadDemo: function (n) { loadDemo(n); },
+            startTutorial: function (n) { startTutorial(n); },
+            runVerify: function () { runVerify(); },
+            setMode: function (m) { setSheetMode(m); },
+            undo: function () { return userUndo(); },
+            allowDemo: EduCADSettings.get(settingsStore, 'showDemos'),
+            allowTutorial: EduCADSettings.get(settingsStore, 'showTutorials'),
+            readOnly: EduCADMeasure.isView(handle.measure)
+          };
+        }
+        function runCmdLine(line) {
+          var res;
+          try {
+            res = EduCADCommand.execute(line, cmdEnv());
+          } catch (err) {
+            res = { ok: false,
+              message: 'Could not run that line: ' + (err && err.message ? err.message : String(err)) };
+          }
+          if (res.ok) {
+            var parsed = null;
+            try {
+              parsed = EduCADCommand.parse(line);
+            } catch (err2) {
+              parsed = null;
+            }
+            if (parsed !== null && (parsed.name === 'delete' || parsed.name === 'clear') &&
+                res.ids && res.ids.length > 0) {
+              cleanupAfterPointDelete(res.ids);
+            }
+            if (handle.sel.selectedId !== null &&
+                handle.table.get(handle.sel.selectedId) === null) {
+              EduCADCanvas.deselect(handle.sel);
+              stopCaretTimer();
+            }
+            EduCADMeasure.clearInspect(handle.measure);
+            renderLayer1();
+            renderLayer2(null, null);
+          }
+          return res;
+        }
+        function currentRole() {
+          try {
+            if (typeof window.EduCADSaves !== 'undefined') {
+              var s = window.EduCADSaves.currentSession();
+              return (s && s.role) || 'guest';
+            }
+          } catch (err) { /* logged out reads as guest */ }
+          return 'guest';
+        }
+        function isAutoLine(line) {
+          var t = String(line).replace(/^\s+|\s+$/g, '');
+          return t === '/auto' || t.indexOf('/auto ') === 0;
+        }
+        function pushHistory(line) {
+          if (EduCADSettings.get(settingsStore, 'commandHistory')) {
+            cmdHistory.push(line);
+            if (cmdHistory.length > 100) cmdHistory.shift();
+          }
+          histIdx = -1;
+        }
+        function interpretFriendly(err) {
+          var m = (err && err.message) || '';
+          if (m.indexOf('guest has no server access') !== -1) {
+            return 'Log in to use plain words (guests stay local).';
+          }
+          if (m === 'interpret_unavailable') {
+            return 'Word drawing is off on this server (no model key).';
+          }
+          if (m === 'interpret_failed') {
+            return 'The model did not answer — try again in a moment.';
+          }
+          if (m === 'unauthorized') return 'Your session expired — log in again.';
+          return 'Could not interpret that (' + m + ').';
+        }
+        // runInterpret: plain words to drawn steps. Students describe after
+        // '/ '; teachers auto-draw models with /auto. Unusable answers and
+        // honest refusals keep the bar open with the reason shown.
+        function runInterpret(text, mode) {
+          if (EduCADMeasure.isView(handle.measure)) {
+            var ro = 'View mode is read-only — /mode edit to draw.';
+            showCmdStatus(false, ro);
+            return Promise.resolve({ ok: false, message: ro, ids: [] });
+          }
+          showCmdStatus(true, mode === 'auto' ? 'Drawing your model…' : 'Interpreting…');
+          var session = null;
+          try { session = window.EduCADSaves.currentSession(); } catch (err) { session = null; }
+          var pts = Object.keys(cmdPoints()).slice(0, 64);
+          return window.EduCADSaves.interpretWords(
+            window.fetch.bind(window), session, text, pts, mode).then(function (data) {
+            var cmds = (data && Array.isArray(data.commands)) ? data.commands : [];
+            var reply = (data && typeof data.reply === 'string') ? data.reply : '';
+            if (cmds.length === 0) {
+              var msg = reply !== '' ? reply :
+                'I could not turn that into drawing steps — try shorter, concrete words.';
+              showCmdStatus(false, msg);
+              return { ok: false, message: msg, ids: [] };
+            }
+            var drawn = 0;
+            var failed = [];
+            for (var i = 0; i < cmds.length; i++) {
+              var r = runCmdLine(cmds[i]);
+              if (r.ok) drawn++;
+              else failed.push(cmds[i] + ' — ' + r.message);
+            }
+            if (failed.length === 0) {
+              var done = (mode === 'auto' ? 'Model drawn' : 'Drawn') +
+                ' (' + drawn + ' step' + (drawn === 1 ? '' : 's') + ')' +
+                (reply !== '' ? ': ' + reply : '.');
+              showCmdStatus(true, done);
+              closeCmdBar();
+              return { ok: true, message: done, ids: [] };
+            }
+            var mix = 'Drew ' + drawn + ' of ' + cmds.length +
+              '; these failed:\n' + failed.join('\n');
+            showCmdStatus(false, mix);
+            return { ok: false, message: mix, ids: [] };
+          }, function (err) {
+            var msg = interpretFriendly(err);
+            showCmdStatus(false, msg);
+            return { ok: false, message: msg, ids: [] };
+          });
+        }
+        // Teacher bridge for the model deep link: auto-draw from a question.
+        window.educadAutoDraw = function (text) {
+          return runInterpret(String(text || ''), 'auto');
+        };
+        // Console/agent bridge: window.educadRunCommand('/point a 10 20')
+        // runs a line headlessly and mirrors the result onto the bar.
+        window.educadRunCommand = function (line) {
+          var res = runCmdLine(line);
+          if (cmdBar) cmdBar.hidden = false;
+          showCmdStatus(res.ok, res.message);
+          if (res.ok && cmdInput) {
+            cmdInput.value = '';
+            refreshCmdAssist();
+          }
+          return res;
+        };
+        // Console/agent bridge: window.educadPoseViews() returns the
+        // live per-view follow similarities, the datum clearance in
+        // mm, plus every drawn anchor at rest and posed (world mm) —
+        // or null outside pose mode. Read-only probe.
+        window.educadPoseViews = function () {
+          if (!poseState || !poseState.sims) return null;
+          var pts = [];
+          var list = handle.table.visibleEntities();
+          for (var i = 0; i < list.length; i++) {
+            var e = list[i];
+            if (e.type === 'DATUM_AXIS') continue;
+            var copies = poseDrawCopies(e);
+            for (var k = 0; k < copies.length; k++) {
+              var p = copies[k];
+              pts.push({ id: e.id, x: e.x, y: e.y, px: p.x, py: p.y,
+                x2: e.x2, y2: e.y2, px2: p.x2, py2: p.y2 });
+            }
+          }
+          return { elev: poseState.sims.elev, plan: poseState.sims.plan,
+            limited: !!poseState.limited, clearanceMm: poseClearance(poseState.pose),
+            overlay: poseState.overlay, points: pts };
+        };
+        if (cmdInput) {
+          cmdInput.addEventListener('input', function () {
+            histIdx = -1;
+            hideCmdStatus();
+            refreshCmdAssist();
+          });
+          cmdInput.addEventListener('focus', refreshCmdAssist);
+          cmdInput.addEventListener('blur', function () {
+            setTimeout(closeSuggest, 150);
+          });
+          cmdInput.addEventListener('keydown', function (e) {
+            e.stopPropagation();
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              var line = cmdInput.value;
+              if (line.replace(/^\s+|\s+$/g, '') === '') return;
+              if (isAutoLine(line)) {
+                var desc = line.replace(/^\s*\/auto\s*/, '').replace(/\s+$/g, '');
+                if (currentRole() !== 'teacher' && currentRole() !== 'academics') {
+                  showCmdStatus(false, 'Auto-draw is a teacher tool — describe your drawing after \'/ \' instead.');
+                  return;
+                }
+                if (desc === '') {
+                  showCmdStatus(false, 'Usage: /auto <words> — describe the model to draw.');
+                  return;
+                }
+                pushHistory(line);
+                runInterpret(desc, 'auto');
+                return;
+              }
+              if (EduCADCommand.isNaturalRequest(line)) {
+                var words = line.replace(/^\s*\/\s*/, '').replace(/\s+$/g, '');
+                if (words === '') {
+                  showCmdStatus(false, 'Describe the drawing in words after \'/ \'.');
+                  return;
+                }
+                pushHistory(line);
+                runInterpret(words, 'draw');
+                return;
+              }
+              var res = runCmdLine(line);
+              showCmdStatus(res.ok, res.message);
+              pushHistory(line);
+              if (res.ok) {
+                closeCmdBar();
+              } else {
+                refreshCmdAssist();
+              }
+              return;
+            }
+            if (e.key === 'Tab') {
+              if (sugOpen.length > 0) {
+                e.preventDefault();
+                acceptSuggest(sugActive);
+              }
+              return;
+            }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              var dir = (e.key === 'ArrowDown') ? 1 : -1;
+              if (sugOpen.length > 0) {
+                e.preventDefault();
+                sugActive = (sugActive + dir + sugOpen.length) % sugOpen.length;
+                paintSuggest();
+                return;
+              }
+              if (EduCADSettings.get(settingsStore, 'commandHistory') &&
+                  cmdHistory.length > 0) {
+                e.preventDefault();
+                if (histIdx === -1) histIdx = cmdHistory.length;
+                histIdx += dir;
+                if (histIdx < 0) histIdx = 0;
+                if (histIdx > cmdHistory.length) histIdx = cmdHistory.length;
+                cmdInput.value = (histIdx === cmdHistory.length) ? '' : cmdHistory[histIdx];
+                try {
+                  cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length);
+                } catch (errHist) { /* headless: caret ops unsupported */ }
+                refreshCmdAssist();
+              }
+              return;
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              closeCmdBar();
+              return;
+            }
+          });
+        }
+        if (cmdBar) {
+          ['pointerdown', 'pointerup', 'click', 'dblclick', 'wheel'].forEach(function (t) {
+            cmdBar.addEventListener(t, function (e) { e.stopPropagation(); });
+          });
+        }
+        // Minecraft opener: bare / on the sheet jumps to the command
+        // line. Never steals from rename, fields, or modified combos.
+        window.addEventListener('keydown', function (e) {
+          if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+          if (handle.sel.editing !== null) return;
+          var ae = (typeof document !== 'undefined') ? document.activeElement : null;
+          if (ae !== null && ae !== undefined &&
+              (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' ||
+               ae.tagName === 'SELECT' || ae.isContentEditable)) {
+            return;
+          }
+          if (!cmdInput) return;
+          e.preventDefault();
+          openCmdBar();
+          // Some browsers commit the key's character after keydown
+          // despite the preventDefault above; collapse that race
+          // ('//' -> '/') once the character has landed.
+          setTimeout(function () {
+            if (cmdInput.value.slice(0, 2) === '//') {
+              cmdInput.value = cmdInput.value.slice(1);
+              refreshCmdAssist();
+            }
+          }, 0);
+        });
+        applySettings();
+      })();
 
       console.log('EduCAD Web App initialized successfully!');
     })();
@@ -3764,8 +5164,33 @@
         if (!(mqi >= 0)) mqi = 0;
         Saves.getSet(fi, s, p.model).then(function (data) {
           var qs = data.questions || [];
-          if (mqi >= qs.length || !qs[mqi].model) {
+          if (mqi >= qs.length || (!qs[mqi].model && !p.autodraw)) {
             status('No model answer for that question.');
+            return;
+          }
+          if (p.autodraw) {
+            // Teacher auto-draw: start from an empty sheet, then draft the
+            // model from the question words. Review and re-attach after.
+            var aq = qs[mqi];
+            var words = aq.prompt + (aq.hint ? ' Hint: ' + aq.hint : '');
+            try {
+              loadOntoSheet({ entities: [] });
+            } catch (err) {
+              status('Sheet not ready.');
+              return;
+            }
+            setMode('edit');
+            status('Auto-drawing the model for ' + p.model + ' Q' + (mqi + 1) + '…');
+            if (typeof window.educadAutoDraw !== 'function') {
+              status('Auto-draw is unavailable (command line did not load).');
+              return;
+            }
+            window.educadAutoDraw(words).then(function (res) {
+              status(res.ok ?
+                ('Model drafted for ' + p.model + ' Q' + (mqi + 1) +
+                  ' — review it, then re-attach via the Sets panel.') :
+                ('Auto-draw could not finish: ' + res.message));
+            });
             return;
           }
           var count;

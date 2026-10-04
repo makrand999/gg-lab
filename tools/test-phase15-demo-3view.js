@@ -85,31 +85,28 @@ var bundle = buttonBundle();
 eq(C.validateBundle(bundle).ok, true);
 pass('phase15 bundle validates');
 
-// 9 headless reconstruction: class A, 12v / 18e / 8f
-var r = R.reconstruct(bundle.entities);
+// 9 headless reconstruction: live wire, 12v / 18e / 8f (phase38 infers faces)
+var r = R.reconstructLive(bundle.entities);
 eq(r.status, 'ok');
-eq(r.class, 'A');
+eq(r.class, null);
 eq(r.geometry.vertices.length, 12);
 eq(r.geometry.edges.length, 18);
 eq(r.geometry.faces.length, 8);
-pass('phase15 reconstruct class A 12v 18e');
+pass('phase15 reconstruct wire 12v 18e');
 
-// 10 triple coverage 1.0, 35 mm span, 70 mm height
-eq(r.coverage.plan, 1);
-eq(r.coverage.elev, 1);
-eq(r.coverage.profile, 1);
+// 10 drawn proportions: 35 mm span, 70 mm height
 var xs = r.geometry.vertices.map(function (v) { return v.x; });
 var ys = r.geometry.vertices.map(function (v) { return v.y; });
 ok(Math.abs(Math.max.apply(null, xs) - Math.min.apply(null, xs) - 35) < 1e-9,
   'x-span 35 mm');
 ok(Math.abs(Math.max.apply(null, ys) - Math.min.apply(null, ys) - 70) < 1e-9,
   'height 70 mm');
-pass('phase15 coverage and size');
+pass('phase15 drawn proportions');
 
 // 11 determinism: rebuild + reconstruct yields identical JSON geometry
 var b2 = buttonBundle();
 eq(JSON.stringify(b2.entities), JSON.stringify(bundle.entities));
-var r2 = R.reconstruct(b2.entities);
+var r2 = R.reconstructLive(b2.entities);
 eq(JSON.stringify(r2.geometry), JSON.stringify(r.geometry));
 pass('phase15 deterministic');
 
@@ -122,7 +119,7 @@ pass('phase15 manual sync');
 // 13 README.md lists the phase15 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('npm run test:phase15') !== -1, 'readme lists phase15');
-ok(readme.indexOf('(874 checks)') !== -1, 'readme grand total');
+ok(readme.indexOf('(1039 checks)') !== -1, 'readme grand total');
 pass('phase15 readme sync');
 
 // 14 package.json chains the phase15 suite after phase14

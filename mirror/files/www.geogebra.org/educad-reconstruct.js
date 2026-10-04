@@ -17,18 +17,17 @@
   // BOTH is classified by y-sign plus a plan-x-overlap profile split;
   // dimensions/text/datum axes, meta.kind in {projector, locus, axis}, and
   // sheet-vertical lines crossing XY are filtered out. A profile depth d
-  // reads at xRef + s * (d - dRef); round-trip projection is the
-  // acceptance gate: drawn geometry must be covered by the reconstruction
-  // within tolerance.
+  // reads at xRef + s * (d - dRef); readers verify by round-trip
+  // coverage, while the wire builder trusts the drawing.
   //
-  // Strategy is recognize-then-verify (profile first): closed loops are
-  // found per view, class hypotheses (A prismatic sweep, B pyramid with
-  // apex, C lifted wireframe) are built directly from the loop inventory,
-  // and each hypothesis is scored by drawn-length coverage. Ambiguity is
-  // reported, never guessed; deterministic tie-breaks prefer max coverage,
-  // then min total edge length.
+  // Strategy is wire-first: every entity with a defined projection in
+  // both views resolves to 3D, whether or not anything closes into a
+  // solid. Declared geometry keeps dedicated readers: banked projector
+  // claims assert a lamina (three or more claims own the sheet), drawn
+  // curves hypothesize a revolved solid. Ambiguity is reported, never
+  // guessed; single-view entities simply stay 2D-only.
   var WORLD_UNITS = 'mm';
-  var VERSION = '10.1.0-educad';
+  var VERSION = '10.6.0-educad';
   var WELD_MIN_MM = 1e-6;
   var WELD_REL = 1e-4;
   var WELD_MAX_MM = 0.5;
@@ -40,12 +39,9 @@
 
   var REASON_LABELS = {
     'missing-view': 'needs both plan and elevation views',
-    'no-closed-profile': 'no closed profile found in either view',
     'unsupported-curves': 'curves not supported yet',
     'x-mismatch': 'plan/elevation x stations differ beyond eps',
-    'name-mismatch': 'plan/elevation labels name different points',
     'ambiguous-pairing': 'ambiguous pairing across views',
-    'non-convex-profile': 'non-convex profile (M1 covers convex only)',
     'unmatched-edge': 'a drawn edge fits no interpretation',
     'unmatched-point': 'a drawn point fits no interpretation',
     'non-manifold': 'degenerate solid (zero height or area)',
@@ -54,7 +50,8 @@
     'hint-loose-foot': 'a claim foot lands off drawn vertices',
     'duplicate-corners': 'two corners lift to one 3D point',
     'corners-not-coplanar': 'claimed corners leave the profile plane',
-    'non-convex-corners': 'claimed corners bound no convex face'
+    'non-convex-corners': 'claimed corners bound no convex face',
+    'empty-sketch': 'nothing with both views drawn yet'
   };
 
   function assertFinite() {
@@ -522,34 +519,6 @@
     return { order: order, area: area };
   }
 
-  // Every hull edge must be drawn (possibly as collinear pieces); a hull
-  // shortcut across undrawn space means a non-convex profile (M1 limit).
-  function loopSolidity(graph, loop, tol) {
-    for (var i = 0; i < loop.order.length; i++) {
-      var a = graph.verts[loop.order[i]];
-      var b = graph.verts[loop.order[(i + 1) % loop.order.length]];
-      if (segCoveredFrac(a.x, a.y, b.x, b.y, graph, tol, 5) < 1) {
-        return { ok: false, edge: i };
-      }
-    }
-    return { ok: true, edge: -1 };
-  }
-
-  function loopStations(graph, loop, tol) {
-    var xs = [];
-    for (var i = 0; i < loop.order.length; i++) {
-      xs.push(graph.verts[loop.order[i]].x);
-    }
-    xs.sort(function (a, b) { return a - b; });
-    var out = [];
-    for (var j = 0; j < xs.length; j++) {
-      if (out.length === 0 || Math.abs(xs[j] - out[out.length - 1]) > tol) {
-        out.push(xs[j]);
-      }
-    }
-    return out;
-  }
-
   // Point vs loop polygon: 'in' | 'out' | 'on' (within tol of boundary).
   function pointInLoop(px, py, graph, loop, tol) {
     var order = loop.order, verts = graph.verts;
@@ -566,18 +535,6 @@
       }
     }
     return inside ? 'in' : 'out';
-  }
-
-  function loopBBox(graph, loop) {
-    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (var i = 0; i < loop.order.length; i++) {
-      var v = graph.verts[loop.order[i]];
-      if (v.x < x0) x0 = v.x;
-      if (v.x > x1) x1 = v.x;
-      if (v.y < y0) y0 = v.y;
-      if (v.y > y1) y1 = v.y;
-    }
-    return { x0: x0, x1: x1, y0: y0, y1: y1 };
   }
 
   // Drawn A/B range of a view (segments only; points add no extent).
@@ -636,12 +593,6 @@
     };
   }
 
-  function loopInside(graph, loop) {
-    return function (px, py, tol) {
-      return pointInLoop(px, py, graph, loop, tol) !== 'out';
-    };
-  }
-
   function newellVec(verts, face) {
     var nx = 0, ny = 0, nz = 0;
     for (var i = 0; i < face.length; i++) {
@@ -663,6 +614,235 @@
       out.push(loop);
     }
     return out;
+  }
+
+  // Logical faces for closed wire: planar simple cycles that tile the
+  // shell prove faces, purely so the 3D view can dash hidden edges —
+  // nothing is painted. Strict by construction: every edge in exactly
+  // two faces and Euler V-E+F=2 per connected component, else [].
+  // Ambiguous, warped, open, oversized, or malformed input yields [],
+  // never a guess, never a throw. Deterministic: ordered adjacency,
+  // canonical cycle starts, fixed selection orders.
+  var FACES_MAX_VERTS = 64;
+  var FACES_MAX_EDGES = 96;
+  var FACES_MAX_LEN = 10;
+  var FACES_MAX_CYCLES = 3000;
+  var FACES_MAX_STEPS = 150000;
+  function inferClosedFaces(verts, edges) {
+    if (!Array.isArray(verts) || !Array.isArray(edges)) return [];
+    var V = verts.length, E = edges.length;
+    if (V < 4 || E < 6 || V > FACES_MAX_VERTS || E > FACES_MAX_EDGES) {
+      return [];
+    }
+    var vi, ei, a, b;
+    for (vi = 0; vi < V; vi++) {
+      var p = verts[vi];
+      if (!p || typeof p.x !== 'number' || typeof p.y !== 'number' ||
+          typeof p.z !== 'number' || !isFinite(p.x) || !isFinite(p.y) ||
+          !isFinite(p.z)) {
+        return [];
+      }
+    }
+    var adj = [], deg = [];
+    for (vi = 0; vi < V; vi++) { adj.push([]); deg.push(0); }
+    var seenE = {}, ek;
+    for (ei = 0; ei < E; ei++) {
+      var ee = edges[ei];
+      if (!ee || ee.length < 2) return [];
+      a = ee[0]; b = ee[1];
+      if (typeof a !== 'number' || typeof b !== 'number' ||
+          a !== Math.floor(a) || b !== Math.floor(b) ||
+          a < 0 || b < 0 || a >= V || b >= V || a === b) {
+        return [];
+      }
+      ek = a < b ? a + '_' + b : b + '_' + a;
+      if (seenE[ek]) continue;
+      seenE[ek] = 1;
+      adj[a].push(b); adj[b].push(a);
+      deg[a]++; deg[b]++;
+    }
+    for (vi = 0; vi < V; vi++) {
+      if (deg[vi] < 3) return [];
+      adj[vi].sort(function (x, y) { return x - y; });
+    }
+    var minX = verts[0].x, maxX = verts[0].x;
+    var minY = verts[0].y, maxY = verts[0].y;
+    var minZ = verts[0].z, maxZ = verts[0].z;
+    for (vi = 1; vi < V; vi++) {
+      if (verts[vi].x < minX) minX = verts[vi].x;
+      if (verts[vi].x > maxX) maxX = verts[vi].x;
+      if (verts[vi].y < minY) minY = verts[vi].y;
+      if (verts[vi].y > maxY) maxY = verts[vi].y;
+      if (verts[vi].z < minZ) minZ = verts[vi].z;
+      if (verts[vi].z > maxZ) maxZ = verts[vi].z;
+    }
+    var dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
+    var planarTol = Math.max(1e-6,
+      Math.sqrt(dx * dx + dy * dy + dz * dz) * 1e-9);
+    // Simple cycles, each once: start at its minimum vertex, either
+    // direction (reverses deduped by canonical key). Bounded steps.
+    var cycles = [], seenC = {}, steps = 0, capped = false;
+    function canonKey(loop) {
+      var n = loop.length, best = null, r, i, s;
+      for (r = 0; r < 2; r++) {
+        var seq = r === 0 ? loop : loop.slice().reverse();
+        for (i = 0; i < n; i++) {
+          s = [];
+          for (var k = 0; k < n; k++) s.push(seq[(i + k) % n]);
+          var key = s.join(',');
+          if (best === null || key < best) best = key;
+        }
+      }
+      return best;
+    }
+    function planar(loop) {
+      var nrm = newellVec(verts, loop);
+      var nl2 = nrm.x * nrm.x + nrm.y * nrm.y + nrm.z * nrm.z;
+      if (!(nl2 > 1e-24)) return false;
+      var nl = Math.sqrt(nl2);
+      var qx = 0, qy = 0, qz = 0, i;
+      for (i = 0; i < loop.length; i++) {
+        qx += verts[loop[i]].x;
+        qy += verts[loop[i]].y;
+        qz += verts[loop[i]].z;
+      }
+      qx /= loop.length; qy /= loop.length; qz /= loop.length;
+      for (i = 0; i < loop.length; i++) {
+        var q = verts[loop[i]];
+        var dev = Math.abs(nrm.x * (q.x - qx) + nrm.y * (q.y - qy) +
+          nrm.z * (q.z - qz)) / nl;
+        if (dev > planarTol) return false;
+      }
+      return true;
+    }
+    var path = [], onPath = {};
+    function dfs(start, u) {
+      if (capped) return;
+      var nb = adj[u];
+      for (var i = 0; i < nb.length; i++) {
+        if (capped) return;
+        steps++;
+        if (steps > FACES_MAX_STEPS) { capped = true; return; }
+        var w = nb[i];
+        if (w === start) {
+          if (path.length >= 3) {
+            var key = canonKey(path);
+            if (!seenC[key]) {
+              seenC[key] = 1;
+              if (planar(path)) cycles.push(path.slice());
+              if (cycles.length >= FACES_MAX_CYCLES) {
+                capped = true; return;
+              }
+            }
+          }
+        } else if (w > start && !onPath[w] &&
+            path.length < FACES_MAX_LEN) {
+          onPath[w] = 1;
+          path.push(w);
+          dfs(start, w);
+          path.pop();
+          delete onPath[w];
+        }
+      }
+    }
+    for (vi = 0; vi < V && !capped; vi++) {
+      onPath = {};
+      onPath[vi] = 1;
+      path = [vi];
+      dfs(vi, vi);
+    }
+    if (cycles.length === 0) return [];
+    // Connected components: separate solids infer separately.
+    var comp = [], compId = -1, stack;
+    var compOf = [];
+    for (vi = 0; vi < V; vi++) compOf.push(-1);
+    for (vi = 0; vi < V; vi++) {
+      if (compOf[vi] !== -1) continue;
+      compId++;
+      comp.push({ verts: [], edges: 0 });
+      stack = [vi];
+      compOf[vi] = compId;
+      while (stack.length > 0) {
+        var u = stack.pop();
+        comp[compId].verts.push(u);
+        for (var q = 0; q < adj[u].length; q++) {
+          if (compOf[adj[u][q]] === -1) {
+            compOf[adj[u][q]] = compId;
+            stack.push(adj[u][q]);
+          }
+        }
+      }
+    }
+    Object.keys(seenE).forEach(function (k) {
+      var vv = k.split('_');
+      comp[compOf[Number(vv[0])]].edges++;
+    });
+    var byComp = [];
+    for (vi = 0; vi < comp.length; vi++) byComp.push([]);
+    cycles.forEach(function (c) { byComp[compOf[c[0]]].push(c); });
+    // Greedy tiling, short and long orders: an edge may serve two
+    // faces; the first order whose set verifies Euler wins.
+    function tryOrder(list, vCount, eCount, asc) {
+      var ord = list.slice().sort(function (x, y) {
+        return asc ? x.length - y.length : y.length - x.length;
+      });
+      var use = {}, picked = [], i, j, kk, okAll;
+      for (i = 0; i < ord.length; i++) {
+        okAll = true;
+        for (j = 0; j < ord[i].length; j++) {
+          var pa = ord[i][j], pb = ord[i][(j + 1) % ord[i].length];
+          kk = pa < pb ? pa + '_' + pb : pb + '_' + pa;
+          if ((use[kk] || 0) >= 2) { okAll = false; break; }
+        }
+        if (!okAll) continue;
+        for (j = 0; j < ord[i].length; j++) {
+          var qa = ord[i][j], qb = ord[i][(j + 1) % ord[i].length];
+          kk = qa < qb ? qa + '_' + qb : qb + '_' + qa;
+          use[kk] = (use[kk] || 0) + 1;
+        }
+        picked.push(ord[i]);
+      }
+      if (vCount - eCount + picked.length !== 2) return null;
+      var keys = Object.keys(use);
+      if (keys.length !== eCount) return null;
+      for (i = 0; i < keys.length; i++) {
+        if (use[keys[i]] !== 2) return null;
+      }
+      return picked;
+    }
+    var faces = [];
+    for (vi = 0; vi < comp.length; vi++) {
+      var set = tryOrder(byComp[vi], comp[vi].verts.length,
+        comp[vi].edges, true) ||
+        tryOrder(byComp[vi], comp[vi].verts.length,
+          comp[vi].edges, false);
+      if (!set) return [];
+      // Outward per component: Newell against its own centroid.
+      var gx = 0, gy = 0, gz = 0, gi;
+      for (gi = 0; gi < comp[vi].verts.length; gi++) {
+        gx += verts[comp[vi].verts[gi]].x;
+        gy += verts[comp[vi].verts[gi]].y;
+        gz += verts[comp[vi].verts[gi]].z;
+      }
+      gx /= comp[vi].verts.length;
+      gy /= comp[vi].verts.length;
+      gz /= comp[vi].verts.length;
+      for (gi = 0; gi < set.length; gi++) {
+        var loop = set[gi].slice(), fn = newellVec(verts, loop);
+        var mx = 0, my = 0, mz = 0, mi;
+        for (mi = 0; mi < loop.length; mi++) {
+          mx += verts[loop[mi]].x;
+          my += verts[loop[mi]].y;
+          mz += verts[loop[mi]].z;
+        }
+        mx = mx / loop.length - gx;
+        my = my / loop.length - gy;
+        mz = mz / loop.length - gz;
+        if (fn.x * mx + fn.y * my + fn.z * mz <= 0) loop.reverse();
+        faces.push(loop);
+      }
+    }
+    return faces;
   }
 
   function totalLength(verts, edges) {
@@ -741,17 +921,6 @@
     return hit / need;
   }
 
-  function onLoopLines(graph, loop) {
-    return function (px, py, tol) {
-      for (var i = 0; i < loop.order.length; i++) {
-        var a = graph.verts[loop.order[i]];
-        var b = graph.verts[loop.order[(i + 1) % loop.order.length]];
-        if (distPtSeg(px, py, a.x, a.y, b.x, b.y) <= tol) return true;
-      }
-      return false;
-    };
-  }
-
   function onPrismElevLines(stations, z0, z1) {
     return function (px, py, tol) {
       if (Math.abs(py - z0) <= tol || Math.abs(py - z1) <= tol) return true;
@@ -780,274 +949,6 @@
     return map.xRef + map.s * (d - map.dRef);
   }
 
-  // Distinct plan-loop depths, mirroring loopStations (which reads x).
-  function loopDepths(graph, loop, tol) {
-    var ds = [];
-    for (var i = 0; i < loop.order.length; i++) {
-      ds.push(-graph.verts[loop.order[i]].y);
-    }
-    ds.sort(function (a, b) { return a - b; });
-    var out = [];
-    for (var j = 0; j < ds.length; j++) {
-      if (out.length === 0 || Math.abs(ds[j] - out[out.length - 1]) > tol) {
-        out.push(ds[j]);
-      }
-    }
-    return out;
-  }
-
-  // Profile validation for Class A: the swept silhouette in the profile
-  // is the mapped depth span crossed with [z0, z1], with verticals at the
-  // mapped plan-loop depth stations. Rules mirror the elevation side.
-  // Returns a fail object, or {pass, coverage} when the map fits.
-  function checkPrismProfile(profG, depths, z0, z1, map, eps, stol) {
-    var px = [];
-    var pi;
-    for (pi = 0; pi < depths.length; pi++) px.push(mapDepth(map, depths[pi]));
-    var plo = Math.min.apply(null, px), phi = Math.max.apply(null, px);
-    var pr = drawnRangeAB(profG);
-    if (!pr) {
-      return fail('unmatched-edge', 'profile shows no prism extent', 0);
-    }
-    if (Math.abs(pr.x0 - plo) > eps || Math.abs(pr.x1 - phi) > eps) {
-      return fail('x-mismatch', 'profile x-range [' + pr.x0 + ', ' +
-        pr.x1 + '] vs mapped depth [' + plo + ', ' + phi + '] beyond eps', 0);
-    }
-    var onProf = onPrismElevLines(px, z0, z1);
-    var si, s, a, b, okLine, qx, qy;
-    for (si = 0; si < profG.segs.length; si++) {
-      s = profG.segs[si];
-      if (s.item.bisCode === 'E') continue;
-      a = profG.verts[s.a];
-      b = profG.verts[s.b];
-      okLine = true;
-      for (var m = 0; m < 5; m++) {
-        var u = m / 4;
-        qx = a.x + (b.x - a.x) * u;
-        qy = a.y + (b.y - a.y) * u;
-        if (!onProf(qx, qy, stol)) { okLine = false; break; }
-      }
-      if (!okLine) {
-        return fail('unmatched-edge', 'profile ' +
-          describeEntity(s.item, s.idx) + ' fits no prism line', 0);
-      }
-    }
-    if (!hCovered(profG, z0, plo, phi, stol)) {
-      return fail('unmatched-edge',
-        'profile misses the base line at y=' + z0, 0);
-    }
-    if (!hCovered(profG, z1, plo, phi, stol)) {
-      return fail('unmatched-edge',
-        'profile misses the top line at y=' + z1, 0);
-    }
-    for (si = 0; si < px.length; si++) {
-      if (!vCovered(profG, px[si], z0, z1, stol)) {
-        return fail('unmatched-edge',
-          'profile misses the vertical at x=' + px[si], 0);
-      }
-    }
-    var inside = rectInside(plo, phi, z0, z1);
-    var eOk = eSegsContained(profG.segs, profG.verts, inside, stol, 5);
-    if (!eOk.ok) {
-      return fail('unmatched-edge', 'profile hidden ' +
-        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
-    }
-    for (si = 0; si < profG.points.length; si++) {
-      var pv = profG.verts[profG.points[si].v];
-      if (!onProf(pv.x, pv.y, eps)) {
-        return fail('unmatched-point', 'profile point ' +
-          describeEntity(profG.points[si].item, profG.points[si].idx) +
-          ' sits off the prism lines', 0);
-      }
-    }
-    return { pass: true, coverage: viewCoverage(profG, onProf, inside, stol) };
-  }
-
-  // --- Class A: prismatic sweep of the plan loop over [z0, z1]. ---
-  // Same-view checks use the weld tol; cross-view checks (plan stations
-  // vs drawn elevation) use the structural tol, since paired stations
-  // may legitimately differ by up to eps.
-  function tryPrism(planG, elevG, planLoop, eps, tol, profG) {
-    if (!planLoop) return null;
-    var stol = Math.max(tol, eps);
-    var solid = loopSolidity(planG, planLoop, tol);
-    if (!solid.ok) {
-      return fail('non-convex-profile',
-        'plan loop edge ' + solid.edge + ' is not drawn (non-convex?)', 0);
-    }
-    var stations = loopStations(planG, planLoop, tol);
-    var xL = stations[0], xR = stations[stations.length - 1];
-    var er = drawnRangeAB(elevG);
-    if (!er) {
-      return fail('unmatched-edge', 'elevation shows no prism extent', 0);
-    }
-    if (Math.abs(er.x0 - xL) > eps || Math.abs(er.x1 - xR) > eps) {
-      return fail('x-mismatch', 'elevation x-range [' + er.x0 + ', ' +
-        er.x1 + '] vs plan [' + xL + ', ' + xR + '] beyond eps', 0);
-    }
-    var z0 = er.y0, z1 = er.y1;
-    if (!(z1 - z0 > tol)) {
-      return fail('non-manifold', 'elevation extent has zero height', 0);
-    }
-    var si, s, a, b, px, py, okLine;
-    for (si = 0; si < planG.segs.length; si++) {
-      s = planG.segs[si];
-      if (s.item.bisCode === 'E') continue;
-      a = planG.verts[s.a];
-      b = planG.verts[s.b];
-      okLine = true;
-      for (var k = 0; k < 5; k++) {
-        var t = k / 4;
-        px = a.x + (b.x - a.x) * t;
-        py = a.y + (b.y - a.y) * t;
-        if (!onLoopLines(planG, planLoop)(px, py, tol)) {
-          okLine = false;
-          break;
-        }
-      }
-      if (!okLine) {
-        return fail('unmatched-edge', 'plan ' +
-          describeEntity(s.item, s.idx) + ' leaves the loop', 0);
-      }
-    }
-    var onElev = onPrismElevLines(stations, z0, z1);
-    for (si = 0; si < elevG.segs.length; si++) {
-      s = elevG.segs[si];
-      if (s.item.bisCode === 'E') continue;
-      a = elevG.verts[s.a];
-      b = elevG.verts[s.b];
-      okLine = true;
-      for (var m = 0; m < 5; m++) {
-        var u = m / 4;
-        px = a.x + (b.x - a.x) * u;
-        py = a.y + (b.y - a.y) * u;
-        if (!onElev(px, py, stol)) { okLine = false; break; }
-      }
-      if (!okLine) {
-        return fail('unmatched-edge', 'elevation ' +
-          describeEntity(s.item, s.idx) + ' fits no prism line', 0);
-      }
-    }
-    if (!hCovered(elevG, z0, xL, xR, stol)) {
-      return fail('unmatched-edge',
-        'elevation misses the base line at y=' + z0, 0);
-    }
-    if (!hCovered(elevG, z1, xL, xR, stol)) {
-      return fail('unmatched-edge',
-        'elevation misses the top line at y=' + z1, 0);
-    }
-    for (si = 0; si < stations.length; si++) {
-      if (!vCovered(elevG, stations[si], z0, z1, stol)) {
-        return fail('unmatched-edge',
-          'elevation misses the vertical at x=' + stations[si], 0);
-      }
-    }
-    var eOk = eSegsContained(elevG.segs, elevG.verts,
-      rectInside(xL, xR, z0, z1), stol, 5);
-    if (!eOk.ok) {
-      return fail('unmatched-edge', 'elevation hidden ' +
-        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
-    }
-    var pOk = eSegsContained(planG.segs, planG.verts,
-      loopInside(planG, planLoop), tol, 5);
-    if (!pOk.ok) {
-      return fail('unmatched-edge', 'plan hidden ' +
-        describeEntity(pOk.seg.item, pOk.seg.idx) + ' escapes the loop', 0);
-    }
-    var onLoop = onLoopLines(planG, planLoop);
-    for (si = 0; si < planG.points.length; si++) {
-      var pv = planG.verts[planG.points[si].v];
-      if (!onLoop(pv.x, pv.y, eps)) {
-        return fail('unmatched-point', 'plan point ' +
-          describeEntity(planG.points[si].item, planG.points[si].idx) +
-          ' sits off the loop', 0);
-      }
-    }
-    for (si = 0; si < elevG.points.length; si++) {
-      var ev = elevG.verts[elevG.points[si].v];
-      if (!onElev(ev.x, ev.y, eps)) {
-        return fail('unmatched-point', 'elevation point ' +
-          describeEntity(elevG.points[si].item, elevG.points[si].idx) +
-          ' sits off the prism lines', 0);
-      }
-    }
-    // M2: with a profile view, both depth orientations are tried in
-    // fixed order; the first passing map wins (the solid derives from
-    // plan/elevation alone, so dual-pass solids are identical and the
-    // pick is deterministic, never a guess). Two failing maps report
-    // the direct map's failure.
-    var profMap = null, profRes = null;
-    if (profG) {
-      var pDepths = loopDepths(planG, planLoop, tol);
-      var pr0 = drawnRangeAB(profG);
-      if (!pr0) {
-        return fail('unmatched-edge', 'profile shows no prism extent', 0);
-      }
-      var pMaps = inferProfileMaps(pDepths[0], pr0.x0, pr0.x1);
-      var pFirstErr = null;
-      for (var pmi = 0; pmi < pMaps.length; pmi++) {
-        var pTry = checkPrismProfile(profG, pDepths, z0, z1,
-          pMaps[pmi], eps, stol);
-        if (pTry.pass) { profMap = pMaps[pmi]; profRes = pTry; break; }
-        if (!pFirstErr) pFirstErr = pTry;
-      }
-      if (!profMap) return pFirstErr;
-    }
-    var n = planLoop.order.length;
-    var verts = [];
-    for (si = 0; si < n; si++) {
-      var lp = planG.verts[planLoop.order[si]];
-      verts.push({ x: lp.x, y: z0, z: -lp.y });
-    }
-    for (si = 0; si < n; si++) {
-      var tp = planG.verts[planLoop.order[si]];
-      verts.push({ x: tp.x, y: z1, z: -tp.y });
-    }
-    var edges = [];
-    for (si = 0; si < n; si++) {
-      var nx = (si + 1) % n;
-      edges.push([si, nx]);
-      edges.push([si + n, nx + n]);
-      edges.push([si, si + n]);
-    }
-    var faces = [];
-    var checks = [];
-    var bottom = [], top = [];
-    for (si = 0; si < n; si++) { bottom.push(si); top.push(si + n); }
-    faces.push(bottom);
-    checks.push(function (nn) { return nn.y < 0; });
-    faces.push(top);
-    checks.push(function (nn) { return nn.y > 0; });
-    for (si = 0; si < n; si++) {
-      var jx = (si + 1) % n;
-      faces.push([si, jx, jx + n, si + n]);
-      checks.push(outwardSideCheck(verts, bottom, si, jx));
-    }
-    faces = orientFaces(verts, faces, checks);
-    var covPlan = viewCoverage(planG, onLoop,
-      loopInside(planG, planLoop), tol);
-    var covElev = viewCoverage(elevG, onElev,
-      rectInside(xL, xR, z0, z1), stol);
-    var covProfA = profRes ? profRes.coverage : 1;
-    var cov = Math.min(covPlan, covElev, covProfA);
-    if (cov < COVERAGE_GATE) {
-      return fail('coverage-failed',
-        'prism round-trip coverage ' + cov.toFixed(3), cov);
-    }
-    var outA = {
-      pass: true, class: 'A', coverage: cov,
-      totalLength: totalLength(verts, edges),
-      geometry: { name: 'prism', vertices: verts, edges: edges, faces: faces },
-      coveragePlan: covPlan, coverageElev: covElev,
-      canonical: canonicalOf(verts, edges)
-    };
-    if (profG) {
-      outA.coverageProfile = covProfA;
-      outA.profileMap = profMap;
-    }
-    return outA;
-  }
-
   function onPyramidElevLines(xL, xR, xa, z0, z1) {
     return function (px, py, tol) {
       if (Math.abs(py - z0) <= tol && px >= xL - tol && px <= xR + tol) {
@@ -1055,18 +956,6 @@
       }
       if (distPtSeg(px, py, xL, z0, xa, z1) <= tol) return true;
       if (distPtSeg(px, py, xR, z0, xa, z1) <= tol) return true;
-      return false;
-    };
-  }
-
-  function onPyramidPlanLines(graph, loop, apex) {
-    var onLoop = onLoopLines(graph, loop);
-    return function (px, py, tol) {
-      if (onLoop(px, py, tol)) return true;
-      for (var i = 0; i < loop.order.length; i++) {
-        var c = graph.verts[loop.order[i]];
-        if (distPtSeg(px, py, apex.x, apex.y, c.x, c.y) <= tol) return true;
-      }
       return false;
     };
   }
@@ -1079,332 +968,6 @@
       var lo = Math.min(xl, xr) - t2, hi = Math.max(xl, xr) + t2;
       return qx >= lo && qx <= hi;
     };
-  }
-
-  // Profile validation for Class B: base line plus slants to the mapped
-  // apex, mirroring the elevation side. Returns a fail object, or
-  // {pass, coverage} when the map fits.
-  function checkPyramidProfile(profG, dLo, dHi, da, z0, z1, map, eps, tol, stol) {
-    var plo = Math.min(mapDepth(map, dLo), mapDepth(map, dHi));
-    var phi = Math.max(mapDepth(map, dLo), mapDepth(map, dHi));
-    var pr = drawnRangeAB(profG);
-    if (!pr) {
-      return fail('unmatched-edge', 'profile shows no pyramid extent', 0);
-    }
-    if (Math.abs(pr.x0 - plo) > eps || Math.abs(pr.x1 - phi) > eps) {
-      return fail('x-mismatch', 'profile x-range [' + pr.x0 + ', ' +
-        pr.x1 + '] vs mapped depth [' + plo + ', ' + phi + '] beyond eps', 0);
-    }
-    var xa = mapDepth(map, da);
-    var profApex = null;
-    for (var ei = 0; ei < profG.points.length; ei++) {
-      var qv = profG.verts[profG.points[ei].v];
-      if (Math.abs(qv.y - z1) <= tol) {
-        if (profApex !== null) {
-          return fail('ambiguous-pairing',
-            'two points share the profile top line', 0);
-        }
-        profApex = { x: qv.x, y: qv.y, ref: profG.points[ei] };
-      }
-    }
-    if (profApex === null) {
-      return fail('unmatched-point',
-        'plan apex has no mate on the profile top line', 0);
-    }
-    var dxa = Math.abs(profApex.x - xa);
-    if (dxa > eps) {
-      if (dxa <= LOOSE_EPS_MM) {
-        return fail('x-mismatch', 'apex mapped x=' + xa +
-          ' vs profile x=' + profApex.x + ' beyond eps', 0);
-      }
-      return fail('unmatched-point',
-        'profile top point matches no plan apex', 0);
-    }
-    var xap = (xa + profApex.x) / 2;
-    if (!hCovered(profG, z0, plo, phi, stol)) {
-      return fail('unmatched-edge',
-        'profile misses the base line at y=' + z0, 0);
-    }
-    if (!slantCovered(profG, plo, z0, xap, z1, stol)) {
-      return fail('unmatched-edge', 'profile misses the left slant', 0);
-    }
-    if (!slantCovered(profG, phi, z0, xap, z1, stol)) {
-      return fail('unmatched-edge', 'profile misses the right slant', 0);
-    }
-    var onProf = onPyramidElevLines(plo, phi, xap, z0, z1);
-    var si, s, a, b, okLine, qx, qy;
-    for (si = 0; si < profG.segs.length; si++) {
-      s = profG.segs[si];
-      if (s.item.bisCode === 'E') continue;
-      a = profG.verts[s.a];
-      b = profG.verts[s.b];
-      okLine = true;
-      for (var m = 0; m < 5; m++) {
-        var u = m / 4;
-        qx = a.x + (b.x - a.x) * u;
-        qy = a.y + (b.y - a.y) * u;
-        if (!onProf(qx, qy, stol)) { okLine = false; break; }
-      }
-      if (!okLine) {
-        return fail('unmatched-edge', 'profile ' +
-          describeEntity(s.item, s.idx) + ' fits no pyramid line', 0);
-      }
-    }
-    var triIn = pyramidTriIn(plo, phi, xap, z0, z1);
-    var eOk = eSegsContained(profG.segs, profG.verts, triIn, stol, 5);
-    if (!eOk.ok) {
-      return fail('unmatched-edge', 'profile hidden ' +
-        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
-    }
-    for (si = 0; si < profG.points.length; si++) {
-      var pv = profG.verts[profG.points[si].v];
-      if (!onProf(pv.x, pv.y, eps)) {
-        return fail('unmatched-point', 'profile point ' +
-          describeEntity(profG.points[si].item, profG.points[si].idx) +
-          ' sits off the pyramid lines', 0);
-      }
-    }
-    return { pass: true, coverage: viewCoverage(profG, onProf, triIn, stol) };
-  }
-
-  // --- Class B: pyramid over the plan loop with an interior apex seen in
-  // both views. Returns null when no plan apex exists (not a pyramid).
-  function tryPyramid(planG, elevG, planLoop, eps, tol, profG) {
-    if (!planLoop) return null;
-    var stol = Math.max(tol, eps);
-    var solid = loopSolidity(planG, planLoop, tol);
-    if (!solid.ok) {
-      return fail('non-convex-profile',
-        'plan loop edge ' + solid.edge + ' is not drawn (non-convex?)', 0);
-    }
-    var apexes = [];
-    for (var pi = 0; pi < planG.points.length; pi++) {
-      var pv = planG.verts[planG.points[pi].v];
-      if (pointInLoop(pv.x, pv.y, planG, planLoop, tol) === 'in') {
-        apexes.push({ x: pv.x, y: pv.y, ref: planG.points[pi] });
-      }
-    }
-    if (apexes.length === 0) return null;
-    if (apexes.length > 1) {
-      return fail('ambiguous-pairing', apexes.length +
-        ' interior plan points compete for the apex', 0);
-    }
-    var apex = apexes[0];
-    var stations = loopStations(planG, planLoop, tol);
-    var xL = stations[0], xR = stations[stations.length - 1];
-    var er = drawnRangeAB(elevG);
-    if (!er) {
-      return fail('unmatched-edge', 'elevation shows no pyramid extent', 0);
-    }
-    if (Math.abs(er.x0 - xL) > eps || Math.abs(er.x1 - xR) > eps) {
-      return fail('x-mismatch', 'elevation x-range [' + er.x0 + ', ' +
-        er.x1 + '] vs plan [' + xL + ', ' + xR + '] beyond eps', 0);
-    }
-    var z0 = er.y0, z1 = er.y1;
-    if (!(z1 - z0 > tol)) {
-      return fail('non-manifold', 'elevation extent has zero height', 0);
-    }
-    var elevApex = null;
-    for (var ei = 0; ei < elevG.points.length; ei++) {
-      var qv = elevG.verts[elevG.points[ei].v];
-      if (Math.abs(qv.y - z1) <= tol) {
-        if (elevApex !== null) {
-          return fail('ambiguous-pairing',
-            'two points share the elevation top line', 0);
-        }
-        elevApex = { x: qv.x, y: qv.y, ref: elevG.points[ei] };
-      }
-    }
-    if (elevApex === null) {
-      return fail('unmatched-point',
-        'plan apex has no mate on the elevation top line', 0);
-    }
-    var dxa = Math.abs(elevApex.x - apex.x);
-    if (dxa > eps) {
-      if (dxa <= LOOSE_EPS_MM) {
-        return fail('x-mismatch', 'apex plan x=' + apex.x +
-          ' vs elevation x=' + elevApex.x + ' beyond eps', 0);
-      }
-      return fail('unmatched-point',
-        'elevation top point matches no plan apex', 0);
-    }
-    var xa = (apex.x + elevApex.x) / 2;
-    if (!hCovered(elevG, z0, xL, xR, stol)) {
-      return fail('unmatched-edge',
-        'elevation misses the base line at y=' + z0, 0);
-    }
-    if (!slantCovered(elevG, xL, z0, xa, z1, stol)) {
-      return fail('unmatched-edge', 'elevation misses the left slant', 0);
-    }
-    if (!slantCovered(elevG, xR, z0, xa, z1, stol)) {
-      return fail('unmatched-edge', 'elevation misses the right slant', 0);
-    }
-    var onPlan = onPyramidPlanLines(planG, planLoop, apex);
-    var si, s, a, b, okLine, px, py;
-    for (si = 0; si < planG.segs.length; si++) {
-      s = planG.segs[si];
-      if (s.item.bisCode === 'E') continue;
-      a = planG.verts[s.a];
-      b = planG.verts[s.b];
-      okLine = true;
-      for (var k = 0; k < 5; k++) {
-        var t = k / 4;
-        px = a.x + (b.x - a.x) * t;
-        py = a.y + (b.y - a.y) * t;
-        if (!onPlan(px, py, tol)) { okLine = false; break; }
-      }
-      if (!okLine) {
-        return fail('unmatched-edge', 'plan ' +
-          describeEntity(s.item, s.idx) + ' fits no pyramid line', 0);
-      }
-    }
-    var onElev = onPyramidElevLines(xL, xR, xa, z0, z1);
-    for (si = 0; si < elevG.segs.length; si++) {
-      s = elevG.segs[si];
-      if (s.item.bisCode === 'E') continue;
-      a = elevG.verts[s.a];
-      b = elevG.verts[s.b];
-      okLine = true;
-      for (var m = 0; m < 5; m++) {
-        var u = m / 4;
-        px = a.x + (b.x - a.x) * u;
-        py = a.y + (b.y - a.y) * u;
-        if (!onElev(px, py, stol)) { okLine = false; break; }
-      }
-      if (!okLine) {
-        return fail('unmatched-edge', 'elevation ' +
-          describeEntity(s.item, s.idx) + ' fits no pyramid line', 0);
-      }
-    }
-    var triIn = pyramidTriIn(xL, xR, xa, z0, z1);
-    var eOk = eSegsContained(elevG.segs, elevG.verts, triIn, stol, 5);
-    if (!eOk.ok) {
-      return fail('unmatched-edge', 'elevation hidden ' +
-        describeEntity(eOk.seg.item, eOk.seg.idx) + ' escapes the outline', 0);
-    }
-    var pOk = eSegsContained(planG.segs, planG.verts,
-      loopInside(planG, planLoop), tol, 5);
-    if (!pOk.ok) {
-      return fail('unmatched-edge', 'plan hidden ' +
-        describeEntity(pOk.seg.item, pOk.seg.idx) + ' escapes the loop', 0);
-    }
-    for (si = 0; si < planG.points.length; si++) {
-      var pv2 = planG.verts[planG.points[si].v];
-      if (!onPlan(pv2.x, pv2.y, eps)) {
-        return fail('unmatched-point', 'plan point ' +
-          describeEntity(planG.points[si].item, planG.points[si].idx) +
-          ' sits off the pyramid lines', 0);
-      }
-    }
-    for (si = 0; si < elevG.points.length; si++) {
-      var ev2 = elevG.verts[elevG.points[si].v];
-      if (!onElev(ev2.x, ev2.y, eps)) {
-        return fail('unmatched-point', 'elevation point ' +
-          describeEntity(elevG.points[si].item, elevG.points[si].idx) +
-          ' sits off the pyramid lines', 0);
-      }
-    }
-    // M2: profile trial mirrors Class A (fixed map order, first pass
-    // wins, direct map's failure reported when neither passes).
-    var profMapB = null, profResB = null;
-    if (profG) {
-      var bDepths = loopDepths(planG, planLoop, tol);
-      var br0 = drawnRangeAB(profG);
-      if (!br0) {
-        return fail('unmatched-edge', 'profile shows no pyramid extent', 0);
-      }
-      var bMaps = inferProfileMaps(bDepths[0], br0.x0, br0.x1);
-      var bFirstErr = null;
-      for (var bmi = 0; bmi < bMaps.length; bmi++) {
-        var bTry = checkPyramidProfile(profG, bDepths[0],
-          bDepths[bDepths.length - 1], -apex.y, z0, z1,
-          bMaps[bmi], eps, tol, stol);
-        if (bTry.pass) { profMapB = bMaps[bmi]; profResB = bTry; break; }
-        if (!bFirstErr) bFirstErr = bTry;
-      }
-      if (!profMapB) return bFirstErr;
-    }
-    var n = planLoop.order.length;
-    var verts = [];
-    for (si = 0; si < n; si++) {
-      var bp = planG.verts[planLoop.order[si]];
-      verts.push({ x: bp.x, y: z0, z: -bp.y });
-    }
-    verts.push({ x: xa, y: z1, z: -apex.y });
-    var apexIdx = n;
-    var edges = [];
-    for (si = 0; si < n; si++) {
-      edges.push([si, (si + 1) % n]);
-      edges.push([si, apexIdx]);
-    }
-    var faces = [];
-    var checks = [];
-    var base = [];
-    for (si = 0; si < n; si++) base.push(si);
-    faces.push(base);
-    checks.push(function (nn) { return nn.y < 0; });
-    for (si = 0; si < n; si++) {
-      var jx = (si + 1) % n;
-      faces.push([si, jx, apexIdx]);
-      checks.push(outwardSideCheck(verts, base, si, jx));
-    }
-    faces = orientFaces(verts, faces, checks);
-    var covPlan = viewCoverage(planG, onPlan,
-      loopInside(planG, planLoop), tol);
-    var covElev = viewCoverage(elevG, onElev, triIn, stol);
-    var covProfB = profResB ? profResB.coverage : 1;
-    var cov = Math.min(covPlan, covElev, covProfB);
-    if (cov < COVERAGE_GATE) {
-      return fail('coverage-failed',
-        'pyramid round-trip coverage ' + cov.toFixed(3), cov);
-    }
-    var outB = {
-      pass: true, class: 'B', coverage: cov,
-      totalLength: totalLength(verts, edges),
-      geometry: { name: 'pyramid', vertices: verts, edges: edges, faces: faces },
-      coveragePlan: covPlan, coverageElev: covElev,
-      canonical: canonicalOf(verts, edges)
-    };
-    if (profG) {
-      outB.coverageProfile = covProfB;
-      outB.profileMap = profMapB;
-    }
-    return outB;
-  }
-
-  // Union x-stations across both views: sorted greedy clustering within
-  // eps. Returns {stations:[x...], planSt:[vertIdx->st], elevSt:[...]}.
-  function unionStations(planG, elevG, eps) {
-    var all = [];
-    var i;
-    for (i = 0; i < planG.verts.length; i++) {
-      all.push({ x: planG.verts[i].x, view: 0, v: i });
-    }
-    for (i = 0; i < elevG.verts.length; i++) {
-      all.push({ x: elevG.verts[i].x, view: 1, v: i });
-    }
-    all.sort(function (a, b) { return a.x - b.x; });
-    var stations = [];
-    var planSt = [], elevSt = [];
-    for (i = 0; i < all.length; i++) {
-      if (stations.length === 0 ||
-          Math.abs(all[i].x - stations[stations.length - 1].x) > eps) {
-        stations.push({ x: all[i].x, n: 0 });
-      }
-      var st = stations[stations.length - 1];
-      st.x = (st.x * st.n + all[i].x) / (st.n + 1);
-      st.n++;
-      if (all[i].view === 0) planSt[all[i].v] = stations.length - 1;
-      else elevSt[all[i].v] = stations.length - 1;
-    }
-    return {
-      stations: stations.map(function (s) { return s.x; }),
-      planSt: planSt, elevSt: elevSt
-    };
-  }
-
-  function stationPairKey(s1, s2) {
-    return s1 < s2 ? s1 + '-' + s2 : s2 + '-' + s1;
   }
 
   // --- Pair-by-name: display names are absolute. Plan `a`, elevation
@@ -1443,770 +1006,16 @@
     return out;
   }
 
-  function vertBases(graph) {
-    var per = [];
-    for (var i = 0; i < graph.verts.length; i++) per.push([]);
-    for (var j = 0; j < graph.points.length; j++) {
-      var p = graph.points[j];
-      if (!p.item || p.item.type !== 'POINT') continue;
-      var bs = captionBases(p.item.caption);
-      for (var k = 0; k < bs.length; k++) {
-        if (per[p.v].indexOf(bs[k]) === -1) per[p.v].push(bs[k]);
-      }
-    }
-    return per;
-  }
-
-  function shareBase(a, b) {
-    for (var i = 0; i < a.length; i++) {
-      if (b.indexOf(a[i]) !== -1) return true;
-    }
-    return false;
-  }
-
-  function namesCompatible(pb, eb) {
-    if (pb.length === 0 || eb.length === 0) return true;
-    return shareBase(pb, eb);
-  }
-
-  // Cross-view label contradiction detector (all classes): at any shared
-  // x-station where both views carry POINT labels, the base sets must
-  // meet; a profile label must name a plan/elevation base. Returns a
-  // `name-mismatch` fail or null. Unlabeled drawings always pass.
-  function checkNameGate(planG, elevG, eps, profG) {
-    var pb = vertBases(planG), eb = vertBases(elevG);
-    var U = unionStations(planG, elevG, eps);
-    var planAt = {}, elevAt = {}, i, st;
-    for (i = 0; i < U.planSt.length; i++) {
-      st = U.planSt[i];
-      if (!planAt[st]) planAt[st] = [];
-      planAt[st].push(i);
-    }
-    for (i = 0; i < U.elevSt.length; i++) {
-      st = U.elevSt[i];
-      if (!elevAt[st]) elevAt[st] = [];
-      elevAt[st].push(i);
-    }
-    function unionOf(per, verts) {
-      var seen = {}, out = [];
-      for (var k = 0; k < verts.length; k++) {
-        var arr = per[verts[k]];
-        for (var m = 0; m < arr.length; m++) {
-          if (!seen[arr[m]]) { seen[arr[m]] = 1; out.push(arr[m]); }
-        }
-      }
-      return out;
-    }
-    for (var sk in planAt) {
-      if (!Object.prototype.hasOwnProperty.call(planAt, sk)) continue;
-      if (!elevAt[sk]) continue;
-      var pB = unionOf(pb, planAt[sk]);
-      var eB = unionOf(eb, elevAt[sk]);
-      if (pB.length === 0 || eB.length === 0) continue;
-      if (!shareBase(pB, eB)) {
-        return fail('name-mismatch', 'plan "' + pB[0] + '" vs elevation "' +
-          eB[0] + '" at x=' + U.stations[Number(sk)] +
-          ' share a projector but name different points', 0);
-      }
-    }
-    if (profG) {
-      var known = {}, anyKnown = false, q, w;
-      var all = pb.concat(eb);
-      for (i = 0; i < all.length; i++) {
-        for (q = 0; q < all[i].length; q++) {
-          known[all[i][q]] = 1;
-          anyKnown = true;
-        }
-      }
-      if (!anyKnown) return null;
-      var qb = vertBases(profG);
-      for (i = 0; i < qb.length; i++) {
-        for (w = 0; w < qb[i].length; w++) {
-          if (!known[qb[i][w]]) {
-            return fail('name-mismatch', 'profile "' + qb[i][w] +
-              '" names no plan/elevation point', 0);
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  function nearDrawnPoint(graph, px, py, tol) {
-    for (var j = 0; j < graph.points.length; j++) {
-      var v = graph.verts[graph.points[j].v];
-      var dx = px - v.x, dy = py - v.y;
-      if (dx * dx + dy * dy <= tol * tol) return true;
-    }
-    return false;
-  }
-
-  // Profile validation for Class C: the lifted wireframe projects into
-  // the profile through the depth map, and the projection must agree
-  // with the drawn profile both ways (drawn geometry explained,
-  // projected geometry drawn). Returns a fail object, or {pass,
-  // coverage} when the map fits.
-  function checkWireProfile(profG, verts, edges, map, eps, stol) {
-    var projE = [], projV = [];
-    var i;
-    for (i = 0; i < edges.length; i++) {
-      var va = verts[edges[i][0]], vb = verts[edges[i][1]];
-      projE.push({
-        ax: mapDepth(map, va.z), ay: va.y,
-        bx: mapDepth(map, vb.z), by: vb.y
-      });
-    }
-    for (i = 0; i < verts.length; i++) {
-      projV.push({ x: mapDepth(map, verts[i].z), y: verts[i].y });
-    }
-    function onProjE(qx, qy, t2) {
-      for (var l = 0; l < projE.length; l++) {
-        if (distPtSeg(qx, qy, projE[l].ax, projE[l].ay,
-            projE[l].bx, projE[l].by) <= t2) {
-          return true;
-        }
-      }
-      return false;
-    }
-    function onProjEW(qx, qy, t2) {
-      if (onProjE(qx, qy, t2)) return true;
-      for (var v = 0; v < projV.length; v++) {
-        var dx = qx - projV[v].x, dy = qy - projV[v].y;
-        if (dx * dx + dy * dy <= t2 * t2) return true;
-      }
-      return false;
-    }
-    var eOk = eSegsContained(profG.segs, profG.verts,
-      function (qx, qy, t2) { return onProjE(qx, qy, t2); }, stol, 5);
-    if (!eOk.ok) {
-      return fail('unmatched-edge', 'profile hidden ' +
-        describeEntity(eOk.seg.item, eOk.seg.idx) +
-        ' matches no projected edge', 0);
-    }
-    var si, s, a, b, okLine, qx, qy;
-    for (si = 0; si < profG.segs.length; si++) {
-      s = profG.segs[si];
-      if (s.item.bisCode === 'E') continue;
-      a = profG.verts[s.a];
-      b = profG.verts[s.b];
-      okLine = true;
-      for (var m = 0; m < 5; m++) {
-        var u = m / 4;
-        qx = a.x + (b.x - a.x) * u;
-        qy = a.y + (b.y - a.y) * u;
-        if (!onProjEW(qx, qy, stol)) { okLine = false; break; }
-      }
-      if (!okLine) {
-        return fail('unmatched-edge', 'profile ' +
-          describeEntity(s.item, s.idx) + ' matches no projected edge', 0);
-      }
-    }
-    for (si = 0; si < profG.points.length; si++) {
-      var pv = profG.verts[profG.points[si].v];
-      if (!onProjEW(pv.x, pv.y, eps)) {
-        return fail('unmatched-point', 'profile point ' +
-          describeEntity(profG.points[si].item, profG.points[si].idx) +
-          ' matches no projected vertex', 0);
-      }
-    }
-    for (i = 0; i < projE.length; i++) {
-      if (segCoveredFrac(projE[i].ax, projE[i].ay, projE[i].bx, projE[i].by,
-          profG, stol, 9) < 1) {
-        return fail('unmatched-edge',
-          'profile omits the projection of a wireframe edge', 0);
-      }
-    }
-    for (i = 0; i < projV.length; i++) {
-      if (minDistToSegs(projV[i].x, projV[i].y, profG.verts, profG.segs,
-          isAB) > stol &&
-          !nearDrawnPoint(profG, projV[i].x, projV[i].y, stol)) {
-        return fail('unmatched-edge',
-          'profile omits the projection of a wireframe vertex', 0);
-      }
-    }
-    var cov = viewCoverage(profG,
-      function (qx, qy, t2) { return onProjEW(qx, qy, t2); },
-      function (qx, qy, t2) { return onProjE(qx, qy, t2); }, stol);
-    return { pass: true, coverage: cov };
-  }
-
-  // --- Class C: lifted wireframe. Vertices pair across views by name
-  // first (shared base at one station), then geometrically; edges need
-  // both projections (degenerate point+segment pins excepted).
-  // strictOpt === false restores the legacy pure-geometric pairing.
-  function tryWireframe(planG, elevG, eps, tol, profG, strictOpt) {
-    var strict = strictOpt !== false;
-    var stol = Math.max(tol, eps);
-    var planBases = strict ? vertBases(planG) : null;
-    var elevBases = strict ? vertBases(elevG) : null;
-    var planOwners = {}, elevOwners = {};
-    var U = unionStations(planG, elevG, eps);
-    var planSt = U.planSt, elevSt = U.elevSt;
-    var P2E = {}, E2P = {};
-    var ambiguous = null;
-    function noteAmb(msg) { if (!ambiguous) ambiguous = msg; }
-    function pairUp(p, q) {
-      if (P2E[p] !== undefined && P2E[p] !== q) {
-        noteAmb('plan vertex pairs twice');
-        return false;
-      }
-      if (E2P[q] !== undefined && E2P[q] !== p) {
-        noteAmb('elevation vertex pairs twice');
-        return false;
-      }
-      P2E[p] = q;
-      E2P[q] = p;
-      return true;
-    }
-    var byStP = {}, byStE = {}, i, st;
-    for (i = 0; i < planG.verts.length; i++) {
-      st = planSt[i];
-      if (!byStP[st]) byStP[st] = [];
-      byStP[st].push(i);
-    }
-    for (i = 0; i < elevG.verts.length; i++) {
-      st = elevSt[i];
-      if (!byStE[st]) byStE[st] = [];
-      byStE[st].push(i);
-    }
-    var segUsersP = {}, segUsersE = {};
-    for (i = 0; i < planG.segs.length; i++) {
-      segUsersP[planG.segs[i].a] = 1;
-      segUsersP[planG.segs[i].b] = 1;
-    }
-    for (i = 0; i < elevG.segs.length; i++) {
-      segUsersE[elevG.segs[i].a] = 1;
-      segUsersE[elevG.segs[i].b] = 1;
-    }
-    function lonePointVert(users, idx) { return !users[idx]; }
-    // Pass 0: pair by name. A plan vertex and an elevation vertex at one
-    // station pair when each shares bases with exactly that one mate;
-    // multi-labeled end-on dots fall through to the pin pass below.
-    function distinctMates(owners, bases) {
-      var out = [];
-      for (var k = 0; k < bases.length; k++) {
-        var own = owners[bases[k]] || [];
-        for (var o = 0; o < own.length; o++) {
-          if (out.indexOf(own[o]) === -1) out.push(own[o]);
-        }
-      }
-      return out;
-    }
-    if (strict) {
-      var vi, bi;
-      for (vi = 0; vi < planBases.length; vi++) {
-        for (bi = 0; bi < planBases[vi].length; bi++) {
-          var pkk = planBases[vi][bi];
-          if (!planOwners[pkk]) planOwners[pkk] = [];
-          if (planOwners[pkk].indexOf(vi) === -1) planOwners[pkk].push(vi);
-        }
-      }
-      for (vi = 0; vi < elevBases.length; vi++) {
-        for (bi = 0; bi < elevBases[vi].length; bi++) {
-          var ekk = elevBases[vi][bi];
-          if (!elevOwners[ekk]) elevOwners[ekk] = [];
-          if (elevOwners[ekk].indexOf(vi) === -1) elevOwners[ekk].push(vi);
-        }
-      }
-      for (vi = 0; vi < planG.verts.length; vi++) {
-        if (planBases[vi].length === 0 || P2E[vi] !== undefined) continue;
-        var mates = distinctMates(elevOwners, planBases[vi]);
-        if (mates.length !== 1) continue;
-        var mq = mates[0];
-        if (E2P[mq] !== undefined) continue;
-        if (planSt[vi] !== elevSt[mq]) continue;
-        if (distinctMates(planOwners, elevBases[mq]).length !== 1) continue;
-        pairUp(vi, mq);
-      }
-    }
-    // Pass 1: 1:1 stations.
-    var sk;
-    for (sk in byStP) {
-      if (!Object.prototype.hasOwnProperty.call(byStP, sk)) continue;
-      if (byStP[sk].length === 1 && byStE[sk] && byStE[sk].length === 1) {
-        var p0 = byStP[sk][0], q0 = byStE[sk][0];
-        if (!strict || namesCompatible(planBases[p0], elevBases[q0])) {
-          pairUp(p0, q0);
-        }
-      }
-    }
-    // Pass 2: segment-guided matching by station span (fixed plan-driven
-    // then elevation-driven order). Iterated with pass 3 to a fixpoint.
-    function guidedDrive(segsA, stA, segsB, stB, flip) {
-      var spanB = {};
-      var i2, s1, s2, key;
-      for (i2 = 0; i2 < segsB.length; i2++) {
-        s1 = stB[segsB[i2].a];
-        s2 = stB[segsB[i2].b];
-        if (s1 === s2) continue;
-        key = stationPairKey(s1, s2);
-        if (!spanB[key]) spanB[key] = [];
-        spanB[key].push(i2);
-      }
-      for (i2 = 0; i2 < segsA.length; i2++) {
-        var a = segsA[i2].a, b = segsA[i2].b;
-        s1 = stA[a];
-        s2 = stA[b];
-        if (s1 === s2) continue;
-        if (flip ? (E2P[a] !== undefined || E2P[b] !== undefined)
-          : (P2E[a] !== undefined || P2E[b] !== undefined)) {
-          continue;
-        }
-        key = stationPairKey(s1, s2);
-        var cands = spanB[key] || [];
-        if (cands.length === 0) continue;
-        if (cands.length > 1) {
-          noteAmb('two edges share one station span');
-          continue;
-        }
-        var c = segsB[cands[0]];
-        var endAtS1 = stB[c.a] === s1 ? c.a : c.b;
-        var endAtS2 = stB[c.a] === s1 ? c.b : c.a;
-        if (flip) {
-          if (!strict || (namesCompatible(planBases[endAtS1], elevBases[a]) &&
-              namesCompatible(planBases[endAtS2], elevBases[b]))) {
-            pairUp(endAtS1, a);
-            pairUp(endAtS2, b);
-          }
-        } else {
-          if (!strict || (namesCompatible(planBases[a], elevBases[endAtS1]) &&
-              namesCompatible(planBases[b], elevBases[endAtS2]))) {
-            pairUp(a, endAtS1);
-            pairUp(b, endAtS2);
-          }
-        }
-      }
-    }
-    var changed = true, guard = 0;
-    while (changed && guard < 12) {
-      guard++;
-      changed = false;
-      var before = Object.keys(P2E).length;
-      guidedDrive(planG.segs, planSt, elevG.segs, elevSt, false);
-      guidedDrive(elevG.segs, elevSt, planG.segs, planSt, true);
-      for (sk in byStP) {
-        if (!Object.prototype.hasOwnProperty.call(byStP, sk)) continue;
-        if (!byStE[sk]) continue;
-        var freeP = byStP[sk].filter(function (v) {
-          return P2E[v] === undefined;
-        });
-        var freeE = byStE[sk].filter(function (v) {
-          return E2P[v] === undefined;
-        });
-        if (freeP.length === 1 && freeE.length === 1) {
-          if (!strict ||
-              namesCompatible(planBases[freeP[0]], elevBases[freeE[0]])) {
-            pairUp(freeP[0], freeE[0]);
-          }
-        }
-      }
-      if (Object.keys(P2E).length !== before) changed = true;
-    }
-    // Degenerate pins: a lone point in one view + a same-station segment
-    // in the other is a vertical (plan pin) or depth (elevation pin) edge.
-    var pins = [];
-    function loneVertsAt(graph, users, stMap, wantSt, skipPaired) {
-      var out = [];
-      for (var v = 0; v < graph.verts.length; v++) {
-        if (stMap[v] !== wantSt) continue;
-        if (!lonePointVert(users, v)) continue;
-        if (skipPaired && skipPaired[v] !== undefined) continue;
-        out.push(v);
-      }
-      return out;
-    }
-    function sameStationSegs(graph, stMap, wantSt, skipPaired) {
-      var out = [];
-      for (var s = 0; s < graph.segs.length; s++) {
-        var sg = graph.segs[s];
-        if (stMap[sg.a] !== wantSt || stMap[sg.b] !== wantSt) continue;
-        if (skipPaired &&
-            (skipPaired[sg.a] !== undefined ||
-              skipPaired[sg.b] !== undefined)) {
-          continue;
-        }
-        out.push(sg);
-      }
-      return out;
-    }
-    var allSt = {};
-    var kk;
-    for (kk in byStP) {
-      if (Object.prototype.hasOwnProperty.call(byStP, kk)) allSt[kk] = 1;
-    }
-    for (kk in byStE) {
-      if (Object.prototype.hasOwnProperty.call(byStE, kk)) allSt[kk] = 1;
-    }
-    for (kk in allSt) {
-      if (!Object.prototype.hasOwnProperty.call(allSt, kk)) continue;
-      var want = Number(kk);
-      var loneP = loneVertsAt(planG, segUsersP, planSt, want, P2E);
-      var loneE = loneVertsAt(elevG, segUsersE, elevSt, want, E2P);
-      var segP = sameStationSegs(planG, planSt, want, P2E);
-      var segE = sameStationSegs(elevG, elevSt, want, E2P);
-      var pinOkV = loneP.length === 1 && segE.length === 1 &&
-        loneE.length === 0 && (!strict || namesCompatible(
-          planBases[loneP[0]],
-          elevBases[segE[0].a].concat(elevBases[segE[0].b])));
-      var pinOkD = loneE.length === 1 && segP.length === 1 &&
-        loneP.length === 0 && (!strict || namesCompatible(
-          planBases[segP[0].a].concat(planBases[segP[0].b]),
-          elevBases[loneE[0]]));
-      if (pinOkV) {
-        pins.push({ p: loneP[0], seg: segE[0], dir: 'vertical' });
-        P2E[loneP[0]] = -1;
-        E2P[segE[0].a] = -2;
-        E2P[segE[0].b] = -2;
-      } else if (pinOkD) {
-        pins.push({ q: loneE[0], seg: segP[0], dir: 'depth' });
-        E2P[loneE[0]] = -1;
-        P2E[segP[0].a] = -2;
-        P2E[segP[0].b] = -2;
-      } else if ((loneP.length === 1 && segE.length > 1) ||
-          (loneE.length === 1 && segP.length > 1)) {
-        noteAmb('one point pins two same-station edges');
-      }
-    }
-    // Leftover analysis: ambiguity residue stays silent; near misses are
-    // x-mismatch; the rest are unmatched points/edges. In strict mode a
-    // named vertex first blames duplicates, then its name-selected mate.
-    var failInfo = null;
-    function noteFail(reason, label) {
-      if (!failInfo) failInfo = { reason: reason, label: label };
-    }
-    function nearestOppX(x, verts) {
-      var best = Infinity;
-      for (var v = 0; v < verts.length; v++) {
-        var d = Math.abs(verts[v].x - x);
-        if (d < best) best = d;
-      }
-      return best;
-    }
-    function compatStationMates(ownBases, ownSt, otherAtSt, otherBases) {
-      var list = otherAtSt[ownSt];
-      if (!list) return 0;
-      var n = 0;
-      for (var c = 0; c < list.length; c++) {
-        if (namesCompatible(ownBases, otherBases[list[c]])) n++;
-      }
-      return n;
-    }
-    function duplicateBase(bases, owners) {
-      for (var k = 0; k < bases.length; k++) {
-        if ((owners[bases[k]] || []).length > 1) return bases[k];
-      }
-      return null;
-    }
-    function namedMate(bases, owners, verts) {
-      var best = null;
-      for (var k = 0; k < bases.length; k++) {
-        var own = owners[bases[k]] || [];
-        for (var o = 0; o < own.length; o++) {
-          if (best === null || verts[own[o]].x < best.x) {
-            best = { base: bases[k], x: verts[own[o]].x };
-          }
-        }
-      }
-      return best;
-    }
-    for (i = 0; i < planG.verts.length; i++) {
-      if (P2E[i] !== undefined) continue;
-      if (strict) {
-        if (compatStationMates(planBases[i], planSt[i], byStE, elevBases) > 0) {
-          noteAmb('plan vertex has several elevation mates');
-          continue;
-        }
-        var dupP = duplicateBase(planBases[i], planOwners);
-        if (dupP !== null) {
-          noteAmb('plan label "' + dupP + '" marks two dots');
-          continue;
-        }
-        var mateP = namedMate(planBases[i], elevOwners, elevG.verts);
-        if (mateP !== null) {
-          noteFail('x-mismatch', 'label "' + mateP.base + '" reads x=' +
-            planG.verts[i].x + ' in plan but x=' + mateP.x + ' in elevation');
-          continue;
-        }
-      } else if (byStE[planSt[i]] && byStE[planSt[i]].length > 0) {
-        noteAmb('plan vertex has several elevation mates');
-        continue;
-      }
-      var nearP = nearestOppX(planG.verts[i].x, elevG.verts);
-      if (nearP <= LOOSE_EPS_MM) {
-        noteFail('x-mismatch', 'plan vertex near x=' +
-          planG.verts[i].x + ' misses its mate beyond eps');
-      } else if (lonePointVert(segUsersP, i)) {
-        noteFail('unmatched-point',
-          strict && planBases[i].length > 0 ?
-            'plan "' + planBases[i][0] + '" has no mate in elevation' :
-            'plan point near x=' + planG.verts[i].x + ' has no mate');
-      } else {
-        noteFail('unmatched-edge',
-          'plan vertex near x=' + planG.verts[i].x + ' has no mate');
-      }
-    }
-    for (i = 0; i < elevG.verts.length; i++) {
-      if (E2P[i] !== undefined) continue;
-      if (strict) {
-        if (compatStationMates(elevBases[i], elevSt[i], byStP, planBases) > 0) {
-          noteAmb('elevation vertex has several plan mates');
-          continue;
-        }
-        var dupE = duplicateBase(elevBases[i], elevOwners);
-        if (dupE !== null) {
-          noteAmb('elevation label "' + dupE + '" marks two dots');
-          continue;
-        }
-        var mateE = namedMate(elevBases[i], planOwners, planG.verts);
-        if (mateE !== null) {
-          noteFail('x-mismatch', 'label "' + mateE.base + '" reads x=' +
-            elevG.verts[i].x + ' in elevation but x=' + mateE.x + ' in plan');
-          continue;
-        }
-      } else if (byStP[elevSt[i]] && byStP[elevSt[i]].length > 0) {
-        noteAmb('elevation vertex has several plan mates');
-        continue;
-      }
-      var nearE = nearestOppX(elevG.verts[i].x, planG.verts);
-      if (nearE <= LOOSE_EPS_MM) {
-        noteFail('x-mismatch', 'elevation vertex near x=' +
-          elevG.verts[i].x + ' misses its mate beyond eps');
-      } else if (lonePointVert(segUsersE, i)) {
-        noteFail('unmatched-point',
-          strict && elevBases[i].length > 0 ?
-            'elevation "' + elevBases[i][0] + '" has no mate in plan' :
-            'elevation point near x=' + elevG.verts[i].x + ' has no mate');
-      } else {
-        noteFail('unmatched-edge',
-          'elevation vertex near x=' + elevG.verts[i].x + ' has no mate');
-      }
-    }
-    if (failInfo) return fail(failInfo.reason, failInfo.label, 0);
-    // Edges need both projections.
-    var elevSpan = {};
-    for (i = 0; i < elevG.segs.length; i++) {
-      var es = elevG.segs[i];
-      if (E2P[es.a] === undefined || E2P[es.b] === undefined) continue;
-      if (E2P[es.a] < 0 || E2P[es.b] < 0) continue;
-      elevSpan[E2P[es.a] + '-' + E2P[es.b]] = 1;
-      elevSpan[E2P[es.b] + '-' + E2P[es.a]] = 1;
-    }
-    var planSpan = {};
-    for (i = 0; i < planG.segs.length; i++) {
-      var ps = planG.segs[i];
-      if (P2E[ps.a] === undefined || P2E[ps.b] === undefined) continue;
-      if (P2E[ps.a] < 0 || P2E[ps.b] < 0) continue;
-      planSpan[P2E[ps.a] + '-' + P2E[ps.b]] = 1;
-      planSpan[P2E[ps.b] + '-' + P2E[ps.a]] = 1;
-    }
-    for (i = 0; i < planG.segs.length; i++) {
-      var pa = planG.segs[i];
-      if (P2E[pa.a] === undefined || P2E[pa.b] === undefined) continue;
-      if (P2E[pa.a] < 0 || P2E[pa.b] < 0) continue;
-      if (planG.segs[i].item.bisCode === 'E') continue;
-      if (!elevSpan[pa.a + '-' + pa.b]) {
-        return fail('unmatched-edge', 'plan ' +
-          describeEntity(pa.item, pa.idx) + ' lacks an elevation mate', 0);
-      }
-    }
-    for (i = 0; i < elevG.segs.length; i++) {
-      var ea = elevG.segs[i];
-      if (E2P[ea.a] === undefined || E2P[ea.b] === undefined) continue;
-      if (E2P[ea.a] < 0 || E2P[ea.b] < 0) continue;
-      if (elevG.segs[i].item.bisCode === 'E') continue;
-      if (!planSpan[ea.a + '-' + ea.b]) {
-        return fail('unmatched-edge', 'elevation ' +
-          describeEntity(ea.item, ea.idx) + ' lacks a plan mate', 0);
-      }
-    }
-    if (ambiguous) return fail('ambiguous-pairing', ambiguous, 0);
-    // Construct: one vertex per pair, x averaged to split the eps error.
-    var pairs = [];
-    for (var pk in P2E) {
-      if (!Object.prototype.hasOwnProperty.call(P2E, pk)) continue;
-      if (P2E[pk] < 0) continue;
-      pairs.push({ p: Number(pk), q: P2E[pk] });
-    }
-    pairs.sort(function (a, b) {
-      var ax = (planG.verts[a.p].x + elevG.verts[a.q].x) / 2;
-      var bx = (planG.verts[b.p].x + elevG.verts[b.q].x) / 2;
-      if (ax !== bx) return ax - bx;
-      if (planG.verts[a.p].y !== planG.verts[b.p].y) {
-        return planG.verts[a.p].y - planG.verts[b.p].y;
-      }
-      return elevG.verts[a.q].y - elevG.verts[b.q].y;
-    });
-    var pairIdx = {};
-    var verts = [];
-    for (i = 0; i < pairs.length; i++) {
-      var pv = planG.verts[pairs[i].p], qv = elevG.verts[pairs[i].q];
-      pairIdx[pairs[i].p + '-' + pairs[i].q] = verts.length;
-      verts.push({ x: (pv.x + qv.x) / 2, y: qv.y, z: -pv.y });
-    }
-    function addPinned(x, d, h) {
-      for (var v = 0; v < verts.length; v++) {
-        var dx = verts[v].x - x, dy = verts[v].y - h, dz = verts[v].z - d;
-        if (dx * dx + dy * dy + dz * dz <= tol * tol) return v;
-      }
-      verts.push({ x: x, y: h, z: d });
-      return verts.length - 1;
-    }
-    var edges = [];
-    var seenEdge = {};
-    function addEdge(a, b) {
-      if (a === b) return;
-      var key = a < b ? a + '-' + b : b + '-' + a;
-      if (seenEdge[key]) return;
-      seenEdge[key] = 1;
-      edges.push([a, b]);
-    }
-    for (i = 0; i < planG.segs.length; i++) {
-      var gs = planG.segs[i];
-      if (P2E[gs.a] === undefined || P2E[gs.b] === undefined) continue;
-      if (P2E[gs.a] < 0 || P2E[gs.b] < 0) continue;
-      if (gs.item.bisCode === 'E') continue;
-      addEdge(pairIdx[gs.a + '-' + P2E[gs.a]],
-        pairIdx[gs.b + '-' + P2E[gs.b]]);
-    }
-    for (i = 0; i < pins.length; i++) {
-      var pin = pins[i];
-      if (pin.dir === 'vertical') {
-        var dp = planG.verts[pin.p];
-        var eA = elevG.verts[pin.seg.a], eB = elevG.verts[pin.seg.b];
-        var xa = (dp.x + eA.x + eB.x) / 3;
-        addEdge(addPinned(xa, -dp.y, eA.y), addPinned(xa, -dp.y, eB.y));
-      } else {
-        var dq = elevG.verts[pin.q];
-        var pA = planG.verts[pin.seg.a], pB = planG.verts[pin.seg.b];
-        var xb = (dq.x + pA.x + pB.x) / 3;
-        addEdge(addPinned(xb, -pA.y, dq.y), addPinned(xb, -pB.y, dq.y));
-      }
-    }
-    // Hidden edges in a wireframe must coincide with a projected edge.
-    var projPlan = [], projElev = [];
-    for (i = 0; i < edges.length; i++) {
-      var va = verts[edges[i][0]], vb = verts[edges[i][1]];
-      projPlan.push({ ax: va.x, ay: -va.z, bx: vb.x, by: -vb.z });
-      projElev.push({ ax: va.x, ay: va.y, bx: vb.x, by: vb.y });
-    }
-    var projVertPlan = verts.map(function (v) { return { x: v.x, y: -v.z }; });
-    var projVertElev = verts.map(function (v) { return { x: v.x, y: v.y }; });
-    function onProj(list) {
-      return function (qx, qy, t2) {
-        for (var l = 0; l < list.length; l++) {
-          if (distPtSeg(qx, qy, list[l].ax, list[l].ay,
-              list[l].bx, list[l].by) <= t2) {
-            return true;
-          }
-        }
-        return false;
-      };
-    }
-    // Coverage accepts lone projected vertices too (point-only
-    // wireframes have no edges to lie on).
-    function onProjW(list, vlist) {
-      var edgeOnly = onProj(list);
-      return function (qx, qy, t2) {
-        if (edgeOnly(qx, qy, t2)) return true;
-        for (var l = 0; l < vlist.length; l++) {
-          var dx = qx - vlist[l].x, dy = qy - vlist[l].y;
-          if (dx * dx + dy * dy <= t2 * t2) return true;
-        }
-        return false;
-      };
-    }
-    var eOkP = eSegsContained(planG.segs, planG.verts,
-      function (qx, qy, t2) { return onProj(projPlan)(qx, qy, t2); }, stol, 5);
-    if (!eOkP.ok) {
-      return fail('unmatched-edge', 'plan hidden ' +
-        describeEntity(eOkP.seg.item, eOkP.seg.idx) +
-        ' matches no projected edge', 0);
-    }
-    var eOkE = eSegsContained(elevG.segs, elevG.verts,
-      function (qx, qy, t2) { return onProj(projElev)(qx, qy, t2); }, stol, 5);
-    if (!eOkE.ok) {
-      return fail('unmatched-edge', 'elevation hidden ' +
-        describeEntity(eOkE.seg.item, eOkE.seg.idx) +
-        ' matches no projected edge', 0);
-    }
-    var covPlan = viewCoverage(planG, onProjW(projPlan, projVertPlan),
-      function (qx, qy, t2) { return onProj(projPlan)(qx, qy, t2); }, stol);
-    var covElev = viewCoverage(elevG, onProjW(projElev, projVertElev),
-      function (qx, qy, t2) { return onProj(projElev)(qx, qy, t2); }, stol);
-    // M2: with a profile view, both depth orientations are validated
-    // against the lifted wireframe; the best passing map wins (ties go
-    // to direct, deterministically). Two failing maps report the direct
-    // map's failure.
-    var covProfC = 1, profMapC = null;
-    if (profG) {
-      var zd = [];
-      for (var zi = 0; zi < verts.length; zi++) zd.push(verts[zi].z);
-      var zd0 = Math.min.apply(null, zd);
-      var prC = drawnRangeAB(profG);
-      var pp0, pp1;
-      if (prC) {
-        pp0 = prC.x0;
-        pp1 = prC.x1;
-      } else if (profG.points.length > 0) {
-        pp0 = Infinity;
-        pp1 = -Infinity;
-        for (var zp = 0; zp < profG.points.length; zp++) {
-          var zv = profG.verts[profG.points[zp].v];
-          if (zv.x < pp0) pp0 = zv.x;
-          if (zv.x > pp1) pp1 = zv.x;
-        }
-      } else {
-        return fail('unmatched-edge',
-          'profile shows no wireframe extent', 0);
-      }
-      var cMaps = inferProfileMaps(zd0, pp0, pp1);
-      var cBest = null, cFirstErr = null;
-      for (var cmi = 0; cmi < cMaps.length; cmi++) {
-        var cTry = checkWireProfile(profG, verts, edges, cMaps[cmi],
-          eps, stol);
-        if (cTry.pass) {
-          if (!cBest || cTry.coverage > cBest.coverage) {
-            cBest = cTry;
-            profMapC = cMaps[cmi];
-          }
-        } else if (!cFirstErr) {
-          cFirstErr = cTry;
-        }
-      }
-      if (!cBest) return cFirstErr;
-      covProfC = cBest.coverage;
-    }
-    var cov = Math.min(covPlan, covElev, covProfC);
-    if (cov < COVERAGE_GATE) {
-      return fail('coverage-failed',
-        'wireframe round-trip coverage ' + cov.toFixed(3), cov);
-    }
-    var outC = {
-      pass: true, class: 'C', coverage: cov,
-      totalLength: totalLength(verts, edges),
-      geometry: {
-        name: 'wireframe', vertices: verts, edges: edges, faces: []
-      },
-      coveragePlan: covPlan, coverageElev: covElev,
-      canonical: canonicalOf(verts, edges)
-    };
-    if (profG) {
-      outC.coverageProfile = covProfC;
-      outC.profileMap = profMapC;
-    }
-    return outC;
-  }
-
-  // --- Class E: claimed corner-lift lamina (M5). Class C pairs whole
+  // --- Claimed corner-lift lamina (M5). The wire builder pairs whole
   // vertices 1:1, which cannot express coincident corners (one elevation
-  // dot yielding two corners at different plan feet). Where C fails, the
-  // student's projector claims identify corners explicitly: one claim =
-  // one 3D corner lifted from its plan + elevation feet. v1 builds
-  // profile laminae only: all corners share x, and the face is the
-  // convex hull in (depth, height), so a wrong pairing fails loudly
+  // dot yielding two corners at different plan feet). Where pairing
+  // fails, the student's projector claims identify corners explicitly:
+  // one claim = one 3D corner lifted from its plan + elevation feet. v1
+  // builds profile laminae only: all corners share x, and the face is
+  // the convex hull in (depth, height), so a wrong pairing fails loudly
   // (duplicate corners, broken hull, uncovered ink) instead of guessing.
   // Claims apply always — hand drawings have no Check truth to gate on.
-  // Returns null when no claims exist (no attempt, old behavior intact).
+  // Returns null when no claims exist.
   function tryClaimedCorners(planG, elevG, eps, tol, claimLines, byId) {
     if (!claimLines || claimLines.length === 0) return null;
     function nearVert(verts, x, y) {
@@ -2391,10 +1200,10 @@
     };
   }
 
-  // --- Class D: vertical-axis solids of revolution (M3 curves). ---
-  // Plan carries exactly one A/B CIRCLE (no polygon loop); elevation shows
-  // the silhouette (rectangle = cylinder, triangle + apex = cone). Full
-  // CIRCLE entities only; CIRCULAR_ARC never forms a D hypothesis.
+  // --- Solids of revolution (M3 curves). Plan carries exactly one
+  // A/B CIRCLE (no polygon loop); elevation shows the silhouette
+  // (rectangle = cylinder, triangle + apex = cone). Full CIRCLE
+  // entities only; CIRCULAR_ARC never forms a revolved hypothesis.
   function isPlanCircle(curve) {
     if (!curve || curve.type !== 'CIRCLE') return false;
     if (curve.bisCode !== 'A' && curve.bisCode !== 'B') return false;
@@ -2950,8 +1759,8 @@
     return outB;
   }
 
-  // Class D dispatcher (cylinder + cone). Returns null when no D
-  // hypothesis applies (plan loop exists, or no A/B plan circle);
+  // Revolved-reader dispatcher (cylinder + cone). Returns null when no
+  // revolved hypothesis applies (plan loop exists, or no A/B plan circle);
   // otherwise a pass or a named fail. Two plan circles report
   // ambiguous-pairing, never a guess. Cylinder is tried first, then
   // cone; the first pass wins, otherwise the better-ranked fail.
@@ -3008,12 +1817,11 @@
   }
 
   var FAIL_PRIORITY = [
-    'missing-view', 'unsupported-curves', 'x-mismatch', 'name-mismatch',
+    'missing-view', 'unsupported-curves', 'x-mismatch',
     'hint-conflict', 'hint-loose-foot', 'duplicate-corners',
     'corners-not-coplanar', 'non-convex-corners',
-    'non-convex-profile', 'unmatched-point', 'unmatched-edge',
-    'non-manifold', 'ambiguous-pairing', 'no-closed-profile',
-    'coverage-failed'
+    'unmatched-point', 'unmatched-edge',
+    'non-manifold', 'ambiguous-pairing', 'coverage-failed'
   ];
 
   function failRank(reason) {
@@ -3021,23 +1829,13 @@
     return r === -1 ? FAIL_PRIORITY.length : r;
   }
 
-  // Top-level reconstruction. entities: spec or table rows (any order).
-  // opts.eps overrides the x-station match tolerance (mm).
-  // opts.strictNames === false disables pair-by-name (legacy geometry).
-  function reconstruct(entities, opts) {
-    opts = opts || {};
-    var eps = opts.eps === undefined ? MATCH_EPS_MM : opts.eps;
-    assertFinite(eps);
-    if (!(eps > 0)) throw new Error('eps must be > 0');
-    var list = Array.isArray(entities) ? entities.slice() : [];
-    var warnings = [];
-    var f = filterEntities(list);
-    // Class E inputs: claimed projectors never survive the helper filter,
-    // so they are collected from the raw list (deterministic id order).
-    var byId = {};
-    for (var bi = 0; bi < list.length; bi++) {
-      if (list[bi] && typeof list[bi].id === 'string') byId[list[bi].id] = list[bi];
-    }
+  // Reader shell for declared geometry: banked projector claims ('E')
+  // and drawn curves ('D'). Exactly one reader runs per call — claims
+  // assert a lamina, curves hypothesize a revolved solid — so there is
+  // no competition and no class letter on the result. Returns null
+  // only for 'D' when no revolved hypothesis applies anywhere (a plan
+  // loop exists, or no plan circle); every other sheet gets a verdict.
+  function collectClaimLines(list) {
     var claimLines = [];
     for (var qi = 0; qi < list.length; qi++) {
       var qe = list[qi];
@@ -3051,6 +1849,17 @@
     claimLines.sort(function (a, b) {
       return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
     });
+    return claimLines;
+  }
+
+  function runReader(list, eps, which) {
+    var warnings = [];
+    var f = filterEntities(list);
+    var byId = {};
+    for (var bi = 0; bi < list.length; bi++) {
+      if (list[bi] && typeof list[bi].id === 'string') byId[list[bi].id] = list[bi];
+    }
+    var claimLines = which === 'E' ? collectClaimLines(list) : [];
     var cls = classifyViews(sortStable(f.kept), undefined, f.curves);
     var tol = weldTolerance(cls.plan, cls.elev, cls.profile);
     var stats = {
@@ -3059,7 +1868,7 @@
       planItems: cls.plan.length, elevItems: cls.elev.length,
       profileItems: cls.profile.length,
       helpersDropped: cls.droppedHelpers.length,
-      weldTol: tol, eps: eps, attempts: [], variant: 'direct'
+      weldTol: tol, eps: eps, reader: which, variant: 'direct'
     };
     function unavailable(reason, label) {
       var covOut = { plan: 0, elev: 0 };
@@ -3096,11 +1905,11 @@
       ];
     }
     function solveFor(variant) {
-      var hasPlanCircle = planCirclesOf(f.curves).length > 0;
+      var hasPlanCircle = which === 'D' && planCirclesOf(f.curves).length > 0;
       if ((variant.plan.length === 0 && !hasPlanCircle) ||
           variant.elev.length === 0) {
         return {
-          tag: variant.tag, planLoop: null, attempts: [],
+          tag: variant.tag, planLoop: null,
           win: null,
           fail: fail('missing-view', variant.plan.length === 0 ?
             'no plan view drawn' : 'no elevation view drawn', 0)
@@ -3110,86 +1919,24 @@
       var elevG = buildViewGraph(sortStable(variant.elev), tol);
       var profG = variant.profile.length > 0 ?
         buildViewGraph(sortStable(variant.profile), tol) : null;
-      var strictNames = opts.strictNames !== false;
-      if (strictNames) {
-        var ng = checkNameGate(planG, elevG, eps, profG);
-        if (ng) {
-          return {
-            tag: variant.tag, planLoop: null, attempts: [],
-            win: null, fail: ng
-          };
-        }
-      }
       var planLoop = convexLoop(planG, tol);
-      var attempts = [];
-      var ra = tryPrism(planG, elevG, planLoop, eps, tol, profG);
-      if (ra) {
-        attempts.push({ class: 'A', pass: !!ra.pass,
-          coverage: ra.coverage || 0, reason: ra.reason || null });
-      }
-      var rb = tryPyramid(planG, elevG, planLoop, eps, tol, profG);
-      if (rb) {
-        attempts.push({ class: 'B', pass: !!rb.pass,
-          coverage: rb.coverage || 0, reason: rb.reason || null });
-      }
-      var rc = tryWireframe(planG, elevG, eps, tol, profG, strictNames);
-      attempts.push({ class: 'C', pass: !!rc.pass,
-        coverage: rc.coverage || 0, reason: rc.reason || null });
-      var rd = tryRevolved(planG, elevG, planLoop, f.curves, eps, tol, profG);
-      if (rd) {
-        attempts.push({ class: 'D', pass: !!rd.pass,
-          coverage: rd.coverage || 0, reason: rd.reason || null });
-      }
-      // Class E rescues ambiguity/failure only: hints never compete with
-      // a geometric success, and legacy geometry mode skips them outright.
-      var re = null;
-      var anyPass = (ra && ra.pass) || (rb && rb.pass) || (rc && rc.pass) || (rd && rd.pass);
-      if (!anyPass && claimLines.length > 0 && strictNames) {
-        re = tryClaimedCorners(planG, elevG, eps, tol, claimLines, byId);
-        attempts.push({ class: 'E', pass: !!re.pass,
-          coverage: re.coverage || 0, reason: re.reason || null });
-      }
-      var passing = [ra, rb, rc, rd, re].filter(function (r) { return r && r.pass; });
-      passing.sort(function (a, b) {
-        if (a.coverage !== b.coverage) return b.coverage - a.coverage;
-        return a.totalLength - b.totalLength;
-      });
+      var verdict = which === 'E' ?
+        tryClaimedCorners(planG, elevG, eps, tol, claimLines, byId) :
+        tryRevolved(planG, elevG, planLoop, f.curves, eps, tol, profG);
       var sol = {
-        tag: variant.tag, planLoop: planLoop, attempts: attempts,
+        tag: variant.tag, planLoop: planLoop,
         planVerts: planG.verts.length, elevVerts: elevG.verts.length,
         profVerts: profG ? profG.verts.length : 0,
-        win: null, fail: null
+        win: null, fail: null, skipped: !verdict
       };
-      if (passing.length > 0) {
-        if (passing.length > 1 &&
-            Math.abs(passing[0].coverage - passing[1].coverage) < 1e-9 &&
-            passing[0].canonical !== passing[1].canonical) {
-          sol.fail = fail('ambiguous-pairing',
-            'two classes explain the drawing equally well', 0);
-          return sol;
-        }
-        sol.win = passing[0];
+      if (verdict && verdict.pass) {
+        sol.win = verdict;
         return sol;
       }
-      if (rd && !rd.pass && rd.competingCircles) {
-        sol.fail = rd;
+      if (verdict) {
+        sol.fail = verdict;
         return sol;
       }
-      var fails = [ra, rb, rc, rd, re].filter(function (r) { return r && !r.pass; });
-      fails.sort(function (a, b) {
-        return failRank(a.reason) - failRank(b.reason);
-      });
-      if (!planLoop && f.curves.length > 0 && !rd) {
-        sol.fail = fail('unsupported-curves',
-          REASON_LABELS['unsupported-curves'], 0);
-        return sol;
-      }
-      if (fails.length > 0) {
-        sol.fail = fails[0];
-        return sol;
-      }
-      sol.fail = fail('no-closed-profile',
-        REASON_LABELS['no-closed-profile'], 0);
       return sol;
     }
     var solved = variants.map(solveFor);
@@ -3199,13 +1946,11 @@
       for (var wi = 1; wi < wins.length; wi++) {
         if (wins[wi].win.canonical !== first.canonical) {
           stats.variant = 'split';
-          stats.attempts = wins[0].attempts;
           return unavailable('ambiguous-pairing',
             'the XY entities admit two different solids');
         }
       }
       stats.variant = wins[0].tag;
-      stats.attempts = wins[0].attempts;
       stats.planVerts = wins[0].planVerts;
       stats.elevVerts = wins[0].elevVerts;
       stats.profVerts = wins[0].profVerts;
@@ -3225,8 +1970,7 @@
             ' construction helper(s) left out (projector/miter)'
         });
       }
-      var leftoverCurves = f.curves.length;
-      if (first.class === 'D') leftoverCurves = f.curves.length - 1;
+      var leftoverCurves = which === 'D' ? f.curves.length - 1 : f.curves.length;
       if (leftoverCurves > 0) {
         warnings.push({
           code: 'curves-ignored',
@@ -3239,25 +1983,734 @@
         covOk.profile = first.coverageProfile;
       }
       return {
-        status: 'ok', reason: null, label: '', class: first.class,
+        status: 'ok', reason: null, label: '', class: null,
         geometry: first.geometry,
         coverage: covOk,
         warnings: warnings, stats: stats
       };
     }
-    var ranked = solved.map(function (s, i) { return { s: s, i: i }; });
-    ranked.sort(function (a, b) {
-      var r = failRank(a.s.fail.reason) - failRank(b.s.fail.reason);
-      return r !== 0 ? r : a.i - b.i;
+    var decided = solved.filter(function (s) { return !!s.fail; });
+    if (decided.length === 0) return null;
+    decided.sort(function (a, b) {
+      var r = failRank(a.fail.reason) - failRank(b.fail.reason);
+      if (r !== 0) return r;
+      return a.tag < b.tag ? -1 : a.tag > b.tag ? 1 : 0;
     });
-    var best = ranked[0].s;
+    var best = decided[0];
     stats.variant = best.tag;
-    stats.attempts = best.attempts;
     stats.planVerts = best.planVerts;
     stats.elevVerts = best.elevVerts;
     stats.profVerts = best.profVerts;
     stats.planLoop = best.planLoop ? best.planLoop.order.length : 0;
     return unavailable(best.fail.reason, best.fail.label);
+  }
+
+  // Live wireframe builder: every entity with a defined projection in
+  // both views resolves to 3D, whether or not anything closes into a
+  // solid. No classes, no gates: single-view entities simply stay
+  // 2D-only. A VP point and an HP point pair by caption base name
+  // (prime ticks stripped, same rule as captionBases) with a
+  // same-x-station check AND a drawn projector line physically
+  // covering both dots; same name at the same station without the
+  // line stays 2D-only. Unnamed points pair automatically iff
+  // exactly one candidate per side shares the station and the line.
+  // Datum (y = 0) points pair as either side by their mate, also on
+  // the line. Edges: a segment
+  // determining exactly one vertex pair emits it (trust the drawing);
+  // coincident stacks fall back to both-views consistency (a pair
+  // needs its mate projection drawn, or degenerated to a point for
+  // view-perpendicular edges), and stack-inferred pairs whose both
+  // projections are covered by strictly shorter emitted pairs drop as
+  // face diagonals on doubly edge-on faces. Closed shells infer
+  // logical faces (see inferClosedFaces) so the glass and the pose
+  // overlay can dash hidden edges; open wire stays faceless all-solid.
+  function liveSideOf(e) {
+    if (e.viewRole === 'PLAN') return 'plan';
+    if (e.viewRole === 'ELEVATION') return 'elev';
+    if (e.viewRole === 'PROFILE') return 'profile';
+    if (e.y > 0) return 'elev';
+    if (e.y < 0) return 'plan';
+    return 'datum';
+  }
+
+  // Single reconstruction entry: wire-first with readers for declared
+  // geometry. entities: spec or table rows (any order). opts.eps
+  // overrides the x-station match tolerance (mm). Three or more banked
+  // projector claims assert a lamina (the claims reader owns the sheet);
+  // drawn curves hypothesize a revolved solid (no applicable hypothesis
+  // reads as wire with the curves skipped); everything else resolves
+  // through the live wireframe core below.
+  function reconstructLive(entities, opts) {
+    opts = opts || {};
+    var eps = opts.eps === undefined ? MATCH_EPS_MM : opts.eps;
+    assertFinite(eps);
+    if (!(eps > 0)) throw new Error('eps must be > 0');
+    var list = Array.isArray(entities) ? entities.slice() : [];
+    var claims = collectClaimLines(list);
+    var curves = false;
+    for (var ci = 0; ci < list.length; ci++) {
+      var ce = list[ci];
+      if (!ce || ce.visible === false) continue;
+      if (ce.type === 'CIRCLE' || ce.type === 'CIRCULAR_ARC') {
+        curves = true;
+        break;
+      }
+    }
+    // One or two claims cannot bound a face, so those sheets read as
+    // wire; three or more assert a lamina, and the claims reader owns
+    // the verdict (a broken claim fails named, never silently).
+    if (claims.length >= 3) {
+      var owned = runReader(list, eps, 'E');
+      if (owned) return owned;
+      return liveCore(list, eps);
+    }
+    if (curves) {
+      var rd = runReader(list, eps, 'D');
+      if (rd) return rd;
+      var live = liveCore(list, eps);
+      if (live.status === 'ok') return live;
+      return { status: 'unavailable', reason: 'unsupported-curves',
+        label: REASON_LABELS['unsupported-curves'], class: null,
+        geometry: null, stats: live.stats };
+    }
+    return liveCore(list, eps);
+  }
+
+  // Live wireframe core: every entity with a defined projection in
+  // both views resolves to 3D (see the builder contract above
+  // liveSideOf). Assumes the router already handled claims/curves.
+  function liveCore(list, eps) {
+    // Own filter: same visibility/type/meta rules as filterEntities,
+    // but datum-touching verticals stay — an HP square side is not a
+    // projector, and true projectors self-skip (both endpoints
+    // resolve to one vertex).
+    var kept = [];
+    var ki;
+    for (ki = 0; ki < list.length; ki++) {
+      var ke = list[ki];
+      if (!ke) continue;
+      if (ke.visible === false) continue;
+      if (!KEEP_TYPES[ke.type]) continue;
+      var kkind = ke.meta && ke.meta.kind;
+      if (kkind && DROP_META[kkind]) continue;
+      if (ke.type === 'CIRCLE' || ke.type === 'CIRCULAR_ARC') continue;
+      kept.push(ke);
+    }
+    var vp = [], hp = [], dp = [], segs = [];
+    var i, e;
+    for (i = 0; i < kept.length; i++) {
+      e = kept[i];
+      if (e.viewRole === 'PROFILE') continue;
+      if (e.type === 'POINT') {
+        var s = liveSideOf(e);
+        if (s === 'elev') vp.push(e);
+        else if (s === 'plan') hp.push(e);
+        else if (s === 'datum') dp.push(e);
+      } else if (e.type === 'SEGMENT' || e.type === 'LINE' ||
+          e.type === 'RAY') {
+        // Cross-view banked claims are declarations, not ink: on a
+        // sheet with fewer than three claims the dots still read as
+        // wire, but the projector line itself never draws as an edge.
+        // Same-view member lines are drawn edges — the choice they
+        // carry narrows candidacy (see parentClaim) instead.
+        var fm = e.meta && e.meta.fromMember;
+        if (fm !== undefined && fm !== null && String(fm) !== '' &&
+            crossesXY(e)) continue;
+        // Projector-shaped ink never evidences edges: a sheet-vertical
+        // strictly spanning both views is a helper even when untagged,
+        // and its span would otherwise vouch for face chords across
+        // stacked stations. Strictly spanning only — a vertical with an
+        // end exactly on XY (resting outline) still draws. Claims keep
+        // the looser crossesXY: their feet land on the datum by design.
+        var vyl = Math.min(e.y, e.y2), vyh = Math.max(e.y, e.y2);
+        if (isSheetVertical(e) && vyl < 0 && vyh > 0) continue;
+        segs.push(e);
+      }
+    }
+    // Claimed-line candidacy, one entry per kept segment (see
+    // parentClaim). Runs after buckets fill — the claimed-end check
+    // reads the kept dots.
+    var segClaims = [];
+    for (i = 0; i < segs.length; i++) segClaims.push(parentClaim(segs[i]));
+    var verts = [];
+    var vBase = [];
+    var vpDots = [];
+    var hpDots = [];
+    var usedVp = {}, usedHp = {}, usedDp = {};
+    function claim(bucket, idx, served, v) {
+      var ent = bucket === 'vp' ? vp[idx] :
+        (bucket === 'hp' ? hp[idx] : dp[idx]);
+      if (bucket === 'vp') usedVp[idx] = true;
+      else if (bucket === 'hp') usedHp[idx] = true;
+      else usedDp[idx] = true;
+      if (served === 'vp') vpDots[v].push(ent);
+      else hpDots[v].push(ent);
+    }
+    function emit(x, h, d, base) {
+      verts.push({ x: x, y: h, z: d });
+      vBase.push(base === undefined ? null : base);
+      vpDots.push([]);
+      hpDots.push([]);
+      return verts.length - 1;
+    }
+    function basesOf(ent) { return captionBases(ent.caption); }
+    // Strict projector rule: a VP dot and an HP dot lift to 3D only
+    // when a drawn projector line physically connects them — same
+    // base name plus same x-station is not enough. Correspondence
+    // ink only (user lines, projector records, untagged verticals);
+    // lesson traces (axis, locus, named readers) never connect.
+    function isProjectorInk(e) {
+      if (!e || e.visible === false) return false;
+      if (e.type !== 'SEGMENT' && e.type !== 'LINE' &&
+          e.type !== 'RAY') return false;
+      if (!isSheetVertical(e) || !crossesXY(e)) return false;
+      var k = e.meta && e.meta.kind;
+      if (k !== undefined && k !== null && k !== 'user-line' &&
+          k !== 'projector') return false;
+      return true;
+    }
+    var projectorInk = [];
+    for (var pli = 0; pli < list.length; pli++) {
+      if (isProjectorInk(list[pli])) projectorInk.push(list[pli]);
+    }
+    function coversDot(line, dot) {
+      if (Math.abs(dot.x - line.x) > eps) return false;
+      var lo = Math.min(line.y, line.y2) - eps;
+      var hi = Math.max(line.y, line.y2) + eps;
+      return dot.y >= lo && dot.y <= hi;
+    }
+    function linkedByProjector(d1, d2) {
+      for (var li = 0; li < projectorInk.length; li++) {
+        if (coversDot(projectorInk[li], d1) &&
+            coversDot(projectorInk[li], d2)) return true;
+      }
+      return false;
+    }
+    // Pass A0: claimed projector pairs — the student's corner choice
+    // decides. One claim pairs its two refs (plan + elevation feet)
+    // even where names fail or collide; anything unresolvable
+    // (missing refs, non-point feet, one-view feet, station
+    // disagreement, non-projector claim line, feet off the line span)
+    // is ignored and positional pairing runs untouched.
+    var byId = {};
+    for (i = 0; i < list.length; i++) {
+      if (list[i] && typeof list[i].id === 'string') byId[list[i].id] = list[i];
+    }
+    var claimedFeet = {};
+    var projUsedV = {}, projUsedH = {};
+    for (i = 0; i < list.length; i++) {
+      var cle = list[i];
+      if (!cle || cle.visible === false) continue;
+      if (cle.type !== 'SEGMENT' && cle.type !== 'LINE' &&
+          cle.type !== 'RAY') continue;
+      var cm = cle.meta && cle.meta.fromMember;
+      if (cm === undefined || cm === null || String(cm) === '') continue;
+      var cb = baseNameOf(String(cm));
+      if (cb === '') continue;
+      var cr = cle.meta.refs;
+      if (!cr || cr.length < 2) continue;
+      var cS = byId[cr[0]], cF = byId[cr[1]];
+      if (!cS || !cF || cS.type !== 'POINT' ||
+          cF.type !== 'POINT') continue;
+      if (cS.visible === false || cF.visible === false) continue;
+      var cSs = liveSideOf(cS), cFs = liveSideOf(cF);
+      if (cSs === cFs) continue;
+      var cP = cSs === 'plan' ? cS : cF;
+      var cE = cSs === 'elev' ? cS : cF;
+      if (liveSideOf(cP) !== 'plan' || liveSideOf(cE) !== 'elev') continue;
+      if (Math.abs(cP.x - cE.x) > eps) continue;
+      if (!isProjectorInk(cle)) continue;
+      if (!coversDot(cle, cP) || !coversDot(cle, cE)) continue;
+      var cvi = vp.indexOf(cE), chi = hp.indexOf(cP);
+      if (cvi === -1 || chi === -1) continue;
+      var ckey = cvi + '_' + chi;
+      if (claimedFeet[ckey]) continue;
+      claimedFeet[ckey] = true;
+      projUsedV[cvi + ':' + cb] = true;
+      projUsedH[chi + ':' + cb] = true;
+      var cvv = emit((cE.x + cP.x) / 2, cE.y, -cP.y, cb);
+      claim('vp', cvi, 'vp', cvv);
+      claim('hp', chi, 'hp', cvv);
+    }
+    // Pass A: named strict-side pairs (exactly one VP + one HP owner
+    // per base sharing the station AND linked by a drawn projector;
+    // anything else stays 2D-only).
+    var ownersV = {}, ownersH = {}, bi, b;
+    for (i = 0; i < vp.length; i++) {
+      var bv = basesOf(vp[i]);
+      for (bi = 0; bi < bv.length; bi++) {
+        if (!ownersV[bv[bi]]) ownersV[bv[bi]] = [];
+        ownersV[bv[bi]].push(i);
+      }
+    }
+    for (i = 0; i < hp.length; i++) {
+      var bh = basesOf(hp[i]);
+      for (bi = 0; bi < bh.length; bi++) {
+        if (!ownersH[bh[bi]]) ownersH[bh[bi]] = [];
+        ownersH[bh[bi]].push(i);
+      }
+    }
+    for (b in ownersV) {
+      if (!Object.prototype.hasOwnProperty.call(ownersV, b)) continue;
+      if (!ownersH[b] || ownersV[b].length !== 1 ||
+          ownersH[b].length !== 1) continue;
+      var pi = ownersV[b][0], qi = ownersH[b][0];
+      if (Math.abs(vp[pi].x - hp[qi].x) > eps) continue;
+      if (!linkedByProjector(vp[pi], hp[qi])) continue;
+      if (claimedFeet[pi + '_' + qi]) continue;
+      claimedFeet[pi + '_' + qi] = true;
+      var v = emit((vp[pi].x + hp[qi].x) / 2, vp[pi].y, -hp[qi].y, b);
+      claim('vp', pi, 'vp', v);
+      claim('hp', qi, 'hp', v);
+    }
+    // Pass A1: drawn projector claims — a projector-shaped line
+    // (sheet-vertical, crossing XY, the same shape Check grades)
+    // pairs the same-letter corners stacked on it, so the drawing
+    // declares correspondence and no menu asks. Runs after Pass A
+    // so positional pairs keep their slots (a projector can only
+    // agree with a unique pair or rescue an ambiguous one, never
+    // contradict it); banked claims still lead in A0. Only
+    // correspondence ink reads (user lines, projector records,
+    // untagged verticals); lesson traces (axis, locus, named
+    // readers) never claim. One owner per base per side or the
+    // base stays out; banked feet keep precedence per corner.
+    for (i = 0; i < list.length; i++) {
+      var ple = list[i];
+      if (!ple || ple.visible === false) continue;
+      if (ple.type !== 'SEGMENT' && ple.type !== 'LINE' &&
+          ple.type !== 'RAY') continue;
+      if (!isSheetVertical(ple) || !crossesXY(ple)) continue;
+      var pkind = ple.meta && ple.meta.kind;
+      if (pkind !== undefined && pkind !== null && pkind !== 'user-line' &&
+          pkind !== 'projector') continue;
+      var plo = Math.min(ple.y, ple.y2) - eps;
+      var phi = Math.max(ple.y, ple.y2) + eps;
+      var pE = [], pP = [], pi;
+      for (pi = 0; pi < vp.length; pi++) {
+        if (Math.abs(vp[pi].x - ple.x) <= eps &&
+            vp[pi].y >= plo && vp[pi].y <= phi) pE.push(pi);
+      }
+      for (pi = 0; pi < hp.length; pi++) {
+        if (Math.abs(hp[pi].x - ple.x) <= eps &&
+            hp[pi].y >= plo && hp[pi].y <= phi) pP.push(pi);
+      }
+      if (pE.length === 0 || pP.length === 0) continue;
+      var pbases = [], pseen = {};
+      for (pi = 0; pi < pE.length; pi++) {
+        var pbb = basesOf(vp[pE[pi]]);
+        for (var pb2 = 0; pb2 < pbb.length; pb2++) {
+          if (!pseen[pbb[pb2]]) {
+            pseen[pbb[pb2]] = 1;
+            pbases.push(pbb[pb2]);
+          }
+        }
+      }
+      for (pi = 0; pi < pbases.length; pi++) {
+        var pbd = pbases[pi], peOwn = [], ppOwn = [], pk;
+        for (pk = 0; pk < pE.length; pk++) {
+          if (projUsedV[pE[pk] + ':' + pbd]) continue;
+          if (basesOf(vp[pE[pk]]).indexOf(pbd) !== -1) peOwn.push(pE[pk]);
+        }
+        for (pk = 0; pk < pP.length; pk++) {
+          if (projUsedH[pP[pk] + ':' + pbd]) continue;
+          if (basesOf(hp[pP[pk]]).indexOf(pbd) !== -1) ppOwn.push(pP[pk]);
+        }
+        if (peOwn.length !== 1 || ppOwn.length !== 1) continue;
+        var pdd = vp[peOwn[0]], pqq = hp[ppOwn[0]];
+        if (Math.abs(pdd.x - pqq.x) > eps) continue;
+        var pkey = peOwn[0] + '_' + ppOwn[0];
+        if (claimedFeet[pkey]) continue;
+        claimedFeet[pkey] = true;
+        projUsedV[peOwn[0] + ':' + pbd] = true;
+        projUsedH[ppOwn[0] + ':' + pbd] = true;
+        var pvv = emit((pdd.x + pqq.x) / 2, pdd.y, -pqq.y, pbd);
+        claim('vp', peOwn[0], 'vp', pvv);
+        claim('hp', ppOwn[0], 'hp', pvv);
+      }
+    }
+    // Pass B: datum wildcard pairs (exactly one datum dot + one mate
+    // on exactly one side, linked by a drawn projector), plus
+    // same-station datum/datum twins on a projector.
+    var ownersD = {};
+    for (i = 0; i < dp.length; i++) {
+      var bd = basesOf(dp[i]);
+      for (bi = 0; bi < bd.length; bi++) {
+        if (!ownersD[bd[bi]]) ownersD[bd[bi]] = [];
+        ownersD[bd[bi]].push(i);
+      }
+    }
+    for (b in ownersD) {
+      if (!Object.prototype.hasOwnProperty.call(ownersD, b)) continue;
+      var matesV = [], matesH = [];
+      if (ownersV[b]) {
+        for (bi = 0; bi < ownersV[b].length; bi++) {
+          if (!usedVp[ownersV[b][bi]]) matesV.push(ownersV[b][bi]);
+        }
+      }
+      if (ownersH[b]) {
+        for (bi = 0; bi < ownersH[b].length; bi++) {
+          if (!usedHp[ownersH[b][bi]]) matesH.push(ownersH[b][bi]);
+        }
+      }
+      var freeD = [];
+      for (bi = 0; bi < ownersD[b].length; bi++) {
+        if (!usedDp[ownersD[b][bi]]) freeD.push(ownersD[b][bi]);
+      }
+      if (freeD.length === 2 && matesV.length === 0 &&
+          matesH.length === 0 &&
+          Math.abs(dp[freeD[0]].x - dp[freeD[1]].x) <= eps &&
+          linkedByProjector(dp[freeD[0]], dp[freeD[1]])) {
+        var t = emit((dp[freeD[0]].x + dp[freeD[1]].x) / 2, 0, 0, b);
+        claim('dp', freeD[0], 'vp', t);
+        claim('dp', freeD[1], 'hp', t);
+        continue;
+      }
+      if (freeD.length !== 1) continue;
+      var di = freeD[0];
+      if (matesV.length === 1 && matesH.length === 0 &&
+          Math.abs(dp[di].x - vp[matesV[0]].x) <= eps &&
+          linkedByProjector(dp[di], vp[matesV[0]])) {
+        var v1 = emit((dp[di].x + vp[matesV[0]].x) / 2,
+          vp[matesV[0]].y, 0, b);
+        claim('dp', di, 'hp', v1);
+        claim('vp', matesV[0], 'vp', v1);
+      } else if (matesH.length === 1 && matesV.length === 0 &&
+          Math.abs(dp[di].x - hp[matesH[0]].x) <= eps &&
+          linkedByProjector(dp[di], hp[matesH[0]])) {
+        var v2 = emit((dp[di].x + hp[matesH[0]].x) / 2,
+          0, -hp[matesH[0]].y, b);
+        claim('dp', di, 'vp', v2);
+        claim('hp', matesH[0], 'hp', v2);
+      }
+    }
+    // Pass C: unnamed auto-pairs (exactly one free unnamed dot per
+    // side per station AND linked by a drawn projector; datum dots
+    // never auto-pair).
+    function unnamedAt(arr, used, idx) {
+      return !used[idx] && basesOf(arr[idx]).length === 0;
+    }
+    var stations = [];
+    function stationOf(x) {
+      for (var k = 0; k < stations.length; k++) {
+        if (Math.abs(stations[k] - x) <= eps) return k;
+      }
+      stations.push(x);
+      return stations.length - 1;
+    }
+    var perStV = {}, perStH = {};
+    for (i = 0; i < vp.length; i++) {
+      if (!unnamedAt(vp, usedVp, i)) continue;
+      var sv = stationOf(vp[i].x);
+      if (!perStV[sv]) perStV[sv] = [];
+      perStV[sv].push(i);
+    }
+    for (i = 0; i < hp.length; i++) {
+      if (!unnamedAt(hp, usedHp, i)) continue;
+      var sh = stationOf(hp[i].x);
+      if (!perStH[sh]) perStH[sh] = [];
+      perStH[sh].push(i);
+    }
+    for (var st in perStV) {
+      if (!Object.prototype.hasOwnProperty.call(perStV, st)) continue;
+      if (perStV[st].length !== 1 || !perStH[st] ||
+          perStH[st].length !== 1) continue;
+      var ui = perStV[st][0], wi = perStH[st][0];
+      if (!linkedByProjector(vp[ui], hp[wi])) continue;
+      var vu = emit((vp[ui].x + hp[wi].x) / 2, vp[ui].y, -hp[wi].y);
+      claim('vp', ui, 'vp', vu);
+      claim('hp', wi, 'hp', vu);
+    }
+    // Edge pass, tier 1: a segment determining exactly one vertex
+    // pair emits it (trust the drawing). Tier 2 (coincident stacks):
+    // a pair needs both-views consistency — its mate projection
+    // drawn, or degenerated to a point for view-perpendicular edges.
+    function pairKey(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
+    function resolveSide(dots, x, y) {
+      var out = [];
+      for (var v = 0; v < dots.length; v++) {
+        for (var k = 0; k < dots[v].length; k++) {
+          var dx = dots[v][k].x - x, dy = dots[v][k].y - y;
+          if (dx * dx + dy * dy <= eps * eps) {
+            if (out.indexOf(v) === -1) out.push(v);
+            break;
+          }
+        }
+      }
+      return out;
+    }
+    // A claimed parent endpoint is an end whose dot carries the
+    // member base — self-validating, refs-free: renamed dots carry
+    // nothing and the line resolves geometrically, as before.
+    function dotCarries(x, y, base) {
+      var buckets = [vp, hp, dp];
+      for (var nb = 0; nb < buckets.length; nb++) {
+        for (var ni = 0; ni < buckets[nb].length; ni++) {
+          var nd = buckets[nb][ni];
+          var dx = nd.x - x, dy = nd.y - y;
+          if (dx * dx + dy * dy > eps * eps) continue;
+          if (basesOf(nd).indexOf(base) !== -1) return true;
+        }
+      }
+      return false;
+    }
+    function parentClaim(sg) {
+      var pm = sg.meta && sg.meta.fromMember;
+      if (pm === undefined || pm === null || String(pm) === '') return null;
+      var pb = baseNameOf(String(pm));
+      if (pb === '') return null;
+      var pts = [];
+      if (dotCarries(sg.x, sg.y, pb)) pts.push({ x: sg.x, y: sg.y });
+      if (dotCarries(sg.x2, sg.y2, pb)) pts.push({ x: sg.x2, y: sg.y2 });
+      if (pts.length === 0) return null;
+      return { member: pb, pts: pts };
+    }
+    function resolveAt(sg, dots, x, y) {
+      var all = resolveSide(dots, x, y);
+      var cl = sg.claim;
+      if (!cl) return all;
+      var atClaim = false;
+      for (var k = 0; k < cl.pts.length; k++) {
+        var dx = cl.pts[k].x - x, dy = cl.pts[k].y - y;
+        if (dx * dx + dy * dy <= eps * eps) { atClaim = true; break; }
+      }
+      if (!atClaim) return all;
+      var kept = [];
+      for (var v = 0; v < all.length; v++) {
+        if (vBase[all[v]] === cl.member) kept.push(all[v]);
+      }
+      return kept.length > 0 ? kept : all;
+    }
+    function combosFor(sg, dots) {
+      var A = resolveAt(sg, dots, sg.x, sg.y);
+      var B = resolveAt(sg, dots, sg.x2, sg.y2);
+      var out = [];
+      for (var ia = 0; ia < A.length; ia++) {
+        for (var ib = 0; ib < B.length; ib++) {
+          if (A[ia] === B[ib]) continue;
+          var key = pairKey(A[ia], B[ib]);
+          if (out.indexOf(key) === -1) out.push(key);
+        }
+      }
+      return out;
+    }
+    var edges = [];
+    var seenEdge = {};
+    function emitEdge(a, b) {
+      var key = pairKey(a, b);
+      if (seenEdge[key]) return;
+      seenEdge[key] = true;
+      edges.push([a, b]);
+    }
+    // Split segments at paired dots: a ring edge's projection is
+    // often a subsegment of a longer drawn line (hexagon edge inside
+    // the elevation base), and only splitting reveals it. Both sides'
+    // dots split every segment; views never share y except datum.
+    // A split is a guess, not ink: only unsplit drawn segments keep
+    // tier-1 blind trust. Split wholes and their pieces join tier-2
+    // and need their mate projection drawn, so crossed (not jointed)
+    // dots on inclined sheets emit no phantom edges — while a whole
+    // line through a crossing still counts once its mate confirms it.
+    var allDots = [];
+    for (i = 0; i < vpDots.length; i++) {
+      for (var idv = 0; idv < vpDots[i].length; idv++) {
+        allDots.push(vpDots[i][idv]);
+      }
+    }
+    for (i = 0; i < hpDots.length; i++) {
+      for (var idh = 0; idh < hpDots[i].length; idh++) {
+        allDots.push(hpDots[i][idh]);
+      }
+    }
+    function splitSeg(sg) {
+      var pts = [{ x: sg.x, y: sg.y }, { x: sg.x2, y: sg.y2 }];
+      var dx = sg.x2 - sg.x, dy = sg.y2 - sg.y;
+      var L2 = dx * dx + dy * dy;
+      if (!(L2 > 0)) return [];
+      for (var k = 0; k < allDots.length; k++) {
+        var t = ((allDots[k].x - sg.x) * dx +
+          (allDots[k].y - sg.y) * dy) / L2;
+        if (t <= 0 || t >= 1) continue;
+        var px = sg.x + t * dx - allDots[k].x;
+        var py = sg.y + t * dy - allDots[k].y;
+        if (px * px + py * py > eps * eps) continue;
+        pts.push({ x: allDots[k].x, y: allDots[k].y });
+      }
+      pts.sort(function (p, q) {
+        var tp = ((p.x - sg.x) * dx + (p.y - sg.y) * dy) / L2;
+        var tq = ((q.x - sg.x) * dx + (q.y - sg.y) * dy) / L2;
+        return tp - tq;
+      });
+      var out = [];
+      for (var j = 0; j + 1 < pts.length; j++) {
+        var ex = pts[j + 1].x - pts[j].x, ey = pts[j + 1].y - pts[j].y;
+        if (ex * ex + ey * ey <= eps * eps) continue;
+        out.push({ x: pts[j].x, y: pts[j].y,
+          x2: pts[j + 1].x, y2: pts[j + 1].y });
+      }
+      return out;
+    }
+    var vpConn = {}, hpConn = {};
+    var tier2 = [];
+    var splitWhole = {};
+    var workSegs = [];
+    var wholeSeg = [];
+    var splitOrigin = [];
+    for (i = 0; i < segs.length; i++) {
+      var parts = splitSeg(segs[i]);
+      if (parts.length > 1) {
+        workSegs.push({ x: segs[i].x, y: segs[i].y,
+          x2: segs[i].x2, y2: segs[i].y2, claim: segClaims[i] });
+        wholeSeg.push(true);
+        splitOrigin.push(true);
+      }
+      var whole = parts.length <= 1;
+      for (var ip = 0; ip < parts.length; ip++) {
+        parts[ip].claim = segClaims[i];
+        workSegs.push(parts[ip]);
+        wholeSeg.push(whole);
+        splitOrigin.push(parts.length > 1);
+      }
+    }
+    for (i = 0; i < workSegs.length; i++) {
+      var cv = combosFor(workSegs[i], vpDots);
+      var ch = combosFor(workSegs[i], hpDots);
+      var union = cv.slice();
+      for (var ic = 0; ic < ch.length; ic++) {
+        if (union.indexOf(ch[ic]) === -1) union.push(ch[ic]);
+      }
+      var iu;
+      for (iu = 0; iu < cv.length; iu++) vpConn[cv[iu]] = true;
+      for (iu = 0; iu < ch.length; iu++) hpConn[ch[iu]] = true;
+      if (union.length === 1 && wholeSeg[i] && !splitOrigin[i]) {
+        var ee = union[0].split('_');
+        emitEdge(+ee[0], +ee[1]);
+      } else if (union.length >= 1) {
+        for (iu = 0; iu < union.length; iu++) {
+          if (tier2.indexOf(union[iu]) === -1) tier2.push(union[iu]);
+        }
+        if (wholeSeg[i] && splitOrigin[i] && union.length === 1) {
+          splitWhole[union[0]] = true;
+        }
+      }
+    }
+    function coincide(dots, a, b) {
+      for (var ia = 0; ia < dots[a].length; ia++) {
+        for (var ib = 0; ib < dots[b].length; ib++) {
+          var dx = dots[a][ia].x - dots[b][ib].x;
+          var dy = dots[a][ia].y - dots[b][ib].y;
+          if (dx * dx + dy * dy <= 1e-18) return true;
+        }
+      }
+      return false;
+    }
+    var tier2kept = {};
+    for (i = 0; i < tier2.length; i++) {
+      var pp = tier2[i].split('_');
+      var pa = +pp[0], pb = +pp[1];
+      var inV = !!vpConn[tier2[i]], inH = !!hpConn[tier2[i]];
+      if ((inV && (inH || coincide(hpDots, pa, pb))) ||
+          (inH && (inV || coincide(vpDots, pa, pb)))) {
+        var key2 = pairKey(pa, pb);
+        if (!seenEdge[key2]) {
+          seenEdge[key2] = true;
+          tier2kept[key2] = true;
+          edges.push([pa, pb]);
+        }
+      }
+    }
+    // Subsumption: a stack-inferred pair whose both projections are
+    // covered by strictly shorter emitted pairs is a face diagonal
+    // on a doubly edge-on face — drop it. Deliberately drawn
+    // (tier-1) pairs are never covered here: the drawing rules
+    // (split wholes face the joint pass below instead). Coverage
+    // is exact-coincidence (snapped drafting): mismatched-x stacks
+    // degrade to visible diagonals, never silent corruption.
+    function ptSegD2(px, py, ax, ay, bx, by) {
+      var dx = bx - ax, dy = by - ay;
+      var L2 = dx * dx + dy * dy;
+      var t = L2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / L2 : 0;
+      if (t < 0) t = 0;
+      if (t > 1) t = 1;
+      var cx = ax + t * dx - px, cy = ay + t * dy - py;
+      return cx * cx + cy * cy;
+    }
+    function projPt(vert, side) {
+      if (side === 'vp') return { x: verts[vert].x, y: verts[vert].y };
+      return { x: verts[vert].x, y: -verts[vert].z };
+    }
+    function covered(vertA, vertB, side, len2) {
+      var p = projPt(vertA, side), q = projPt(vertB, side);
+      for (var k = 0; k < edges.length; k++) {
+        var u = edges[k][0], w = edges[k][1];
+        if ((u === vertA && w === vertB) || (u === vertB && w === vertA)) {
+          continue;
+        }
+        var du = verts[u], dw = verts[w];
+        var ddx = du.x - dw.x, ddy = du.y - dw.y, ddz = du.z - dw.z;
+        if (!(ddx * ddx + ddy * ddy + ddz * ddz < len2)) continue;
+        var a2 = projPt(u, side), b2 = projPt(w, side);
+        if (ptSegD2(p.x, p.y, a2.x, a2.y, b2.x, b2.y) > 1e-18) continue;
+        if (ptSegD2(q.x, q.y, a2.x, a2.y, b2.x, b2.y) > 1e-18) continue;
+        return true;
+      }
+      return false;
+    }
+    var keptEdges = [];
+    for (i = 0; i < edges.length; i++) {
+      var ea = edges[i][0], eb = edges[i][1];
+      var kk = pairKey(ea, eb);
+      if (tier2kept[kk]) {
+        var va = verts[ea], vb = verts[eb];
+        var ex = va.x - vb.x, ey = va.y - vb.y, ez = va.z - vb.z;
+        var elen2 = ex * ex + ey * ey + ez * ez;
+        if (covered(ea, eb, 'vp', elen2) && covered(ea, eb, 'hp', elen2)) {
+          continue;
+        }
+      }
+      keptEdges.push(edges[i]);
+    }
+    // Joint pass: a confirmed pair from a split whole is the spanning
+    // artifact — not an edge — when a jointed midpoint's both
+    // sub-pairs survived in both views (a T-joint voids its span).
+    // A merely crossed midpoint's sub-pairs never survive, so the
+    // spanning pair stands. Unsplit tier-1 is never tested.
+    function strictlyInside(vertC, vertA, vertB, side) {
+      var p = projPt(vertA, side), q = projPt(vertB, side),
+        r = projPt(vertC, side);
+      var dx = q.x - p.x, dy = q.y - p.y;
+      var L2 = dx * dx + dy * dy;
+      if (!(L2 > 0)) return false;
+      var t = ((r.x - p.x) * dx + (r.y - p.y) * dy) / L2;
+      if (!(t > 1e-9 && t < 1 - 1e-9)) return false;
+      var px = p.x + t * dx - r.x, py = p.y + t * dy - r.y;
+      return px * px + py * py <= eps * eps;
+    }
+    var survived = {};
+    for (i = 0; i < keptEdges.length; i++) {
+      survived[pairKey(keptEdges[i][0], keptEdges[i][1])] = true;
+    }
+    edges = keptEdges.filter(function (e) {
+      if (!splitWhole[pairKey(e[0], e[1])]) return true;
+      for (var c = 0; c < verts.length; c++) {
+        if (c === e[0] || c === e[1]) continue;
+        if (!survived[pairKey(e[0], c)] ||
+            !survived[pairKey(e[1], c)]) continue;
+        if (strictlyInside(c, e[0], e[1], 'vp') &&
+            strictlyInside(c, e[0], e[1], 'hp')) return false;
+      }
+      return true;
+    });
+    var stats = { seen: vp.length + hp.length + dp.length,
+      paired: verts.length, edges: edges.length };
+    if (verts.length > 0) {
+      return { status: 'ok', reason: null, label: '', class: null,
+        geometry: { name: 'wireframe', vertices: verts, edges: edges,
+          faces: inferClosedFaces(verts, edges) },
+        stats: stats };
+    }
+    return { status: 'unavailable', reason: 'empty-sketch',
+      label: REASON_LABELS['empty-sketch'], class: null, geometry: null,
+      stats: stats };
   }
 
   return {
@@ -3275,15 +2728,13 @@
     pointInLoop: pointInLoop,
     inferProfileMaps: inferProfileMaps,
     mapDepth: mapDepth,
-    tryPrism: tryPrism,
-    tryPyramid: tryPyramid,
-    tryWireframe: tryWireframe,
     tryCylinder: tryCylinder,
     tryCone: tryCone,
     tryRevolved: tryRevolved,
     RIM_K: RIM_K,
     projectToViews: projectToViews,
     baseNameOf: baseNameOf, captionBases: captionBases,
-    reconstruct: reconstruct
+    inferClosedFaces: inferClosedFaces,
+    reconstructLive: reconstructLive
   };
 });

@@ -29,11 +29,11 @@ function circ(x, y, r, role, bis) {
   return { type: 'CIRCLE', x: x, y: y, x2: 0, y2: 0, radius: r, bisCode: bis || 'A', viewRole: role || 'PLAN' };
 }
 
-// 1 2-view cylinder bundle reconstructs, class D, exact counts and proportions
+// 1 2-view cylinder bundle reconstructs unclassified, exact counts and proportions
 var cylEnts = C.regularSolid({ solid: 'CYLINDER', sizeMm: 35, heightMm: 70, xMm: 0 }).entities;
-var r1 = R.reconstruct(cylEnts);
+var r1 = R.reconstructLive(cylEnts);
 eq(r1.status, 'ok');
-eq(r1.class, 'D');
+eq(r1.class, null);
 eq(r1.geometry.vertices.length, 48);
 eq(r1.geometry.edges.length, 72);
 eq(r1.geometry.faces.length, 26);
@@ -46,10 +46,10 @@ near(Math.max.apply(null, cy1) - Math.min.apply(null, cy1), 70, 1e-9, 'height');
 pass('phase13 cylinder ok 48v 72e 26f');
 
 // 2 determinism under reorder and rerun
-var a2 = R.reconstruct(cylEnts);
-var b2 = R.reconstruct(cylEnts.slice().reverse());
+var a2 = R.reconstructLive(cylEnts);
+var b2 = R.reconstructLive(cylEnts.slice().reverse());
 assert.deepStrictEqual(a2.geometry, b2.geometry);
-assert.deepStrictEqual(R.reconstruct(cylEnts), R.reconstruct(cylEnts));
+assert.deepStrictEqual(R.reconstructLive(cylEnts), R.reconstructLive(cylEnts));
 pass('phase13 cylinder deterministic');
 
 // 3 wrong radius fails named, never a wrong solid
@@ -61,48 +61,48 @@ var wrong3 = [
   seg(12, 70, -12, 70, 'ELEVATION', 'A'),
   seg(-12, 70, -12, 0, 'ELEVATION', 'A')
 ];
-var r3 = R.reconstruct(wrong3);
+var r3 = R.reconstructLive(wrong3);
 eq(r3.status, 'unavailable');
 eq(r3.reason, 'x-mismatch');
 pass('phase13 wrong radius x-mismatch');
 
 // 4 two plan circles compete, never a guess
 var twin4 = cylEnts.concat([circ(60, -25.5, 10, 'PLAN', 'A')]);
-var r4 = R.reconstruct(twin4);
+var r4 = R.reconstructLive(twin4);
 eq(r4.status, 'unavailable');
 eq(r4.reason, 'ambiguous-pairing');
 pass('phase13 twin circles ambiguous');
 
 // 5 arc-only sheet stays deferred
-var r5 = R.reconstruct([{ type: 'CIRCULAR_ARC', x: 0, y: -25, x2: 5, y2: -20, radius: 17.5, startAngle: 0, endAngle: 1, bisCode: 'A', viewRole: 'PLAN' }]);
+var r5 = R.reconstructLive([{ type: 'CIRCULAR_ARC', x: 0, y: -25, x2: 5, y2: -20, radius: 17.5, startAngle: 0, endAngle: 1, bisCode: 'A', viewRole: 'PLAN' }]);
 eq(r5.status, 'unavailable');
 eq(r5.reason, 'unsupported-curves');
 pass('phase13 arc-only deferred');
 
 // 6 valid cylinder plus an extra arc ignores the arc, never unmatched
 var withArc6 = cylEnts.concat([{ type: 'CIRCULAR_ARC', x: 0, y: 20, x2: 5, y2: 25, radius: 5, startAngle: 0, endAngle: 1, bisCode: 'A', viewRole: 'ELEVATION' }]);
-var r6 = R.reconstruct(withArc6);
+var r6 = R.reconstructLive(withArc6);
 eq(r6.status, 'ok');
-eq(r6.class, 'D');
+eq(r6.class, null);
 ok(r6.warnings.map(function (w) { return w.code; }).indexOf('curves-ignored') !== -1, 'arc warned');
 pass('phase13 cylinder plus arc ok ignored');
 
 // 7 center point tolerated at center, optional, off-center fails
 var noCenter7 = cylEnts.filter(function (e) { return !(e.type === 'POINT' && e.viewRole === 'PLAN'); });
-var r7a = R.reconstruct(noCenter7);
+var r7a = R.reconstructLive(noCenter7);
 eq(r7a.status, 'ok');
-eq(r7a.class, 'D');
+eq(r7a.class, null);
 var offCenter7 = noCenter7.concat([pt(5, -25.5, 'PLAN', 'B')]);
-var r7b = R.reconstruct(offCenter7);
+var r7b = R.reconstructLive(offCenter7);
 eq(r7b.status, 'unavailable');
 eq(r7b.reason, 'unmatched-point');
 pass('phase13 center tolerated optional');
 
-// 8 2-view cone bundle reconstructs, class D, apex placed
+// 8 2-view cone bundle reconstructs unclassified, apex placed
 var coneEnts = C.regularSolid({ solid: 'CONE', sizeMm: 35, heightMm: 70, xMm: 0 }).entities;
-var r8 = R.reconstruct(coneEnts);
+var r8 = R.reconstructLive(coneEnts);
 eq(r8.status, 'ok');
-eq(r8.class, 'D');
+eq(r8.class, null);
 eq(r8.geometry.vertices.length, 25);
 eq(r8.geometry.edges.length, 48);
 eq(r8.geometry.faces.length, 25);
@@ -116,7 +116,7 @@ pass('phase13 cone ok 25v 48e 25f');
 
 // 9 cone missing apex point fails named, never guessed
 var noApex9 = coneEnts.filter(function (e) { return !(e.type === 'POINT' && e.viewRole === 'ELEVATION'); });
-var r9 = R.reconstruct(noApex9);
+var r9 = R.reconstructLive(noApex9);
 eq(r9.status, 'unavailable');
 eq(r9.reason, 'unmatched-point');
 pass('phase13 cone missing apex unmatched');
@@ -124,11 +124,11 @@ pass('phase13 cone missing apex unmatched');
 // 10 cone drifted apex: loose band x-mismatch, far unmatched
 var base10 = coneEnts.filter(function (e) { return !(e.type === 'POINT' && e.viewRole === 'ELEVATION'); });
 var drift10a = base10.concat([pt(1.0, 70, 'ELEVATION', 'B')]);
-var r10a = R.reconstruct(drift10a);
+var r10a = R.reconstructLive(drift10a);
 eq(r10a.status, 'unavailable');
 eq(r10a.reason, 'x-mismatch');
 var drift10b = base10.concat([pt(5, 70, 'ELEVATION', 'B')]);
-var r10b = R.reconstruct(drift10b);
+var r10b = R.reconstructLive(drift10b);
 eq(r10b.status, 'unavailable');
 eq(r10b.reason, 'unmatched-point');
 pass('phase13 cone drifted apex named');
@@ -137,9 +137,9 @@ pass('phase13 cone drifted apex named');
 [1, -1].forEach(function (side) {
   var sheet = C.threeViewSheet({ solid: 'CYLINDER', sizeMm: 35, heightMm: 70, xMm: 0, side: side });
   eq(C.validateBundle(sheet).ok, true);
-  var rr = R.reconstruct(sheet.entities);
+  var rr = R.reconstructLive(sheet.entities);
   eq(rr.status, 'ok');
-  eq(rr.class, 'D');
+  eq(rr.class, null);
   eq(rr.geometry.vertices.length, 48);
   eq(rr.coverage.plan, 1);
   eq(rr.coverage.elev, 1);
@@ -151,9 +151,9 @@ pass('phase13 3-view cylinder both sides');
 [1, -1].forEach(function (side) {
   var sheet = C.threeViewSheet({ solid: 'CONE', sizeMm: 35, heightMm: 70, xMm: 0, side: side });
   eq(C.validateBundle(sheet).ok, true);
-  var rr = R.reconstruct(sheet.entities);
+  var rr = R.reconstructLive(sheet.entities);
   eq(rr.status, 'ok');
-  eq(rr.class, 'D');
+  eq(rr.class, null);
   eq(rr.geometry.vertices.length, 25);
   eq(rr.coverage.plan, 1);
   eq(rr.coverage.elev, 1);
@@ -170,7 +170,7 @@ var narrow13 = cylSheet13.entities.filter(function (e) { return e.viewRole !== '
     seg(120, 70, 100, 70, 'PROFILE', 'A'),
     seg(100, 70, 100, 0, 'PROFILE', 'A')
   ]);
-var r13 = R.reconstruct(narrow13);
+var r13 = R.reconstructLive(narrow13);
 eq(r13.status, 'unavailable');
 eq(r13.reason, 'x-mismatch');
 pass('phase13 wrong depth x-mismatch');
@@ -184,21 +184,21 @@ var tall14 = coneSheet14.entities.filter(function (e) { return e.viewRole !== 'P
     seg(135, 0, 117.5, 80, 'PROFILE', 'A'),
     pt(117.5, 80, 'PROFILE', 'B')
   ]);
-var r14 = R.reconstruct(tall14);
+var r14 = R.reconstructLive(tall14);
 eq(r14.status, 'unavailable');
 eq(r14.reason, 'unmatched-point');
 pass('phase13 wrong height unmatched-point');
 
 // 15 tessellation goldens: K=24, rim vertex 0 at +X, CCW from +Y
 eq(R.RIM_K, 24);
-var g15c = R.reconstruct(cylEnts).geometry;
+var g15c = R.reconstructLive(cylEnts).geometry;
 assert.deepStrictEqual(g15c.vertices[0], { x: 17.5, y: 0, z: 25.5 });
 assert.deepStrictEqual(g15c.vertices[24], { x: 17.5, y: 70, z: 25.5 });
 near(g15c.vertices[1].x, 17.5 * Math.cos(Math.PI / 12), 1e-9, 'v1 x');
 near(g15c.vertices[1].z, 25.5 + 17.5 * Math.sin(Math.PI / 12), 1e-9, 'v1 z');
 near(g15c.vertices[6].x, 0, 1e-9, 'v6 x');
 near(g15c.vertices[6].z, 43, 1e-9, 'v6 z');
-var g15k = R.reconstruct(coneEnts).geometry;
+var g15k = R.reconstructLive(coneEnts).geometry;
 assert.deepStrictEqual(g15k.vertices[0], { x: 17.5, y: 0, z: 25.5 });
 assert.deepStrictEqual(g15k.vertices[24], { x: 0, y: 70, z: 25.5 });
 pass('phase13 tessellation goldens rim v0');
@@ -241,39 +241,36 @@ eq(c18.front + c18.hidden, 48);
 ok(c18.hidden > 0, 'some hidden');
 pass('phase13 cone renders hidden');
 
-// 19 box plus arc stays ok, arc ignored never unmatched
-function planRect(x0, y0, x1, y1) {
-  return [
-    seg(x0, y0, x1, y0), seg(x1, y0, x1, y1),
-    seg(x1, y1, x0, y1), seg(x0, y1, x0, y0)
-  ];
-}
-var box19 = planRect(0, -40, 30, -10).concat(planRect(0, 5, 30, 50))
+// 19 prism plus arc reads as prism wire: no revolved hypothesis fits
+// (a plan loop exists), so the wire builder serves with curves skipped
+var prism19 = C.regularSolid({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
+var box19 = prism19.entities
   .concat([{ type: 'CIRCULAR_ARC', x: 15, y: -25, x2: 20, y2: -20, radius: 5, startAngle: 0, endAngle: 1, bisCode: 'A', viewRole: 'PLAN' }]);
-var r19 = R.reconstruct(box19);
+var r19 = R.reconstructLive(box19);
 eq(r19.status, 'ok');
-eq(r19.class, 'A');
-ok(r19.warnings.map(function (w) { return w.code; }).indexOf('curves-ignored') !== -1, 'arc warned');
-pass('phase13 box plus arc ignored');
+eq(r19.class, null);
+eq(r19.geometry.vertices.length, 12);
+eq(r19.geometry.edges.length, 18);
+eq(r19.warnings, undefined, 'wire carries no warnings');
+pass('phase13 prism plus arc reads wire');
 
-// 20 failure hygiene: reason set pins the pair-by-name amendment (+name-mismatch)
-// and the M5 Class E amendment (+hint-conflict, +hint-loose-foot,
-// +duplicate-corners, +corners-not-coplanar, +non-convex-corners); old labels untouched
-assert.deepStrictEqual(Object.keys(R.REASON_LABELS).sort(), ['ambiguous-pairing', 'corners-not-coplanar', 'coverage-failed', 'duplicate-corners', 'hint-conflict', 'hint-loose-foot', 'missing-view', 'name-mismatch', 'no-closed-profile', 'non-convex-corners', 'non-convex-profile', 'non-manifold', 'unmatched-edge', 'unmatched-point', 'unsupported-curves', 'x-mismatch']);
+// 20 failure hygiene: the trimmed reason set (wire quiet state + reader
+// verdicts); the class-gate reasons are gone, old labels untouched
+assert.deepStrictEqual(Object.keys(R.REASON_LABELS).sort(), ['ambiguous-pairing', 'corners-not-coplanar', 'coverage-failed', 'duplicate-corners', 'empty-sketch', 'hint-conflict', 'hint-loose-foot', 'missing-view', 'non-convex-corners', 'non-manifold', 'unmatched-edge', 'unmatched-point', 'unsupported-curves', 'x-mismatch']);
 eq(R.REASON_LABELS['unsupported-curves'], 'curves not supported yet');
-var allowed20 = { 'x-mismatch': 1, 'name-mismatch': 1, 'unmatched-edge': 1, 'unmatched-point': 1, 'ambiguous-pairing': 1, 'coverage-failed': 1, 'non-manifold': 1, 'unsupported-curves': 1, 'missing-view': 1 };
+var allowed20 = { 'x-mismatch': 1, 'unmatched-edge': 1, 'unmatched-point': 1, 'ambiguous-pairing': 1, 'coverage-failed': 1, 'non-manifold': 1, 'unsupported-curves': 1, 'missing-view': 1 };
 [r3, r4, r5, r7b, r9, r10a, r10b, r13, r14].forEach(function (r) {
   ok(allowed20[r.reason], 'known reason ' + r.reason);
 });
 pass('phase13 failure hygiene no new reasons');
 
 // 21 determinism: cone and 3-view reorder plus rerun identical
-var a21 = R.reconstruct(coneEnts);
-var b21 = R.reconstruct(coneEnts.slice().reverse());
+var a21 = R.reconstructLive(coneEnts);
+var b21 = R.reconstructLive(coneEnts.slice().reverse());
 assert.deepStrictEqual(a21.geometry, b21.geometry);
 var sheet21 = C.threeViewSheet({ solid: 'CYLINDER', sizeMm: 35, heightMm: 70, xMm: 0 }).entities;
-assert.deepStrictEqual(R.reconstruct(sheet21).geometry, R.reconstruct(sheet21.slice().reverse()).geometry);
-assert.deepStrictEqual(R.reconstruct(sheet21), R.reconstruct(sheet21));
+assert.deepStrictEqual(R.reconstructLive(sheet21).geometry, R.reconstructLive(sheet21.slice().reverse()).geometry);
+assert.deepStrictEqual(R.reconstructLive(sheet21), R.reconstructLive(sheet21));
 pass('phase13 cone 3-view deterministic');
 
 // 22 round-trip: D projections cover drawn silhouettes
@@ -293,7 +290,7 @@ function nearAnySeg(px, py, segs, tol) {
   return false;
 }
 [cylEnts, coneEnts].forEach(function (ents, idx) {
-  var res = R.reconstruct(ents);
+  var res = R.reconstructLive(ents);
   eq(res.status, 'ok');
   var proj = R.projectToViews(res.geometry);
   var kept = R.filterEntities(ents).kept;
@@ -439,7 +436,7 @@ ok(src29.split('clearBank();').length - 1 >= 5, 'clears wired');
 ok(src29.indexOf('drawKnockoutLabel(ctx2, String(cpi + 1)') !== -1, 'numerals wired');
 pass('phase13 clears numerals wired');
 
-// 30 gesture-drawn plan circle plus hand silhouette reconstructs Class D
+// 30 gesture-drawn plan circle plus hand silhouette reads through the revolved reader
 var gest30 = Cv.circleFromThreePoints({ x: 17.5, y: -25.5 }, { x: 0, y: -8 }, { x: -17.5, y: -25.5 });
 eq(gest30.ok, true);
 var ents30 = [
@@ -450,11 +447,11 @@ var ents30 = [
   seg(17.5, 70, -17.5, 70, 'ELEVATION', 'A'),
   seg(-17.5, 70, -17.5, 0, 'ELEVATION', 'A')
 ];
-var r30 = R.reconstruct(ents30);
+var r30 = R.reconstructLive(ents30);
 eq(r30.status, 'ok');
-eq(r30.class, 'D');
+eq(r30.class, null);
 eq(r30.geometry.vertices.length, 48);
-pass('phase13 gesture ties to Class D');
+pass('phase13 gesture ties to revolved reader');
 
 assert.strictEqual(n, TOTAL);
 console.log('OK ' + TOTAL + '/' + TOTAL + ' phase13-curves tests passed');

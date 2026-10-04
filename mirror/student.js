@@ -479,9 +479,26 @@
     });
   }
 
+  // ---- manual (inline, student slice) ----
+  function renderManual() {
+    clear(root);
+    flash('');
+    var s = session();
+    if (!s) { window.location.replace('login.html'); return; }
+    if (!window.EduCADLabManual) {
+      window.location.href = 'manual.html';
+      return;
+    }
+    window.EduCADLabManual.show(root, 'student');
+  }
+
   // ---- routing ----
   function route() {
     var h = String(window.location.hash || '').replace(/^#/, '');
+    if (h === 'manual') {
+      renderManual();
+      return;
+    }
     if (h.indexOf('class/') === 0 && h.length > 6) {
       renderClass(decodeURIComponent(h.slice(6)));
       return;
@@ -493,5 +510,6 @@
     renderHome();
   }
   window.addEventListener('hashchange', route);
+  if (window.EduCADLabManual) window.EduCADLabManual.wireNav();
   route();
 })();

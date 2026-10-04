@@ -72,7 +72,7 @@ a ✓ next visit.
 ## Test
 
 ```sh
-npm test       # full suite: baseline + phases 1–30 (874 checks)
+npm test       # full suite: baseline + phases 1–45 (1039 checks)
 ```
 
 | Command | Suite |
@@ -87,19 +87,19 @@ npm test       # full suite: baseline + phases 1–30 (874 checks)
 | `npm run test:phase7` | Production audit: boot, budgets, mount (27) |
 | `npm run test:phase8` | Labels: 3-tier layout + leader fallback (28) |
 | `npm run test:phase9` | Solid widget: iso render, orbit/zoom, hidden edges (55) |
-| `npm run test:phase10` | Reconstruction: classes A/B/C, failures, live sync (53) |
+| `npm run test:phase10` | Reconstruction: live wireframe, readers, failures, live sync (54) |
 | `npm run test:phase11` | Manual: Markdown→HTML build, in-app link, freshness guard (22) |
-| `npm run test:phase12` | Reconstruction 3-view: PROFILE role, depth maps, triple gate (30) |
-| `npm run test:phase13` | Curves: Class D cylinders/cones, K=24 tessellation (30) |
+| `npm run test:phase12` | Reconstruction 3-view: PROFILE role, result shapes, ignored views (30) |
+| `npm run test:phase13` | Curves: revolved cylinders/cones, K=24 tessellation (30) |
 | `npm run test:phase14` | Glass overlay: fullscreen sheet, aura hit-test, orbit/zoom/pan (42) |
-| `npm run test:phase15` | Demo 3-view: button wiring, `#3view` hash, class-A prism proof (14) |
+| `npm run test:phase15` | Demo 3-view: button wiring, `#3view` hash, prism wire proof (14) |
 | `npm run test:phase16` | Line vs circle: shared Ctrl+click anchor, plain-click draws line (12) |
 | `npm run test:phase17` | Point cascade: deleting a point deletes its lines, refs + coincident (12) |
 | `npm run test:phase18` | Two-point line: core rejects one-point lines everywhere (12) |
 | `npm run test:phase19` | Multi-caption: coincident pairs, parens verdicts, corner truth (24) |
 | `npm run test:phase20` | Claims + verify: member chooser, checker, Check button (26) |
 | `npm run test:phase21` | Tutorial: scripted user, square stepper, action funnel (24) |
-| `npm run test:phase22` | Class E: claimed corner-lift lamina, hint failures (20) |
+| `npm run test:phase22` | Claims reader: corner-lift lamina, hint failures (20) |
 | `npm run test:phase23` | Tutorial: hex-prism lesson, 88 steps, honest solid (20) |
 | `npm run test:phase24` | Typed distance: select point, type mm, Enter stakes (12) |
 | `npm run test:phase25` | Typed plot offset: focus line, type mm, Enter stakes (12) |
@@ -108,8 +108,23 @@ npm test       # full suite: baseline + phases 1–30 (874 checks)
 | `npm run test:phase28` | View mode: Edit/View toggle, select-and-measure inspect (12) |
 | `npm run test:phase29` | View dimensions: drafting-style overlay (extension lines, leaders) (12) |
 | `npm run test:phase30` | Model + grade: model answers, strict verify, remarks, pass/fail (18) |
+| `npm run test:phase31` | Undo: Ctrl+Z sheet history, batch-atomic snapshots (12) |
+| `npm run test:phase32` | Slash commands: Minecraft-style `/cmd` draw, autocomplete, Settings prefs (16) |
+| `npm run test:phase33` | Words to drawing: student `/ words` NL, teacher auto-draw via local gateway (16) |
+| `npm run test:phase34` | Pose mode: Blender-style 3D moves drag the drawn 2D views (19) |
+| `npm run test:phase35` | Pose live views: exact 2D projections of the posed solid (10) |
+| `npm run test:phase36` | Live wireframe: 2D entities with both views resolve to 3D (12) |
+| `npm run test:phase37` | Claim-decided pairing: corner choices pair 3D, dot picker covers stacks (9) |
+| `npm run test:phase38` | Logical faces: closed wire infers faces for hidden dashes (9) |
+| `npm run test:phase39` | Projector-read claims: drawn Type G pairs stacks, menu retired (12) |
+| `npm run test:phase40` | Split pieces need both-views proof; whole lines keep trust (4) |
+| `npm run test:phase41` | Pose accuracy: Y-move/Z-rotate projection invariants on the hex prism (7) |
+| `npm run test:phase42` | Pose ink rides exact: vertex dots, labels, projector feet track split views (7) |
+| `npm run test:phase43` | True projector corners: spanning lines head every touched corner once (5) |
+| `npm run test:phase44` | Cmd-only problem-bank drawing: /polyline /ellipse /hatch /style /undo, render fixes, EduCAD Script (18) |
+| `npm run test:phase45` | Pose stack labels split across parted corners (8) |
 | `npm run test:login` | Login: 3 roles + guest, `/api/login`, gate ships (15) |
-| `npm run test:lab` | Lab: studio + workspace pages, role routing, deep links, class client (15) |
+| `npm run test:lab` | Lab: studio + workspace pages, role routing, deep links, class client, inline manual (18) |
 | `npm run test:cpp` | C++ backend: static serving, auth, drawings/progress, question sets, classes (43) |
 | `npm run test:saves` | Saves module: snapshot/restore, API client incl. sets, guest gate, UI ships (20) |
 
@@ -126,8 +141,8 @@ Short version:
   on Ubuntu). No `npm install` needed — zero npm dependencies.
 - Layout: `mirror/` app, `tools/` tests, `backend/` C++ server, `docs/`
   manual source.
-- `npm test` builds the backend, then runs baseline + phases 1–30
-  (874 checks); CI additionally runs the login/lab/saves/cpp suites on
+- `npm test` builds the backend, then runs baseline + phases 1–43
+  (1039 checks); CI additionally runs the login/lab/saves/cpp suites on
   every PR.
 - `mirror/manual.html` is generated — edit `docs/MANUAL.md` and run
   `npm run build:manual`.

@@ -50,16 +50,13 @@ ok(overflowUse !== -1 && placeUse !== -1 && overflowUse < placeUse,
   'cap checked before placing');
 pass('phase27 cap warns before placing');
 
-// 3 the member chooser joins the bank: choosing a corner banks it
-// with the claim instead of clearing fellow picks.
-var mpartIdx = index.indexOf('if (mparts.length >= 2 && !bankHas(cid)) {');
-ok(mpartIdx !== -1, 'chooser gate found');
-var joinSlice = index.slice(mpartIdx, index.indexOf('bankFromPick({ cid: cid', mpartIdx));
-ok(joinSlice.indexOf('showMemberMenu(cursor, mparts)') !== -1, 'chooser opens');
-eq(joinSlice.indexOf('clearBank()'), -1, 'bank kept while choosing');
-ok(joinSlice.indexOf('pendingMember = { cid: cid, cursor: cursor }') !== -1,
-  'pick parked');
-pass('phase27 chooser joins bank');
+// 3 (phase39) single dots bank directly with no corner question:
+// drawn projectors declare correspondence, the bank only holds dots.
+eq(index.indexOf('if (mparts.length >= 2 && !bankHas(cid)) {'), -1,
+  'chooser gate gone');
+eq(index.indexOf('showMemberMenu'), -1, 'chooser gone');
+ok(index.indexOf('var cid = cids[0];') !== -1, 'single dot banks');
+pass('phase27 direct bank, no chooser');
 
 // 4 re-clicking a banked pick never finalizes: the guards name both
 // banked ids before either user action runs.
@@ -144,7 +141,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase27`') !== -1, 'phase27 row');
 ok(readme.indexOf('Pick bank: Ctrl banks, plain click finalizes') !== -1,
   'phase27 label');
-ok(readme.indexOf('baseline + phases 1–30 (874 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 838');
 pass('phase27 readme suite row');
 

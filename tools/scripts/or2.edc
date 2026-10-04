@@ -1,0 +1,26 @@
+# OR-2 (EduCAD Script): base plate + rib + two holes.
+# FV skeleton with centre lines, cutting plane, hatch, dims.
+/datum -90 90
+/point p1 -60 0
+/point p2 60 0
+/point p3 60 20
+/point p4 -60 20
+/polygon p1 p2 p3 p4
+/point r1 -7.5 20
+/point r2 7.5 20
+/point r3 7.5 70
+/point r4 -7.5 70
+/polygon r1 r2 r3 r4
+/point h1 -30 10
+/circle h1 10
+/point h2 30 10
+/circle h2 10
+/point c1 -70 10
+/point c2 70 10
+/xline c1 c2 G elevation
+/point k1 -60 -5
+/point k2 60 -5
+/line k1 k2 H elevation
+/hatch -60 0 0 20 3
+/dimension p1 p2
+/text -60 76 OR2-BASE-RIB-HOLES

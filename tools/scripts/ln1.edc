@@ -1,0 +1,21 @@
+# LN-1 (EduCAD Script): AB 75 long, 30 to HP, 45 to VP.
+# A is 12 above HP, 10 in front of VP. FV + TV with loci,
+# TL rotation arcs, projector, and measured span.
+/datum -60 120
+/point a' 0 12
+/point a 0 -10
+/point ap0 -50 12
+/point ap1 110 12
+/xline ap0 ap1 G elevation
+/point at0 -50 -10
+/point at1 110 -10
+/xline at0 at1 G plan
+/arc a' 75 0 60
+/arc a 61.24 0 45
+/point b' 45 49.5
+/point b 45 -58.03
+/line a' b'
+/line a b
+/xline b' b G
+/dimension a b
+/text -55 60 LN1-AB75-t30-p45

@@ -15,7 +15,8 @@
 // GET /api/submissions/:id, PUT /api/submissions/:id/grade)
 // + classes (GET/POST /api/classes, GET/DELETE /api/classes/:code,
 // POST /api/classes/:code/join, POST /api/classes/:code/leave,
-// GET /api/classes/:code/members, GET /api/classes/:code/sets).
+// GET /api/classes/:code/members, GET /api/classes/:code/sets)
+// + natural language (POST /api/interpret: words to slash commands).
 // Sets carry an optional class_id (NULL = open set, solvable by code).
 
 #include <algorithm>
@@ -1573,6 +1574,180 @@ void handleLogin(Db &db, const httplib::Request &req, httplib::Response &res) {
                       {"token", token}});
 }
 
+// ---- Natural-language interpretation (student `/ words`, teacher /auto) ----
+// POST /api/interpret turns one plain-language request into slash commands
+// via the local model gateway (antigravity-manager.md). Browsers never see
+// the key: it comes from server environment, else the manager's own file.
+//   OPENAI_API_KEY  (preferred; else ~/.hermes/.env; missing key answers 503)
+//   ANTIGRAVITY_URL (default http://127.0.0.1:8045)
+//   EDUCAD_NL_MODEL (default gemini-3.8-flash-medium)
+const size_t kInterpretMaxBody = 8192;
+const size_t kInterpretMaxText = 2000;
+const size_t kInterpretMaxPoints = 64;
+const size_t kInterpretMaxCommands = 40;
+const char *kDefaultGatewayUrl = "http://127.0.0.1:8045";
+const char *kDefaultNlModel = "gemini-3.8-flash-medium";
+
+std::string interpretSystemPrompt(const std::string &points, bool autoMode) {
+  std::string p =
+      "You translate plain drawing requests into EduCAD slash commands. "
+      "Reply with ONLY a JSON object: {\"commands\": [\"...\"], \"reply\": \"...\"}.\n"
+      "Coordinate plane: millimetres. y >= 0 is the elevation view (front, above "
+      "the XY ground line); y < 0 is the plan view (top, below the line). Keep "
+      "|x| and |y| under 120 unless asked otherwise. In Monge projection each "
+      "corner's elevation x must equal its plan x.\n"
+      "Commands (every line must start with /):\n"
+      "/point <name> <x> <y> [role] — place a point. role: "
+      "plan|elevation|both|profile (omit for auto).\n"
+      "/line <from> <to> [bis] [role] — segment between named points.\n"
+      "/ray <from> <to> [bis] [role] — ray from the first point through the "
+      "second.\n"
+      "/xline <from> <to> [bis] [role] — construction line through two points.\n"
+      "/circle <center> <r> [bis] [role] — or /circle <x> <y> <r> [bis] [role].\n"
+      "/arc <center> <r> <a1> <a2> [bis] [role] — or /arc <x> <y> <r> <a1> "
+      "<a2> [bis] [role]; angles in degrees.\n"
+      "/text <x> <y> <words...> — annotation.\n"
+      "/dimension <from> <to> [bis] [role] — measured span.\n"
+      "/polygon <p1> <p2> <p3> [p4 ...] — closed chain, needs existing points.\n"
+      "/polyline <p1> <p2> [p3 ...] — open chain for curves, needs points.\n"
+      "/ellipse <center> <rx> <ry> [n] [bis] [role] — or /ellipse <x> <y> "
+      "<rx> <ry> [n] [bis] [role].\n"
+      "/hatch <x1> <y1> <x2> <y2> <spacing> [angle] [bis] [role] — section "
+      "hatching in a rect.\n"
+      "/rename <old> <new> — rename. /delete <name> — delete. "
+      "/style <name> <bis> [role] — restyle. /datum [x1] [x2] — ground axis.\n"
+      "/clear — empty sheet. /undo — undo last change. "
+      "/demo <line|points|prism|3view|square>. "
+      "/tutorial <square|prism>. /check. /mode <edit|view>.\n"
+      "BIS line styles: A B E G H K (default B; hidden edges E, centre lines "
+      "G).\n"
+      "Rules: create every point with /point before referencing it. Use short "
+      "letter names (a, b, c...). Never invent commands outside this list. At "
+      "most 40 lines. If the request is vague, impossible, or needs "
+      "information you lack, return {\"commands\": [], \"reply\": \"<one or two "
+      "sentences saying what is missing or why it cannot be drawn>\"}.";
+  if (autoMode) {
+    p += "\nGoal: draw a complete model answer for an engineering-drawing "
+         "question. Prefer full closed geometry over fragments.";
+  }
+  if (!points.empty()) {
+    p += "\nPoints already on the sheet: " + points +
+         ". Reuse them by name when the request means them.";
+  }
+  return p;
+}
+
+// The gateway key: explicit environment wins; otherwise read the manager's
+// single credential file (~/.hermes/.env, KEY=VALUE lines). Empty when
+// neither exists, which the route reports as 503.
+std::string gatewayApiKey() {
+  const char *env = std::getenv("OPENAI_API_KEY");
+  if (env && *env) return std::string(env);
+  const char *home = std::getenv("HOME");
+  if (!home || !*home) return "";
+  std::ifstream f(std::string(home) + "/.hermes/.env");
+  if (!f.is_open()) return "";
+  std::string line;
+  while (std::getline(f, line)) {
+    size_t a = line.find_first_not_of(" \t\r\n");
+    if (a == std::string::npos || line[a] == '#') continue;
+    size_t e = line.find('=', a);
+    if (e == std::string::npos) continue;
+    std::string k = line.substr(a, e - a);
+    size_t ke = k.find_last_not_of(" \t");
+    if (ke != std::string::npos) k = k.substr(0, ke + 1);
+    if (k != "OPENAI_API_KEY") continue;
+    std::string v = line.substr(e + 1);
+    size_t va = v.find_first_not_of(" \t");
+    size_t vz = v.find_last_not_of(" \t\r\n");
+    if (va == std::string::npos) continue;
+    v = v.substr(va, vz - va + 1);
+    if (v.size() >= 2 &&
+        ((v.front() == '"' && v.back() == '"') ||
+         (v.front() == '\'' && v.back() == '\''))) {
+      v = v.substr(1, v.size() - 2);
+    }
+    if (!v.empty()) return v;
+  }
+  return "";
+}
+
+bool splitGatewayUrl(const std::string &url, std::string *host, int *port) {
+  const std::string pre = "http://";
+  if (url.compare(0, pre.size(), pre) != 0) return false;
+  std::string rest = url.substr(pre.size());
+  size_t slash = rest.find('/');
+  std::string hp = (slash == std::string::npos) ? rest : rest.substr(0, slash);
+  if (hp.empty()) return false;
+  size_t colon = hp.find(':');
+  *host = (colon == std::string::npos) ? hp : hp.substr(0, colon);
+  *port = 80;
+  if (colon != std::string::npos) {
+    try {
+      *port = std::stoi(hp.substr(colon + 1));
+    } catch (...) {
+      return false;
+    }
+  }
+  return !host->empty() && *port > 0 && *port < 65536;
+}
+
+bool extractJsonObject(const std::string &text, json *out) {
+  size_t a = text.find('{');
+  size_t b = text.rfind('}');
+  if (a == std::string::npos || b == std::string::npos || b <= a) return false;
+  try {
+    *out = json::parse(text.substr(a, b - a + 1));
+  } catch (...) {
+    return false;
+  }
+  return out->is_object();
+}
+
+// One chat completion against the local gateway. Returns the assistant text.
+bool gatewayChat(const std::string &system, const std::string &userText,
+                 std::string *content) {
+  const char *urlEnv = std::getenv("ANTIGRAVITY_URL");
+  const char *modelEnv = std::getenv("EDUCAD_NL_MODEL");
+  std::string key = gatewayApiKey();
+  if (key.empty()) return false;
+  std::string host;
+  int port = 0;
+  if (!splitGatewayUrl(urlEnv && *urlEnv ? urlEnv : kDefaultGatewayUrl, &host,
+                       &port)) {
+    return false;
+  }
+  std::string model =
+      (modelEnv && *modelEnv) ? modelEnv : kDefaultNlModel;
+  httplib::Client cli(host.c_str(), port);
+  cli.set_connection_timeout(10, 0);
+  cli.set_read_timeout(30, 0);
+  cli.set_write_timeout(10, 0);
+  json payload = {{"model", model},
+                  {"temperature", 0.2},
+                  {"max_tokens", 1200},
+                  {"messages",
+                   {{{"role", "system"}, {"content", system}},
+                    {{"role", "user"}, {"content", userText}}}}};
+  httplib::Headers headers = {{"Authorization", "Bearer " + key},
+                              {"Content-Type", "application/json"}};
+  auto res = cli.Post("/v1/chat/completions", headers, payload.dump(),
+                      "application/json");
+  if (!res || res->status != 200) return false;
+  json body;
+  try {
+    body = json::parse(res->body);
+  } catch (...) {
+    return false;
+  }
+  try {
+    *content = body["choices"][0]["message"]["content"].get<std::string>();
+  } catch (...) {
+    return false;
+  }
+  return !content->empty();
+}
+
 void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
   using HR = httplib::Server::HandlerResponse;
   // httplib defaults to SO_REUSEPORT, which lets a second server share a busy
@@ -1597,6 +1772,9 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
       } else if (path == "/api/me") {
         known = true;
         allowed = (m == "GET");
+      } else if (path == "/api/interpret") {
+        known = true;
+        allowed = (m == "POST");
       } else if (path == "/api/drawings") {
         known = true;
         allowed = (m == "GET" || m == "POST");
@@ -1692,6 +1870,86 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
     std::string token;
     if (bearerToken(req, &token)) db.deleteSession(token);
     sendJson(res, 200, {{"ok", true}});
+  });
+  svr.Post("/api/interpret", [&](const httplib::Request &req, httplib::Response &res) {
+    Db::User user;
+    if (!requireAuth(db, req, res, &user)) return;
+    json body;
+    if (!jsonBody(req, res, kInterpretMaxBody, &body)) return;
+    if (!body.contains("text") || !body["text"].is_string()) {
+      sendJson(res, 400, {{"ok", false}, {"error", "bad text"}});
+      return;
+    }
+    std::string text = body["text"].get<std::string>();
+    if (text.empty() || text.size() > kInterpretMaxText) {
+      sendJson(res, 400, {{"ok", false}, {"error", "bad text"}});
+      return;
+    }
+    std::string mode = "draw";
+    if (body.contains("mode")) {
+      if (!body["mode"].is_string()) {
+        sendJson(res, 400, {{"ok", false}, {"error", "bad mode"}});
+        return;
+      }
+      mode = body["mode"].get<std::string>();
+      if (mode != "draw" && mode != "auto") {
+        sendJson(res, 400, {{"ok", false}, {"error", "bad mode"}});
+        return;
+      }
+    }
+    std::string points;
+    if (body.contains("points")) {
+      if (!body["points"].is_array()) {
+        sendJson(res, 400, {{"ok", false}, {"error", "bad points"}});
+        return;
+      }
+      size_t n = 0;
+      for (const auto &q : body["points"]) {
+        if (!q.is_string()) {
+          sendJson(res, 400, {{"ok", false}, {"error", "bad points"}});
+          return;
+        }
+        if (n >= kInterpretMaxPoints) break;
+        if (!points.empty()) points += ", ";
+        points += q.get<std::string>().substr(0, 40);
+        n++;
+      }
+    }
+    if (gatewayApiKey().empty()) {
+      sendJson(res, 503, {{"ok", false}, {"error", "interpret_unavailable"}});
+      return;
+    }
+    std::string content;
+    if (!gatewayChat(interpretSystemPrompt(points, mode == "auto"), text,
+                     &content)) {
+      sendJson(res, 502, {{"ok", false}, {"error", "interpret_failed"}});
+      return;
+    }
+    json ans;
+    if (!extractJsonObject(content, &ans)) {
+      sendJson(res, 200,
+               {{"ok", true},
+                {"commands", json::array()},
+                {"reply", "The model gave an unusable answer — try shorter, "
+                          "concrete words (names, mm, shapes)."}});
+      return;
+    }
+    json commands = json::array();
+    if (ans.contains("commands") && ans["commands"].is_array()) {
+      for (const auto &c : ans["commands"]) {
+        if (commands.size() >= kInterpretMaxCommands) break;
+        if (!c.is_string()) continue;
+        std::string line = c.get<std::string>();
+        if (line.size() > 1 && line[0] == '/' && line.size() <= 300) {
+          commands.push_back(line);
+        }
+      }
+    }
+    std::string reply;
+    if (ans.contains("reply") && ans["reply"].is_string()) {
+      reply = ans["reply"].get<std::string>().substr(0, 600);
+    }
+    sendJson(res, 200, {{"ok", true}, {"commands", commands}, {"reply", reply}});
   });
   svr.Get("/api/me", [&](const httplib::Request &req, httplib::Response &res) {
     std::string token;

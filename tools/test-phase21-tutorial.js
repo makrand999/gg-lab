@@ -188,12 +188,11 @@ eq(r11.pass, true, JSON.stringify(r11.checks.filter(function (c) {
 eq(r11.counts.fail, 0);
 pass('phase21 end-state passes Check');
 
-// 12 the claimed end-state now lifts (M5 Class E supersedes the old
-// always-ambiguous expectation); bare geometry without claims still
-// reports ambiguous-pairing (pinned in phase22 test 4)
-var r12 = R.reconstruct(endState);
+// 12 the claimed end-state lifts through the claims reader (M5); bare
+// geometry without claims lifts as wire instead (pinned in phase22 test 4)
+var r12 = R.reconstructLive(endState);
 eq(r12.status, 'ok');
-eq(r12.class, 'E');
+eq(r12.class, null);
 eq(r12.geometry.vertices.length, 4);
 eq(r12.geometry.edges.length, 4);
 pass('phase21 end-state lifts to 3D');
@@ -289,14 +288,20 @@ ok(V.isProjectorShaped({ type: 'SEGMENT', x: 0, y: -48, x2: 0, y2: -8 }) === fal
   'plan-internal stays geometry');
 pass('phase21 touching rule');
 
-// 21 a claimed helper is read as a claim, not silently dropped (M5):
-// refs dangling off id-less bundle specs fail loose-foot outright
+// 21 claimed helpers route to the claims reader (M5, three claims own
+// the sheet): refs dangling off id-less bundle specs fail loose-foot
 var t21 = [];
 sq.entities.forEach(function (e) { t21.push(e); });
 t21.push({ id: 'U1', type: 'SEGMENT', x: 0, y: 0, x2: 0, y2: -8,
   bisCode: 'G', viewRole: 'BOTH', visible: true, caption: '',
   showLabel: false, meta: { kind: 'user-line', refs: ['S2', 'S3'], fromMember: 'd' } });
-var r21 = R.reconstruct(t21);
+t21.push({ id: 'U2', type: 'SEGMENT', x: 0, y: 40, x2: 0, y2: -8,
+  bisCode: 'G', viewRole: 'BOTH', visible: true, caption: '',
+  showLabel: false, meta: { kind: 'user-line', refs: ['QX', 'QY'], fromMember: 'a' } });
+t21.push({ id: 'U3', type: 'SEGMENT', x: 0, y: 40, x2: 0, y2: -48,
+  bisCode: 'G', viewRole: 'BOTH', visible: true, caption: '',
+  showLabel: false, meta: { kind: 'user-line', refs: ['QZ', 'QW'], fromMember: 'b' } });
+var r21 = R.reconstructLive(t21);
 eq(r21.status, 'unavailable');
 eq(r21.reason, 'hint-loose-foot', 'dangling claim feet fail named');
 pass('phase21 dangling claim feet');
@@ -312,7 +317,7 @@ pass('phase21 manual sync');
 // 23 README lists the phase21 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase21`') !== -1, 'phase21 row');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 789');
 pass('phase21 readme suite row');
 

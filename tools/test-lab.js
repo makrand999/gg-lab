@@ -1,16 +1,25 @@
 'use strict';
 // Lab: teacher studio + student workspace shipping checks. Static file
-// assertions plus live static serving on an ephemeral Node demo server.
-// Standalone: `npm run test:lab` (not in `npm test`, like test:login).
+// assertions plus live static serving on an ephemeral C++ server.
+// Standalone: `npm run test:lab` (builds the backend first; not in
+// `npm test`, like test:login).
 var assert = require('assert');
+var child = require('child_process');
 var fs = require('fs');
 var http = require('http');
+var net = require('net');
+var os = require('os');
 var path = require('path');
 
-var Serve = require('./serve.js');
 var Saves = require('../mirror/files/www.geogebra.org/educad-saves.js');
 
-var TOTAL = 15;
+var ROOT = path.join(__dirname, '..');
+var SERVER = path.join(ROOT, 'backend', 'build', 'educad-server');
+var SEED = path.join(ROOT, 'backend', 'build', 'educad-seed');
+var USERS = path.join(__dirname, 'users.json');
+var MIRROR = path.join(ROOT, 'mirror');
+
+var TOTAL = 18;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -20,15 +29,32 @@ function readMirror(f) {
   return fs.readFileSync(path.join(__dirname, '..', 'mirror', f), 'utf8');
 }
 
-function onceListening(srv) {
+function freePort() {
   return new Promise(function (resolve, reject) {
-    srv.once('listening', resolve);
-    srv.once('error', reject);
+    var s = net.createServer();
+    s.once('error', reject);
+    s.listen(0, '127.0.0.1', function () {
+      var p = s.address().port;
+      s.close(function () { resolve(p); });
+    });
   });
 }
 
-function closeServer(srv) {
-  return new Promise(function (resolve) { srv.close(function () { resolve(); }); });
+function waitReady(port, srv, timeoutMs) {
+  var start = Date.now();
+  return new Promise(function (resolve, reject) {
+    (function poll() {
+      get(port, '/teacher.html').then(function (r) {
+        if (r.status === 200) return resolve();
+        if (Date.now() - start > timeoutMs) return reject(new Error('server not ready'));
+        setTimeout(poll, 100);
+      }, function () {
+        if (srv.exitCode !== null) return reject(new Error('server exited early'));
+        if (Date.now() - start > timeoutMs) return reject(new Error('server not ready'));
+        setTimeout(poll, 100);
+      });
+    })();
+  });
 }
 
 function get(port, urlPath) {
@@ -177,10 +203,18 @@ async function main() {
   });
   pass('lab saves class wrappers');
 
-  var srv = Serve.start(0, '127.0.0.1');
-  await onceListening(srv);
+  ok(fs.existsSync(SERVER), 'educad-server built');
+  var tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'educad-lab-'));
+  var db = path.join(tmp, 'educad.db');
+  var seed = child.spawnSync(SEED, [USERS, db], { encoding: 'utf8' });
+  eq(seed.status, 0, 'seed exit 0: ' + (seed.stderr || ''));
+  var port = await freePort();
+  var srv = child.spawn(SERVER, [String(port)], {
+    env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+    stdio: ['ignore', 'ignore', 'ignore']
+  });
   try {
-    var port = srv.address().port;
+    await waitReady(port, srv, 10000);
 
     // 12 studio + workspace pages serve with html type
     var r12a = await get(port, '/teacher.html');
@@ -201,6 +235,10 @@ async function main() {
     ok(String(r13b.headers['content-type']).indexOf('javascript') !== -1, 'js type');
     var r13c = await get(port, '/student.js');
     eq(r13c.status, 200);
+    var r13d = await get(port, '/lab-manual.js');
+    eq(r13d.status, 200);
+    ok(String(r13d.headers['content-type']).indexOf('javascript') !== -1,
+      'manual lib type');
     pass('lab assets serve');
 
     // 14 sheet still gates + keeps its buttons
@@ -212,7 +250,9 @@ async function main() {
     ok(r14.body.indexOf('id="btn-home"') !== -1, 'home ships');
     pass('lab sheet buttons kept');
   } finally {
-    await closeServer(srv);
+    srv.kill('SIGTERM');
+    await new Promise(function (resolve) { srv.on('exit', resolve); });
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 
   // 15 success flashes survive the follow-up rerender: every render*
@@ -225,6 +265,64 @@ async function main() {
   ok(!wiped.test(sj), 'student keeps success flash: ' +
     ((sj.match(wiped) || [''])[0].slice(0, 80)));
   pass('lab success flash survives rerender');
+
+  // 16 studio Manual opens inline with the teacher slice
+  ok(th.indexOf('lab-manual.js') !== -1, 'manual script wired');
+  ok(th.indexOf('id="nav-manual"') !== -1, 'nav manual hook');
+  ok(th.indexOf('href="manual.html"') !== -1, 'full-manual fallback kept');
+  ok(tj.indexOf("h === 'manual'") !== -1, 'manual route');
+  ok(tj.indexOf('renderManual()') !== -1, 'manual render called');
+  ok(tj.indexOf('EduCADLabManual') !== -1, 'manual lib used');
+  var tmStart = tj.indexOf('function renderManual()');
+  ok(tmStart !== -1, 'renderManual defined');
+  ok(tj.slice(tmStart, tmStart + 500).indexOf("'teacher'") !== -1,
+    'teacher role passed');
+  pass('lab teacher inline manual');
+
+  // 17 workspace Manual opens inline with the student slice
+  ok(sh.indexOf('lab-manual.js') !== -1, 'manual script wired');
+  ok(sh.indexOf('id="nav-manual"') !== -1, 'nav manual hook');
+  ok(sh.indexOf('href="manual.html"') !== -1, 'full-manual fallback kept');
+  ok(sj.indexOf("h === 'manual'") !== -1, 'manual route');
+  ok(sj.indexOf('renderManual()') !== -1, 'manual render called');
+  ok(sj.indexOf('EduCADLabManual') !== -1, 'manual lib used');
+  var smStart = sj.indexOf('function renderManual()');
+  ok(smStart !== -1, 'renderManual defined');
+  ok(sj.slice(smStart, smStart + 500).indexOf("'student'") !== -1,
+    'student role passed');
+  pass('lab student inline manual');
+
+  // 18 manual lib: role section maps, parsed (never injected) html
+  var lm = readMirror('lab-manual.js');
+  ok(lm.indexOf('EduCADLabManual') !== -1, 'global ships');
+  ok(lm.indexOf('DOMParser') !== -1, 'parses manual');
+  ok(lm.indexOf('manual.html') !== -1, 'fetches manual');
+  eq(lm.indexOf('innerHTML'), -1, 'no html injection');
+  function roleSlice(name) {
+    var s = lm.indexOf(name + ': [');
+    ok(s !== -1, name + ' map');
+    return lm.slice(s, lm.indexOf(']', s));
+  }
+  var tArr = roleSlice('teacher');
+  var sArr = roleSlice('student');
+  ok(tArr.indexOf('93-teaching-scripts-follow-verbatim') !== -1,
+    'teacher scripts');
+  eq(tArr.indexOf('2-quick-start-your-first-drawing-in-5-minutes'), -1,
+    'teacher trims quick start');
+  ok(sArr.indexOf('2-quick-start-your-first-drawing-in-5-minutes') !== -1,
+    'student quick start');
+  ok(sArr.indexOf('94-tutorial-square-scripted-user') !== -1,
+    'student tutorials');
+  eq(sArr.indexOf('93-teaching-scripts-follow-verbatim'), -1,
+    'student trims scripts');
+  ok(tArr.indexOf('310-classes-and-question-sets-teachers-post-students-submit') !== -1,
+    'teacher sets flow');
+  eq(tArr.indexOf('3-interface-tour'), -1, 'teacher trims tour');
+  ok(sArr.indexOf('3-interface-tour') !== -1,
+    'student tour covers sets flow');
+  ok(tArr.indexOf('11-troubleshooting') !== -1 &&
+    sArr.indexOf('11-troubleshooting') !== -1, 'both troubleshoot');
+  pass('lab manual role sections');
 
   assert.strictEqual(n, TOTAL);
   console.log('OK ' + TOTAL + '/' + TOTAL + ' lab tests passed');

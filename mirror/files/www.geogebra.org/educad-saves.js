@@ -200,6 +200,10 @@
       'api/sets/' + code + '/questions/' + qi + '/check', session,
       { enabled: !!enabled });
   }
+  function interpretWords(fetchImpl, session, text, points, mode) {
+    return apiRequest(fetchImpl, 'POST', 'api/interpret', session,
+      { text: text, points: points || [], mode: mode || 'draw' });
+  }
   function gradeSubmission(fetchImpl, session, id, verdict, remarks) {
     return apiRequest(fetchImpl, 'PUT', 'api/submissions/' + id + '/grade', session,
       { verdict: verdict, remarks: remarks });
@@ -269,6 +273,7 @@
     listSubmissions: listSubmissions, getSubmission: getSubmission,
     listMySubmissions: listMySubmissions,
     listProgress: listProgress, putProgress: putProgress,
-    recordProgress: recordProgress, fetchProgress: fetchProgress
+    recordProgress: recordProgress, fetchProgress: fetchProgress,
+    interpretWords: interpretWords
   };
 });

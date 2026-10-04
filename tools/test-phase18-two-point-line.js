@@ -190,7 +190,7 @@ pass('phase18 manual states the property');
 // 11 README lists the phase18 suite with the new grand total.
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase18`') !== -1, 'phase18 row');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 789');
 pass('phase18 readme suite row');
 

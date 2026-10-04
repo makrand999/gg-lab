@@ -14,6 +14,7 @@
   // browser via window.EduCADMeasure, plain Node via module.exports.
   var MODE_EDIT = 'edit';
   var MODE_VIEW = 'view';
+  var MODE_POSE = 'pose';
   var MEASURE_TOL_PX = 14;
   var TWO_POINT_MEASURABLE = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION', 'DATUM_AXIS'];
   var ROUND_MEASURABLE = ['CIRCLE', 'CIRCULAR_ARC'];
@@ -25,17 +26,25 @@
   function createViewState() {
     return { mode: MODE_EDIT, inspectId: null, inspectSide: null };
   }
+  // Pose reads as view-like: every isView gate is a sheet-read-only
+  // gate, and pose never mutates the table, so pose takes the same
+  // branches. Use isPose only where pose needs its own behavior.
   function isView(st) {
-    return !!st && st.mode === MODE_VIEW;
+    return !!st && (st.mode === MODE_VIEW || st.mode === MODE_POSE);
   }
   function isEdit(st) {
-    return !st || st.mode !== MODE_VIEW;
+    return !st || st.mode === MODE_EDIT;
+  }
+  function isPose(st) {
+    return !!st && st.mode === MODE_POSE;
   }
   // Switching modes always drops the inspected pick: a readout must
   // never survive into a mode that cannot explain it. Unknown modes
   // are ignored (the sheet keeps its current mode).
   function setMode(st, mode) {
-    if (mode !== MODE_EDIT && mode !== MODE_VIEW) return st.mode;
+    if (mode !== MODE_EDIT && mode !== MODE_VIEW && mode !== MODE_POSE) {
+      return st.mode;
+    }
     st.mode = mode;
     st.inspectId = null;
     st.inspectSide = null;
@@ -391,12 +400,14 @@
   return {
     MODE_EDIT: MODE_EDIT,
     MODE_VIEW: MODE_VIEW,
+    MODE_POSE: MODE_POSE,
     MEASURE_TOL_PX: MEASURE_TOL_PX,
     DIM_OFFSET_MM: DIM_OFFSET_MM,
     DIM_ARROW_PX: DIM_ARROW_PX,
     createViewState: createViewState,
     isView: isView,
     isEdit: isEdit,
+    isPose: isPose,
     setMode: setMode,
     setInspect: setInspect,
     clearInspect: clearInspect,

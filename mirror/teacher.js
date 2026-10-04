@@ -46,9 +46,9 @@
       window.location.replace('login.html');
       return;
     }
-    // The minimal Node demo server has no lab API at all.
+    // Without the app server there is no lab API at all.
     if (/failed to fetch|load failed|not found/i.test(msg) || !err.status) {
-      flash(what + ': lab server unreachable. Run `npm run start:cpp` ' +
+      flash(what + ': lab server unreachable. Run `npm start` ' +
         'for classes, sets and saves.', 'error');
       return;
     }
@@ -671,6 +671,13 @@
             };
           })(i), 'lab-danger'));
         }
+        // Auto-draw the model from the question words on the sheet.
+        var auto = link(has ? 'Auto-draw replacement' : 'Auto-draw model',
+          'index.html?model=' + encodeURIComponent(data.code) + '&q=' + i +
+          '&autodraw=1');
+        auto.target = '_blank';
+        auto.rel = 'noopener';
+        acts.appendChild(auto);
         // Attach / replace the model from a saved drawing.
         var sel = modelSelect('');
         sel.style.maxWidth = '220px';
@@ -692,7 +699,8 @@
       });
       root.appendChild(el('p', 'Draw the model on the Sheet and Save it, ' +
         'then attach it here — or attach the current sheet from the Sheet’s ' +
-        'Sets panel. Students never see the model drawing; the toggle only ' +
+        'Sets panel. Auto-draw drafts it from the question words instead. ' +
+        'Students never see the model drawing; the toggle only ' +
         'switches strict auto pass/fail checking on or off.', 'lab-hint'));
 
       root.appendChild(h2('Submissions by question'));
@@ -767,9 +775,26 @@
     });
   }
 
+  // ---- manual (inline, teacher slice) ----
+  function renderManual() {
+    clear(root);
+    flash('');
+    var s = session();
+    if (!s) { window.location.replace('login.html'); return; }
+    if (!window.EduCADLabManual) {
+      window.location.href = 'manual.html';
+      return;
+    }
+    window.EduCADLabManual.show(root, 'teacher');
+  }
+
   // ---- routing ----
   function route() {
     var h = String(window.location.hash || '').replace(/^#/, '');
+    if (h === 'manual') {
+      renderManual();
+      return;
+    }
     if (h.indexOf('class/') === 0 && h.length > 6) {
       renderClass(decodeURIComponent(h.slice(6)));
       return;
@@ -790,5 +815,6 @@
     renderHome();
   }
   window.addEventListener('hashchange', route);
+  if (window.EduCADLabManual) window.EduCADLabManual.wireNav();
   route();
 })();

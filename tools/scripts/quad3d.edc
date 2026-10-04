@@ -1,0 +1,24 @@
+# QUAD-3D (EduCAD Script): a lamina drawn in both views.
+# FV rect + TV rect share x-stations; the four Type G projectors
+# pair the corners, so the sheet reconstructs to 4V 4E headlessly.
+/datum -60 60
+/point a' -20 30
+/point a -20 -30
+/point b' 20 30
+/point b 20 -30
+/point c' 20 50
+/point c 20 -10
+/point d' -20 50
+/point d -20 -10
+/line a' b'
+/line b' c'
+/line c' d'
+/line d' a'
+/line a b
+/line b c
+/line c d
+/line d a
+/line a a' G
+/line b b' G
+/line c c' G
+/line d d' G

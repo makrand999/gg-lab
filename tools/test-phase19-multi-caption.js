@@ -120,13 +120,13 @@ deep(R.captionBases(''), []);
 deep(R.captionBases('(z)'), ['z']);
 pass('phase19 captionBases');
 
-// 12 name gate meets on shared parts (prism stations pass)
+// 12 shared caption parts pair across views (prism stations lift)
 var prism = C.regularSolid({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
-var r12 = R.reconstruct(prism.entities);
-eq(r12.status, 'ok', 'pair stations pass the gate');
+var r12 = R.reconstructLive(prism.entities);
+eq(r12.status, 'ok', 'pair stations lift');
 eq(r12.geometry.vertices.length, 12);
 eq(r12.geometry.edges.length, 18);
-pass('phase19 gate set semantics');
+pass('phase19 shared parts pair');
 
 // 13 parens are invisible to 3D: verdicts never break reconstruction
 var pared = prism.entities.map(function (e) {
@@ -138,12 +138,13 @@ var pared = prism.entities.map(function (e) {
   else c.caption = '(' + c.caption + ')';
   return c;
 });
-var r13 = R.reconstruct(pared);
+var r13 = R.reconstructLive(pared);
 eq(r13.status, 'ok', 'fully parenthesized still ok');
 deep(r13.geometry, r12.geometry, 'identical solid');
 pass('phase19 verdicts invisible to 3D');
 
-// 14 a true mismatch still fails the gate by name
+// 14 breaking a shared corner caption drops exactly its two vertices;
+// the rest of the wire lifts on
 var wrong = prism.entities.map(function (e) {
   if (e.type !== 'POINT' || e.caption !== 'g,a') return e;
   var c = {};
@@ -151,10 +152,11 @@ var wrong = prism.entities.map(function (e) {
   c.caption = 'z,y';
   return c;
 });
-var r14 = R.reconstruct(wrong);
-eq(r14.status, 'unavailable');
-eq(r14.reason, 'name-mismatch');
-pass('phase19 mismatch still fails');
+var r14 = R.reconstructLive(wrong);
+eq(r14.status, 'ok');
+eq(r14.geometry.vertices.length, 10);
+eq(r14.geometry.edges.length, 13);
+pass('phase19 broken caption drops two');
 
 // 15 prism corner truth: 12 corners at exact stations
 var corners = prism.corners;
@@ -218,11 +220,13 @@ sqPts.forEach(function (p) { sqGot[p.caption] = true; });
 });
 pass('phase19 square stations');
 
-// 20 the square is honestly ambiguous in 3D
-var r20 = R.reconstruct(sq.entities);
-eq(r20.status, 'unavailable');
-eq(r20.reason, 'ambiguous-pairing');
-pass('phase19 square ambiguous');
+// 20 the named square lifts as wire; banked claims add the face (phase22)
+var r20 = R.reconstructLive(sq.entities);
+eq(r20.status, 'ok');
+eq(r20.geometry.vertices.length, 4);
+eq(r20.geometry.edges.length, 4);
+eq(r20.geometry.faces.length, 0);
+pass('phase19 square lifts as wire');
 
 // 21 square specs insert into a real table
 var t21 = E.createTable();
@@ -238,7 +242,7 @@ pass('phase19 3view truth passthrough');
 // 23 README lists the phase19 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase19`') !== -1, 'phase19 row');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 789');
 pass('phase19 readme suite row');
 

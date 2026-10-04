@@ -85,8 +85,8 @@ ephemeral.
   whose face is the convex hull in (depth, height).
 - Anything else → explicit "3D unavailable" state with a reason.
 
-*Curves are deferred to a later tier; until then circle/arc drawings report
-"curves not supported yet".
+*Full-circle plan drawings reconstruct as Class D solids (§11); arc-only
+sheets report "curves not supported yet".
 
 ### 4.2 Pipeline
 
@@ -145,12 +145,10 @@ candidate interpretation.
   failure states, round-trip), `setGeometry` widget tests, live-sync integration
   tests. All 448 existing tests stay green. Zero new dependencies; Node-safe.
 
-## 7. Non-goals (M1)
+## 7. Scope note (M1)
 
-Third-angle interpretation (marker exists; later), curves (cylinder/cone
-surfaces, tessellation), perspective, shading/fills/lighting, booleans,
-sections, 3D dimensions, export, general two-view reconstruction of arbitrary
-ambiguous drawings.
+M1 shipped the two-view scope in §§3–6. The third view (§10) and curve
+support (§11) followed as amendments; §§12–14 record the lesson layer.
 
 ## 8. Acceptance criteria (M1)
 
@@ -229,15 +227,14 @@ Dropped helpers surface as a `helpers-ignored` warning.
 ## 11. Curves — vertical cylinders and cones (M3 amendment)
 
 This section amends §4.1/§7: full-circle cylinders/cones now reconstruct
-as Class D; arcs stay deferred.
+as Class D; arc-only sheets report `unsupported-curves`.
 
 ### 11.1 Scope lock
 
 Full `CIRCLE` only, vertical-axis solids of revolution (plan circle +
 elevation silhouette: rectangle = cylinder, triangle + apex = cone).
-`CIRCULAR_ARC` stays deferred exactly as before (`unsupported-curves`
-when load-bearing, `curves-ignored` otherwise). No tilted axes,
-ellipses, partial rims, or freeform curves. No new failure reasons.
+`CIRCULAR_ARC` reports `unsupported-curves` when load-bearing,
+`curves-ignored` otherwise. No new failure reasons.
 
 ### 11.2 Class D pairing
 
@@ -262,8 +259,6 @@ construction after the §11.2 checks pass; silhouette coverage ≥ 0.999
 in plan, elevation, and profile. Class D competes by coverage, then
 edge length; ties report `ambiguous-pairing`.
 
-Deferred: arcs, tilted axes, ellipses, third-angle timing.
-
 ## 12. Verify-only lesson layer (M4 amendment)
 
 Student verdicts and projector claims are checked, never derived:
@@ -277,8 +272,7 @@ Student verdicts and projector claims are checked, never derived:
   existing `meta.refs`. Reconstruction ignores both.
 - `educad-verify.js` grades verdicts and claims against curriculum corner
   truth. Without truth (hand drawings) everything reports `unverifiable`,
-  never a guess. Profile verdicts report `unchecked-view` in v1.
-- Deferred: quiz-mode 3D gating, label recoloring.
+  never a guess. Profile verdicts report `unchecked-view`.
 
 ## 13. Claimed corners — Class E corner-lift (M5 amendment)
 
@@ -290,7 +284,7 @@ fails, Class E lifts corners from projector claims instead:
   one 3D corner at (x̄, h, d) from its plan and elevation feet. Claims on
   non-projector lines are ignored (the checker flags them); claims apply
   always, since hand drawings have no Check truth to gate on.
-- v1 builds profile laminae only: all corners share x
+- Class E builds profile laminae only: all corners share x
   (`corners-not-coplanar` otherwise), number ≥ 3, all on their convex hull
   in (depth, height) (`non-convex-corners` otherwise, collinear included).
 - Wrong pairings fail loudly: same corner twice (`hint-conflict`), feet off
@@ -298,8 +292,8 @@ fails, Class E lifts corners from projector claims instead:
   (`duplicate-corners`). Coverage is checked both directions per view
   against drawn A/B ink through the standard gate.
 - E attempts only when no geometric class passes and claims exist, so hints
-  rescue ambiguity but never compete with a success. Profile ink is ignored
-  in v1. The lamina face is emitted double-wound (no interior to hide).
+  rescue ambiguity but never compete with a success. Profile ink is ignored.
+  The lamina face is emitted double-wound (no interior to hide).
 
 ## 12. Names are absolute — pair-by-name (M4 amendment)
 

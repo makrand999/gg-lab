@@ -165,12 +165,27 @@ deep([verdicts['@7'], verdicts['@8'], verdicts['@9'], verdicts['@10']],
   ["a'", "g'", "d'", "j'"], 'singles stay bare');
 pass('phase23 verdicts');
 
-// 8 replayed end-state constructs the 12-vertex, 8-face prism
+// 8 replayed end-state lifts the 12-vertex, 18-edge prism wire. The old
+// pin (22 edges: 4 projector-evidenced face chords on top of the 18)
+// documented buggy behavior — crossing-vertical helpers are not edge
+// evidence (phase36 test 12) — so the tutorial sheet now matches the
+// demo wire edge for edge, projectors and all.
+function edgeKeys23(g) {
+  function vk(v) { return v.x.toFixed(2) + ',' + v.y.toFixed(2) + ',' + v.z.toFixed(2); }
+  return g.edges.map(function (e) {
+    var k1 = vk(g.vertices[e[0]]), k2 = vk(g.vertices[e[1]]);
+    return k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1;
+  }).sort();
+}
 var end = runScript(T.PRISM_SCRIPT);
-var res = R.reconstruct(end);
+var res = R.reconstructLive(end);
 eq(res.status, 'ok', 'reconstructs: ' + (res.reason || 'ok'));
 eq(res.geometry.vertices.length, 12, 'twelve vertices');
-eq(res.geometry.faces.length, 8, 'eight faces');
+eq(res.geometry.faces.length, 8, 'closed prism infers faces (phase38)');
+eq(res.geometry.edges.length, 18, 'eighteen true edges, no chords');
+var demoKeys = edgeKeys23(R.reconstructLive(prism.entities).geometry);
+eq(demoKeys.length, 18, 'demo has eighteen');
+deep(edgeKeys23(res.geometry), demoKeys, 'tutorial matches demo wire');
 pass('phase23 end-state constructs 3D');
 
 // 9 replayed end-state checks 18/18 (14 stations + 4 projectors)
@@ -187,20 +202,22 @@ var neutral = T.PRISM_SCRIPT.filter(function (s) {
     s.do.name.indexOf('(') === -1;
 });
 var nEnd = runScript(neutral);
-var nRes = R.reconstruct(nEnd);
+var nRes = R.reconstructLive(nEnd);
 eq(nRes.status, 'ok', 'neutral names still construct');
 var nChk = V.verify(nEnd, prism.corners);
 eq(nChk.counts.fail, 10, 'ten verdicts fail');
 ok(!nChk.pass, 'check red until verdicts');
 pass('phase23 verdicts are check-only');
 
-// 11 loophole pin: unnamed stations veto 3D (name-mismatch)
+// 11 unnamed stations stay 2D-only: no station is uniquely pairable,
+// so the sheet reads quiet until names resolve the shared stations
 var unnamed = T.PRISM_SCRIPT.filter(function (s) { return s.do.op !== 'rename'; });
 var uEnd = runScript(unnamed);
-var uRes = R.reconstruct(uEnd);
+var uRes = R.reconstructLive(uEnd);
 eq(uRes.status, 'unavailable', 'no 3D without names');
-eq(uRes.reason, 'name-mismatch', 'names gate, geometry pairs');
-pass('phase23 names gate 3D');
+eq(uRes.reason, 'empty-sketch', 'crowded stations stay quiet');
+eq(uRes.stats.paired, 0, 'nothing pairs');
+pass('phase23 names resolve shared stations');
 
 // 12 demo bar: prism button exact markup, order kept
 var bar = /<div class="demo-bar">([\s\S]*?)<\/div>/.exec(INDEX);
@@ -285,7 +302,7 @@ ok(MD.indexOf('18/18') !== -1, 'finale stated');
 pass('phase23 manual');
 
 // 18 readme + package pin the new suite
-ok(README.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(README.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 789');
 ok(PKG.indexOf('node tools/test-phase23-prism-tutorial.js') !== -1,
   'suite runs phase23');

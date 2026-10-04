@@ -50,24 +50,18 @@ function endState() {
     tutLine('P4', 0, 0, 0, -8, 'G', ['S2', 'S3'], 'd')
   ];
 }
-function attemptsOf(r) {
-  return (r.stats && r.stats.attempts ? r.stats.attempts : []).map(function (a) {
-    return a.class;
-  });
-}
-
 // 1 version bump, zero deps kept
-ok(/^10\.1\./.test(R.VERSION), 'version ' + R.VERSION);
+ok(/^10\.6\./.test(R.VERSION), 'version ' + R.VERSION);
 var SRC = fs.readFileSync(path.join(ROOT, 'mirror', 'files',
   'www.geogebra.org', 'educad-reconstruct.js'), 'utf8');
 ok(SRC.indexOf('require(') === -1, 'zero deps');
-ok(SRC.indexOf('function tryClaimedCorners(') !== -1, 'Class E attempt');
-pass('phase22 loads Class E');
+ok(SRC.indexOf('function tryClaimedCorners(') !== -1, 'claims reader kept');
+pass('phase22 loads claims reader');
 
-// 2 claimed square lifts: class E, full coverage
-var r2 = R.reconstruct(endState());
+// 2 claimed square lifts: unclassified lamina, full coverage
+var r2 = R.reconstructLive(endState());
 eq(r2.status, 'ok');
-eq(r2.class, 'E');
+eq(r2.class, null);
 deep(r2.coverage, { plan: 1, elev: 1 });
 eq(r2.geometry.vertices.length, 4);
 eq(r2.geometry.edges.length, 4);
@@ -83,20 +77,22 @@ deep(r2.geometry.edges, [[3, 2], [2, 1], [1, 0], [0, 3]]);
 deep(r2.geometry.faces, [[3, 2, 1, 0], [0, 1, 2, 3]]);
 pass('phase22 exact lamina');
 
-// 4 bare square still ambiguous with no E attempt
+// 4 bare square lifts as wire (claims add the face in test 2)
 var sq = C.profileSquare({ sizeMm: 40, xMm: 0 });
-var r4 = R.reconstruct(sq.entities);
-eq(r4.status, 'unavailable');
-eq(r4.reason, 'ambiguous-pairing');
-ok(attemptsOf(r4).indexOf('E') === -1, 'E never attempted');
-pass('phase22 bare square unchanged');
+var r4 = R.reconstructLive(sq.entities);
+eq(r4.status, 'ok');
+eq(r4.class, null);
+eq(r4.geometry.vertices.length, 4);
+eq(r4.geometry.edges.length, 4);
+eq(r4.geometry.faces.length, 0);
+pass('phase22 bare square lifts wire');
 
 // 5 wrong foot duplicates a corner, named
 var bad5 = endState();
 bad5.forEach(function (e) {
   if (e.id === 'P1') { e.y2 = -48; e.meta.refs = ['S1', 'S4']; }
 });
-var r5 = R.reconstruct(bad5);
+var r5 = R.reconstructLive(bad5);
 eq(r5.status, 'unavailable');
 eq(r5.reason, 'duplicate-corners');
 ok(r5.label.indexOf('"a"') !== -1 && r5.label.indexOf('"b"') !== -1,
@@ -106,21 +102,23 @@ pass('phase22 duplicate corners');
 // 6 one corner claimed two ways conflicts
 var bad6 = endState();
 bad6.push(tutLine('P5', 0, 40, 0, -48, 'G', ['S1', 'S4'], 'a'));
-var r6 = R.reconstruct(bad6);
+var r6 = R.reconstructLive(bad6);
 eq(r6.reason, 'hint-conflict');
 ok(r6.label.indexOf('pairs two ways') !== -1, r6.label);
 pass('phase22 double pairing conflicts');
 
-// 7 renamed-away member is stale, surfaced over ambiguity; a fully
-// broken station still reports the name breakage first (precedence)
+// 7 a renamed-away member is stale and surfaces as a stale claim;
+// a fully renamed station reports the same breakage, never a guess
 var bad7 = endState();
 bad7.forEach(function (e) { if (e.id === 'S1') e.caption = "b',x'"; });
-var r7 = R.reconstruct(bad7);
+var r7 = R.reconstructLive(bad7);
 eq(r7.reason, 'hint-conflict');
 ok(r7.label.indexOf('left its station') !== -1, r7.label);
 var bad7b = endState();
 bad7b.forEach(function (e) { if (e.id === 'S1') e.caption = 'x,y'; });
-eq(R.reconstruct(bad7b).reason, 'x-mismatch', 'name breakage outranks');
+var r7b = R.reconstructLive(bad7b);
+eq(r7b.reason, 'hint-conflict', 'renamed member surfaces');
+ok(r7b.label.indexOf('left its station') !== -1, r7b.label);
 pass('phase22 stale claim surfaced');
 
 // 8 unresolvable feet fail loose
@@ -128,7 +126,7 @@ var bad8 = endState();
 bad8.forEach(function (e) {
   if (e.id === 'P1') e.meta.refs = ['S1', 'QX'];
 });
-var r8 = R.reconstruct(bad8);
+var r8 = R.reconstructLive(bad8);
 eq(r8.reason, 'hint-loose-foot');
 pass('phase22 loose foot');
 
@@ -137,7 +135,7 @@ var bad9 = endState();
 bad9.push(tutPt('S5', 10, 40, "e'", 'ELEVATION'));
 bad9.push(tutPt('S6', 10, -8, 'e', 'PLAN'));
 bad9.push(tutLine('P5', 10, 40, 10, -8, 'G', ['S5', 'S6'], 'e'));
-var r9 = R.reconstruct(bad9);
+var r9 = R.reconstructLive(bad9);
 eq(r9.reason, 'corners-not-coplanar');
 pass('phase22 non-coplanar');
 
@@ -146,39 +144,43 @@ var bad10 = endState();
 bad10.push(tutPt('S5', 0, 20, "e'", 'ELEVATION'));
 bad10.push(tutPt('S6', 0, -20, 'e', 'PLAN'));
 bad10.push(tutLine('P5', 0, 20, 0, -20, 'G', ['S5', 'S6'], 'e'));
-var r10 = R.reconstruct(bad10);
+var r10 = R.reconstructLive(bad10);
 eq(r10.reason, 'non-convex-corners');
 ok(r10.label.indexOf('"e"') !== -1, r10.label);
 pass('phase22 interior corner');
 
-// 11 two corners cannot bound a face
+// 11 two claims cannot bound a face: the corners lift as wire instead
 var few11 = endState().filter(function (e) {
   return e.id !== 'P3' && e.id !== 'P4';
 });
-var r11 = R.reconstruct(few11);
-eq(r11.reason, 'non-convex-corners');
-ok(r11.label.indexOf('cannot bound a face') !== -1, r11.label);
-pass('phase22 too few corners');
+var r11 = R.reconstructLive(few11);
+eq(r11.status, 'ok');
+eq(r11.class, null);
+eq(r11.geometry.vertices.length, 4);
+eq(r11.geometry.edges.length, 4);
+eq(r11.geometry.faces.length, 0);
+pass('phase22 two claims lift wire');
 
 // 12 three claims lift a triangle (lamina grows as claims land)
 var tri12 = endState().filter(function (e) { return e.id !== 'P4'; });
-var r12 = R.reconstruct(tri12);
+var r12 = R.reconstructLive(tri12);
 eq(r12.status, 'ok');
-eq(r12.class, 'E');
+eq(r12.class, null);
 eq(r12.geometry.vertices.length, 3);
 eq(r12.geometry.edges.length, 3);
 pass('phase22 triangle at three');
 
-// 13 claimed non-projector lines are not pairing evidence
+// 13 slanted lines are not claims: the dots lift as wire, claim-free
 var flat13 = endState().filter(function (e) {
   return e.id !== 'P1' && e.id !== 'P2' && e.id !== 'P3' && e.id !== 'P4';
 });
 flat13.push(tutLine('P9', 0, 40, 5, -8, 'G', ['S1', 'S3'], 'a'));
-var r13 = R.reconstruct(flat13);
-eq(r13.status, 'unavailable');
-ok(['ambiguous-pairing', 'unmatched-edge', 'unmatched-point', 'x-mismatch']
-  .indexOf(r13.reason) !== -1, 'a Class C verdict stands, got ' + r13.reason);
-ok(attemptsOf(r13).indexOf('E') === -1, 'E never attempted');
+flat13.push(tutLine('PJ', 0, -48, 0, 40, 'G', []));
+var r13 = R.reconstructLive(flat13);
+eq(r13.status, 'ok');
+eq(r13.geometry.vertices.length, 4);
+eq(r13.geometry.edges.length, 4);
+eq(r13.geometry.faces.length, 0);
 pass('phase22 slanted claims ignored');
 
 // 14 prism success never consults hints
@@ -200,21 +202,24 @@ withIds.push(tutLine('Q1', outer.x, outer.y, foot.x, foot.y, 'G',
   [outer.id, foot.id], 'a'));
 withIds.push(tutLine('Q2', outer.x, outer.y, foot.x, foot.y, 'G',
   [outer.id, foot.id], 'g'));
-var r14 = R.reconstruct(withIds);
+var r14 = R.reconstructLive(withIds);
 eq(r14.status, 'ok');
-eq(r14.class, 'A', 'prism stays prismatic');
-ok(attemptsOf(r14).indexOf('E') === -1, 'hints never compete');
+eq(r14.class, null);
+eq(r14.geometry.vertices.length, 12);
+eq(r14.geometry.edges.length, 18);
+deep(r14.geometry, R.reconstructLive(prism.entities).geometry,
+  'two stray claims change nothing');
 pass('phase22 hints never perturb success');
 
-// 15 legacy geometry mode skips Class E outright
-var r15 = R.reconstruct(endState(), { strictNames: false });
-eq(r15.reason, 'ambiguous-pairing');
-ok(attemptsOf(r15).indexOf('E') === -1, 'E skipped');
-pass('phase22 legacy skips E');
+// 15 legacy opts are retired: claims route to the reader regardless
+var r15 = R.reconstructLive(endState(), { strictNames: false });
+eq(r15.status, 'ok');
+deep(r15.geometry, r2.geometry, 'identical lamina');
+pass('phase22 legacy opts retired');
 
 // 16 input order never moves the solid
 var rev16 = endState().slice().reverse();
-var r16 = R.reconstruct(rev16);
+var r16 = R.reconstructLive(rev16);
 eq(r16.status, 'ok');
 deep(r16.geometry, r2.geometry, 'identical solid');
 pass('phase22 deterministic');
@@ -230,11 +235,11 @@ deep([R.REASON_LABELS['hint-conflict'], R.REASON_LABELS['hint-loose-foot'],
     'claimed corners bound no convex face']);
 pass('phase22 reason labels');
 
-// 18 docs name Class E and the new failures
+// 18 manual teaches the live wireframe (classes retired in phase36); contract keeps Class E
 var md = fs.readFileSync(MD_PATH, 'utf8');
 var ps = fs.readFileSync(PS_PATH, 'utf8');
-ok(md.indexOf('Class E') !== -1, 'manual Class E');
-ok(md.indexOf('duplicate-corners') !== -1, 'manual reasons');
+ok(md.indexOf('live wireframe') !== -1, 'manual live wireframe');
+ok(md.indexOf('nothing with both views') !== -1, 'manual quiet state');
 ok(ps.indexOf('Class E') !== -1, 'contract Class E');
 ok(ps.indexOf('M5 amendment') !== -1, 'contract M5');
 pass('phase22 docs sync');
@@ -242,7 +247,7 @@ pass('phase22 docs sync');
 // 19 README lists the phase22 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase22`') !== -1, 'phase22 row');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 789');
 pass('phase22 readme suite row');
 

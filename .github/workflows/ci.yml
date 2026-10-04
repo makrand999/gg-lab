@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install C++ build deps
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libsodium-dev
+      - name: Full Node suite (baseline + phases 1-30)
+        run: npm test
+      - name: Extra suites (login, lab, saves, C++ backend)
+        run: npm run test:login && npm run test:lab && npm run test:saves && npm run test:cpp

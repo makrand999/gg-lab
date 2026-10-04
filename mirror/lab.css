@@ -98,6 +98,55 @@ button.lab-act:disabled { color: #999; cursor: default; text-decoration: none; }
 }
 
 .lab-back { font-size: 12px; }
+
+/* Inline manual: cloned manual.html sections in lab clothing. Scoped so
+   the document styles never leak onto the studio/workspace chrome. */
+.lab-manual { font-size: 13px; color: #222; }
+.lab-manual h3 { font-size: 14px; margin: 18px 0 6px; }
+.lab-manual h4 { font-size: 13px; margin: 14px 0 6px; }
+.lab-manual p { margin: 8px 0; }
+.lab-manual a { color: #0645ad; text-decoration: none; }
+.lab-manual a:hover { color: #003d99; text-decoration: underline; }
+.lab-manual ul, .lab-manual ol { margin: 8px 0; padding-left: 26px; }
+.lab-manual li { margin: 3px 0; }
+.lab-manual table {
+  border-collapse: collapse;
+  margin: 10px 0;
+  max-width: 100%;
+  font-size: 12px;
+}
+.lab-manual th, .lab-manual td {
+  border: 1px solid #ddd;
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.lab-manual th { background: #f4f4f4; }
+.lab-manual code {
+  font-family: Consolas, Menlo, monospace;
+  font-size: 12px;
+  background: #f4f4f4;
+  padding: 0 4px;
+}
+.lab-manual pre {
+  background: #f4f4f4;
+  border: 1px solid #e2e2e2;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.lab-manual pre code { background: none; padding: 0; }
+.lab-manual blockquote {
+  margin: 10px 0;
+  padding: 6px 14px;
+  background: #f0f6ff;
+  border-left: 3px solid #0645ad;
+  color: #333;
+}
+.lab-manual blockquote p { margin: 5px 0; }
+.lab-manual hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }
+.lab-manual-jump { margin: 2px 0 4px; line-height: 2; }
 .lab-questions { margin: 6px 0 0 18px; }
 .lab-questions li { margin: 3px 0; }
 .lab-stub {

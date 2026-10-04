@@ -31,6 +31,46 @@ function rect(x0, y0, x1, y1, role) {
 function box3() {
   return rect(0, -40, 30, -10).concat(rect(0, 5, 30, 50), rect(100, 5, 130, 50));
 }
+function cpt(x, y, role, caption) {
+  return { type: 'POINT', x: x, y: y, bisCode: 'B', viewRole: role, caption: caption };
+}
+function proj(x, y1, y2) {
+  return { type: 'SEGMENT', x: x, y: y1, x2: x, y2: y2,
+    bisCode: 'G', viewRole: 'BOTH' };
+}
+function hasVert(verts, x, y, z) {
+  return verts.some(function (v) { return v.x === x && v.y === y && v.z === z; });
+}
+function canonGeom(g) {
+  function vk(v) { return v.x.toFixed(6) + ',' + v.y.toFixed(6) + ',' + v.z.toFixed(6); }
+  var vs = g.vertices.map(vk).sort();
+  var es = g.edges.map(function (e) {
+    var k1 = vk(g.vertices[e[0]]), k2 = vk(g.vertices[e[1]]);
+    return k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1;
+  }).sort();
+  return JSON.stringify({ v: vs, e: es, f: g.faces.length });
+}
+// Resting dotted box: 16 corner dots (datum twins included) + 8 sides.
+// tagRoles pins strict-side dots to PLAN/ELEVATION, leaving datum twins
+// BOTH so the datum wildcard still serves them.
+function restingBoxDots(tagRoles) {
+  return [
+    [0, 0, "A'"], [0, 0, 'A'], [35, 0, "B'"], [35, 0, 'B'],
+    [0, 60, "C'"], [0, 0, 'C'], [35, 60, "D'"], [35, 0, 'D'],
+    [0, 0, "E'"], [0, -35, 'E'], [35, 0, "F'"], [35, -35, 'F'],
+    [0, 60, "G'"], [0, -35, 'G'], [35, 60, "H'"], [35, -35, 'H']
+  ].map(function (d) {
+    var role = 'BOTH';
+    if (tagRoles) role = d[1] > 0 ? 'ELEVATION' : (d[1] < 0 ? 'PLAN' : 'BOTH');
+    return cpt(d[0], d[1], role, d[2]);
+  });
+}
+function restingBoxSides() {
+  return [
+    seg(0, 0, 35, 0), seg(35, 0, 35, 60), seg(35, 60, 0, 60), seg(0, 60, 0, 0),
+    seg(0, 0, 35, 0), seg(35, 0, 35, -35), seg(35, -35, 0, -35), seg(0, -35, 0, 0)
+  ];
+}
 
 // 1 PROFILE role is valid in entities + curriculum; invalid still throws
 ok(E.VIEW_ROLES.indexOf('PROFILE') !== -1, 'entities roles');
@@ -122,7 +162,7 @@ eq(c9.plan.length, 1);
 eq(c9.elev.length, 1);
 eq(c9.profile.length, 1);
 pass('phase12 tagged profile point buckets');
-// 10 shifted elevation keeps the legacy x-mismatch path (buckets + verdict)
+// 10 shifted elevation buckets plan/elev; dotless it reads quiet
 function shiftedBox(dx) {
   return rect(0, -40, 30, -10).concat(rect(dx, 5, 30 + dx, 50));
 }
@@ -130,10 +170,10 @@ var c10 = R.classifyViews(shiftedBox(1.2));
 eq(c10.plan.length, 4);
 eq(c10.elev.length, 4);
 eq(c10.profile.length, 0);
-var r10 = R.reconstruct(shiftedBox(1.2));
+var r10 = R.reconstructLive(shiftedBox(1.2));
 eq(r10.status, 'unavailable');
-eq(r10.reason, 'x-mismatch');
-pass('phase12 shifted elev still x-mismatch');
+eq(r10.reason, 'empty-sketch');
+pass('phase12 shifted elev dotless quiet');
 // 11 a stray elevation diagonal is kept as solid, never a helper
 var c11 = R.classifyViews(box3().concat([seg(0, 5, 30, 50)]));
 eq(c11.elev.length, 5);
@@ -149,70 +189,62 @@ ok(t3 > t2, 'profile widens the span');
 eq(R.weldTolerance(cls12.plan, cls12.elev, undefined), t2);
 pass('phase12 weld tolerance takes profile');
 
-// 13 tagged 3-view box with helpers resolves, class A, triple coverage
-function box3Tagged() {
-  return rect(0, -40, 30, -10, 'PLAN')
-    .concat(rect(0, 5, 30, 50, 'ELEVATION'))
-    .concat(rect(100, 5, 130, 50, 'PROFILE'))
-    .concat([
-      seg(30, 5, 100, 5), seg(30, 50, 100, 50),
-      seg(100, 0, 135, -35),
-      seg(100, 0, 100, 50, 'BOTH', 'G', { meta: { kind: 'axis' } }),
-      { type: 'DATUM_AXIS', x: -50, y: 0, x2: 160, y2: 0, bisCode: 'G', viewRole: 'BOTH' }
-    ]);
-}
-var r13 = R.reconstruct(box3Tagged());
+// 13 tagged resting box lifts 8 corners + 12 edges, unclassified
+var r13 = R.reconstructLive(restingBoxDots(true).concat(restingBoxSides(),
+  [proj(0, -35, 60), proj(35, -35, 60)]));
 eq(r13.status, 'ok');
-eq(r13.class, 'A');
+eq(r13.class, null);
 eq(r13.geometry.vertices.length, 8);
 eq(r13.geometry.edges.length, 12);
-eq(r13.geometry.faces.length, 6);
-eq(r13.coverage.plan, 1);
-eq(r13.coverage.elev, 1);
-eq(r13.coverage.profile, 1);
-pass('phase12 tagged box ok triple cover');
-// 14 same box untagged resolves identically
-var r14 = R.reconstruct(box3().concat([
-  seg(30, 5, 100, 5), seg(30, 50, 100, 50), seg(100, 0, 135, -35)
+eq(r13.geometry.faces.length, 6); // phase38: closed box infers faces
+ok(hasVert(r13.geometry.vertices, 0, 0, 0), 'corner A');
+ok(hasVert(r13.geometry.vertices, 0, 60, 35), 'corner G');
+pass('phase12 tagged box lifts wire');
+// 14 profile ink and helpers never perturb the wire: identical solid
+var r14 = R.reconstructLive(restingBoxDots(true).concat(restingBoxSides(), [
+  proj(0, -35, 60), proj(35, -35, 60),
+  seg(100, 5, 130, 5, 'PROFILE'), seg(130, 5, 130, 60, 'PROFILE'),
+  seg(130, 60, 100, 60, 'PROFILE'), seg(100, 60, 100, 5, 'PROFILE'),
+  seg(35, 5, 100, 5), seg(100, 0, 100, 60),
+  { type: 'DATUM_AXIS', x: -50, y: 0, x2: 160, y2: 0, bisCode: 'G', viewRole: 'BOTH' }
 ]));
 eq(r14.status, 'ok');
-eq(r14.class, 'A');
-eq(r14.geometry.vertices.length, 8);
-eq(r14.geometry.edges.length, 12);
-eq(r14.coverage.profile, 1);
 assert.deepStrictEqual(r14.geometry, r13.geometry);
-pass('phase12 untagged box identical solid');
-// 15 curriculum hex prism sheet: 12v/18e at drawn proportions
+pass('phase12 profile helpers ignored');
+// 15 two-view and three-view prism sheets lift the identical wire:
+// same 12v/18e at drawn proportions, profile adding nothing
+var hex2 = C.regularSolid({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
 var hex3 = C.threeViewSheet({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
 eq(C.validateBundle(hex3).ok, true);
-var r15 = R.reconstruct(hex3.entities);
+var r15 = R.reconstructLive(hex3.entities);
 eq(r15.status, 'ok');
-eq(r15.class, 'A');
+eq(r15.class, null);
 eq(r15.geometry.vertices.length, 12);
 eq(r15.geometry.edges.length, 18);
-eq(r15.geometry.faces.length, 8);
-eq(r15.coverage.profile, 1);
+eq(r15.geometry.faces.length, 8); // phase38: closed prism infers faces
+var r15b = R.reconstructLive(hex2.entities);
+assert.deepStrictEqual(r15b.geometry, r15.geometry);
 var hx15 = r15.geometry.vertices.map(function (v) { return v.x; });
 var hy15 = r15.geometry.vertices.map(function (v) { return v.y; });
 ok(Math.abs(Math.max.apply(null, hx15) - Math.min.apply(null, hx15) - 35) < 1e-9, 'across corners');
 ok(Math.abs(Math.max.apply(null, hy15) - Math.min.apply(null, hy15) - 70) < 1e-9, 'height');
 pass('phase12 hex prism sheet 12v 18e');
-// 16 curriculum pyramid sheet resolves with apex
+// 16 curriculum pyramid sheet resolves with apex (live wireframe:
+// same 5 corners + 8 edges, 5 inferred faces since phase38)
 var pyr3 = C.threeViewSheet({ solid: 'PYRAMID', sizeMm: 35, heightMm: 70, xMm: 0 });
 eq(C.validateBundle(pyr3).ok, true);
-var r16 = R.reconstruct(pyr3.entities);
+var r16 = R.reconstructLive(pyr3.entities);
 eq(r16.status, 'ok');
-eq(r16.class, 'B');
 eq(r16.geometry.vertices.length, 5);
 eq(r16.geometry.edges.length, 8);
-eq(r16.geometry.faces.length, 5);
-eq(r16.coverage.profile, 1);
+eq(r16.geometry.faces.length, 5); // phase38: closed pyramid infers faces
 var apex16 = r16.geometry.vertices[r16.geometry.vertices.length - 1];
 ok(Math.abs(apex16.x - 0) < 1e-9, 'apex x');
 ok(Math.abs(apex16.y - 70) < 1e-9, 'apex h');
 ok(Math.abs(apex16.z - 25.5) < 1e-9, 'apex d');
 pass('phase12 pyramid sheet apex');
-// 17 asymmetric apex picks direct vs mirrored deterministically
+// 17 the profile apex station never moves the wire: both variants lift
+// the same apex from plan + elevation alone
 function asymPyramid(profApexX) {
   return rect(0, -40, 30, -10, 'PLAN')
     .concat([
@@ -222,7 +254,7 @@ function asymPyramid(profApexX) {
     .concat([
       seg(0, 5, 30, 5, 'ELEVATION'),
       seg(0, 5, 15, 50, 'ELEVATION'), seg(30, 5, 15, 50, 'ELEVATION'),
-      pt(15, 50, 'ELEVATION')
+      pt(15, 50, 'ELEVATION'), proj(15, -15, 50)
     ])
     .concat([
       seg(100, 5, 130, 5, 'PROFILE'),
@@ -231,59 +263,72 @@ function asymPyramid(profApexX) {
       pt(profApexX, 50, 'PROFILE')
     ]);
 }
-var r17a = R.reconstruct(asymPyramid(105));
+var r17a = R.reconstructLive(asymPyramid(105));
 eq(r17a.status, 'ok');
-eq(r17a.class, 'B');
-eq(r17a.stats.profileMap.s, 1);
-var r17b = R.reconstruct(asymPyramid(125));
+eq(r17a.geometry.vertices.length, 1);
+var r17b = R.reconstructLive(asymPyramid(125));
 eq(r17b.status, 'ok');
-eq(r17b.class, 'B');
-eq(r17b.stats.profileMap.s, -1);
-assert.deepStrictEqual(R.reconstruct(asymPyramid(125)).geometry, r17b.geometry);
-pass('phase12 orientation picked deterministically');
-// 18 wrong-depth profile fails named, never a wrong solid
-var r18 = R.reconstruct(
+assert.deepStrictEqual(r17b.geometry, r17a.geometry);
+assert.deepStrictEqual(r17a.geometry.vertices, [{ x: 15, y: 50, z: 15 }]);
+pass('phase12 profile never moves wire');
+// 18 a wrong-depth profile never vetoes the wire
+var r18 = R.reconstructLive(
   rect(0, -40, 30, -10, 'PLAN')
     .concat(rect(0, 5, 30, 50, 'ELEVATION'))
+    .concat([pt(15, -15, 'PLAN'), pt(15, 50, 'ELEVATION'), proj(15, -15, 50)])
     .concat(rect(100, 5, 120, 50, 'PROFILE'))
 );
-eq(r18.status, 'unavailable');
-eq(r18.reason, 'x-mismatch');
-pass('phase12 wrong depth x-mismatch');
-// 19 wrong-height profile fails named
-var r19 = R.reconstruct(
+eq(r18.status, 'ok');
+assert.deepStrictEqual(r18.geometry.vertices, [{ x: 15, y: 50, z: 15 }]);
+pass('phase12 wrong depth never vetoes');
+// 19 a wrong-height profile never vetoes the wire
+var r19 = R.reconstructLive(
   rect(0, -40, 30, -10, 'PLAN')
     .concat(rect(0, 5, 30, 50, 'ELEVATION'))
+    .concat([pt(15, -15, 'PLAN'), pt(15, 50, 'ELEVATION'), proj(15, -15, 50)])
     .concat(rect(100, 5, 130, 60, 'PROFILE'))
 );
-eq(r19.status, 'unavailable');
-eq(r19.reason, 'unmatched-edge');
-pass('phase12 wrong height unmatched-edge');
+eq(r19.status, 'ok');
+assert.deepStrictEqual(r19.geometry.vertices, [{ x: 15, y: 50, z: 15 }]);
+pass('phase12 wrong height never vetoes');
 // 20 projectToViews maps the profile; one-arg shape unchanged
-var p20a = R.projectToViews(r13.geometry);
+var box20 = {
+  vertices: [{ x: 0, y: 5, z: 10 }, { x: 30, y: 50, z: 40 }],
+  edges: [[0, 1]], faces: []
+};
+var p20a = R.projectToViews(box20);
 assert.deepStrictEqual(Object.keys(p20a).sort(),
   ['elevPts', 'elevSegs', 'planPts', 'planSegs']);
-var p20b = R.projectToViews(r13.geometry, { xRef: 100, s: 1, dRef: 10 });
-eq(p20b.profilePts.length, 8);
-eq(p20b.profileSegs.length, 12);
+var p20b = R.projectToViews(box20, { xRef: 100, s: 1, dRef: 10 });
+eq(p20b.profilePts.length, 2);
+eq(p20b.profileSegs.length, 1);
 function hasPt(pts, x, y) {
   return pts.some(function (p) { return p.x === x && p.y === y; });
 }
 ok(hasPt(p20b.profilePts, 100, 5), 'near-bottom maps to xRef');
 ok(hasPt(p20b.profilePts, 130, 50), 'far-top maps outboard');
 throws(function () {
-  R.projectToViews(r13.geometry, { xRef: NaN, s: 1, dRef: 10 });
+  R.projectToViews(box20, { xRef: NaN, s: 1, dRef: 10 });
 });
 pass('phase12 projectToViews profile map');
-// 21 coverage shape: profile key only with a profile view
-eq(r13.coverage.profile, 1);
-var r21 = R.reconstruct(rect(0, -40, 30, -10).concat(rect(0, 5, 30, 50)));
+// 21 result shapes: wire is lean, readers carry coverage + warnings
+assert.deepStrictEqual(Object.keys(r13).sort(),
+  ['class', 'geometry', 'label', 'reason', 'stats', 'status']);
+eq(r13.class, null);
+eq(r13.coverage, undefined);
+eq(r13.warnings, undefined);
+var r21 = R.reconstructLive(
+  C.regularSolid({ solid: 'CYLINDER', sizeMm: 35, heightMm: 70, xMm: 0 }).entities);
+eq(r21.status, 'ok');
+eq(r21.class, null);
 eq(r21.coverage.plan, 1);
 eq(r21.coverage.elev, 1);
-eq(r21.coverage.profile, undefined);
-pass('phase12 coverage shape compatible');
-// 22 helpers-ignored warns only when helpers drop
-ok(r13.warnings.map(function (w) { return w.code; }).indexOf('helpers-ignored') !== -1,
+assert.deepStrictEqual(r21.warnings, []);
+pass('phase12 result shapes compatible');
+// 22 a 3-view reader warns helpers-ignored; 2-view warns nothing
+var r22cyl = R.reconstructLive(
+  C.threeViewSheet({ solid: 'CYLINDER', sizeMm: 35, heightMm: 70, xMm: 0 }).entities);
+ok(r22cyl.warnings.map(function (w) { return w.code; }).indexOf('helpers-ignored') !== -1,
   'helpers warned');
 assert.deepStrictEqual(r21.warnings, []);
 pass('phase12 helpers warning gated');
@@ -294,7 +339,7 @@ eq(C.threeViewSheet({ solid: 'CYLINDER' }).solid, 'CYLINDER');
 eq(C.threeViewSheet({ solid: 'CONE' }).solid, 'CONE');
 var mir23 = C.threeViewSheet({ solid: 'PRISM', side: -1 });
 eq(mir23.side, -1);
-eq(R.reconstruct(mir23.entities).status, 'ok');
+eq(R.reconstructLive(mir23.entities).status, 'ok');
 pass('phase12 threeViewSheet guards mirror');
 
 // 24 3-view straight line resolves, class C, true length kept
@@ -324,32 +369,28 @@ function trueLen(verts) {
   return Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) +
     (b.z - a.z) * (b.z - a.z));
 }
-var r24 = R.reconstruct(lineProfile(false));
+var r24 = R.reconstructLive(lineProfile(false));
 eq(r24.status, 'ok');
-eq(r24.class, 'C');
+eq(r24.class, null);
 eq(r24.geometry.vertices.length, 2);
 eq(r24.geometry.edges.length, 1);
-eq(r24.coverage.profile, 1);
 ok(Math.abs(trueLen(r24.geometry.vertices) - 80) < 1e-6, 'true length');
-eq(r24.stats.profileMap.s, 1);
 pass('phase12 wireframe line ok TL kept');
-// 25 3-view quadrant point resolves on a single profile point
+// 25 3-view quadrant point resolves, the profile dot ignored
 var qp25 = C.quadrantPoint({ quadrant: 1 });
-var r25 = R.reconstruct(qp25.entities.concat([pt(100, 20, 'PROFILE')]));
+var r25 = R.reconstructLive(qp25.entities.concat([pt(100, 20, 'PROFILE')]));
 eq(r25.status, 'ok');
-eq(r25.class, 'C');
+eq(r25.class, null);
 assert.deepStrictEqual(r25.geometry.vertices, [{ x: 10, y: 20, z: 15 }]);
-eq(r25.coverage.profile, 1);
 pass('phase12 wireframe point ok');
-// 26 mirrored line profile resolves with s = -1, same solid
-var r26 = R.reconstruct(lineProfile(true));
+// 26 mirrored line profile lifts the identical wire
+var r26 = R.reconstructLive(lineProfile(true));
 eq(r26.status, 'ok');
-eq(r26.class, 'C');
-eq(r26.stats.profileMap.s, -1);
+eq(r26.class, null);
 ok(Math.abs(trueLen(r26.geometry.vertices) - 80) < 1e-6, 'true length');
 assert.deepStrictEqual(r26.geometry, r24.geometry);
 pass('phase12 mirrored wireframe same solid');
-// 27 twin profile points (both orientations drawn) fail named
+// 27 twin profile points are ignored, never evidence
 var twin27 = lineProfile(false);
 var plan27y = twin27.filter(function (e) {
   return e.viewRole === 'PLAN' && e.type === 'SEGMENT' && e.bisCode === 'A';
@@ -361,36 +402,37 @@ twin27 = twin27.concat([
   pt(p1_27 - (10 - d0_27), 20, 'PROFILE'),
   pt(p1_27 - (d1_27 - d0_27), 60, 'PROFILE')
 ]);
-var r27 = R.reconstruct(twin27);
-eq(r27.status, 'unavailable');
-eq(r27.reason, 'unmatched-point');
-pass('phase12 twin profile points unmatched');
-// 28 twin plan/elev pairings stay ambiguous with a profile present
-var r28 = R.reconstruct([
+var r27 = R.reconstructLive(twin27);
+eq(r27.status, 'ok');
+assert.deepStrictEqual(r27.geometry, r24.geometry);
+pass('phase12 twin profile points ignored');
+// 28 twin plan/elev pairings stay 2D-only with a profile present
+var r28 = R.reconstructLive([
   pt(10, -20, 'PLAN'), pt(10, -25, 'PLAN'),
   pt(10, 20, 'ELEVATION'), pt(10, 30, 'ELEVATION'),
   pt(100, 20, 'PROFILE'), pt(100, 30, 'PROFILE')
 ]);
 eq(r28.status, 'unavailable');
-eq(r28.reason, 'ambiguous-pairing');
-pass('phase12 twin pairing ambiguous');
-// 29 stray profile edge is unmatched, never absorbed
+eq(r28.reason, 'empty-sketch');
+pass('phase12 twin pairing quiet');
+// 29 stray profile edge is ignored, never absorbed
 var stray29 = lineProfile(false).concat([
   seg(100, 60, 156.5685424949238, 20, 'PROFILE', 'A')
 ]);
-var r29 = R.reconstruct(stray29);
-eq(r29.status, 'unavailable');
-eq(r29.reason, 'unmatched-edge');
-pass('phase12 stray profile edge unmatched');
-// 30 curves stay deferred on a 3-view sheet
-var r30 = R.reconstruct(box3Tagged().concat([
+var r29 = R.reconstructLive(stray29);
+eq(r29.status, 'ok');
+assert.deepStrictEqual(r29.geometry, r24.geometry);
+pass('phase12 stray profile edge ignored');
+// 30 a stray circle beside a prism reads as prism wire, circle skipped
+var r30 = R.reconstructLive(hex2.entities.concat([
   { type: 'CIRCLE', x: 15, y: -25, x2: 0, y2: 0, radius: 5, bisCode: 'A', viewRole: 'PLAN' }
 ]));
 eq(r30.status, 'ok');
-eq(r30.class, 'A');
-ok(r30.warnings.map(function (w) { return w.code; }).indexOf('curves-ignored') !== -1,
-  'curves warned');
-pass('phase12 curves deferred in 3-view');
+eq(r30.class, null);
+eq(r30.geometry.vertices.length, 12);
+eq(r30.geometry.edges.length, 18);
+eq(r30.warnings, undefined);
+pass('phase12 stray circle skipped');
 
 assert.strictEqual(n, TOTAL);
 console.log('OK ' + TOTAL + '/' + TOTAL + ' phase12-3view tests passed');

@@ -5,7 +5,7 @@
 // tables, fenced code blocks, blockquotes, horizontal rules, and inline
 // `code` / **bold** / *italic* / [text](href).
 //
-// Served-context link rule (only mirror/ is served, both by tools/serve.js
+// Served-context link rule (only mirror/ is served, both by educad-server
 // and by the nginx /major/ alias, so every href must stay relative):
 //   - "#anchor"        -> kept unchanged (in-page navigation).
 //   - "../mirror/..."   -> the "../mirror/" prefix is stripped, because the

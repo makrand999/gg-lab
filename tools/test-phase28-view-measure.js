@@ -242,7 +242,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase28`') !== -1, 'phase28 row');
 ok(readme.indexOf('View mode: Edit/View toggle, select-and-measure inspect') !== -1,
   'phase28 label');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 850');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase28'], 'node tools/test-phase28-view-measure.js',

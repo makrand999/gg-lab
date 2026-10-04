@@ -295,6 +295,32 @@
     return best;
   }
 
+  // Every visible POINT within tolPx of the cursor, nearest first,
+  // table order breaking ties — the head always agrees with
+  // hitTestPoint. The page lists the whole stack for a dot choice.
+  function hitTestPointAll(entities, cursorPx, view, tolPx) {
+    assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty);
+    if (!Array.isArray(entities)) throw new Error('entities must be an array');
+    var tol = (tolPx === undefined || tolPx === null) ? SELECT_TOL_PX : tolPx;
+    assertFinite(tol);
+    var hits = [];
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (!e || e.type !== 'POINT' || e.visible === false) continue;
+      assertFinite(e.x, e.y);
+      var px = e.x * view.s + view.tx;
+      var py = view.ty - e.y * view.s;
+      var dx = px - cursorPx.x, dy = py - cursorPx.y;
+      var d2 = dx * dx + dy * dy;
+      if (d2 <= tol * tol) hits.push({ id: e.id, d2: d2, i: i });
+    }
+    hits.sort(function (a, b) {
+      if (a.d2 !== b.d2) return a.d2 - b.d2;
+      return a.i - b.i;
+    });
+    return hits.map(function (h) { return h.id; });
+  }
+
   function selectPoint(sel, id) {
     sel.selectedId = id;
     return sel;
@@ -1170,6 +1196,7 @@
     createSelectionState: createSelectionState,
     isEditing: isEditing,
     hitTestPoint: hitTestPoint,
+    hitTestPointAll: hitTestPointAll,
     selectPoint: selectPoint,
     beginEdit: beginEdit,
     cancelEdit: cancelEdit,

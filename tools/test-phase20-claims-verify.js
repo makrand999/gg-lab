@@ -237,13 +237,13 @@ ok(index.indexOf('anchorLineTool(handle.line, bank[0].id, p1.x, p1.y,') !== -1,
 ok(index.indexOf("'for ' + lt.p1Member") !== -1, 'preview tags the claim');
 pass('phase20 claim commit wiring');
 
-// 21 member chooser popup mirrors the BIS menu patterns
-ok(index.indexOf('showMemberMenu(cursor, mparts)') !== -1, 'multi parks in chooser');
-ok(index.indexOf("row.setAttribute('data-member'") !== -1, 'member rows');
-ok(index.indexOf('Draw for which corner?') !== -1, 'chooser title');
-ok(index.indexOf('bankFromPick(pick, bare)') !== -1, 'pick banks');
-ok(index.indexOf("if (mparts.length >= 2 && !bankHas(cid)) {") !== -1, 'pairs only');
-pass('phase20 chooser wiring');
+// 21 (phase39) the member chooser is retired: correspondence is
+// declared by drawn Type G projectors, never by a bank-time popup.
+eq(index.indexOf('showMemberMenu'), -1, 'no chooser');
+eq(index.indexOf('Draw for which corner?'), -1, 'no chooser title');
+eq(index.indexOf('data-member'), -1, 'no member rows');
+ok(index.indexOf('showDotMenu(cursor, cids)') !== -1, 'dot picker kept');
+pass('phase20 chooser retired');
 
 // 22 demo bar: square button order, check button, manual still last
 var bar = /<div class="demo-bar">([\s\S]*?)<\/div>/.exec(index);
@@ -279,7 +279,7 @@ pass('phase20 check panel wiring');
 // 25 README lists the phase20 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase20`') !== -1, 'phase20 row');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 789');
 pass('phase20 readme suite row');
 

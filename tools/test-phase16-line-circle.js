@@ -156,7 +156,7 @@ pass('phase16 manual documents bank');
 // package.json still chains the file in the test script.
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase16`') !== -1, 'phase16 row');
-ok(readme.indexOf('baseline + phases 1–30 (880 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
   'grand total 838');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 ok(pkg.scripts.test.indexOf('node tools/test-phase16-line-circle.js') !== -1,

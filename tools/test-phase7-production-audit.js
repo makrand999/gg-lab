@@ -3,7 +3,6 @@ var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
 var zlib = require('zlib');
-var http = require('http');
 
 var MIRROR = path.join(__dirname, '..', 'mirror', 'files', 'www.geogebra.org');
 var Boot = require('../mirror/files/www.geogebra.org/educad-boot.js');
@@ -17,9 +16,8 @@ var Snap = require('../mirror/files/www.geogebra.org/edugraphics-snapping.js');
 var Instr = require('../mirror/files/www.geogebra.org/edugraphics-instruments.js');
 var Curr = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
 var Labels = require('../mirror/files/www.geogebra.org/educad-labels.js');
-var Serve = require('./serve.js');
 
-var TOTAL = 33;
+var TOTAL = 27;
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/' + TOTAL + ' ' + name); }
 function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
@@ -45,30 +43,6 @@ function benchMs(fn, iters) {
   }
   ts.sort(function (a, b) { return a - b; });
   return { median: ts[Math.floor(ts.length / 2)], min: ts[0], max: ts[ts.length - 1] };
-}
-
-function get(port, urlPath) {
-  return new Promise(function (resolve, reject) {
-    var req = http.get({ host: '127.0.0.1', port: port, path: urlPath }, function (res) {
-      var body = '';
-      res.on('data', function (c) { body += c; });
-      res.on('end', function () {
-        resolve({ status: res.statusCode, headers: res.headers, body: body });
-      });
-    });
-    req.on('error', reject);
-  });
-}
-
-function onceListening(srv) {
-  return new Promise(function (resolve, reject) {
-    srv.once('listening', resolve);
-    srv.once('error', reject);
-  });
-}
-
-function closeServer(srv) {
-  return new Promise(function (resolve) { srv.close(function () { resolve(); }); });
 }
 
 async function main() {
@@ -330,56 +304,7 @@ async function main() {
   Boot.dispose(h25);
   pass('phase7 heap under 35MB');
 
-  // 26 serve.js loads: host/port/root, content types, core-only deps
-  eq(Serve.HOST, '127.0.0.1');
-  eq(Serve.PORT, 8124);
-  eq(Serve.ROOT, path.join(__dirname, '..', 'mirror'));
-  ok(Serve.contentTypeFor('a.js').indexOf('javascript') !== -1, 'js type');
-  ok(Serve.contentTypeFor('a.css').indexOf('css') !== -1, 'css type');
-  var serveSrc = fs.readFileSync(path.join(__dirname, 'serve.js'), 'utf8');
-  var reqRe = /require\('([^']+)'\)/g;
-  var mm;
-  var allowedCore = ['http', 'fs', 'path'];
-  var foundReq = [];
-  while ((mm = reqRe.exec(serveSrc)) !== null) foundReq.push(mm[1]);
-  ok(foundReq.length > 0, 'serve requires parsed');
-  foundReq.forEach(function (r) {
-    ok(allowedCore.indexOf(r) !== -1, 'core-only require ' + r);
-  });
-  pass('phase7 serve loads zero-dep');
-
-  // 27-29 live server checks on 127.0.0.1:8124
-  var srv = Serve.start(8124, '127.0.0.1');
-  await onceListening(srv);
-  try {
-    // 27 root check
-    var r27 = await get(8124, '/');
-    eq(r27.status, 200);
-    ok(r27.body.indexOf('files') !== -1, 'root lists files');
-    pass('phase7 server root check');
-
-    // 28 serves boot js with javascript type
-    var r28 = await get(8124, '/files/www.geogebra.org/educad-boot.js');
-    eq(r28.status, 200);
-    ok(String(r28.headers['content-type']).indexOf('javascript') !== -1, 'js content-type');
-    ok(r28.body.indexOf('EduCADBoot') !== -1, 'boot body');
-    pass('phase7 server serves boot');
-
-    // 29 serves css, 404s missing, blocks traversal
-    var r29a = await get(8124, '/files/www.geogebra.org/edugraphics-hud.css');
-    eq(r29a.status, 200);
-    ok(String(r29a.headers['content-type']).indexOf('css') !== -1, 'css content-type');
-    var r29b = await get(8124, '/__missing_educad_404__');
-    eq(r29b.status, 404);
-    var r29c = await get(8124, '/..%2F..%2Fpackage.json');
-    ok(r29c.status === 404 || r29c.status === 400, 'traversal blocked ' + r29c.status);
-    ok(r29c.body.indexOf('educad-phase0') === -1, 'no leak');
-    pass('phase7 server css 404 traversal');
-  } finally {
-    await closeServer(srv);
-  }
-
-  // 30 bundle inventory: every module file on disk, non-empty
+  // 26 bundle inventory: every module file on disk, non-empty
   var rawTotal = 0;
   Boot.MODULE_FILES.forEach(function (f) {
     var st = fs.statSync(path.join(MIRROR, f));
@@ -390,7 +315,7 @@ async function main() {
   console.log('  raw total ' + rawTotal + ' B across ' + Boot.MODULE_FILES.length + ' js files');
   pass('phase7 bundle inventory');
 
-  // 31 hidpi buffer math + dpr-aware mount under mock DOM
+  // 27 hidpi buffer math + dpr-aware mount under mock DOM
   var hb31 = Common.hidpiBufferSize(800, 600, 2);
   eq(hb31.bufW, 1600);
   eq(hb31.bufH, 1200);
@@ -427,38 +352,6 @@ async function main() {
     delete global.document;
   }
   pass('phase7 hidpi mount');
-
-  // 32 port precedence: argv, then $PORT, then 8124
-  var oldPort = process.env.PORT;
-  process.env.PORT = '9011';
-  eq(Serve.resolvePort(undefined), 9011);
-  eq(Serve.resolvePort('9022'), 9022);
-  process.env.PORT = 'bogus';
-  eq(Serve.resolvePort(undefined), 8124);
-  eq(Serve.resolvePort('nope'), 8124);
-  if (oldPort === undefined) delete process.env.PORT;
-  else process.env.PORT = oldPort;
-  pass('phase7 port precedence');
-
-  // 33 EADDRINUSE falls forward to the next free port
-  var occ33 = Serve.start(0, '127.0.0.1');
-  await onceListening(occ33);
-  var pOcc33 = occ33.address().port;
-  var fb33 = await new Promise(function (resolve, reject) {
-    Serve.startNextAvailable(pOcc33, '127.0.0.1', Serve.ROOT, 5, function (err, srv, actual) {
-      if (err) reject(err);
-      else resolve({ srv: srv, actual: actual });
-    });
-  });
-  try {
-    ok(fb33.actual !== pOcc33, 'moved to ' + fb33.actual);
-    var r33 = await get(fb33.actual, '/');
-    eq(r33.status, 200);
-  } finally {
-    await closeServer(fb33.srv);
-    await closeServer(occ33);
-  }
-  pass('phase7 port fallback');
 
   assert.strictEqual(n, TOTAL);
   console.log('OK ' + TOTAL + '/' + TOTAL + ' phase7 tests passed');

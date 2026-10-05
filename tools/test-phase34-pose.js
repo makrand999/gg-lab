@@ -7,8 +7,8 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var P = require('../mirror/files/www.geogebra.org/educad-pose.js');
-var M = require('../mirror/files/www.geogebra.org/educad-measure.js');
+var P = require('../public/lib/educad-pose.js');
+var M = require('../public/lib/educad-measure.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
@@ -325,7 +325,7 @@ pass('phase34 measure pose mode');
 
 // 13 the page ships the pose engine, HUD, and gesture branches
 var index = fs.readFileSync(INDEX_PATH, 'utf8');
-ok(index.indexOf('<script src="files/www.geogebra.org/educad-pose.js"></script>') !== -1,
+ok(index.indexOf('<script src="lib/educad-pose.js"></script>') !== -1,
   'pose module loaded');
 ['id="btn-mode-pose"', 'id="pose-panel"', 'id="pose-readout"',
   'id="pose-reset"', 'id="pose-exit"', 'id="pose-close"',

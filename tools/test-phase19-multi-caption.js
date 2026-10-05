@@ -2,11 +2,11 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var L = require('../mirror/files/www.geogebra.org/educad-labels.js');
-var Cv = require('../mirror/files/www.geogebra.org/educad-canvas.js');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
+var L = require('../public/lib/educad-labels.js');
+var Cv = require('../public/lib/educad-canvas.js');
+var R = require('../public/lib/educad-reconstruct.js');
+var C = require('../public/lib/educad-curriculum.js');
+var E = require('../public/lib/educad-entities.js');
 
 var ROOT = path.join(__dirname, '..');
 var README_PATH = path.join(ROOT, 'README.md');

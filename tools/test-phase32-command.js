@@ -6,9 +6,9 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var C = require('../mirror/files/www.geogebra.org/educad-command.js');
-var S = require('../mirror/files/www.geogebra.org/educad-settings.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
+var C = require('../public/lib/educad-command.js');
+var S = require('../public/lib/educad-settings.js');
+var E = require('../public/lib/educad-entities.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
@@ -391,9 +391,9 @@ pass('phase32 help text');
 
 // 14 the page ships the bar, the panel, and the wiring
 var index = fs.readFileSync(INDEX_PATH, 'utf8');
-ok(index.indexOf('<script src="files/www.geogebra.org/educad-settings.js"></script>') !== -1,
+ok(index.indexOf('<script src="lib/educad-settings.js"></script>') !== -1,
   'settings loaded');
-ok(index.indexOf('<script src="files/www.geogebra.org/educad-command.js"></script>') !== -1,
+ok(index.indexOf('<script src="lib/educad-command.js"></script>') !== -1,
   'command loaded');
 ['id="cmd-bar"', 'id="cmd-input"', 'id="cmd-suggest"', 'id="cmd-preview"',
   'id="cmd-status"', 'id="settings-panel"', 'id="settings-rows"',

@@ -1,10 +1,10 @@
 'use strict';
 var assert = require('assert');
 var fs = require('fs');
-var L = require('../mirror/files/www.geogebra.org/educad-labels.js');
-var Cv = require('../mirror/files/www.geogebra.org/educad-canvas.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
+var L = require('../public/lib/educad-labels.js');
+var Cv = require('../public/lib/educad-canvas.js');
+var E = require('../public/lib/educad-entities.js');
+var C = require('../public/lib/educad-curriculum.js');
 
 var TOTAL = 28;
 var n = 0;
@@ -49,7 +49,7 @@ eq(L.WORLD_UNITS, 'mm');
 ok(/^8\./.test(L.VERSION), 'version ' + L.VERSION);
 pass('phase8 loads mm v8');
 // 2 zero deps + dual-env markers
-var src = fs.readFileSync('mirror/files/www.geogebra.org/educad-labels.js', 'utf8');
+var src = fs.readFileSync('public/lib/educad-labels.js', 'utf8');
 eq(src.indexOf('require('), -1);
 ok(src.indexOf('EduCADLabels') !== -1, 'window.EduCADLabels marker');
 ok(src.indexOf('module.exports') !== -1, 'module.exports marker');

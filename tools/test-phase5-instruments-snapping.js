@@ -1,9 +1,9 @@
 'use strict';
 var assert = require('assert');
 var fs = require('fs');
-var SN = require('../mirror/files/www.geogebra.org/edugraphics-snapping.js');
-var IN = require('../mirror/files/www.geogebra.org/edugraphics-instruments.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
+var SN = require('../public/lib/edugraphics-snapping.js');
+var IN = require('../public/lib/edugraphics-instruments.js');
+var E = require('../public/lib/educad-entities.js');
 
 var TOTAL = 32;
 var n = 0;
@@ -31,8 +31,8 @@ ok(/^5\./.test(SN.VERSION), 'snap version ' + SN.VERSION);
 ok(/^5\./.test(IN.VERSION), 'inst version ' + IN.VERSION);
 pass('phase5 loads mm v5');
 // 2 zero deps + dual-env markers
-var srcS = fs.readFileSync('mirror/files/www.geogebra.org/edugraphics-snapping.js', 'utf8');
-var srcI = fs.readFileSync('mirror/files/www.geogebra.org/edugraphics-instruments.js', 'utf8');
+var srcS = fs.readFileSync('public/lib/edugraphics-snapping.js', 'utf8');
+var srcI = fs.readFileSync('public/lib/edugraphics-instruments.js', 'utf8');
 eq(srcS.indexOf('require('), -1);
 eq(srcI.indexOf('require('), -1);
 ok(srcS.indexOf('EduGraphicsSnapping') !== -1, 'snap window global');

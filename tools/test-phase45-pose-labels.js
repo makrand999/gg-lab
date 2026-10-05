@@ -6,11 +6,11 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var Pose = require('../mirror/files/www.geogebra.org/educad-pose.js');
-var Curr = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
-var Rec = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
-var Lab = require('../mirror/files/www.geogebra.org/educad-labels.js');
-var Ver = require('../mirror/files/www.geogebra.org/educad-verify.js');
+var Pose = require('../public/lib/educad-pose.js');
+var Curr = require('../public/lib/educad-curriculum.js');
+var Rec = require('../public/lib/educad-reconstruct.js');
+var Lab = require('../public/lib/educad-labels.js');
+var Ver = require('../public/lib/educad-verify.js');
 
 var ROOT = path.join(__dirname, '..');
 var TOTAL = 8;

@@ -10,8 +10,8 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
-var C = require('../mirror/files/www.geogebra.org/educad-canvas.js');
+var R = require('../public/lib/educad-reconstruct.js');
+var C = require('../public/lib/educad-canvas.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');

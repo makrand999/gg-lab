@@ -1,8 +1,8 @@
 'use strict';
 var assert = require('assert');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
+var R = require('../public/lib/educad-reconstruct.js');
+var E = require('../public/lib/educad-entities.js');
+var C = require('../public/lib/educad-curriculum.js');
 
 var TOTAL = 30;
 var n = 0;

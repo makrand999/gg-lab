@@ -7,8 +7,8 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var C = require('../mirror/files/www.geogebra.org/educad-command.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
+var C = require('../public/lib/educad-command.js');
+var E = require('../public/lib/educad-entities.js');
 var D = require('./edc.js');
 
 var ROOT = path.join(__dirname, '..');

@@ -2,10 +2,10 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var T = require('../mirror/files/www.geogebra.org/educad-tutorial.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
-var V = require('../mirror/files/www.geogebra.org/educad-verify.js');
+var T = require('../public/lib/educad-tutorial.js');
+var C = require('../public/lib/educad-curriculum.js');
+var R = require('../public/lib/educad-reconstruct.js');
+var V = require('../public/lib/educad-verify.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX = fs.readFileSync(path.join(ROOT, 'mirror', 'index.html'), 'utf8');
@@ -309,8 +309,7 @@ ok(PKG.indexOf('node tools/test-phase23-prism-tutorial.js') !== -1,
 pass('phase23 suite pinned');
 
 // 19 tutorial source keeps its contract: zero deps, dual env
-var SRC = fs.readFileSync(path.join(ROOT, 'mirror', 'files',
-  'www.geogebra.org', 'educad-tutorial.js'), 'utf8');
+var SRC = fs.readFileSync(path.join(ROOT, 'public', 'lib', 'educad-tutorial.js'), 'utf8');
 ok(SRC.indexOf('require(') === -1, 'zero deps');
 ok(SRC.indexOf('window.EduCADTutorial') !== -1, 'browser global');
 ok(SRC.indexOf('module.exports') !== -1, 'node export');

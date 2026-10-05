@@ -2,10 +2,10 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var T = require('../mirror/files/www.geogebra.org/educad-tutorial.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
-var V = require('../mirror/files/www.geogebra.org/educad-verify.js');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
+var T = require('../public/lib/educad-tutorial.js');
+var C = require('../public/lib/educad-curriculum.js');
+var V = require('../public/lib/educad-verify.js');
+var R = require('../public/lib/educad-reconstruct.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
@@ -21,8 +21,7 @@ function ok(v, msg) { assert.ok(v, msg); }
 function deep(a, b, msg) { assert.deepStrictEqual(a, b, msg); }
 
 var index = fs.readFileSync(INDEX_PATH, 'utf8');
-var SRC = fs.readFileSync(path.join(ROOT, 'mirror', 'files',
-  'www.geogebra.org', 'educad-tutorial.js'), 'utf8');
+var SRC = fs.readFileSync(path.join(ROOT, 'public', 'lib', 'educad-tutorial.js'), 'utf8');
 
 // 1 module loads: version, zero deps, dual env, exports
 eq(T.VERSION, '1.1.0-educad');

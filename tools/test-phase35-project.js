@@ -6,8 +6,8 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var P = require('../mirror/files/www.geogebra.org/educad-project.js');
-var Pose = require('../mirror/files/www.geogebra.org/educad-pose.js');
+var P = require('../public/lib/educad-project.js');
+var Pose = require('../public/lib/educad-pose.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
@@ -228,7 +228,7 @@ pass('phase35 overlay datum invariant');
 
 // 9 the page overlays exact edges over faded riding ink in pose mode
 var index = fs.readFileSync(INDEX_PATH, 'utf8');
-ok(index.indexOf('<script src="files/www.geogebra.org/educad-project.js"></script>') !== -1,
+ok(index.indexOf('<script src="lib/educad-project.js"></script>') !== -1,
   'project module loaded');
 ['poseProjectedEdges', 'poseState.overlay', 'POSE_FADE',
   'window.educadPoseViews', 'overlay:'].forEach(function (str) {

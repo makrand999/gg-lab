@@ -1,10 +1,10 @@
 'use strict';
 var assert = require('assert');
 var fs = require('fs');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
-var S = require('../mirror/files/www.geogebra.org/educad-solid.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
+var R = require('../public/lib/educad-reconstruct.js');
+var S = require('../public/lib/educad-solid.js');
+var E = require('../public/lib/educad-entities.js');
+var C = require('../public/lib/educad-curriculum.js');
 
 var TOTAL = 54;
 var n = 0;
@@ -63,7 +63,7 @@ eq(R.WORLD_UNITS, 'mm');
 ok(/^10\./.test(R.VERSION), 'version ' + R.VERSION);
 pass('phase10 loads mm v10');
 // 2 zero deps + dual-env markers
-var src = fs.readFileSync('mirror/files/www.geogebra.org/educad-reconstruct.js', 'utf8');
+var src = fs.readFileSync('public/lib/educad-reconstruct.js', 'utf8');
 eq(src.indexOf('require('), -1);
 ok(src.indexOf('EduCADReconstruct') !== -1, 'window.EduCADReconstruct marker');
 ok(src.indexOf('module.exports') !== -1, 'module.exports marker');
@@ -592,7 +592,7 @@ eq(live5.status, 'unavailable');
 eq(live5.reason, 'empty-sketch');
 pass('phase10 headless live flow');
 // 43 app wires the live bridge
-var html = fs.readFileSync('mirror/index.html', 'utf8');
+var html = fs.readFileSync('public/index.html', 'utf8');
 ['educad-reconstruct.js', 'handle.rebuildSolid',
   'requestAnimationFrame(rebuildSolid)', 'table.subscribe',
   'visibleEntities()', 'setUnavailable'].forEach(function (s) {

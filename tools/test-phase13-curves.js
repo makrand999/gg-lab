@@ -1,11 +1,11 @@
 'use strict';
 var assert = require('assert');
 var fs = require('fs');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
-var S = require('../mirror/files/www.geogebra.org/educad-solid.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
-var Cv = require('../mirror/files/www.geogebra.org/educad-canvas.js');
+var R = require('../public/lib/educad-reconstruct.js');
+var S = require('../public/lib/educad-solid.js');
+var E = require('../public/lib/educad-entities.js');
+var C = require('../public/lib/educad-curriculum.js');
+var Cv = require('../public/lib/educad-canvas.js');
 
 var TOTAL = 30;
 var n = 0;
@@ -424,14 +424,14 @@ var lt28 = Cv.createLineToolState();
 eq(Cv.isLineToolActive(lt28), false);
 Cv.anchorLineTool(lt28, 'p1', 0, 0);
 eq(Cv.isLineToolActive(lt28), true);
-var src28 = fs.readFileSync('mirror/index.html', 'utf8');
+var src28 = fs.readFileSync('public/index.html', 'utf8');
 ok(src28.indexOf('isLineToolActive(handle.line)') !== -1, 'line guard wired');
 ok(src28.indexOf('isPolarToolActive(handle.polar)') !== -1, 'polar guard wired');
 ok(src28.indexOf('toggleCirclePick(handle.circlePicks') !== -1, 'picks wired idle');
 pass('phase13 precedence armed wins');
 
 // 29 clears wired: bank drops through one cursor-safe helper
-var src29 = fs.readFileSync('mirror/index.html', 'utf8');
+var src29 = fs.readFileSync('public/index.html', 'utf8');
 ok(src29.split('clearBank();').length - 1 >= 5, 'clears wired');
 ok(src29.indexOf('drawKnockoutLabel(ctx2, String(cpi + 1)') !== -1, 'numerals wired');
 pass('phase13 clears numerals wired');

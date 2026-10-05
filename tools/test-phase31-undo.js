@@ -1,6 +1,6 @@
 'use strict';
 // EduCAD phase 31: sheet undo. Ctrl+Z (Cmd+Z on macOS) reverses the
-// last sheet change on mirror/index.html; undo only, no redo. The
+// last sheet change on public/index.html; undo only, no redo. The
 // history lives on the sheet (a snapshot stack over the live entity
 // table, one step per synchronous batch); this suite pins the wiring
 // statically and proves the restore mechanism on the real modules.
@@ -8,8 +8,8 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var S = require('../mirror/files/www.geogebra.org/educad-saves.js');
+var E = require('../public/lib/educad-entities.js');
+var S = require('../public/lib/educad-saves.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');

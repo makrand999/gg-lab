@@ -4,18 +4,18 @@ var fs = require('fs');
 var path = require('path');
 var zlib = require('zlib');
 
-var MIRROR = path.join(__dirname, '..', 'mirror', 'files', 'www.geogebra.org');
-var Boot = require('../mirror/files/www.geogebra.org/educad-boot.js');
-var Common = require('../mirror/files/www.geogebra.org/edugraphics-common.js');
-var Vp = require('../mirror/files/www.geogebra.org/educad-viewport.js');
-var Cv = require('../mirror/files/www.geogebra.org/educad-canvas.js');
-var Ent = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var Shim = require('../mirror/files/www.geogebra.org/educad-shim.js');
-var Solver = require('../mirror/files/www.geogebra.org/educad-solver.js');
-var Snap = require('../mirror/files/www.geogebra.org/edugraphics-snapping.js');
-var Instr = require('../mirror/files/www.geogebra.org/edugraphics-instruments.js');
-var Curr = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
-var Labels = require('../mirror/files/www.geogebra.org/educad-labels.js');
+var MIRROR = path.join(__dirname, '..', 'public', 'lib');
+var Boot = require('../public/lib/educad-boot.js');
+var Common = require('../public/lib/edugraphics-common.js');
+var Vp = require('../public/lib/educad-viewport.js');
+var Cv = require('../public/lib/educad-canvas.js');
+var Ent = require('../public/lib/educad-entities.js');
+var Shim = require('../public/lib/educad-shim.js');
+var Solver = require('../public/lib/educad-solver.js');
+var Snap = require('../public/lib/edugraphics-snapping.js');
+var Instr = require('../public/lib/edugraphics-instruments.js');
+var Curr = require('../public/lib/educad-curriculum.js');
+var Labels = require('../public/lib/educad-labels.js');
 
 var TOTAL = 27;
 var n = 0;
@@ -52,8 +52,8 @@ async function main() {
   pass('phase7 boot loads mm v7');
 
   // 2 zero deps + dual-env markers for new mirror js
-  var bootSrc = fs.readFileSync(path.join(MIRROR, 'educad-boot.js'), 'utf8');
-  var commonSrc = fs.readFileSync(path.join(MIRROR, 'edugraphics-common.js'), 'utf8');
+  var bootSrc = fs.readFileSync(path.join(LIB, 'educad-boot.js'), 'utf8');
+  var commonSrc = fs.readFileSync(path.join(LIB, 'edugraphics-common.js'), 'utf8');
   eq(bootSrc.indexOf('require('), -1);
   eq(commonSrc.indexOf('require('), -1);
   ok(bootSrc.indexOf('module.exports') !== -1, 'boot node marker');
@@ -242,7 +242,7 @@ async function main() {
   pass('phase7 common headless mount');
 
   // 20 css ships HUD + 2-option menu only, no extra chrome words
-  var cssPath = path.join(MIRROR, 'edugraphics-hud.css');
+  var cssPath = path.join(LIB, 'edugraphics-hud.css');
   var css = fs.readFileSync(cssPath, 'utf8');
   ok(css.length > 100 && css.length < 10240, 'css size ' + css.length);
   ['.edugraphics-hud', '.edugraphics-menu', '.edugraphics-btn',
@@ -266,7 +266,7 @@ async function main() {
   var jsFiles = fs.readdirSync(MIRROR).filter(function (f) { return /\.js$/.test(f); });
   ok(jsFiles.length >= 10, 'mirror js count ' + jsFiles.length);
   jsFiles.forEach(function (f) {
-    var src = fs.readFileSync(path.join(MIRROR, f), 'utf8');
+    var src = fs.readFileSync(path.join(LIB, f), 'utf8');
     ok(src.indexOf('module.exports') !== -1, f + ' node export');
     ok(src.indexOf('window') !== -1, f + ' window export');
   });
@@ -275,7 +275,7 @@ async function main() {
   // 23 no forbidden framework/chrome strings in mirror js
   var banned = ['react', 'vue', 'toolbar', 'dialog', 'webgl', 'tinkercad', 'three.js'];
   jsFiles.forEach(function (f) {
-    var low = fs.readFileSync(path.join(MIRROR, f), 'utf8').toLowerCase();
+    var low = fs.readFileSync(path.join(LIB, f), 'utf8').toLowerCase();
     banned.forEach(function (w) {
       eq(low.indexOf(w), -1, f + ' has no ' + w);
     });
@@ -285,7 +285,7 @@ async function main() {
   // 24 gzipped bundle under 80 KB
   var bundle = '';
   Boot.MODULE_FILES.forEach(function (f) {
-    bundle += fs.readFileSync(path.join(MIRROR, f), 'utf8') + '\n';
+    bundle += fs.readFileSync(path.join(LIB, f), 'utf8') + '\n';
   });
   var gz = zlib.gzipSync(bundle);
   console.log('  bundle raw ' + bundle.length + ' B, gzip ' + gz.length +
@@ -307,7 +307,7 @@ async function main() {
   // 26 bundle inventory: every module file on disk, non-empty
   var rawTotal = 0;
   Boot.MODULE_FILES.forEach(function (f) {
-    var st = fs.statSync(path.join(MIRROR, f));
+    var st = fs.statSync(path.join(LIB, f));
     ok(st.size > 500, f + ' size ' + st.size);
     rawTotal += st.size;
   });

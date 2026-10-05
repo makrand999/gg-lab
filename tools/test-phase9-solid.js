@@ -1,6 +1,6 @@
 'use strict';
 var assert = require('assert');
-var S = require('../mirror/files/www.geogebra.org/educad-solid.js');
+var S = require('../public/lib/educad-solid.js');
 
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/55 ' + name); }

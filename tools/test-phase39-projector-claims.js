@@ -9,7 +9,7 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
+var R = require('../public/lib/educad-reconstruct.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');

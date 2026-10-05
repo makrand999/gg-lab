@@ -6,9 +6,9 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var Pose = require('../mirror/files/www.geogebra.org/educad-pose.js');
-var Curr = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
-var Rec = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
+var Pose = require('../public/lib/educad-pose.js');
+var Curr = require('../public/lib/educad-curriculum.js');
+var Rec = require('../public/lib/educad-reconstruct.js');
 
 var ROOT = path.join(__dirname, '..');
 var README_PATH = path.join(ROOT, 'README.md');

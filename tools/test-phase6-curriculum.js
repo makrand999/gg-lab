@@ -1,8 +1,8 @@
 'use strict';
 var assert = require('assert');
 var fs = require('fs');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
+var C = require('../public/lib/educad-curriculum.js');
+var E = require('../public/lib/educad-entities.js');
 
 var TOTAL = 23;
 var n = 0;
@@ -23,7 +23,7 @@ eq(C.WORLD_UNITS, 'mm');
 ok(/^6\./.test(C.VERSION), 'version ' + C.VERSION);
 pass('phase6 loads mm v6');
 // 2 zero deps + dual-env markers
-var src = fs.readFileSync('mirror/files/www.geogebra.org/educad-curriculum.js', 'utf8');
+var src = fs.readFileSync('public/lib/educad-curriculum.js', 'utf8');
 eq(src.indexOf('require('), -1);
 ok(src.indexOf('EduCADCurriculum') !== -1, 'window.EduCADCurriculum marker');
 ok(src.indexOf('module.exports') !== -1, 'module.exports marker');

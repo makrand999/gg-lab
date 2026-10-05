@@ -2,8 +2,8 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var R = require('../mirror/files/www.geogebra.org/educad-reconstruct.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
+var R = require('../public/lib/educad-reconstruct.js');
+var C = require('../public/lib/educad-curriculum.js');
 
 var ROOT = path.join(__dirname, '..');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
@@ -52,8 +52,7 @@ function endState() {
 }
 // 1 version bump, zero deps kept
 ok(/^10\.6\./.test(R.VERSION), 'version ' + R.VERSION);
-var SRC = fs.readFileSync(path.join(ROOT, 'mirror', 'files',
-  'www.geogebra.org', 'educad-reconstruct.js'), 'utf8');
+var SRC = fs.readFileSync(path.join(ROOT, 'public', 'lib', 'educad-reconstruct.js'), 'utf8');
 ok(SRC.indexOf('require(') === -1, 'zero deps');
 ok(SRC.indexOf('function tryClaimedCorners(') !== -1, 'claims reader kept');
 pass('phase22 loads claims reader');

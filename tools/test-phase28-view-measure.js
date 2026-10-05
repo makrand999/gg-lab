@@ -2,7 +2,7 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var M = require('../mirror/files/www.geogebra.org/educad-measure.js');
+var M = require('../public/lib/educad-measure.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
@@ -139,7 +139,7 @@ pass('phase28 anchors land on geometry');
 
 // 7 the page loads the module and carries the mode pair ahead of
 // the Manual link (still last), with Edit active on boot.
-ok(index.indexOf('<script src="files/www.geogebra.org/educad-measure.js"></script>') !== -1,
+ok(index.indexOf('<script src="lib/educad-measure.js"></script>') !== -1,
   'module loaded');
 var bar = /<div class="demo-bar">([\s\S]*?)<\/div>/.exec(index);
 ok(bar !== null, 'demo bar found');

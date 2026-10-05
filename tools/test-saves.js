@@ -3,8 +3,8 @@
 // stub fetch (no server needed; the live API is covered by test:cpp).
 // Standalone like test:login: `npm run test:saves` (not in `npm test`).
 var assert = require('assert');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var S = require('../mirror/files/www.geogebra.org/educad-saves.js');
+var E = require('../public/lib/educad-entities.js');
+var S = require('../public/lib/educad-saves.js');
 
 var TOTAL = 20;
 var n = 0;
@@ -229,7 +229,7 @@ async function main() {
   var fs = require('fs');
   var path = require('path');
   var src = fs.readFileSync(
-    path.join(__dirname, '..', 'mirror', 'files', 'www.geogebra.org', 'educad-saves.js'), 'utf8');
+    path.join(__dirname, '..', 'public', 'lib', 'educad-saves.js'), 'utf8');
   ok(src.indexOf('EduCADSaves') !== -1, 'global export');
   var html = fs.readFileSync(path.join(__dirname, '..', 'mirror', 'index.html'), 'utf8');
   ok(html.indexOf('educad-saves.js') !== -1, 'index includes module');

@@ -1,9 +1,9 @@
 'use strict';
 var assert = require('assert');
 var fs = require('fs');
-var G = require('../mirror/files/www.geogebra.org/educad-shim.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
+var G = require('../public/lib/educad-shim.js');
+var E = require('../public/lib/educad-entities.js');
+var V = require('../public/lib/educad-viewport.js');
 
 var TOTAL = 56;
 var n = 0;
@@ -56,7 +56,7 @@ deep(G.COMMANDS, ['Point', 'Segment', 'Line', 'Circle', 'Arc', 'Perpendicular',
   'Text', 'Dimension']);
 pass('shim API_METHODS 39 COMMANDS 14');
 // 5 zero deps + dual-env markers; standalone fallback works
-var src = fs.readFileSync('mirror/files/www.geogebra.org/educad-shim.js', 'utf8');
+var src = fs.readFileSync('public/lib/educad-shim.js', 'utf8');
 eq(src.indexOf('require('), -1);
 ok(src.indexOf('ggbApplet') !== -1, 'window.ggbApplet marker');
 ok(src.indexOf('module.exports') !== -1, 'module.exports marker');

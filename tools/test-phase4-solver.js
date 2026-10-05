@@ -1,8 +1,8 @@
 'use strict';
 var assert = require('assert');
 var fs = require('fs');
-var S = require('../mirror/files/www.geogebra.org/educad-solver.js');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
+var S = require('../public/lib/educad-solver.js');
+var E = require('../public/lib/educad-entities.js');
 
 var TOTAL = 64;
 var n = 0;
@@ -19,7 +19,7 @@ eq(typeof S.solveSystem, 'function');
 ok(/^4\./.test(S.VERSION), 'version ' + S.VERSION);
 pass('solver loads mm v4');
 // 2 zero deps + dual-env markers
-var src = fs.readFileSync('mirror/files/www.geogebra.org/educad-solver.js', 'utf8');
+var src = fs.readFileSync('public/lib/educad-solver.js', 'utf8');
 eq(src.indexOf('require('), -1);
 ok(src.indexOf('EduCADSolver') !== -1, 'window.EduCADSolver marker');
 ok(src.indexOf('module.exports') !== -1, 'module.exports marker');

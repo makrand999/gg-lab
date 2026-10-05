@@ -2,9 +2,9 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
-var G = require('../mirror/files/www.geogebra.org/educad-shim.js');
-var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
+var E = require('../public/lib/educad-entities.js');
+var G = require('../public/lib/educad-shim.js');
+var V = require('../public/lib/educad-viewport.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');

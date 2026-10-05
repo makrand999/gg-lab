@@ -1,7 +1,7 @@
 'use strict';
 var assert = require('assert');
-var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
-var C = require('../mirror/files/www.geogebra.org/educad-canvas.js');
+var V = require('../public/lib/educad-viewport.js');
+var C = require('../public/lib/educad-canvas.js');
 
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/71 ' + name); }

@@ -2,8 +2,8 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var Cv = require('../mirror/files/www.geogebra.org/educad-canvas.js');
-var V = require('../mirror/files/www.geogebra.org/educad-viewport.js');
+var Cv = require('../public/lib/educad-canvas.js');
+var V = require('../public/lib/educad-viewport.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');

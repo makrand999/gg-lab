@@ -1,6 +1,6 @@
 'use strict';
 var assert = require('assert');
-var E = require('../mirror/files/www.geogebra.org/educad-entities.js');
+var E = require('../public/lib/educad-entities.js');
 
 var n = 0;
 function pass(name) { n++; console.log('PASS ' + n + '/51 ' + name); }

@@ -11,7 +11,7 @@ var net = require('net');
 var os = require('os');
 var path = require('path');
 
-var Saves = require('../mirror/files/www.geogebra.org/educad-saves.js');
+var Saves = require('../public/lib/educad-saves.js');
 
 var ROOT = path.join(__dirname, '..');
 var SERVER = path.join(ROOT, 'backend', 'build', 'educad-server');

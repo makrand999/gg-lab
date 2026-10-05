@@ -2,9 +2,9 @@
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
-var V = require('../mirror/files/www.geogebra.org/educad-verify.js');
-var Cv = require('../mirror/files/www.geogebra.org/educad-canvas.js');
-var C = require('../mirror/files/www.geogebra.org/educad-curriculum.js');
+var V = require('../public/lib/educad-verify.js');
+var Cv = require('../public/lib/educad-canvas.js');
+var C = require('../public/lib/educad-curriculum.js');
 
 var ROOT = path.join(__dirname, '..');
 var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
@@ -34,8 +34,7 @@ function userLine(id, x1, y1, x2, y2, refs, member) {
 }
 
 var index = fs.readFileSync(INDEX_PATH, 'utf8');
-var SRC = fs.readFileSync(path.join(ROOT, 'mirror', 'files',
-  'www.geogebra.org', 'educad-verify.js'), 'utf8');
+var SRC = fs.readFileSync(path.join(ROOT, 'public', 'lib', 'educad-verify.js'), 'utf8');
 
 // 1 module loads: version, zero deps, dual env, exports, reasons
 eq(V.VERSION, '1.0.0-educad');

@@ -109,7 +109,7 @@ async function main() {
 
   // 6 committed page equals fresh output (staleness guard)
   ok(html === a5,
-    'mirror/manual.html is stale: run npm run build:manual to regenerate it');
+    'public/manual.html is stale: run npm run build:manual to regenerate it');
   pass('phase11 committed page fresh');
 
   // 7 no script of any kind, no inline handlers, no javascript: urls
@@ -133,11 +133,11 @@ async function main() {
   pass('phase11 generated anchors resolve');
 
   // 9 no dead repo-relative hrefs; mirror strip + plain-text rules hold
-  ['../docs/', '../tools/', '../mirror/'].forEach(function (p) {
+  ['../docs/', '../tools/', '../public/'].forEach(function (p) {
     eq(html.indexOf(p), -1, 'no ' + p + ' in output');
   });
   ok(html.indexOf('href="index.html"') !== -1, 'mirror prefix stripped');
-  ok(html.indexOf('href="files/www.geogebra.org/"') !== -1, 'dir target kept');
+  ok(html.indexOf('href="lib/"') !== -1, 'dir target kept');
   ok(html.indexOf('<code>backend/src/main.cpp</code>') !== -1, 'outside text kept');
   eq(html.indexOf('href="../backend/src/main.cpp"'), -1, 'outside target unlinked');
   pass('phase11 link rules served root');
@@ -224,7 +224,7 @@ async function main() {
   ok(html.indexOf('Generated from docs/MANUAL.md by tools/build-manual.js') !== -1,
     'footer provenance');
   ok(html.indexOf('npm run build:manual') !== -1, 'footer rebuild hint');
-  ok(html.indexOf('only mirror/ is served') !== -1, 'footer link rule');
+  ok(html.indexOf('only public/ is served') !== -1, 'footer link rule');
   pass('phase11 page shape');
 
   // 18 index.html carries the Manual link as the last demo-bar child

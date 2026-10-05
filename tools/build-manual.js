@@ -1,15 +1,15 @@
 'use strict';
-// EduCAD manual builder: docs/MANUAL.md -> mirror/manual.html, zero deps.
+// EduCAD manual builder: docs/MANUAL.md -> public/manual.html, zero deps.
 // Deterministic Markdown subset renderer for exactly the constructs used in
 // the user manual: ATX headings, paragraphs, bullet/ordered lists (nested),
 // tables, fenced code blocks, blockquotes, horizontal rules, and inline
 // `code` / **bold** / *italic* / [text](href).
 //
-// Served-context link rule (only mirror/ is served, both by educad-server
+// Served-context link rule (only public/ is served, both by educad-server
 // and by the nginx /major/ alias, so every href must stay relative):
 //   - "#anchor"        -> kept unchanged (in-page navigation).
-//   - "../mirror/..."   -> the "../mirror/" prefix is stripped, because the
-//                          generated page lives inside mirror/ already.
+//   - "../public/..."   -> the "../public/" prefix is stripped, because the
+//                          generated page lives inside public/ already.
 //   - anything else starting with "../" (e.g. ../docs/..., ../tools/...) ->
 //                          the target is outside the served root and would be
 //                          a dead link, so the exact visible text is rendered
@@ -21,7 +21,7 @@ var fs = require('fs');
 var path = require('path');
 
 var SRC = path.join(__dirname, '..', 'docs', 'MANUAL.md');
-var DEST = path.join(__dirname, '..', 'mirror', 'manual.html');
+var DEST = path.join(__dirname, '..', 'public', 'manual.html');
 
 // Inline <style>: app palette (#f8fafc / #1e293b / #0284c7), bordered
 // tables, horizontally scrollable pre, ~900px max-width. No external CSS
@@ -91,13 +91,13 @@ function slugify(headingText) {
   return s;
 }
 
-// Rewrite one Markdown href for the served mirror/ context. Returns either
+// Rewrite one Markdown href for the served public/ context. Returns either
 // { href: '...' } to render an <a>, or { text: true } to render the visible
 // text with no link (dead repo-relative targets outside the served root).
 function rewriteHref(href) {
   var h = String(href);
   if (h.charAt(0) === '#') return { href: h };
-  if (h.indexOf('../mirror/') === 0) return { href: h.slice('../mirror/'.length) };
+  if (h.indexOf('../public/') === 0) return { href: h.slice('../public/'.length) };
   if (h.indexOf('../') === 0) return { text: true };
   return { href: h };
 }
@@ -388,9 +388,9 @@ function renderPage(markdown) {
     '<footer>\n' +
     '<p>Generated from docs/MANUAL.md by tools/build-manual.js ' +
     '\u2014 edit the Markdown and run npm run build:manual. ' +
-    'Links that point outside the served mirror/ folder (for example into ' +
+    'Links that point outside the served public/ folder (for example into ' +
     'docs/ or tools/) are shown as plain text, not links, because only ' +
-    'mirror/ is served.</p>\n' +
+    'public/ is served.</p>\n' +
     '</footer>\n' +
     '</body>\n' +
     '</html>\n';

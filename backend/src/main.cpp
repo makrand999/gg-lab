@@ -1,8 +1,8 @@
-// EduCAD C++ backend: static file server for mirror/ + JSON API.
-// Serves mirror/ plus the JSON API (login, drawings, progress, sets, classes).
+// EduCAD C++ backend: static file server for public/ + JSON API.
+// Serves public/ plus the JSON API (login, drawings, progress, sets, classes).
 //
 //   educad-server [port]   (default 8124; $PORT fallback; +10 busy retry)
-//   env: EDUCAD_ROOT (default <exe>/../../mirror)
+//   env: EDUCAD_ROOT (default <exe>/../../public)
 //        EDUCAD_DB   (default <exe>/../data/educad.db, outside served root)
 //
 // Static files + auth (POST /api/login, POST /api/logout, GET /api/me)
@@ -1478,7 +1478,7 @@ void handleStatic(const fs::path &root, const httplib::Request &req,
       if (base == "/") base = "";
       std::string html =
           "<!doctype html><html><head><meta charset=\"utf-8\">"
-          "<title>EduCAD mirror</title></head><body><h1>EduCAD mirror</h1><ul>";
+          "<title>EduCAD</title></head><body><h1>EduCAD</h1><ul>";
       auto collapseSlashes = [](std::string s) {
         std::string r;
         for (char c : s) {
@@ -2861,7 +2861,7 @@ int main(int argc, char **argv) {
   }
   fs::path exe = exeDir(argv[0]);
   fs::path root = (std::getenv("EDUCAD_ROOT") ? fs::path(std::getenv("EDUCAD_ROOT"))
-                                             : (exe / ".." / ".." / "mirror"))
+                                             : (exe / ".." / ".." / "public"))
                       .lexically_normal();
   std::string dbPath = std::getenv("EDUCAD_DB")
                            ? std::getenv("EDUCAD_DB")

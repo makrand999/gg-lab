@@ -192,7 +192,7 @@ async function main() {
     var r12font = await req(port, 'GET', '/fonts/cuprum-latin.woff2');
     eq(r12font.status, 200);
     ok(String(r12font.headers['content-type']).indexOf('font/woff2') !== -1, 'font type');
-    var r12boot = await req(port, 'GET', '/files/www.geogebra.org/educad-boot.js');
+    var r12boot = await req(port, 'GET', '/lib/educad-boot.js');
     eq(r12boot.status, 200);
     ok(String(r12boot.headers['content-type']).indexOf('text/javascript') !== -1,
       'boot js type');

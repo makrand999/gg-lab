@@ -87,6 +87,18 @@
     return compareTiers(a, b) < 0;
   }
 
+  // Axes a locked snap of one tier constrains: point tiers pin both
+  // coordinates, LOCUS pins height only (its xMm is the cursor's x),
+  // PROJECTOR pins the station only (its yMm is the cursor's y).
+  // Placement merges these per axis with the axis lock. Unknown tiers
+  // throw, like tierRank.
+  function snapTierAxes(tier) {
+    tierRank(tier);
+    if (tier === 'LOCUS') return { x: false, y: true };
+    if (tier === 'PROJECTOR') return { x: true, y: false };
+    return { x: true, y: true };
+  }
+
   function snapKey(c) {
     if (c.key !== undefined && c.key !== null) return String(c.key);
     return c.tier + ':' + c.xMm + ',' + c.yMm;
@@ -399,6 +411,7 @@
     assertFinite: assertFinite, forward: forward, inverse: inverse,
     distPx: distPx, distMm: distMm, checkProjector: checkProjector,
     tierRank: tierRank, compareTiers: compareTiers, isBetterTier: isBetterTier,
+    snapTierAxes: snapTierAxes,
     pickBest: pickBest, candidatesWithin: candidatesWithin,
     shouldLock: shouldLock, shouldRelease: shouldRelease,
     updateSnap: updateSnap, updateSnapLock: updateSnap,

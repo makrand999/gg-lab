@@ -210,7 +210,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase36`') !== -1, 'phase36 row');
 ok(readme.indexOf('Live wireframe: 2D entities with both views resolve to 3D') !== -1,
   'phase36 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 960');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase36'], 'node tools/test-phase36-wire.js',

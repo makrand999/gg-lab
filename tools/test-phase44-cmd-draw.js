@@ -319,7 +319,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase44`') !== -1, 'phase44 row');
 ok(readme.indexOf('Cmd-only problem-bank drawing: /polyline /ellipse /hatch /style /undo, render fixes') !== -1,
   'phase44 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 1039');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase44'], 'node tools/test-phase44-cmd-draw.js',

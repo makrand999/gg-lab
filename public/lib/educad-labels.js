@@ -30,6 +30,11 @@
     180: 2, 270: 2.5, 315: 3, 225: 3.5
   };
   var RADIUS_PX = 10;
+  // Retry ring step: a job that would fire a leader is re-scanned at
+  // +12/+24 px before giving up, so crowded same-anchor parts (a tilted
+  // solid's stacked corners) seat on a wider adjacent ring instead of
+  // ejecting 25 mm out. Jobs that seat at radius 10 are untouched.
+  var PART_RING_PX = 12;
   var FONT_PX = 13;
   var DEFAULT_FONT = 'italic 13px "Cambria", "Times New Roman", serif';
   var HALO_WIDTH_PX = 3.5;
@@ -434,11 +439,17 @@
         loci.push({ entity: e, kind: kind, text: labelText(e, kind),
           anchorMm: locusOuterEnd(e), sectors: SECTORS_DEG });
       } else if (kind === 'datum') {
+        // Datum ends seat below the line (legacy sectors, tried first),
+        // falling back above it only when the underside is blocked: when
+        // the plan crowds below (a tilted solid's parted rings), X/Y step
+        // into VP instead of firing 25 mm leaders down into the part.
         var ends = datumEnds(e);
         datums.push({ entity: e, kind: kind, text: 'X',
-          anchorMm: ends.left, sectors: [225, 270, 180] });
+          anchorMm: ends.left, sectors: [225, 270, 180],
+          fallbackSectors: [135, 90] });
         datums.push({ entity: e, kind: kind, text: 'Y',
-          anchorMm: ends.right, sectors: [315, 270, 0] });
+          anchorMm: ends.right, sectors: [315, 270, 0],
+          fallbackSectors: [45, 90] });
       }
     }
     return fixed.concat(points, dims, loci, datums);
@@ -484,19 +495,41 @@
       };
     }
     var ap = forward(view, job.anchorMm.x, job.anchorMm.y);
-    var best = null;
-    var fallback = null;
-    for (var i = 0; i < job.sectors.length; i++) {
-      var deg = job.sectors[i];
-      var dir = sectorDirPx(deg);
-      var box = candidateBox(ap.x, ap.y, deg, w, h, o.radiusPx);
-      var cost = costCandidate(box, dir, deg, job, placed, entities, view, false);
-      var plain = costCandidate(box, dir, deg, job, placed, entities, view, true);
-      if (fallback === null || plain < fallback.cost) {
-        fallback = { deg: deg, box: box, cost: plain };
+    var scanGroup = function (sectors, rad) {
+      var rb = null, rf = null;
+      for (var i = 0; i < sectors.length; i++) {
+        var deg = sectors[i];
+        var dir = sectorDirPx(deg);
+        var box = candidateBox(ap.x, ap.y, deg, w, h, rad);
+        var cost = costCandidate(box, dir, deg, job, placed, entities, view, false);
+        var plain = costCandidate(box, dir, deg, job, placed, entities, view, true);
+        if (rf === null || plain < rf.cost) {
+          rf = { deg: deg, box: box, cost: plain };
+        }
+        if (cost !== Infinity && (rb === null || cost < rb.cost)) {
+          rb = { deg: deg, box: box, cost: cost };
+        }
       }
-      if (cost !== Infinity && (best === null || cost < best.cost)) {
-        best = { deg: deg, box: box, cost: cost };
+      return { best: rb, fallback: rf };
+    };
+    // Attempt order: primary sectors at radius 10, then fallback sectors
+    // (datum above-line), then both groups at +12/+24 px. The first seat
+    // at or under threshold wins; jobs that seated before are untouched,
+    // and a surviving leader still uses the radius-10 primary read.
+    var groups = [job.sectors];
+    if (Array.isArray(job.fallbackSectors) && job.fallbackSectors.length > 0) {
+      groups.push(job.fallbackSectors);
+    }
+    var radii = [o.radiusPx, o.radiusPx + PART_RING_PX,
+      o.radiusPx + 2 * PART_RING_PX];
+    var best = null, fallback = null, seated = false;
+    for (var r = 0; r < radii.length && !seated; r++) {
+      for (var g = 0; g < groups.length && !seated; g++) {
+        var res = scanGroup(groups[g], radii[r]);
+        if (r === 0 && g === 0) { best = res.best; fallback = res.fallback; }
+        if (res.best !== null && res.best.cost <= o.threshold) {
+          best = res.best; seated = true;
+        }
       }
     }
     if (best === null || best.cost > o.threshold) {
@@ -553,7 +586,8 @@
     WORLD_UNITS: WORLD_UNITS, VERSION: VERSION,
     SECTORS_DEG: SECTORS_DEG, SECTOR_STEP: SECTOR_STEP,
     SECTOR_PREF: SECTOR_PREF,
-    RADIUS_PX: RADIUS_PX, FONT_PX: FONT_PX, DEFAULT_FONT: DEFAULT_FONT,
+    RADIUS_PX: RADIUS_PX, PART_RING_PX: PART_RING_PX,
+    FONT_PX: FONT_PX, DEFAULT_FONT: DEFAULT_FONT,
     HALO_WIDTH_PX: HALO_WIDTH_PX, HALO_STYLE: HALO_STYLE,
     TEXT_FILL: TEXT_FILL,
     W_INCIDENT: W_INCIDENT, W_EDGE_CROSS: W_EDGE_CROSS,

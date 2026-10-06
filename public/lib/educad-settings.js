@@ -18,6 +18,7 @@
   //   showTutorials      tutorial picker visible and usable
   //   commandHistory     Up/Down recalls past commands
   //   coordsHud          coordinate readout visible
+  //   showLocusLines     Type K locus lines drawn on the sheet
   var VERSION = '1.0.0-educad';
   var STORAGE_KEY = 'educad_settings_v1';
 
@@ -27,11 +28,12 @@
     showDemos: true,
     showTutorials: true,
     commandHistory: true,
-    coordsHud: true
+    coordsHud: true,
+    showLocusLines: true
   };
 
   var KEYS = ['commandPreview', 'commandSuggestions', 'showDemos',
-    'showTutorials', 'commandHistory', 'coordsHud'];
+    'showTutorials', 'commandHistory', 'coordsHud', 'showLocusLines'];
 
   var LABELS = {
     commandPreview: 'Preview commands while typing',
@@ -39,7 +41,8 @@
     showDemos: 'Show demos',
     showTutorials: 'Show tutorials',
     commandHistory: 'Remember command history (Up/Down)',
-    coordsHud: 'Show coordinate readout'
+    coordsHud: 'Show coordinate readout',
+    showLocusLines: 'Show locus lines (L)'
   };
 
   function isValidKey(key) { return KEYS.indexOf(key) !== -1; }

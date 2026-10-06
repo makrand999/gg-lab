@@ -11,9 +11,9 @@ var S = require('../public/lib/educad-settings.js');
 var E = require('../public/lib/educad-entities.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
-var HTML_PATH = path.join(ROOT, 'mirror', 'manual.html');
+var HTML_PATH = path.join(ROOT, 'public', 'manual.html');
 var README_PATH = path.join(ROOT, 'README.md');
 var PKG_PATH = path.join(ROOT, 'package.json');
 
@@ -34,10 +34,10 @@ function freshEnv(extra) {
   return env;
 }
 
-// 1 settings ship six on-by-default preferences with labels
-eq(S.KEYS.length, 6, 'six keys');
+// 1 settings ship seven on-by-default preferences with labels
+eq(S.KEYS.length, 7, 'seven keys');
 deep(S.KEYS, ['commandPreview', 'commandSuggestions', 'showDemos',
-  'showTutorials', 'commandHistory', 'coordsHud']);
+  'showTutorials', 'commandHistory', 'coordsHud', 'showLocusLines']);
 Object.keys(S.DEFAULTS).forEach(function (k) {
   eq(S.DEFAULTS[k], true, k + ' defaults on');
 });
@@ -45,6 +45,7 @@ eq(S.labelFor('commandPreview'), 'Preview commands while typing');
 eq(S.labelFor('commandSuggestions'), 'Suggest commands while typing');
 eq(S.labelFor('showDemos'), 'Show demos');
 eq(S.labelFor('showTutorials'), 'Show tutorials');
+eq(S.labelFor('showLocusLines'), 'Show locus lines (L)');
 ok(S.isValidKey('coordsHud') && !S.isValidKey('nope'), 'key check');
 pass('phase32 settings defaults labels');
 
@@ -79,6 +80,10 @@ deep(S.parse('{"showDemos":false,"nope":true}').values,
   S.createStore({ showDemos: false }).values, 'unknown dropped');
 deep(S.parse('{"showDemos":"yes"}').values, S.createStore().values,
   'non-boolean defaulted');
+eq(S.parse('{"showDemos":false}').values.showLocusLines, true,
+  'stored prefs without the locus key default it on');
+deep(S.parse(S.serialize(S.createStore({ showLocusLines: false }))).values,
+  S.createStore({ showLocusLines: false }).values, 'locus round-trip');
 var mem = {};
 var fakeStorage = {
   getItem: function (k) { return mem[k] === undefined ? null : mem[k]; },
@@ -423,6 +428,32 @@ ok(cmdBlock.indexOf('Continuous Thick') !== -1, 'style names table');
 ok(index.indexOf('cmd-sug-line') !== -1, 'sample canvas style');
 ok(cmdBlock.indexOf('cleanupAfterPointDelete(res.ids)') !== -1, 'delete sync');
 ok(cmdBlock.indexOf('renderLayer1();') !== -1, 'redraws');
+// Pinned loci: the store is hoisted for the renderer, Layer 1 drops
+// stored locus entities and draws ephemeral pinned ones instead, the
+// L key toggles the selected point's pin, and snaps run off the live
+// list plus pinned heights. Applying prefs repaints both layers so
+// the master switch takes effect immediately.
+ok(index.indexOf('var settingsStore = null;') !== -1, 'settings hoisted');
+ok(index.indexOf('var pinnedLocus = {};') !== -1, 'pin map');
+ok(index.indexOf("EduCADSettings.get(settingsStore, 'showLocusLines')") !== -1,
+  'locus pref read');
+ok(index.indexOf('function locusSystemOn()') !== -1, 'master switch');
+ok(index.indexOf('function pinnedLocusLines()') !== -1, 'ephemeral pins');
+ok(index.indexOf('function liveEntities()') !== -1, 'live list');
+ok(index.indexOf('function snapOptions()') !== -1, 'snap inputs');
+ok(index.indexOf('function togglePinnedLocus()') !== -1, 'L toggle');
+ok(index.indexOf("'locus-pin-' + id") !== -1, 'pin entity ids');
+ok(index.indexOf("e.key === 'l'") !== -1, 'L key');
+ok(index.indexOf('locusYMmList') !== -1, 'locus snap list wired');
+ok(index.indexOf('snapAt(cursor, handle.view, snapOptions()') !== -1,
+  'snap sites use pins');
+ok(index.indexOf('snapTierAxes') !== -1, 'tier axes used');
+ok(index.indexOf('var placeSnap = EduCADSnapping.snapAt(cursor, handle.view,') !== -1,
+  'fresh snap at click');
+ok(index.indexOf("lock.lock !== 'x'") !== -1 &&
+  index.indexOf("lock.lock !== 'y'") !== -1, 'lock wins its axis');
+ok(cmdBlock.indexOf('refreshCmdAssist();\n          renderLayer1();\n' +
+  '          renderLayer2(null, null);') !== -1, 'prefs repaint');
 pass('phase32 page wiring');
 
 // 15 the manual documents the bar, every command, and the preferences
@@ -432,7 +463,9 @@ var html = fs.readFileSync(HTML_PATH, 'utf8');
   '/xline', '/circle', '/arc', '/polygon', '/demo', '/tutorial', '/mode',
   'profile', 'Preview commands while typing',
   'Suggest commands while typing', 'Show demos', 'Show tutorials',
-  'Remember command history', 'Minecraft-style'].forEach(function (s) {
+  'Remember command history', 'Show locus lines',
+  'Pinned loci', 'to unpin', 'Magnetic placement',
+  'Minecraft-style'].forEach(function (s) {
   ok(md.indexOf(s) !== -1, 'manual has ' + s);
 });
 ok(md.indexOf('| `Settings` |') !== -1, 'demo-bar row');
@@ -445,7 +478,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase32`') !== -1, 'phase32 row');
 ok(readme.indexOf('Slash commands: Minecraft-style `/cmd` draw, autocomplete, Settings prefs') !== -1,
   'phase32 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 960');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase32'], 'node tools/test-phase32-command.js',

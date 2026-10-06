@@ -519,6 +519,22 @@
   var POSE_TWO_POINT_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION',
     'DATUM_AXIS'];
 
+  // Reference ink the sheet holds fixed in pose mode: centre axes and
+  // locus lines are drawing furniture, not part geometry. A spanning
+  // elevation axis ridden endpoint-wise would tilt into a diagonal
+  // across the sheet (each end follows its own view's map), so the
+  // page draws pinned entities unposed, exactly like DATUM_AXIS, and
+  // skips them in the datum clamp. poseCopies/poseEntity stay purely
+  // mechanical (riderless helpers still fit); this predicate is the
+  // page's riding policy, kept here so tests can pin it. Projectors
+  // and hidden edges are NOT pinned: they are live correspondence.
+  var POSE_PINNED_KINDS = ['axis', 'locus'];
+  function isPosePinned(ent) {
+    if (!ent || typeof ent !== 'object') return false;
+    if (ent.type === 'DATUM_AXIS') return true;
+    return !!(ent.meta && POSE_PINNED_KINDS.indexOf(ent.meta.kind) !== -1);
+  }
+
   // Posed render copy of one entity: each drawn point rides its own
   // view's follow map (see routeSide), so a projector spanning the XY
   // line stretches instead of detaching. Geometric side wins over
@@ -1165,6 +1181,8 @@
   return {
     VERSION: VERSION,
     WORLD_UNITS: WORLD_UNITS,
+    POSE_PINNED_KINDS: POSE_PINNED_KINDS,
+    isPosePinned: isPosePinned,
     AXES: AXES,
     AXIS_COLORS: AXIS_COLORS,
     CONTACT_EPS: CONTACT_EPS,

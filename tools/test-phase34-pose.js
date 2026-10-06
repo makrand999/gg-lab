@@ -11,9 +11,9 @@ var P = require('../public/lib/educad-pose.js');
 var M = require('../public/lib/educad-measure.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
-var HTML_PATH = path.join(ROOT, 'mirror', 'manual.html');
+var HTML_PATH = path.join(ROOT, 'public', 'manual.html');
 var README_PATH = path.join(ROOT, 'README.md');
 var PKG_PATH = path.join(ROOT, 'package.json');
 
@@ -373,7 +373,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase34`') !== -1, 'phase34 row');
 ok(readme.indexOf('Pose mode: Blender-style 3D moves drag the drawn 2D views') !== -1,
   'phase34 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 960');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase34'], 'node tools/test-phase34-pose.js',

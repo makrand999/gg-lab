@@ -13,7 +13,7 @@ var Curr = require('../public/lib/educad-curriculum.js');
 var Rec = require('../public/lib/educad-reconstruct.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 var README_PATH = path.join(ROOT, 'README.md');
 var PKG_PATH = path.join(ROOT, 'package.json');
 
@@ -287,7 +287,7 @@ pass('phase42 page wiring');
   ok(readme.indexOf('`npm run test:phase42`') !== -1, 'phase42 row');
   ok(readme.indexOf('Pose ink rides exact: vertex dots, labels, projector feet track split views') !== -1,
     'phase42 label');
-  ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+  ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
     'grand total 1039');
   var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
   eq(pkg.scripts['test:phase42'], 'node tools/test-phase42-exact-ink.js',

@@ -159,7 +159,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase25`') !== -1, 'phase25 row');
 ok(readme.indexOf('Typed plot offset: focus line, type mm, Enter stakes') !== -1,
   'phase25 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 813');
 pass('phase25 readme suite row');
 

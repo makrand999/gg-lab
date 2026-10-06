@@ -385,7 +385,7 @@ async function main() {
   ok(readme.indexOf('`npm run test:phase33`') !== -1, 'phase33 row');
   ok(readme.indexOf('Words to drawing: student `/ words` NL, teacher auto-draw via local gateway') !== -1,
     'phase33 label');
-  ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+  ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
     'grand total 960');
   var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
   eq(pkg.scripts['test:phase33'], 'npm run build:cpp && node tools/test-phase33-nl.js',

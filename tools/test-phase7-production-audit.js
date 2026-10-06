@@ -52,8 +52,8 @@ async function main() {
   pass('phase7 boot loads mm v7');
 
   // 2 zero deps + dual-env markers for new mirror js
-  var bootSrc = fs.readFileSync(path.join(LIB, 'educad-boot.js'), 'utf8');
-  var commonSrc = fs.readFileSync(path.join(LIB, 'edugraphics-common.js'), 'utf8');
+  var bootSrc = fs.readFileSync(path.join(MIRROR, 'educad-boot.js'), 'utf8');
+  var commonSrc = fs.readFileSync(path.join(MIRROR, 'edugraphics-common.js'), 'utf8');
   eq(bootSrc.indexOf('require('), -1);
   eq(commonSrc.indexOf('require('), -1);
   ok(bootSrc.indexOf('module.exports') !== -1, 'boot node marker');
@@ -242,7 +242,7 @@ async function main() {
   pass('phase7 common headless mount');
 
   // 20 css ships HUD + 2-option menu only, no extra chrome words
-  var cssPath = path.join(LIB, 'edugraphics-hud.css');
+  var cssPath = path.join(__dirname, '..', 'public', 'css', 'edugraphics-hud.css');
   var css = fs.readFileSync(cssPath, 'utf8');
   ok(css.length > 100 && css.length < 10240, 'css size ' + css.length);
   ['.edugraphics-hud', '.edugraphics-menu', '.edugraphics-btn',
@@ -266,7 +266,7 @@ async function main() {
   var jsFiles = fs.readdirSync(MIRROR).filter(function (f) { return /\.js$/.test(f); });
   ok(jsFiles.length >= 10, 'mirror js count ' + jsFiles.length);
   jsFiles.forEach(function (f) {
-    var src = fs.readFileSync(path.join(LIB, f), 'utf8');
+    var src = fs.readFileSync(path.join(MIRROR, f), 'utf8');
     ok(src.indexOf('module.exports') !== -1, f + ' node export');
     ok(src.indexOf('window') !== -1, f + ' window export');
   });
@@ -275,7 +275,7 @@ async function main() {
   // 23 no forbidden framework/chrome strings in mirror js
   var banned = ['react', 'vue', 'toolbar', 'dialog', 'webgl', 'tinkercad', 'three.js'];
   jsFiles.forEach(function (f) {
-    var low = fs.readFileSync(path.join(LIB, f), 'utf8').toLowerCase();
+    var low = fs.readFileSync(path.join(MIRROR, f), 'utf8').toLowerCase();
     banned.forEach(function (w) {
       eq(low.indexOf(w), -1, f + ' has no ' + w);
     });
@@ -285,7 +285,7 @@ async function main() {
   // 24 gzipped bundle under 80 KB
   var bundle = '';
   Boot.MODULE_FILES.forEach(function (f) {
-    bundle += fs.readFileSync(path.join(LIB, f), 'utf8') + '\n';
+    bundle += fs.readFileSync(path.join(MIRROR, f), 'utf8') + '\n';
   });
   var gz = zlib.gzipSync(bundle);
   console.log('  bundle raw ' + bundle.length + ' B, gzip ' + gz.length +
@@ -307,7 +307,7 @@ async function main() {
   // 26 bundle inventory: every module file on disk, non-empty
   var rawTotal = 0;
   Boot.MODULE_FILES.forEach(function (f) {
-    var st = fs.statSync(path.join(LIB, f));
+    var st = fs.statSync(path.join(MIRROR, f));
     ok(st.size > 500, f + ' size ' + st.size);
     rawTotal += st.size;
   });

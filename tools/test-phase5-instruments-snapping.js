@@ -145,6 +145,15 @@ eq(lo13[0].yMm, 10);
 near(lo13[0].distPx, 1, 1e-9, 'locus dist');
 var r13 = SN.snapAt({ x: 400, y: 279 }, v5, { entities: [], locusYMmList: [10] });
 eq(r13.snap.tier, 'LOCUS');
+// tier axes for magnetic placement: loci pull height, projectors
+// pull station, point tiers pin both; unknown tiers throw
+deep(SN.snapTierAxes('LOCUS'), { x: false, y: true });
+deep(SN.snapTierAxes('PROJECTOR'), { x: true, y: false });
+['ENDPOINT', 'INTERSECTION', 'MIDPOINT', 'CENTER'].forEach(function (t) {
+  deep(SN.snapTierAxes(t), { x: true, y: true }, t + ' pins both');
+});
+throws(function () { SN.snapTierAxes('DETENT'); }, 'detent not a snap tier');
+throws(function () { SN.snapTierAxes('nope'); }, 'unknown tier');
 pass('phase5 locus snap');
 // 14 snapAt empty -> null snap badge ring
 var r14 = SN.snapAt({ x: 0, y: 0 }, v5, { entities: [] });

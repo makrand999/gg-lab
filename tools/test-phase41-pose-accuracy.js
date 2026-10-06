@@ -311,7 +311,7 @@ pass('phase41 datum wall');
   ok(readme.indexOf('`npm run test:phase41`') !== -1, 'phase41 row');
   ok(readme.indexOf('Pose accuracy: Y-move/Z-rotate projection invariants on the hex prism') !== -1,
     'phase41 label');
-  ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+  ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
     'grand total 1039');
   var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
   eq(pkg.scripts['test:phase41'], 'node tools/test-phase41-pose-accuracy.js',

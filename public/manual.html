@@ -296,6 +296,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <li><strong>Edit</strong> (default, blue on load) is the drawing mode: clicks place, select, bank, plot, and rename, exactly as §4–§6 describe.</li>
 <li><strong>View</strong> is the read-only measure mode. View measures, never edits: click the entity to inspect — a point, segment, circle, or arc — and a badge reads it back. A point shows its coordinates with the Elevation/Plan tag; a segment shows its length with ΔX/ΔY and its angle from +X; a circle shows its center with radius and diameter. Clicking empty sheet clears the pick, Escape clears the readout, and so does a right-click.</li>
 </ul>
+<p>In View mode, the 3D wireframe gains faint HP and VP reference surfaces, meeting at XY. The drawing beneath it becomes quieter. Click a 3D vertex to see its perpendicular projection guides and distances above/below HP and in front of/behind VP. Click a 3D edge to read its true length and inclinations to both planes. A click inspects; a drag still orbits. The <strong>Spatial view</strong> area beneath the diagram summarizes its position. <strong>Geometry details</strong> expands to show extents, signed position ranges, all reconstructed vertex coordinates, and wire-edge lengths and angles. Point IDs P1, P2… belong to the reconstructed wireframe; click an ID in the details to select it. <strong>HP / VP</strong> toggles the surfaces, and <strong>Fit</strong> frames the model together with both planes. These references and details appear only in View mode, and never become drawing entities or saved ink.</p>
 <p>Drafting style: a segment gets a true dimension — extension lines off both ends, a parallel dimension line with arrow tips, and the bare value centered (all values in mm). The dimension opens toward the click: click above the span and it draws above it. Short spans park the value past the far end with a leader. Circles and arcs get a radius leader (arrow on the rim, <code>R</code> value on a shelf, diameter beneath), and points keep their callout plus a witness to the XY fold labeled with the height — the point's distance to its own plane.</p>
 <p>Entering View parks every authoring gesture (selection, rename, line menu, polar sweep, plotting, bank, typed buffer, popups), and while View is on, double-click never renames and typing never stakes — there is nothing to change by accident. Panning, zooming, the 3D glass, and <code>Check hidden</code> all keep working, and starting a tutorial returns the sheet to Edit. The readout lives on the overlay layer only: it is never an entity, never saved, and never reconstructed.</p>
 <h3 id="310-classes-and-question-sets-teachers-post-students-submit">3.10 Classes and question sets (teachers post, students submit)</h3>
@@ -362,7 +363,9 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <li><strong>Show tutorials</strong> — the tutorial picker, and <code>/tutorial</code> itself.</li>
 <li><strong>Remember command history (Up/Down)</strong> — recall past lines.</li>
 <li><strong>Show coordinate readout</strong> — the <code>X/Y</code> coordinates box.</li>
+<li><strong>Show locus lines (L)</strong> — the master switch for the locus system. Off means no locus lines and no locus snaps anywhere, and the <code>L</code> key stays inert.</li>
 </ul>
+<p>Pinned loci: locus lines are never drawn all at once (a full sheet of them buries the drawing). Instead, select a point and press <code>L</code> to pin its locus — a labeled Type K line (<code>locus of b</code>) at the point's own height, with snapping along it and at its projector crossings. Press <code>L</code> again on the same point to unpin. Pins are ephemeral guides: never saved, never undoable, never reaching the 3D view or Check. Points sitting exactly on XY have no pin (the datum is their line).</p>
 <p><strong>Reset to defaults</strong> switches everything back on.</p>
 <hr>
 <h2 id="4-drawing-tool-by-tool">4. Drawing, tool by tool</h2>
@@ -569,9 +572,9 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <tr><td>1 (highest)</td><td>ENDPOINT</td><td>Point dots; segment/arc ends; ray origins</td></tr>
 <tr><td>2</td><td>INTERSECTION</td><td>Segment/line crossings near the cursor</td></tr>
 <tr><td>3</td><td>MIDPOINT</td><td>Segment midpoints</td></tr>
-<tr><td>4 (lowest, wired)</td><td>CENTER</td><td>Circle/arc centers</td></tr>
+<tr><td>4</td><td>CENTER</td><td>Circle/arc centers</td></tr>
+<tr><td>5 (lowest)</td><td>LOCUS</td><td>Pinned locus lines (§3.11): height snaps along the line; crossings snap as INTERSECTION above</td></tr>
 <tr><td>— (not wired)</td><td>PROJECTOR</td><td>Needs a plan-x list the page never sends: never fires</td></tr>
-<tr><td>— (not wired)</td><td>LOCUS</td><td>Needs a locus-y list the page never sends: never fires</td></tr>
 </tbody>
 </table>
 <p>Rules that matter to your hand:</p>
@@ -591,6 +594,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <li>Clicking on the selection itself is treated as a re-select, not a place.</li>
 </ul>
 <p>The same <code>ΔX</code>/<code>ΔY</code> badge follows your cursor live whenever a selection is active, so you can read the distance before you click.</p>
+<p>Magnetic placement: the click also honors the locked snap ring, merged per axis with the lock above. A locus pulls height only, a projector pulls station only, and point tiers (endpoint, intersection, midpoint, center) pin both coordinates — except on the lock's own axis, which always wins. So with <code>a'</code> selected and <code>b</code>'s locus pinned (§3.11), clicking where the ring sits on the locus under <code>a'</code> places the new point exactly at <code>(a'.x, b.y)</code>: x from the lock, y from the locus.</p>
 <p>Type the distance instead of clicking it: with a point selected, type digits at any time (<code>40</code>, <code>12.5</code>) — the badge switches to <code>ΔX: 40 mm (Enter)</code> with a sky preview ring on the staked target. Aim the cursor onto the wanted axis on the wanted side of the selection and press Enter: the new point lands that exact distance along the axis, zoom-proof, unlike eyeballing the cursor. Backspace edits, the first Escape clears what you typed, the second deselects, and the selection stays put for repeat entry. Typing needs the bare selection: rename editing, banked picks, line/polar tools, and popups keep the keyboard while they run, and Enter off-axis only warns.</p>
 <h3 id="63-tolerances-that-matter">6.3 Tolerances that matter</h3>
 <table>
@@ -679,8 +683,8 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <p>The rest pose is an exact isometric projection, so the default cube reads as a textbook 2D sketch until you orbit it.</p>
 <h3 id="83-pen-sketch-look-and-hidden-edges">8.3 Pen-sketch look and hidden edges</h3>
 <ul>
-<li>Ink strokes only: solid edges draw 1.75 px in <code>#1e293b</code> with round caps; vertices draw as filled 3 px dots in <code>#0f172a</code>. No fills, shading, lights, or colors.</li>
-<li><strong>Hidden edges</strong> (edges whose every adjacent face turns away from you) draw dashed <code>[4, 4]</code> at 45% opacity, underneath the solid edges. On the default cube geometry this yields exactly 9 solid + 3 dashed edges at the isometric rest pose, the dashed three meeting at the far corner.</li>
+<li>Ink strokes only: solid edges draw 1.75 px in <code>#1e293b</code> with round caps; vertices draw as filled 3 px dots in <code>#0f172a</code>. No fills, shading, lights, or colors on the object. View mode adds faint warm-gray HP and gray-blue VP surfaces behind the wireframe, with small labels and XY.</li>
+<li><strong>Hidden edges</strong> (edges whose every adjacent face turns away from you) draw dashed <code>[4, 4]</code> at 45% opacity, underneath the solid edges. On the default cube geometry this yields exactly 9 solid + 3 dashed edges at the isometric rest pose, the dashed three meeting at the far corner. In View mode, hidden strokes are finer (1.15 px, 32% opacity) and hidden vertex dots are quieter; the object's faces remain unfilled.</li>
 <li>Faceless wireframes (§8.6) have no faces to hide behind, so all their edges draw solid. But when your wire provably closes into a solid — flat loops, every edge shared by two faces — the view infers those faces silently (nothing is painted) and dashes the edges that turn away, exactly like the demo solids. Open or warped wire keeps drawing all-solid.</li>
 </ul>
 <h3 id="84-the-aura-pointer-routing">8.4 The aura (pointer routing)</h3>
@@ -688,7 +692,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <p>On the ink: drag orbits, wheel zooms, middle-drag pans, double-click resets — none of these reach the sheet, and presses that start on ink never place points or open sheet menus. Off the ink, the glass is fully transparent to input: drawing, selecting, sheet pan/zoom, and menus work exactly as if the 3D layer were not there. While the view shows <code>3D unavailable</code> there is no ink, hence no aura: the whole sheet is clickable.</p>
 <h3 id="85-live-update-behavior">8.5 Live update behavior</h3>
 <p>The 3D view rebuilds from the <em>current visible drawing</em> on <strong>every table change</strong> (place, rename-commit, delete, demo load, clear), coalesced to one rebuild per animation frame. There is no refresh button and no stale state: what you see is always the latest drawing. Clearing the sheet immediately shows <code>3D unavailable</code> (<code>nothing with both views drawn yet</code>). Nothing 3D is ever stored on your drawing — the geometry is derived fresh each time and discarded.</p>
-<p>Derived geometry is centered and uniformly scaled into model space with proportions preserved, so a 35×70 mm prism and a 350×700 mm one look identical on the glass (only proportions survive; absolute mm do not show).</p>
+<p>Derived geometry is centered and uniformly scaled into model space with proportions preserved. View-mode HP and VP use that same transform, so their distances remain correct relative to the wireframe. Inspection readouts and coordinate tables use the original reconstructed millimeters.</p>
 <h3 id="86-how-the-3d-view-reads-your-drawing-user-language">8.6 How the 3D view reads your drawing (user language)</h3>
 <p>The 3D view is a live wireframe: every point with a projection in both views appears in space, every segment joining two such points appears as an edge — whether or not anything closes into a solid. There are no drawing classes and no solidity gate. Draw <code>a'</code> above XY and <code>a</code> below it and the 3D dot is already there; join two resolved points and the 3D edge follows within one frame. Lone dots, open chains, and partial sketches all render as-is. Anything with only one view stays 2D-only, silently: no mate yet, no 3D point — draw the missing projection and it pops in.</p>
 <p>Pairing rules:</p>
@@ -713,7 +717,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <h4 id="line-rotation-tl80-θ30-φ45--the-inclined-line"><code>Line Rotation (TL=80, θ=30°, φ=45°)</code> — the inclined line</h4>
 <p>Loads a straight-line lesson: true length 80 mm, inclined 30° to HP and 45° to VP, with end A fixed at plan <code>(-30, -20)</code> / elevation <code>(-30, 25)</code>.</p>
 <ul>
-<li><strong>What it loads.</strong> A datum span on XY; points <code>a</code>, <code>b</code> (plan) and <code>a'</code>, <code>b'</code> (elevation); thick plan/elevation views <code>ab</code> / <code>a'b'</code>; two Type G projectors; two Type K locus lines (<code>locus of b</code>, <code>locus of b'</code>).</li>
+<li><strong>What it loads.</strong> A datum span on XY; points <code>a</code>, <code>b</code> (plan) and <code>a'</code>, <code>b'</code> (elevation); thick plan/elevation views <code>ab</code> / <code>a'b'</code>; two Type G projectors; two Type K locus lines (<code>locus of b</code>, <code>locus of b'</code>) kept as data — the sheet itself only ever shows pinned loci (§3.11).</li>
 <li><strong>What to look at.</strong> End B lands at x = 10 mm in both views (projector shift dx = 40 mm): plan <code>b = (10, -76.57)</code>, elevation <code>b' = (10, 65.00)</code>. Appearances: plan length 80·cos30° ≈ 69.28 mm, elevation length 80·cos45° ≈ 56.57 mm, both shorter than TL = 80 mm.</li>
 <li><strong>What it teaches.</strong> The rotation method: apparent lengths are TL·cos of each inclination; B's loci sit TL·sin away from A's; the projector shift completes the right triangle TL² = dx² + dh² + dd². Angles here are feasible (sin²30° + sin²45° = 0.75 ≤ 1).</li>
 <li><strong>In 3D.</strong> Renders as a live-wireframe edge at true 80 mm proportions. Orbit it and compare against the two foreshortened sheet views.</li>
@@ -972,7 +976,8 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <tr><td>INTERSECTION</td><td>Segment/line crossings (e.g. projector × locus in the prism demo)</td></tr>
 <tr><td>MIDPOINT</td><td>Every segment midpoint</td></tr>
 <tr><td>CENTER</td><td>Nothing on the four demo sheets (no circles)</td></tr>
-<tr><td>PROJECTOR / LOCUS</td><td>Never fire (page sends no station lists)</td></tr>
+<tr><td>LOCUS</td><td>Pinned locus lines only (§3.11): nothing pinned means nothing fires</td></tr>
+<tr><td>PROJECTOR</td><td>Never fires (page sends no plan-x station list)</td></tr>
 </tbody>
 </table>
 <hr>
@@ -1032,7 +1037,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <li>No sections, perspectives, shading, or 3D export; hidden-line rendering is the only 3D analysis. (A first-angle side/profile view is supported — §8.6.)</li>
 <li>Arc-only sheets report <code>curves not supported yet</code>; full-circle cylinders and cones do reconstruct (revolved, §8.6–§8.7).</li>
 <li>Faces are never inferred: the 3D view is wireframe only, concave and convex alike. Coincident same-name dots pair nothing; draw one corner per name per station.</li>
-<li>Absolute mm do not survive into the 3D stage (uniform re-scaling); only proportions do.</li>
+<li>The 3D display uses uniform scaling; View-mode distances and coordinate tables retain the original reconstructed millimeters.</li>
 <li>3D warnings (<code>curves-ignored</code>, <code>on-datum-placed</code>, <code>helpers-ignored</code>) are computed but never displayed.</li>
 <li>No grid customization (fixed steps, fixed style); no layers panel; no background/paper options.</li>
 </ol>
@@ -1045,7 +1050,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <hr>
 <h2 id="13-appendix-developer-reference">13. Appendix (developer reference)</h2>
 <h3 id="131-module-map">13.1 Module map</h3>
-<p>App shell: <a href="index.html"><code>mirror/index.html</code></a> (all UI wiring, rendering, and event handling). Library modules in <a href="lib/"><code>mirror/lib/</code></a>:</p>
+<p>App shell: <code>mirror/index.html</code> (all UI wiring, rendering, and event handling). Library modules in <code>mirror/files/www.geogebra.org/</code>:</p>
 <table>
 <thead>
 <tr><th>File</th><th>Role</th><th>Wired to UI?</th></tr>
@@ -1063,6 +1068,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <tr><td><code>educad-verify.js</code></td><td><code>Check hidden</code> grading of verdicts and projector claims</td><td>Yes</td></tr>
 <tr><td><code>educad-labels.js</code></td><td>3-tier label layout + leader fallback</td><td>Yes</td></tr>
 <tr><td><code>educad-solid.js</code></td><td>Full-screen 3D glass (orbit/zoom/pan/aura/render)</td><td>Yes</td></tr>
+<tr><td><code>educad-spatial.js</code></td><td>View-mode HP/VP reference planes, spatial picking, measurements, and geometry details</td><td>Yes</td></tr>
 <tr><td><code>educad-reconstruct.js</code></td><td>Two/three-view → 3D live wireframe + claims/curves readers, named failures</td><td>Yes</td></tr>
 <tr><td><code>edugraphics-common.js</code></td><td>Dual-layer mount, zoom HUD, 2-option menu</td><td>Yes</td></tr>
 <tr><td><code>educad-boot.js</code></td><td>Cold-boot wiring of all modules</td><td>Yes</td></tr>
@@ -1159,7 +1165,7 @@ lesson.steps.forEach(function (s) { console.log(s); });</code></pre>
 <p>Line numbers refer to the files as of this writing; behavior (not line numbers) is the contract. If a line drifts, search the file for the quoted string — every quoted string in this manual appears verbatim in the code.</p>
 </main>
 <footer>
-<p>Generated from docs/MANUAL.md by tools/build-manual.js — edit the Markdown and run npm run build:manual. Links that point outside the served mirror/ folder (for example into docs/ or tools/) are shown as plain text, not links, because only mirror/ is served.</p>
+<p>Generated from docs/MANUAL.md by tools/build-manual.js — edit the Markdown and run npm run build:manual. Links that point outside the served public/ folder (for example into docs/ or tools/) are shown as plain text, not links, because only public/ is served.</p>
 </footer>
 </body>
 </html>

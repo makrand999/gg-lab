@@ -189,7 +189,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase38`') !== -1, 'phase38 row');
 ok(readme.indexOf('Logical faces: closed wire infers faces for hidden dashes') !== -1,
   'phase38 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 978');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase38'], 'node tools/test-phase38-closed-faces.js',

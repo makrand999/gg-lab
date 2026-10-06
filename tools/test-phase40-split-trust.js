@@ -165,7 +165,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase40`') !== -1, 'phase40 row');
 ok(readme.indexOf('Split pieces need both-views proof; whole lines keep trust') !== -1,
   'phase40 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 1039');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase40'], 'node tools/test-phase40-split-trust.js',

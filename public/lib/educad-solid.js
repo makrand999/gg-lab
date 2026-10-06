@@ -296,10 +296,17 @@
     opts = opts || {};
     if (geometry === undefined || geometry === null) {
       st.geometry = CUBE_GEOMETRY;
+      st.geometryMm = null;
+      st.geometryTransform = null;
     } else if (opts.normalize === false) {
       st.geometry = geometry;
+      st.geometryMm = null;
+      st.geometryTransform = null;
     } else {
-      st.geometry = normalizeGeometry(geometry).geometry;
+      var normalized = normalizeGeometry(geometry);
+      st.geometry = normalized.geometry;
+      st.geometryMm = geometry;
+      st.geometryTransform = normalized.transform;
     }
     st.status = { available: true, reason: '', label: '' };
     if (target && target.state && target.el &&
@@ -318,6 +325,8 @@
   function setUnavailable(target, reason, label) {
     var st = (target && target.state) ? target.state : target;
     if (!st) throw new Error('setUnavailable needs a state or widget');
+    st.geometryMm = null;
+    st.geometryTransform = null;
     st.status = {
       available: false,
       reason: String(reason === undefined ? 'unknown' : reason),
@@ -1031,7 +1040,8 @@
       ctx.lineTo(pts[e.b].x, pts[e.b].y);
     }
     if (drewHidden) {
-      ctx.globalAlpha = HIDDEN_OPACITY;
+      ctx.globalAlpha = st.inspection ? 0.32 : HIDDEN_OPACITY;
+      ctx.lineWidth = st.inspection ? 1.15 : LINE_WIDTH_PX;
       if (typeof ctx.setLineDash === 'function') {
         ctx.setLineDash(HIDDEN_DASH);
       }
@@ -1049,6 +1059,7 @@
     }
     if (drewFront) {
       ctx.globalAlpha = 1;
+      ctx.lineWidth = LINE_WIDTH_PX;
       if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
       ctx.stroke();
     }
@@ -1056,15 +1067,25 @@
       ctx.globalAlpha = 1;
       if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
       ctx.fillStyle = VERTEX_FILL;
-      ctx.beginPath();
-      for (i = 0; i < pts.length; i++) {
-        // moveTo the arc start first: without it, arc() would connect
-        // each dot to the previous one with a straight line and the
-        // single fill() would paint the caps/faces between them black.
-        ctx.moveTo(pts[i].x + VERTEX_R_PX, pts[i].y);
-        ctx.arc(pts[i].x, pts[i].y, VERTEX_R_PX, 0, 2 * Math.PI);
+      var frontVertices = {};
+      var incidentVertices = {};
+      if (st.inspection) edges.forEach(function (edge) {
+        incidentVertices[edge.a] = true; incidentVertices[edge.b] = true;
+        if (!edge.hidden) { frontVertices[edge.a] = true; frontVertices[edge.b] = true; }
+      });
+      for (var dotPass = 0; dotPass < (st.inspection ? 2 : 1); dotPass++) {
+        ctx.beginPath();
+        ctx.globalAlpha = st.inspection && dotPass === 0 ? 0.32 : 1;
+        var dotRadius = st.inspection ? 2.3 : VERTEX_R_PX;
+        for (i = 0; i < pts.length; i++) {
+          var visibleDot = !incidentVertices[i] || !!frontVertices[i];
+          if (st.inspection && visibleDot !== (dotPass === 1)) continue;
+          // Each arc starts a separate subpath; dots never fill faces.
+          ctx.moveTo(pts[i].x + dotRadius, pts[i].y);
+          ctx.arc(pts[i].x, pts[i].y, dotRadius, 0, 2 * Math.PI);
+        }
+        ctx.fill();
       }
-      ctx.fill();
     }
     ctx.restore();
     return counts;
@@ -1154,7 +1175,9 @@
       if (typeof ctx.clearRect === 'function') {
         ctx.clearRect(0, 0, st.w, st.h);
       }
+      if (typeof opts.drawUnderlay === 'function') opts.drawUnderlay(ctx, st);
       var counts = renderFast(ctx, st, { cxPx: st.cx, cyPx: st.cy });
+      if (typeof opts.drawOverlay === 'function') opts.drawOverlay(ctx, st);
       frame = buildGlassFrame(st);
       try {
         if (typeof cv.getBoundingClientRect === 'function') {

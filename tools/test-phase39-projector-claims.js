@@ -242,7 +242,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase39`') !== -1, 'phase39 row');
 ok(readme.indexOf('Projector-read claims: drawn Type G pairs stacks, menu retired') !== -1,
   'phase39 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 990');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase39'], 'node tools/test-phase39-projector-claims.js',

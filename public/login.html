@@ -17,12 +17,12 @@
         <ul class="menu-list">
           <li><a href="index.html">Home</a></li>
           <li><a href="tutorials.html">Tutorials</a></li>
-          <li><a href="manual.html">Manual</a></li>
-          <li class="current"><a href="login.html">Login</a></li>
+          <li id="menu-manual"><a href="manual.html" id="tab-manual">Manual</a></li>
+          <li id="menu-login" class="current"><a href="login.html" id="tab-login">Login</a></li>
         </ul>
       </div>
     </nav>
-    <main class="cf-content">
+    <main id="login-view" class="cf-content">
       <h1>Login to EduCAD</h1>
       <div class="cf-tabs">
         <button type="button" data-role="academics" class="active">Academics</button>
@@ -50,6 +50,12 @@
         <p class="cf-hint" id="demo-hint"></p>
       </form>
       <p class="cf-guest">Just looking around? <a href="index.html" id="guest-link">Continue as guest</a></p>
+    </main>
+    <main id="manual-view" class="cf-content" hidden>
+      <h1>EduCAD User Manual</h1>
+      <div id="manual-content-container" class="cf-manual-body">
+        <p class="cf-hint">Loading manual...</p>
+      </div>
     </main>
     <footer class="cf-footer">EduCAD &middot; zero-dependency teaching CAD &middot; demo login, no real security</footer>
   </div>

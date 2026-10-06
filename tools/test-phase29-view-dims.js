@@ -5,9 +5,9 @@ var path = require('path');
 var M = require('../public/lib/educad-measure.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
-var HTML_PATH = path.join(ROOT, 'mirror', 'manual.html');
+var HTML_PATH = path.join(ROOT, 'public', 'manual.html');
 var README_PATH = path.join(ROOT, 'README.md');
 var PKG_PATH = path.join(ROOT, 'package.json');
 
@@ -197,7 +197,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase29`') !== -1, 'phase29 row');
 ok(readme.indexOf('View dimensions: drafting-style overlay (extension lines, leaders)') !== -1,
   'phase29 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 880');
 pass('phase29 readme suite row');
 

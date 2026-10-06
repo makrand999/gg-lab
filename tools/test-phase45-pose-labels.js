@@ -144,7 +144,7 @@ ok(Math.abs(g[0].xPx - a[0].xPx) > 60, 'corners separated on screen');
 pass('phase45 labels divide');
 
 // 7 the page splits per frame from cached rest points
-var index = fs.readFileSync(path.join(ROOT, 'mirror', 'index.html'), 'utf8');
+var index = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
 ['splitStackCaption(ent, copies, force', 'poseState.restPoints',
   'restPoints: poseState.restPoints',
   "typeof EduCADPose.splitStackCaption === 'function'"].forEach(function (s) {
@@ -157,7 +157,7 @@ var readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 ok(readme.indexOf('`npm run test:phase45`') !== -1, 'phase45 row');
 ok(readme.indexOf('Pose stack labels split across parted corners') !== -1,
   'phase45 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 1039');
 var pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 eq(pkg.scripts['test:phase45'], 'node tools/test-phase45-pose-labels.js',

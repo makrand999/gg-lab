@@ -179,7 +179,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase37`') !== -1, 'phase37 row');
 ok(readme.indexOf('Claim-decided pairing: corner choices pair 3D, dot picker covers stacks') !== -1,
   'phase37 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 969');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase37'], 'node tools/test-phase37-claims-live.js',

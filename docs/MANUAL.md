@@ -453,6 +453,19 @@ The `Edit`/`View` pair switches what the sheet does with your clicks:
   Clicking empty sheet clears the pick, Escape clears the readout, and
   so does a right-click.
 
+In View mode, the 3D wireframe gains faint HP and VP reference surfaces,
+meeting at XY. The drawing beneath it becomes quieter. Click a 3D vertex
+to see its perpendicular projection guides and distances above/below HP
+and in front of/behind VP. Click a 3D edge to read its true length and
+inclinations to both planes. A click inspects; a drag still orbits.
+The **Spatial view** area beneath the diagram summarizes its position.
+**Geometry details** expands to show extents, signed position ranges,
+all reconstructed vertex coordinates, and wire-edge lengths and angles.
+Point IDs P1, P2… belong to the reconstructed wireframe; click an ID in
+the details to select it. **HP / VP** toggles the surfaces, and **Fit**
+frames the model together with both planes. These references and details
+appear only in View mode, and never become drawing entities or saved ink.
+
 Drafting style: a segment gets a true dimension — extension lines
 off both ends, a parallel dimension line with arrow tips, and the bare
 value centered (all values in mm). The dimension opens toward the click:
@@ -697,6 +710,15 @@ its own: its endpoints are the clamped projections themselves.
 - **Show tutorials** — the tutorial picker, and `/tutorial` itself.
 - **Remember command history (Up/Down)** — recall past lines.
 - **Show coordinate readout** — the `X/Y` coordinates box.
+- **Show locus lines (L)** — the master switch for the locus system. Off means no locus lines and no locus snaps anywhere, and the `L` key stays inert.
+
+Pinned loci: locus lines are never drawn all at once (a full sheet of
+them buries the drawing). Instead, select a point and press `L` to pin
+its locus — a labeled Type K line (`locus of b`) at the point's own
+height, with snapping along it and at its projector crossings. Press
+`L` again on the same point to unpin. Pins are ephemeral guides: never
+saved, never undoable, never reaching the 3D view or Check. Points
+sitting exactly on XY have no pin (the datum is their line).
 
 **Reset to defaults** switches everything back on.
 
@@ -1132,9 +1154,9 @@ always active, with fixed priority:
 | 1 (highest) | ENDPOINT | Point dots; segment/arc ends; ray origins |
 | 2 | INTERSECTION | Segment/line crossings near the cursor |
 | 3 | MIDPOINT | Segment midpoints |
-| 4 (lowest, wired) | CENTER | Circle/arc centers |
+| 4 | CENTER | Circle/arc centers |
+| 5 (lowest) | LOCUS | Pinned locus lines (§3.11): height snaps along the line; crossings snap as INTERSECTION above |
 | — (not wired) | PROJECTOR | Needs a plan-x list the page never sends: never fires |
-| — (not wired) | LOCUS | Needs a locus-y list the page never sends: never fires |
 
 Rules that matter to your hand:
 
@@ -1163,6 +1185,14 @@ point axis-locked to the selection:
 
 The same `ΔX`/`ΔY` badge follows your cursor live whenever a selection is
 active, so you can read the distance before you click.
+
+Magnetic placement: the click also honors the locked snap ring, merged
+per axis with the lock above. A locus pulls height only, a projector
+pulls station only, and point tiers (endpoint, intersection, midpoint,
+center) pin both coordinates — except on the lock's own axis, which
+always wins. So with `a'` selected and `b`'s locus pinned (§3.11),
+clicking where the ring sits on the locus under `a'` places the new
+point exactly at `(a'.x, b.y)`: x from the lock, y from the locus.
 
 Type the distance instead of clicking it: with a point selected, type
 digits at any time (`40`, `12.5`) — the badge switches to
@@ -1321,11 +1351,14 @@ as a textbook 2D sketch until you orbit it.
 
 - Ink strokes only: solid edges draw 1.75 px in `#1e293b` with round caps;
   vertices draw as filled 3 px dots in `#0f172a`. No fills, shading,
-  lights, or colors.
+  lights, or colors on the object. View mode adds faint warm-gray HP and
+  gray-blue VP surfaces behind the wireframe, with small labels and XY.
 - **Hidden edges** (edges whose every adjacent face turns away from you)
   draw dashed `[4, 4]` at 45% opacity, underneath the solid edges. On the
   default cube geometry this yields exactly 9 solid + 3 dashed edges at the
   isometric rest pose, the dashed three meeting at the far corner.
+  In View mode, hidden strokes are finer (1.15 px, 32% opacity) and
+  hidden vertex dots are quieter; the object's faces remain unfilled.
 - Faceless wireframes (§8.6) have no faces to hide behind, so all
   their edges draw solid. But when your wire provably closes into a
   solid — flat loops, every edge shared by two faces — the view infers
@@ -1361,8 +1394,9 @@ is ever stored on your drawing — the geometry is derived fresh each time
 and discarded.
 
 Derived geometry is centered and uniformly scaled into model space
-with proportions preserved, so a 35×70 mm prism and a 350×700 mm one look
-identical on the glass (only proportions survive; absolute mm do not show).
+with proportions preserved. View-mode HP and VP use that same transform,
+so their distances remain correct relative to the wireframe. Inspection
+readouts and coordinate tables use the original reconstructed millimeters.
 
 ### 8.6 How the 3D view reads your drawing (user language)
 
@@ -1464,7 +1498,8 @@ Loads a straight-line lesson: true length 80 mm, inclined 30° to HP and
 
 - **What it loads.** A datum span on XY; points `a`, `b` (plan) and `a'`,
   `b'` (elevation); thick plan/elevation views `ab` / `a'b'`; two Type G
-  projectors; two Type K locus lines (`locus of b`, `locus of b'`).
+  projectors; two Type K locus lines (`locus of b`, `locus of b'`) kept
+  as data — the sheet itself only ever shows pinned loci (§3.11).
 - **What to look at.** End B lands at x = 10 mm in both views (projector
   shift dx = 40 mm): plan `b = (10, -76.57)`, elevation
   `b' = (10, 65.00)`. Appearances: plan length 80·cos30° ≈ 69.28 mm,
@@ -1873,7 +1908,8 @@ priority order within 14 px wins):
 | INTERSECTION | Segment/line crossings (e.g. projector × locus in the prism demo) |
 | MIDPOINT | Every segment midpoint |
 | CENTER | Nothing on the four demo sheets (no circles) |
-| PROJECTOR / LOCUS | Never fire (page sends no station lists) |
+| LOCUS | Pinned locus lines only (§3.11): nothing pinned means nothing fires |
+| PROJECTOR | Never fires (page sends no plan-x station list) |
 
 ---
 
@@ -1946,8 +1982,8 @@ it, and (unless noted) no remnant wires it to the screen.
 12. Faces are never inferred: the 3D view is wireframe only, concave and
     convex alike. Coincident same-name dots pair nothing; draw one corner
     per name per station.
-13. Absolute mm do not survive into the 3D stage (uniform re-scaling);
-    only proportions do.
+13. The 3D display uses uniform scaling; View-mode distances and
+    coordinate tables retain the original reconstructed millimeters.
 14. 3D warnings (`curves-ignored`, `on-datum-placed`, `helpers-ignored`)
     are computed but never displayed.
 15. No grid customization (fixed steps, fixed style); no layers panel; no
@@ -1993,6 +2029,7 @@ rendering, and event handling). Library modules in
 | `educad-verify.js` | `Check hidden` grading of verdicts and projector claims | Yes |
 | `educad-labels.js` | 3-tier label layout + leader fallback | Yes |
 | `educad-solid.js` | Full-screen 3D glass (orbit/zoom/pan/aura/render) | Yes |
+| `educad-spatial.js` | View-mode HP/VP reference planes, spatial picking, measurements, and geometry details | Yes |
 | `educad-reconstruct.js` | Two/three-view → 3D live wireframe + claims/curves readers, named failures | Yes |
 | `edugraphics-common.js` | Dual-layer mount, zoom HUD, 2-option menu | Yes |
 | `educad-boot.js` | Cold-boot wiring of all modules | Yes |

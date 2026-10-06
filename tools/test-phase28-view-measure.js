@@ -5,9 +5,9 @@ var path = require('path');
 var M = require('../public/lib/educad-measure.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
-var HTML_PATH = path.join(ROOT, 'mirror', 'manual.html');
+var HTML_PATH = path.join(ROOT, 'public', 'manual.html');
 var README_PATH = path.join(ROOT, 'README.md');
 var PKG_PATH = path.join(ROOT, 'package.json');
 
@@ -163,7 +163,7 @@ var bankBranch = index.indexOf('if (e.ctrlKey || e.metaKey) {', clickIdx);
 ok(viewBranch !== -1 && bankBranch !== -1 && viewBranch < bankBranch,
   'view owns the click before banking');
 var viewSlice = index.slice(viewBranch, bankBranch);
-ok(viewSlice.indexOf('viewClickInspect(cursor);') !== -1, 'inspects');
+ok(viewSlice.indexOf('viewClickInspect(cursor, e.altKey);') !== -1, 'inspects with Alt sheet bypass');
 ok(viewSlice.indexOf('return;') !== -1, 'returns');
 var insp = bodyOf('viewClickInspect');
 ok(insp.indexOf('hitTestAll') !== -1, 'hit tests');
@@ -242,7 +242,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase28`') !== -1, 'phase28 row');
 ok(readme.indexOf('View mode: Edit/View toggle, select-and-measure inspect') !== -1,
   'phase28 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 850');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase28'], 'node tools/test-phase28-view-measure.js',

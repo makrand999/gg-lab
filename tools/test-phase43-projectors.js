@@ -228,7 +228,7 @@ pass('phase43 fitted path preserved');
   ok(readme.indexOf('`npm run test:phase43`') !== -1, 'phase43 row');
   ok(readme.indexOf('True projector corners: spanning lines head every touched corner once') !== -1,
     'phase43 label');
-  ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+  ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
     'grand total 1039');
   var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
   eq(pkg.scripts['test:phase43'], 'node tools/test-phase43-projectors.js',

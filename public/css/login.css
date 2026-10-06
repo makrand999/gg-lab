@@ -175,6 +175,101 @@ a:hover { color: #003d99; }
   color: #555;
 }
 
+/* Manual in-page view: strictly styled to match login page design */
+.cf-manual-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 6px;
+  margin-bottom: 16px;
+}
+.cf-manual-header h1 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin: 0;
+}
+.cf-manual-body {
+  line-height: 1.6;
+  color: #222;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 12px;
+}
+.cf-manual-body h1 {
+  display: none; /* Already in cf-manual-header */
+}
+.cf-manual-body h2 {
+  font-size: 15px;
+  font-weight: bold;
+  margin: 20px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #eee;
+  color: #222;
+}
+.cf-manual-body h3 {
+  font-size: 13.5px;
+  font-weight: bold;
+  margin: 14px 0 6px;
+  color: #333;
+}
+.cf-manual-body h4 {
+  font-size: 13px;
+  font-weight: bold;
+  margin: 10px 0 4px;
+  color: #444;
+}
+.cf-manual-body p {
+  margin: 8px 0;
+}
+.cf-manual-body ul, .cf-manual-body ol {
+  margin: 8px 0 8px 24px;
+}
+.cf-manual-body li {
+  margin: 3px 0;
+}
+.cf-manual-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.cf-manual-body th, .cf-manual-body td {
+  border: 1px solid #c8c8c8;
+  padding: 5px 8px;
+  text-align: left;
+}
+.cf-manual-body th {
+  background: #f0f0f0;
+  font-weight: bold;
+}
+.cf-manual-body tr:nth-child(even) td {
+  background: #fafafa;
+}
+.cf-manual-body code {
+  font-family: Consolas, Menlo, monospace;
+  background: #f4f4f4;
+  padding: 1px 4px;
+  font-size: 12px;
+  border-radius: 2px;
+}
+.cf-manual-body pre {
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  padding: 10px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.cf-manual-body pre code {
+  background: transparent;
+  padding: 0;
+}
+.cf-manual-body hr {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 18px 0;
+}
+
 .cf-footer {
   border-top: 1px solid #ddd;
   padding: 12px 28px 20px;

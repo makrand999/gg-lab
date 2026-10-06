@@ -246,7 +246,7 @@ pass('phase22 docs sync');
 // 19 README lists the phase22 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase22`') !== -1, 'phase22 row');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 789');
 pass('phase22 readme suite row');
 

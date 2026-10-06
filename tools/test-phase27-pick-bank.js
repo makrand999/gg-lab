@@ -141,7 +141,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase27`') !== -1, 'phase27 row');
 ok(readme.indexOf('Pick bank: Ctrl banks, plain click finalizes') !== -1,
   'phase27 label');
-ok(readme.indexOf('baseline + phases 1–45 (1039 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
   'grand total 838');
 pass('phase27 readme suite row');
 

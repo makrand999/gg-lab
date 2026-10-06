@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EduCAD - 2D Engineering Graphics CAD</title>
   <link rel="stylesheet" href="css/edugraphics-hud.css">
+  <link rel="stylesheet" href="css/educad-spatial.css?v=hp-vp-1">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -709,7 +710,8 @@
   <script src="lib/edugraphics-instruments.js"></script>
   <script src="lib/educad-curriculum.js"></script>
   <script src="lib/educad-labels.js"></script>
-  <script src="lib/educad-solid.js"></script>
+  <script src="lib/educad-solid.js?v=hp-vp-1"></script>
+  <script src="lib/educad-spatial.js?v=hp-vp-1"></script>
   <script src="lib/educad-reconstruct.js"></script>
   <script src="lib/educad-verify.js"></script>
   <script src="lib/educad-measure.js"></script>
@@ -738,6 +740,16 @@
       // Saves UI bridge: the session-bar script below is a separate block
       // and reaches the live table only through this handle.
       window.educadHandle = handle;
+      // Settings store, owned by the commandLine block below. Hoisted
+      // here so renderLayer1 can honor display prefs (locus lines).
+      // Null until Settings loads; renderers treat null as defaults.
+      var settingsStore = null;
+      // Pinned loci: pointId -> true. L toggles the selected point's
+      // entry; renderers draw one ephemeral Type K line per pinned
+      // point (locus of <name>) plus its snaps. Dangling ids (deleted
+      // points, cleared sheets, undo restores) are pruned lazily on
+      // read, so no other flow needs to maintain this map.
+      var pinnedLocus = {};
 
       // Sheet undo (Ctrl+Z): snapshot history over the live table. The
       // subscriber records the pre-batch sheet: mutations landing in one
@@ -1005,6 +1017,72 @@
         stopCaretTimer();
         renderLayer1();
         renderLayer2(cursorPx || null, null);
+      }
+      // Locus system master switch: the Settings preference. Off (or
+      // Settings not yet loaded) means no locus lines and no locus
+      // snaps anywhere, and the L key stays inert.
+      function locusSystemOn() {
+        return settingsStore !== null &&
+          typeof EduCADSettings !== 'undefined' &&
+          EduCADSettings.get(settingsStore, 'showLocusLines');
+      }
+      // Ephemeral pinned loci: one Type K LINE per pinned point at the
+      // point's own height, shaped exactly like curriculum loci so the
+      // geometry loop, pose copies, and label pass treat them alike.
+      // Never written to the table: no saves, undo, verify, or 3D
+      // impact. Points on XY are skipped (the datum is their line).
+      function pinnedLocusLines() {
+        if (!locusSystemOn()) return [];
+        var out = [];
+        for (var id in pinnedLocus) {
+          if (!Object.prototype.hasOwnProperty.call(pinnedLocus, id)) continue;
+          var p = handle.table.get(id);
+          if (p === null || p.type !== 'POINT') { delete pinnedLocus[id]; continue; }
+          if (p.visible === false || Math.abs(p.y) < 1e-9) continue;
+          var nm = (p.caption !== undefined && p.caption !== null && p.caption !== '') ?
+            p.caption : (p.name || '');
+          out.push({ id: 'locus-pin-' + id, type: 'LINE',
+            x: p.x - 30, y: p.y, x2: p.x + 30, y2: p.y,
+            bisCode: 'K', viewRole: p.viewRole || 'BOTH',
+            visible: true, showLabel: true, caption: 'locus-' + nm,
+            meta: { kind: 'locus' } });
+        }
+        return out;
+      }
+      // Table entities minus stored locus lines. Stored loci are
+      // display-dead data (demos and saves keep them, but the sheet
+      // only ever shows pinned ones), so interaction inputs must not
+      // see them either otherwise invisible lines stay pickable and
+      // their crossings stay snappable.
+      function liveEntities() {
+        return handle.table.list().filter(function (e) {
+          return !(e.meta && e.meta.kind === 'locus');
+        });
+      }
+      // Snap inputs: live entities plus pinned loci (their projector
+      // crossings snap at INTERSECTION tier), with the pinned heights
+      // as the LOCUS tier list. LINEs contribute no endpoints, so the
+      // pinned extent ends never become snap points.
+      function snapOptions() {
+        var pins = pinnedLocusLines();
+        return {
+          entities: liveEntities().concat(pins),
+          locusYMmList: pins.map(function (l) { return l.y; })
+        };
+      }
+      // L key: pin or unpin the selected point's locus line. Returns
+      // false (key ignored) with the system off, nothing selected, or
+      // a non-point selected.
+      function togglePinnedLocus() {
+        if (!locusSystemOn()) return false;
+        if (handle.sel.selectedId === null) return false;
+        var p = handle.table.get(handle.sel.selectedId);
+        if (p === null || p.type !== 'POINT') return false;
+        if (pinnedLocus[p.id]) delete pinnedLocus[p.id];
+        else pinnedLocus[p.id] = true;
+        renderLayer1();
+        renderLayer2(lastCursor, { snap: handle.snapCurrent });
+        return true;
       }
       function userRenamePoint(id, newName) {
         var ent = handle.table.get(id);
@@ -1323,6 +1401,7 @@
       handle.typedDist = EduCADCanvas.createTypedDistState();
       // Edit/View mode + inspected pick (View is read-only measuring).
       handle.measure = EduCADMeasure.createViewState();
+      var spatialView = null;
       function abortPlotTask() {
         EduCADCanvas.abortPlotTool(handle.plot);
         EduCADCanvas.clearTypedDist(handle.typedDist);
@@ -1431,7 +1510,11 @@
       // labels, and projector feet stay glued to the exact overlay;
       // all other ink rides the fitted similarities as before.
       function poseDrawCopies(ent) {
-        if (!poseState || !poseState.sims || ent.type === 'DATUM_AXIS') {
+        // Pinned reference ink (datum, centre axes, loci) draws unposed:
+        // a spanning elevation axis ridden endpoint-wise would tilt into
+        // a diagonal across the sheet, and loci are rest-height rules.
+        if (!poseState || !poseState.sims || ent.type === 'DATUM_AXIS' ||
+            EduCADPose.isPosePinned(ent)) {
           return [ent];
         }
         var sims = poseState.sims;
@@ -1473,6 +1556,8 @@
         var pairs = EduCADPose.projectionPairs(poseState.rest2D, sims.now);
         var list = handle.table.visibleEntities();
         for (var i = 0; i < list.length; i++) {
+          // Pinned ink never moves, so its ghost must not clamp gestures.
+          if (EduCADPose.isPosePinned(list[i])) continue;
           var forces = EduCADPose.routeCopies(list[i]);
           for (var k = 0; k < forces.length; k++) {
             var pts = EduCADPose.contactPoints(list[i], sims.elev,
@@ -1681,6 +1766,7 @@
           exitPose();
         }
         var next = EduCADMeasure.setMode(handle.measure, mode);
+        if (spatialView) spatialView.setEnabled(next === 'view');
         var be = document.getElementById('btn-mode-edit');
         var bv = document.getElementById('btn-mode-view');
         var bp = document.getElementById('btn-mode-pose');
@@ -1715,8 +1801,11 @@
       // the cursor, or clear the readout on empty sheet. Read-only:
       // no placement, no selection, no banking, no menus. The cursor's
       // side of the span is stored so the dimension opens toward it.
-      function viewClickInspect(cursor) {
-        var id = EduCADMeasure.hitTestAll(handle.table.list(), cursor,
+      function viewClickInspect(cursor, sheetOnly) {
+        if (!sheetOnly && spatialView && handle.measure.mode === 'view' &&
+            spatialView.inspectAt(cursor.x, cursor.y)) return;
+        if (spatialView) spatialView.clear();
+        var id = EduCADMeasure.hitTestAll(liveEntities(), cursor,
           handle.view, EduCADCanvas.SELECT_TOL_PX);
         var side = null;
         if (id !== null) {
@@ -1963,6 +2052,7 @@
         EduGraphicsCommon.sizeCanvasForDpr(c2, sz);
         if (handle.solid && typeof handle.solid.resize === 'function') {
           handle.solid.resize(w, h);
+          if (spatialView && handle.measure.mode === 'view') spatialView.fit();
         }
         renderLayer1();
       });
@@ -1977,11 +2067,18 @@
         var s = v.s;
 
         // Visible entities up front: geometry loop, datum check, label pass.
+        // Stored locus lines never draw (demos and saves keep them as
+        // data, but the sheet only shows pinned ones); pinned loci join
+        // here so they ride the pose copies and label pass like ink.
         var entities = handle.table.list();
         var visible = [];
         for (var vi = 0; vi < entities.length; vi++) {
-          if (entities[vi].visible) visible.push(entities[vi]);
+          if (!entities[vi].visible) continue;
+          if (entities[vi].meta && entities[vi].meta.kind === 'locus') continue;
+          visible.push(entities[vi]);
         }
+        var pins = pinnedLocusLines();
+        for (var qi = 0; qi < pins.length; qi++) visible.push(pins[qi]);
         var hasDatum = false;
         for (var di = 0; di < visible.length; di++) {
           if (visible[di].type === 'DATUM_AXIS') { hasDatum = true; break; }
@@ -2430,6 +2527,8 @@
       var solidOrbiting = false;
       var solidPanning = false;
       var solidLast = { x: 0, y: 0 };
+      var solidPress = { x: 0, y: 0 };
+      var solidDragged = false;
       var solidPanStart = { x: 0, y: 0 };
       var solidSuppressClick = false;
       var solidTap = (typeof EduCADSolid !== 'undefined' &&
@@ -2508,6 +2607,7 @@
           if (typeof EduCADSolid.tapHit === 'function' &&
               EduCADSolid.tapHit(solidTap, solidNowMs(), e.clientX, e.clientY)) {
             handle.solid.resetView();
+            if (spatialView && handle.measure.mode === 'view') spatialView.fit();
             solidSuppressClick = true;
             c2.style.cursor = 'grab';
             e.preventDefault();
@@ -2515,6 +2615,8 @@
           }
           solidOrbiting = true;
           solidLast = { x: e.clientX, y: e.clientY };
+          solidPress = { x: e.clientX, y: e.clientY };
+          solidDragged = false;
           solidSuppressClick = true;
           c2.style.cursor = 'grabbing';
           e.preventDefault();
@@ -2544,6 +2646,7 @@
           return;
         }
         if (solidOrbiting) {
+          if (Math.hypot(e.clientX - solidPress.x, e.clientY - solidPress.y) > 4) solidDragged = true;
           var odx = e.clientX - solidLast.x, ody = e.clientY - solidLast.y;
           if (odx !== 0 || ody !== 0) {
             // Moved: a drag, not a tap (mirrors OS click semantics).
@@ -2589,13 +2692,16 @@
         }
 
         // Snapping candidate check
-        var snapResult = EduCADSnapping.snapAt(cursor, handle.view, { entities: handle.table.list() }, handle.snapCurrent);
+        var snapResult = EduCADSnapping.snapAt(cursor, handle.view, snapOptions(), handle.snapCurrent);
         handle.snapCurrent = snapResult.snap;
         renderLayer2(cursor, snapResult);
       });
 
       window.addEventListener('pointerup', function (e) {
         if (solidOrbiting || solidPanning) {
+          if (solidOrbiting && !solidDragged && spatialView && handle.measure.mode === 'view') {
+            spatialView.inspectAt(e.clientX, e.clientY);
+          }
           solidOrbiting = false;
           solidPanning = false;
           var upAt = (e && isFinite(e.clientX) && isFinite(e.clientY)) ?
@@ -2659,6 +2765,7 @@
           e.preventDefault();
           if (typeof e.stopPropagation === 'function') e.stopPropagation();
           EduCADMeasure.clearInspect(handle.measure);
+          if (spatialView) spatialView.clear();
           renderLayer2(null, null);
           return;
         }
@@ -2713,7 +2820,7 @@
           return;
         }
         var cursor = { x: e.clientX, y: e.clientY };
-        var snap = EduCADSnapping.snapAt(cursor, handle.view, { entities: handle.table.list() });
+        var snap = EduCADSnapping.snapAt(cursor, handle.view, snapOptions());
         var hitDist = snap && snap.snap ? snap.snap.distPx : 999;
         var menuPos = EduCADCanvas.onEmptyRightClick(handle.canvasState, e.clientX, e.clientY, hitDist, { w: window.innerWidth, h: window.innerHeight });
 
@@ -2752,7 +2859,7 @@
         // View mode owns the whole click: inspect, never edit. Placed
         // before banking so Ctrl+click is read-only here too.
         if (EduCADMeasure.isView(handle.measure)) {
-          viewClickInspect(cursor);
+          viewClickInspect(cursor, e.altKey);
           return;
         }
         // Banking: Ctrl+click toggles a point into the two-slot bank
@@ -2841,7 +2948,7 @@
             userLockTarget(id, cursor);
             return;
           }
-          var lid = EduCADCanvas.hitTestLine(handle.table.list(), cursor, handle.view);
+          var lid = EduCADCanvas.hitTestLine(liveEntities(), cursor, handle.view);
           if (lid !== null) {
             var blEnt = handle.table.get(lid);
             var p0id = bank[0].id;
@@ -2880,7 +2987,7 @@
             renderLayer2(cursor, null);
             return;
           }
-          var plid = EduCADCanvas.hitTestLine(handle.table.list(), cursor, handle.view);
+          var plid = EduCADCanvas.hitTestLine(liveEntities(), cursor, handle.view);
           if (plid !== null) {
             var plEnt = handle.table.get(plid);
             EduCADCanvas.clearTypedDist(handle.typedDist);
@@ -2924,10 +3031,23 @@
         var px = wpt.x, py = wpt.y;
         var ref = handle.sel.selectedId !== null ?
           handle.table.get(handle.sel.selectedId) : null;
+        var lock = null;
         if (ref && ref.type === 'POINT') {
-          var lock = EduCADCanvas.axisLockState(cursor, handle.view, { x: ref.x, y: ref.y });
+          lock = EduCADCanvas.axisLockState(cursor, handle.view, { x: ref.x, y: ref.y });
           px = lock.xMm;
           py = lock.yMm;
+        }
+        // Magnetic placement: a locked snap constrains its tier's axes
+        // (a locus pulls height, a projector pulls station, point tiers
+        // pin both), except on the axis lock's own axis, which always
+        // wins. Fresh reading seeded with the live snap keeps hysteresis.
+        var placeSnap = EduCADSnapping.snapAt(cursor, handle.view,
+          snapOptions(), handle.snapCurrent).snap;
+        handle.snapCurrent = placeSnap;
+        if (placeSnap !== null) {
+          var snapAxes = EduCADSnapping.snapTierAxes(placeSnap.tier);
+          if (snapAxes.x && (lock === null || lock.lock !== 'x')) px = placeSnap.xMm;
+          if (snapAxes.y && (lock === null || lock.lock !== 'y')) py = placeSnap.yMm;
         }
         userPlacePoint(px, py, cursor);
       });
@@ -2943,6 +3063,7 @@
         var dcur = { x: e.clientX, y: e.clientY };
         if (!e.altKey && !sheetToolActive() && solidAt(dcur)) {
           handle.solid.resetView();
+          if (spatialView && handle.measure.mode === 'view') spatialView.fit();
           e.preventDefault();
           return;
         }
@@ -2982,6 +3103,7 @@
           }
           if (e.key === 'Escape') {
             EduCADMeasure.clearInspect(handle.measure);
+            if (spatialView) spatialView.clear();
             renderLayer2(null, null);
           }
           return;
@@ -3049,6 +3171,23 @@
           if (handle.sel.editing !== null) return;
           e.preventDefault();
           userUndo();
+          return;
+        }
+        // L: pin or unpin the selected point's locus line (a labeled
+        // Type K guide plus its snaps). Bare key, edit mode only: never
+        // steals from fields or mid-rename typing, and stays inert with
+        // the locus system off or nothing selected.
+        if ((e.key === 'l' || e.key === 'L') &&
+            !e.ctrlKey && !e.metaKey && !e.altKey) {
+          var lae = (typeof document !== 'undefined') ?
+            document.activeElement : null;
+          if (lae !== null && lae !== undefined &&
+              (lae.tagName === 'INPUT' || lae.tagName === 'TEXTAREA' ||
+               lae.tagName === 'SELECT' || lae.isContentEditable)) {
+            return;
+          }
+          if (handle.sel.editing !== null) return;
+          if (togglePinnedLocus()) e.preventDefault();
           return;
         }
         if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -3530,10 +3669,23 @@
       if (typeof EduCADSolid !== 'undefined' &&
           typeof EduCADSolid.mountSolidGlass === 'function') {
         handle.solid = EduCADSolid.mountSolidGlass(container, {
-          w: window.innerWidth, h: window.innerHeight, dpr: dpr
+          w: window.innerWidth, h: window.innerHeight, dpr: dpr,
+          drawUnderlay: function (ctx) { if (spatialView) spatialView.underlay(ctx); },
+          drawOverlay: function (ctx) { if (spatialView) spatialView.overlay(ctx); }
         });
       } else if (typeof EduCADSolid !== 'undefined') {
         handle.solid = EduCADSolid.mountSolidWidget(container, { size: 260 });
+      }
+      if (handle.solid && !handle.solid.headless &&
+          typeof EduCADSpatial !== 'undefined' && handle.solid.state.baseR) {
+        spatialView = EduCADSpatial.mount(handle.solid, container, EduCADSolid, {
+          onSelect: function () {
+            EduCADMeasure.clearInspect(handle.measure);
+            renderLayer2(null, null);
+          }
+        });
+        handle.spatialView = spatialView;
+        spatialView.setEnabled(handle.measure.mode === 'view');
       }
 
       // Live 2D -> 3D bridge: every table change rebuilds the glass from
@@ -3579,7 +3731,7 @@
             typeof EduCADCommand === 'undefined') {
           return;
         }
-        var settingsStore = EduCADSettings.load(
+        settingsStore = EduCADSettings.load(
           (typeof window.localStorage !== 'undefined') ? window.localStorage : null);
         var cmdInput = document.getElementById('cmd-input');
         var cmdSuggest = document.getElementById('cmd-suggest');
@@ -3596,7 +3748,8 @@
 
         // applySettings: every preference takes effect immediately and is
         // persisted. Demos/tutorials hide their pickers; the command
-        // executor reads the same store through its gates.
+        // executor reads the same store through its gates; the sheet
+        // repaints so display prefs (locus lines) apply at once.
         function applySettings() {
           var demos = EduCADSettings.get(settingsStore, 'showDemos');
           var tuts = EduCADSettings.get(settingsStore, 'showTutorials');
@@ -3617,6 +3770,8 @@
             }
           } catch (err) { /* private mode: prefs stay session-only */ }
           refreshCmdAssist();
+          renderLayer1();
+          renderLayer2(null, null);
         }
         function buildSettingsRows() {
           if (!settingsRows) return;

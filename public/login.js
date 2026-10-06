@@ -116,4 +116,76 @@
     save({ role: 'guest', username: 'guest', name: 'Guest', token: 'guest' });
     goApp('guest');
   });
+
+  // In-page Manual view toggling within the same UI
+  var menuManual = $('menu-manual');
+  var menuLogin = $('menu-login');
+  var tabManual = $('tab-manual');
+  var tabLogin = $('tab-login');
+  var loginView = $('login-view');
+  var manualView = $('manual-view');
+  var manualContainer = $('manual-content-container');
+  var manualLoaded = false;
+
+  function setView(view) {
+    var isManual = view === 'manual';
+    if (loginView) loginView.hidden = isManual;
+    if (manualView) manualView.hidden = !isManual;
+
+    if (menuManual && menuLogin) {
+      if (isManual) {
+        menuManual.classList.add('current');
+        menuLogin.classList.remove('current');
+      } else {
+        menuLogin.classList.add('current');
+        menuManual.classList.remove('current');
+      }
+      // Re-trigger resize/lava repositioning if menu-lava is active
+      window.dispatchEvent(new Event('resize'));
+    }
+
+    if (isManual && !manualLoaded) {
+      loadManualContent();
+    }
+  }
+
+  function loadManualContent() {
+    if (!manualContainer) return;
+    window.fetch('manual.html')
+      .then(function (res) {
+        if (!res.ok) throw new Error('Network error');
+        return res.text();
+      })
+      .then(function (html) {
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        var main = doc.querySelector('main');
+        if (main) {
+          // Remove internal topbar if present
+          var topbar = main.querySelector('.topbar');
+          if (topbar) topbar.remove();
+          manualContainer.innerHTML = main.innerHTML;
+        } else {
+          manualContainer.innerHTML = doc.body.innerHTML;
+        }
+        manualLoaded = true;
+      })
+      .catch(function () {
+        manualContainer.innerHTML = '<p class="cf-error">Failed to load manual content. Please try again.</p>';
+      });
+  }
+
+  if (tabManual) {
+    tabManual.addEventListener('click', function (e) {
+      e.preventDefault();
+      setView('manual');
+    });
+  }
+
+  if (tabLogin) {
+    tabLogin.addEventListener('click', function (e) {
+      e.preventDefault();
+      setView('login');
+    });
+  }
 })();

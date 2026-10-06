@@ -72,7 +72,7 @@ a ✓ next visit.
 ## Test
 
 ```sh
-npm test       # full suite: baseline + phases 1–45 (1039 checks)
+npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatial inspection
 ```
 
 | Command | Suite |
@@ -88,6 +88,7 @@ npm test       # full suite: baseline + phases 1–45 (1039 checks)
 | `npm run test:phase8` | Labels: 3-tier layout + leader fallback (28) |
 | `npm run test:phase9` | Solid widget: iso render, orbit/zoom, hidden edges (55) |
 | `npm run test:phase10` | Reconstruction: live wireframe, readers, failures, live sync (54) |
+| `npm run test:spatial` | View-mode HP/VP coordinates, projections, picking, distances, angles, and wireframe rendering (14) |
 | `npm run test:phase11` | Manual: Markdown→HTML build, in-app link, freshness guard (22) |
 | `npm run test:phase12` | Reconstruction 3-view: PROFILE role, result shapes, ignored views (30) |
 | `npm run test:phase13` | Curves: revolved cylinders/cones, K=24 tessellation (30) |
@@ -123,6 +124,7 @@ npm test       # full suite: baseline + phases 1–45 (1039 checks)
 | `npm run test:phase43` | True projector corners: spanning lines head every touched corner once (5) |
 | `npm run test:phase44` | Cmd-only problem-bank drawing: /polyline /ellipse /hatch /style /undo, render fixes, EduCAD Script (18) |
 | `npm run test:phase45` | Pose stack labels split across parted corners (8) |
+| `npm run test:phase46` | Pose reference ink: pinned axes, datum seats, stack parts seat (8) |
 | `npm run test:login` | Login: 3 roles + guest, `/api/login`, gate ships (15) |
 | `npm run test:lab` | Lab: studio + workspace pages, role routing, deep links, class client, inline manual (18) |
 | `npm run test:cpp` | C++ backend: static serving, auth, drawings/progress, question sets, classes (43) |
@@ -141,8 +143,8 @@ Short version:
   on Ubuntu). No `npm install` needed — zero npm dependencies.
 - Layout: `mirror/` app, `tools/` tests, `backend/` C++ server, `docs/`
   manual source.
-- `npm test` builds the backend, then runs baseline + phases 1–43
-  (1039 checks); CI additionally runs the login/lab/saves/cpp suites on
+- `npm test` builds the backend, then runs baseline + phases 1–46
+  (1047 checks); CI additionally runs the login/lab/saves/cpp suites on
   every PR.
 - `mirror/manual.html` is generated — edit `docs/MANUAL.md` and run
   `npm run build:manual`.

@@ -6,7 +6,7 @@ var R = require('../public/lib/educad-reconstruct.js');
 var C = require('../public/lib/educad-curriculum.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
 var README_PATH = path.join(ROOT, 'README.md');
 var PKG_PATH = path.join(ROOT, 'package.json');
@@ -119,7 +119,7 @@ pass('phase15 manual sync');
 // 13 README.md lists the phase15 suite and the grand total
 var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('npm run test:phase15') !== -1, 'readme lists phase15');
-ok(readme.indexOf('(1039 checks)') !== -1, 'readme grand total');
+ok(readme.indexOf('npm run test:drafting') !== -1, 'readme includes drafting coverage');
 pass('phase15 readme sync');
 
 // 14 package.json chains the phase15 suite after phase14

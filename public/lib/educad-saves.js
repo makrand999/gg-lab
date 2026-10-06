@@ -74,7 +74,7 @@
     if (!data || typeof data !== 'object' || !Array.isArray(data.entities)) {
       throw new Error('saves: snapshot needs an entities array');
     }
-    var seen = {};
+    var seen = Object.create(null);
     var built = data.entities.map(function (raw, i) {
       if (!raw || typeof raw !== 'object' || typeof raw.type !== 'string') {
         throw new Error('saves: entity ' + i + ' is malformed');
@@ -87,6 +87,9 @@
       seen[e.id] = true;
       return e;
     });
+    // Resolve old name references with the complete snapshot, including
+    // forward references, without changing the caller's saved payload.
+    built.forEach(function (e) { e.meta = E.normalizeMeta(built, e); });
     table.clear();
     built.forEach(function (e) { table.add(e); });
     return built.length;

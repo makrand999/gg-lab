@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(function () { return require('./educad-drafting.js'); });
   } else {
-    root.EduCADCommand = factory();
+    root.EduCADCommand = factory(function () { return root.EduCADDrafting; });
   }
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+})(typeof window !== 'undefined' ? window : globalThis, function (getDrafting) {
   'use strict';
   // EduCAD slash commands: draw the sheet without a mouse, Minecraft-style.
   // Users and agents type /<cmd> into the sheet's command line; this module
@@ -1100,7 +1100,7 @@
             caption: p.name === 'dimension' ?
               String(Math.round(Math.sqrt(Math.pow(lb.ent.x - la.ent.x, 2) +
                 Math.pow(lb.ent.y - la.ent.y, 2)) * 1000) / 1000) : '',
-            showLabel: false, meta: { refs: [la.ent.name, lb.ent.name] } });
+            showLabel: false, meta: { refs: [la.ent.id, lb.ent.id] } });
         if (seg.fail) return seg.fail;
         return { ok: true,
           message: xverbs[p.name] + args[0] + ' → ' + args[1] + '.',
@@ -1127,7 +1127,7 @@
           }
           cx = cc.ent.x;
           cy = cc.ent.y;
-          cref = cc.ent.name;
+          cref = cc.ent.id;
         } else {
           cx = parseNum(args[0]);
           cy = parseNum(args[1]);
@@ -1153,7 +1153,7 @@
         var nc = create(xnoun, { x: cx, y: cy, radius: crr,
           startAngle: aa1, endAngle: aa2, bisCode: xbis, viewRole: crole,
           caption: '', showLabel: false,
-          meta: cref !== null ? { refs: [cref] } : {} });
+          meta: cref !== null ? { refs: [cref], centerRef: cref } : {} });
         if (nc.fail) return nc.fail;
         if (p.name === 'arc') {
           return { ok: true,
@@ -1196,13 +1196,13 @@
             return fail('Two different points needed — "' + args[di] + '" repeats.');
           }
         }
-        var names = pts.map(function (e) { return e.name; });
+        var names = pts.map(function (e) { return e.id; });
         var ids = [];
         for (var ei = 0; ei < pts.length; ei++) {
           var a = pts[ei], b = pts[(ei + 1) % pts.length];
           var edge = create('SEGMENT', { x: a.x, y: a.y, x2: b.x, y2: b.y,
             bisCode: 'B', viewRole: 'BOTH', caption: '', showLabel: false,
-            meta: { refs: names.slice(), vertices: names.slice() } });
+            meta: { refs: [a.id, b.id], vertices: names.slice() } });
           if (edge.fail) return edge.fail;
           ids.push(edge.ent.id);
         }
@@ -1224,13 +1224,13 @@
             return fail('Two different points needed — "' + args[oj] + '" repeats.');
           }
         }
-        var onames = opts.map(function (e) { return e.name; });
+        var onames = opts.map(function (e) { return e.id; });
         var oids = [];
         for (var okk = 0; okk + 1 < opts.length; okk++) {
           var oa = opts[okk], ob = opts[okk + 1];
           var oedge = create('SEGMENT', { x: oa.x, y: oa.y, x2: ob.x, y2: ob.y,
             bisCode: 'B', viewRole: 'BOTH', caption: '', showLabel: false,
-            meta: { refs: onames.slice(), vertices: onames.slice() } });
+            meta: { refs: [oa.id, ob.id], vertices: onames.slice() } });
           if (oedge.fail) return oedge.fail;
           oids.push(oedge.ent.id);
         }
@@ -1340,7 +1340,9 @@
           return fail('There is already a point "' + args[1] + '".');
         }
         try {
-          if (typeof table.update === 'function') {
+          if (ro.type === 'POINT' && getDrafting()) {
+            getDrafting().renamePoint(table, ro.id, args[1]);
+          } else if (typeof table.update === 'function') {
             table.update(ro.id, { name: args[1], caption: args[1] });
           } else {
             ro.name = args[1];

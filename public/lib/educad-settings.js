@@ -19,6 +19,8 @@
   //   commandHistory     Up/Down recalls past commands
   //   coordsHud          coordinate readout visible
   //   showLocusLines     Type K locus lines drawn on the sheet
+  //   projectionGuides   centre axes and projection transfer guides
+  //   solidPreview       show the linked 3D preview
   var VERSION = '1.0.0-educad';
   var STORAGE_KEY = 'educad_settings_v1';
 
@@ -29,11 +31,14 @@
     showTutorials: true,
     commandHistory: true,
     coordsHud: true,
-    showLocusLines: true
+    showLocusLines: true,
+    projectionGuides: true,
+    solidPreview: true
   };
 
   var KEYS = ['commandPreview', 'commandSuggestions', 'showDemos',
-    'showTutorials', 'commandHistory', 'coordsHud', 'showLocusLines'];
+    'showTutorials', 'commandHistory', 'coordsHud', 'showLocusLines',
+    'projectionGuides', 'solidPreview'];
 
   var LABELS = {
     commandPreview: 'Preview commands while typing',
@@ -42,7 +47,9 @@
     showTutorials: 'Show tutorials',
     commandHistory: 'Remember command history (Up/Down)',
     coordsHud: 'Show coordinate readout',
-    showLocusLines: 'Show locus lines (L)'
+    showLocusLines: 'Show locus lines (L)',
+    projectionGuides: 'Show projection guides',
+    solidPreview: 'Show 3D preview'
   };
 
   function isValidKey(key) { return KEYS.indexOf(key) !== -1; }

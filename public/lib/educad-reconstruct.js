@@ -2046,6 +2046,12 @@
     assertFinite(eps);
     if (!(eps > 0)) throw new Error('eps must be > 0');
     var list = Array.isArray(entities) ? entities.slice() : [];
+    // Drafting validates the side view separately so an unfinished or wrong
+    // side drawing does not erase a valid front/top preview (including curves).
+    if (opts.ignoreProfile) list = list.filter(function (e) {
+      // Older saved sheets did not tag these side-transfer guides as helpers.
+      return e && e.viewRole !== 'PROFILE' && !/^(?:proj-pf-|ref-X1Y1$|miter$)/.test(e.caption || '');
+    });
     var claims = collectClaimLines(list);
     var curves = false;
     for (var ci = 0; ci < list.length; ci++) {

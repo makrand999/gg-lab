@@ -6,7 +6,7 @@ var Cv = require('../public/lib/educad-canvas.js');
 var E = require('../public/lib/educad-entities.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
 var README_PATH = path.join(ROOT, 'README.md');
 var PKG_PATH = path.join(ROOT, 'package.json');

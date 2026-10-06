@@ -154,10 +154,10 @@ var cirP = P.poseEntity(cir, simE2, { angle: 0, scale: 2, tx: 0, ty: 0 });
 eq(cirP.radius, 20, 'circle scales with plan');
 deep([cirP.x, cirP.y], [10, -10], 'circle center rides plan');
 var arc = { id: 'E5', type: 'CIRCULAR_ARC', viewRole: 'ELEVATION',
-  x: 1, y: 1, radius: 4, startAngle: 0, endAngle: 1 };
+  x: 1, y: 1, radius: 4, startAngle: 0, endAngle: 90 };
 var arcP = P.poseEntity(arc, { angle: 0.5, scale: 1, tx: 0, ty: 0 }, simP2);
-near(arcP.startAngle, 0.5, 1e-9, 'arc angles turn');
-near(arcP.endAngle, 1.5, 1e-9, 'arc sweep kept');
+near(arcP.startAngle, 0.5 * 180 / Math.PI, 1e-9, 'stored degree angles turn');
+near(arcP.endAngle, 90 + 0.5 * 180 / Math.PI, 1e-9, 'degree sweep kept');
 var txt = { id: 'E6', type: 'TEXT', viewRole: 'PLAN', x: 7, y: -7, caption: 'hi' };
 var txtP = P.poseEntity(txt, simE2, simP2);
 deep([txtP.x, txtP.y], [7, -12], 'text anchor rides plan');
@@ -438,10 +438,10 @@ near(P.followAngle({ angle: 0.5, scale: 1, tx: 0, ty: 0 }, 1), 1.5, 1e-9,
 near(P.followAngle({ angle: 0, sx: -1, sy: 1, scale: -1, tx: 0, ty: 0 }, 0),
   Math.PI, 1e-9, 'mirror flips direction zero');
 var arcM = P.poseEntity({ id: 'E8', type: 'CIRCULAR_ARC', viewRole: 'PLAN',
-  x: 0, y: -5, radius: 4, startAngle: 0, endAngle: 1 },
+  x: 0, y: -5, radius: 4, startAngle: 0, endAngle: 90 },
   simE2, { angle: 0, sx: -1, sy: 1, scale: -1, tx: 0, ty: 0 });
-near(arcM.startAngle, Math.PI - 1, 1e-9, 'mirrored arc start');
-near(arcM.endAngle, Math.PI, 1e-9, 'mirrored arc end');
+near(arcM.startAngle, 90, 1e-9, 'mirrored degree arc start');
+near(arcM.endAngle, 180, 1e-9, 'mirrored degree arc end');
 eq(arcM.radius, 4, 'mirror keeps circle area');
 pass('phase34 follow fit');
 

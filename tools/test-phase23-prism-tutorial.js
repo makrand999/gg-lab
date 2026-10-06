@@ -8,7 +8,7 @@ var R = require('../public/lib/educad-reconstruct.js');
 var V = require('../public/lib/educad-verify.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX = fs.readFileSync(path.join(ROOT, 'mirror', 'index.html'), 'utf8');
+var INDEX = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
 var MD = fs.readFileSync(path.join(ROOT, 'docs', 'MANUAL.md'), 'utf8');
 var README = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 var PKG = fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8');

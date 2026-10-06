@@ -80,14 +80,14 @@ to the topic — every subsection is one click away:
   [line-type popup](#44-line-type-bis-sp-46-popup) ·
   [polar](#45-polar-point-angle--distance-from-an-anchor) ·
   [plotting](#46-line-referenced-plotting-perpendicular-offset-point) ·
-  [not in the UI](#47-not-reachable-from-the-ui-read-before-searching) ·
+  [not in the UI](#47-tool-availability-read-before-searching) ·
   [box & pyramid recipes](#48-recipes-draw-a-box-and-a-pyramid-by-hand) ·
   [circle](#49-circle-from-three-points-bank-two-click-third)
 - [5. Editing](#5-editing-and-housekeeping): [selection](#51-selection) ·
   [deselect](#52-deselect-right-click--escape) ·
   [rename](#53-rename-double-click-then-keys) ·
   [auto-naming](#54-auto-naming-rules) · [deleting](#55-deleting) ·
-  [hover](#56-hover-behavior) · [cannot do](#57-what-you-cannot-do-recap)
+  [hover](#56-hover-behavior) · [cannot do](#57-editing-and-history)
 - [6. Precision](#6-precision-snapping-axis-lock-zoom-line-weights):
   [snapping](#61-object-snapping-always-on-no-toggles) ·
   [axis lock](#62-axis-locked-placement) ·
@@ -162,7 +162,7 @@ two-view engineering-drawing sheet with a front view (elevation) and a top view
 - **Zero npm dependencies, no frameworks.** The app is static files plus
   a C++ server (one CMake build; httplib/JSON/SQLite vendored, libsodium
   from the system). (The in-app manual page is a generated file:
-  `mirror/manual.html` is built from `docs/MANUAL.md` with
+  `public/manual.html` is built from `docs/MANUAL.md` with
   `npm run build:manual`.)
 
 ### How to run the app
@@ -177,12 +177,12 @@ two-view engineering-drawing sheet with a front view (elevation) and a top view
 
 What to expect:
 
-- The server prints `educad serve http://127.0.0.1:8124/ -> <repo>/mirror`.
+- The server prints `educad serve http://127.0.0.1:8124/ -> <repo>/public`.
 - If port 8124 is busy, the server picks the next free port (up to 10 tries)
   and prints `educad serve: port 8124 busy, using <port>` — open the URL it
   prints instead. You can also force a port: `npm start -- <port>` or
   `PORT=<port> npm start`.
-- The server binds to localhost only; it serves the `mirror/` folder plus
+- The server binds to localhost only; it serves the `public/` folder plus
   the JSON API. Stop it with `Ctrl+C` when you are done.
 - The **Manual** button in the demo bar (top-right) opens this guide in a
   new tab at `manual.html`.
@@ -211,75 +211,72 @@ so teach from a desktop or laptop.
 
 ## 2. Quick start: your first drawing in 5 minutes
 
-Once past the login page, the app opens with the **Line Rotation** demo
-already loaded (or with a demo chosen by the page address — see
-[Demos](#9-demos-and-lessons)). Do this:
+The sheet starts in **Select** mode. A small **Draw** menu provides tools when
+you need them, then closes as you draw. Preferences live in **Settings**.
+Select geometry for projection actions; click **Edit** to reveal coordinates.
 
-1. **Look at the sheet.** The horizontal line across the middle is the XY
-   ground line (`y = 0 mm`). Labels above it read `V.P. (Front View /
-   Elevation)`; below it, `H.P. (Top View / Plan)`.
-2. **Clear the sheet.** Click **Clear Sheet** (top-right demo bar). The sheet,
-   the labels, and the 3D view all empty together.
-3. **Draw a point.** Left-click anywhere on the empty sheet. A dot appears with
-   the label `a`. Click again a little to the right (farther than 14 px from
-   `a`, or the click just re-selects `a`): a second dot labelled `b`. Each
-   click places one point, named automatically.
-4. **Join them with a line.** Hold **Ctrl** and left-click point `a` (the
-   cursor turns into a crosshair). Release **Ctrl**, then left-click point
-   `b`. A small popup appears showing line-style previews. Click the first
-   (solid thick) preview. A short animation draws the segment `a–b`.
-5. **Rename a point.** Once the animation finishes, double-click point `a`,
-   type `P1`, and press **Enter**. The label updates on the sheet.
-6. **See it in 3D.** Look at the 3D wireframe floating over the sheet
-   (it rests in the top-right). With two free clicks it shows
-   `3D unavailable`: the dots are auto-named `a` and `b`, and different
-   names never pair — and placing a point never selects it, so neither
-   click was axis-locked either.
-   For the guaranteed demo, click **Clear Sheet**, place one point above
-   XY, click it to select it (amber ring), then move straight below it
-   until the vertical axis-lock badge `ΔY: … mm` appears — the new point's
-   x is now locked to the selection (`index.html:885-893`) — and click.
-   Now double-click the lower dot and rename it to match the upper dot's
-   caption (type the same letter, Enter). The 3D view shows the pair as
-   one 3D point. Drag on the ink to orbit it.
-7. **Pan and zoom.** Drag with the **middle mouse button** (or
-   **Shift + left-drag**) to pan. With the cursor over the sheet, roll the
-   **mouse wheel** to zoom at the cursor (on 3D ink the wheel zooms
-   the solid instead; middle-drag on ink slides the solid around).
-   Click **Home** (bottom-right) to reset the 2D view.
+1. Open **Settings → Clear Sheet**, then choose **Draw → Line**. Click two positions above XY to draw
+   a front-view edge. The endpoints are created automatically. **Settings → Line style → Visible**
+   is the default; choose Thin, Hidden, Centre, or Construction when needed.
+   The style is remembered. **Polyline** continues from each endpoint;
+   Escape or Enter finishes it. While choosing an endpoint or circle radius,
+   aim the cursor, type a length in millimetres, and press Enter.
+2. Choose **Draw → Select** (or press Escape), then click an endpoint. Choose **Project to Top** in the inline
+   selection row and click below XY. The new point stays at the same X,
+   receives the corresponding name, and is joined by a projector. Repeat for
+   the other endpoint, then join the top points with **Line**. The 3D edge
+   appears from the two drawn views.
+3. Select a point or edge to highlight its corresponding projections and 3D
+   geometry. Drag a point, or click **Edit**, change its X/Y fields, and click **Apply**. Attached
+   edges and named projection counterparts move together. Select an edge to
+   change its endpoints or line style; **Delete** removes selected geometry.
+4. Open **Settings → 3 views** to add a side layout. **Left side** is drawn to the right
+   of the front view in first angle; **Right side** is drawn to the left.
+   Select a paired point and choose **Project to Side**. The cursor preview
+   transfers height and depth through the 45° miter. Join the side points.
+   Choose **Settings → Draw in → Side** to draw additional side geometry explicitly.
+5. **Settings → Show projection guides** hides or shows transfer guides. The status reports incomplete
+   or inconsistent side geometry; amber marks identify disagreements and
+   missing edges. A valid front/top 3D preview stays available while the side
+   view is unfinished. Cylinders and cones use silhouettes rather than mesh
+   sampling lines in orthographic pose projections.
+6. **Draw → Circle** uses a centre and radius point. **Dimension** uses two endpoints
+   followed by a click to place the dimension away from the edge. Coordinates
+   and measurements remain in millimetres at every zoom.
+7. **Draw → Undo / Redo** reverse whole gestures, including complete drags. Use
+   Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, or Ctrl/Cmd+Y. **Draw → Fit views** frames all visible
+   projections, leaving room for 3D; **Settings → Show 3D preview** hides the model when more drawing
+   space is useful. Shift-drag pans; the wheel zooms at the cursor.
 
-You now know the whole loop: click to place, Ctrl+click to connect,
-double-click to rename, right-click or **Escape** to cancel anything.
+Existing Ctrl-click banking, plotting, renaming, tutorials, and slash commands
+remain available. Tab navigates the controls normally; the **Pose** button
+enters the read-only 3D → 2D preview. Pose updates front, top, and enabled side
+projections without changing saved geometry.
 
 ---
 
 ## 3. Interface tour
 
-There is **no toolbar or tool palette** — drawing actions are mouse
-gestures directly on the sheet (see [Drawing](#4-drawing-tool-by-tool)),
-or typed slash commands (see [§3.11](#311-command-line--and-settings)).
-The visible chrome is: one status box, one demo bar, one command line, one
-session chip, three zoom buttons, five popups, sheet watermarks, and the
-floating 3D wireframe (plus the login page and the desktop-only gate in
-front of it all, §3.8).
+The default sheet shows a small **Draw** menu and the Edit/View/Pose, Settings,
+and Manual controls. Tools appear when Draw is opened and close after a choice.
+A selected point reveals projection actions; its coordinate fields appear only
+after **Edit**. Drawing view, line style, side layout, guides, 3D visibility,
+demos and tutorials live in **Settings**. Guide and 3D preferences survive reload
+and reset with the other preferences. Contextual instructions follow an active
+construction; warnings remain visible when a projection needs attention.
 
 ### 3.1 Status HUD (top-left)
 
-A white rounded box showing, on two lines:
-
-- Line 1: **EduCAD 2D Engine** • **1st Angle Monge Projection** • a plane pill.
-- Line 2: the live cursor coordinates, e.g. `X: 12.34 mm • Y: -56.78 mm`.
-
-The pill starts as `VP (Elevation)` and the coordinates start as
-`X: 0.00 mm • Y: 0.00 mm (Ground Line XY)`. As soon as you move the mouse,
-they switch to live values: the pill reads **`V.P. (Elevation / Front)`**
-when the cursor is at or above XY (`y >= 0`) and **`H.P. (Plan / Top)`**
-when it is below XY, with matching indigo/amber pill colors. The box ignores
-mouse clicks (it never steals a drawing click).
+The coordinate readout sits quietly beside the zoom controls at the bottom-right.
+It reports millimetres and the current drawing plane. **Settings → Show coordinate
+readout** hides it. Construction instructions appear near the cursor while you
+place geometry. Projection warnings use a quiet status line near the bottom-left.
 
 ### 3.2 Demo bar (top-right)
 
-Eleven buttons plus the Edit/View/Pose mode trio (fourteen controls in one row):
+Edit, View, Pose, Settings and Manual remain at the top-right. Demo and tutorial
+pickers, Clear Sheet and Check hidden are inside **Settings → Sheet**. Choosing
+a demo or tutorial closes Settings and returns to the drawing.
 
 | Button (exact label) | What it does |
 |----------------------|--------------|
@@ -292,10 +289,10 @@ Eleven buttons plus the Edit/View/Pose mode trio (fourteen controls in one row):
 | `Tutorial: Prism` | Replays the hexagonal-prism lesson click by click, with narration (see §9.5). |
 | `Clear Sheet` | Deletes every entity, cancels every tool, empties the 3D view. Never stays highlighted. |
 | `Check hidden` | Grades your hidden verdicts and projector claims against the loaded demo. Never clears the sheet. |
-| `Edit` | Drawing mode (default, blue on load): every click draws, selects, banks, or renames. |
+| `Edit` | Drawing mode (default): choose a tool through Draw; Select is the initial tool. |
 | `View` | Read-only measure mode: clicks inspect one entity at a time instead of editing (see §3.9). |
 | `Pose` | Pose mode: Blender-move the 3D model, watch 2D ghosts follow (see §3.13). |
-| `Settings` | Opens Settings → Preferences: command preview, suggestions, history, demos, tutorials, coordinates (see §3.11). |
+| `Settings` | Drawing view, line style, side layout, demos, tutorials and display preferences (see §3.11). |
 | `Manual` | Opens this guide in a new tab at `manual.html`. |
 
 Clicking a demo also clears whatever you drew before it. See
@@ -458,13 +455,18 @@ meeting at XY. The drawing beneath it becomes quieter. Click a 3D vertex
 to see its perpendicular projection guides and distances above/below HP
 and in front of/behind VP. Click a 3D edge to read its true length and
 inclinations to both planes. A click inspects; a drag still orbits.
-The **Spatial view** area beneath the diagram summarizes its position.
+The **Spatial view** card in the top-left corner — the same corner as
+the pose panel — summarizes its position, with the 3D diagram on the
+right.
 **Geometry details** expands to show extents, signed position ranges,
 all reconstructed vertex coordinates, and wire-edge lengths and angles.
 Point IDs P1, P2… belong to the reconstructed wireframe; click an ID in
 the details to select it. **HP / VP** toggles the surfaces, and **Fit**
-frames the model together with both planes. These references and details
-appear only in View mode, and never become drawing entities or saved ink.
+frames the model together with both planes. Where the Spatial card or
+3D content covers the sheet's XY datum, the datum breaks so it never
+ghosts through text, wires, or the translucent planes. These references
+and details appear only in View mode, and never become drawing entities
+or saved ink.
 
 Drafting style: a segment gets a true dimension — extension lines
 off both ends, a parallel dimension line with arrow tips, and the bare
@@ -659,7 +661,7 @@ each carrying its own corner's name (matched through the mate dot in
 the other view), and rejoins into the full stack at rest. It is
 visualization only — the committed sheet never changes, there is
 nothing to undo, and exiting restores the exact rest pose. Enter with
-the demo-bar **Pose** button or `Tab`; Pose needs one resolved 3D
+the demo-bar **Pose** button; Pose needs one resolved 3D
 point, so a sheet with nothing drawn in both views answers "Pose needs
 a point" instead. Exit with `Tab`, `Escape`, the Pose button again, or
 the panel's Exit.
@@ -726,12 +728,11 @@ sitting exactly on XY have no pin (the datum is their line).
 
 ## 4. Drawing, tool by tool
 
-Tools have no buttons: each one is a click sequence on the sheet. The tools
-that exist in the UI are: **place point**, **select**, **line/segment**,
-**BIS line-type popup**, **polar point**, **line-referenced plotting**, and
-**three-point circle**. Everything else in this section is marked
-**not reachable from the UI** where that is the case — read those notes
-before hunting for a button that does not exist.
+Open **Draw** for **Select, Point, Line, Polyline, Circle, Projector,
+and Dimension**. The quick start describes that workflow. The sections below
+also describe legacy Ctrl-click banking, polar construction, and plotting.
+Choose **Point** before placing free points; in **Select**, an empty click
+clears selection without adding geometry.
 
 Conventions: "click" = left-click; "Ctrl+click" also works with Cmd on macOS;
 a "point" is a sheet dot with a letter label.
@@ -912,34 +913,33 @@ dot instead — then move the cursor above the datum until the badge reads
 `x` is the cursor's projection clamped to `[0, 40]`. (Below the datum
 the same badge reading lands at `(x, -10.00)`.)
 
-### 4.7 Not reachable from the UI (read before searching)
+### 4.7 Tool availability (read before searching)
 
-Each item below exists somewhere in the code (demos, file format, or
-developer API) but **no mouse or keyboard gesture in the app creates,
-edits, or toggles it**. They are listed here so you do not hunt for them.
+The text tools cover everyday drawing. This table distinguishes their available
+actions from capabilities still limited to scripts or demos.
 
 | Capability | Status | Where it actually lives |
 |------------|--------|-------------------------|
 | Ray | Not reachable | Entity type exists; nothing draws or creates it in the app. |
 | Circle | Bank two points, click the third (§4.9) | Ordered bank with numerals; the finalizer commits a Type A `CIRCLE`. |
 | Arc | Not reachable | No creation gesture; arcs stay deferred in 3D. |
-| Dimension | Not reachable | No dimension gesture; dimension geometry is not drawn by the sheet renderer even if present. |
+| Dimension | Dimension tool | Pick two endpoints, then place the dimension; extension lines, arrows, and measured text are drawn. |
 | Text / free label | Not reachable | Labels come only from point captions (rename) and demo data. |
 | Axis / datum line | Not reachable | Demos include datum/projector/axis lines; you cannot draw your own. |
-| Projector lines | Not reachable | Demo-generated only (Type G verticals). |
+| Projector lines | Projector tool / Project to actions | Creates a constrained, named counterpart and its connecting projector. |
 | Virtual ruler | Not reachable | State machine exists in code but no gesture drives it. |
 | Virtual compass | Not reachable | Same as ruler. |
 | Constraint solver | Not reachable | Powers nothing on screen; demo geometry is computed by the lesson builders, not the solver. |
 | Command line (`Point(…)`, …) | Not reachable | Developer API only; there is no input box. |
-| Undo the last sheet change | Ctrl+Z / Cmd+Z key (Edit mode) | Reverses the last sheet change; see §5.7. |
+| Undo / Redo | Text controls and keyboard (Edit mode) | Ctrl/Cmd+Z undoes; Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y redoes a complete gesture. |
 | Save / export / print | Session-bar Save/Drawings | Logged-in users persist sheets to their account (§3.8); guests still lose the sheet on reload; no print pipeline. |
 | Line thickness picker | Not reachable | Weights are fixed cosmetic 1 px / 2 px. |
 | BIS Type H in popup | Not reachable | Engine supports it; the popup offers A/B/E/G/K only. |
 | Snap on/off toggles | Not reachable | Snapping is always on; see §6. |
 | Snap badge text | Not shown | Tier names exist in code but the sheet draws only the snap ring. |
 | Pan by dragging empty sheet | Not reachable | Pan needs middle-drag or Shift+left-drag. |
-| Drag-move of entities | Not reachable | Points cannot be moved after placement. |
-| Delete key / erase tool | Not reachable | Only blank-rename delete and Clear Sheet (see §5). |
+| Drag-move of entities | Select, then drag a point | Attached endpoints and named projections follow; collapsed edges are rejected. |
+| Delete key / erase tool | Delete selection | Select a point, edge, circle, or dimension; click Delete or press Delete/Backspace. |
 
 ### 4.8 Recipes: draw a box and a pyramid by hand
 
@@ -1044,9 +1044,9 @@ Creates: one `CIRCLE` (Type A) through three picked points. No tool to arm.
 
 ### 5.1 Selection
 
-- Click a point to select it (amber ring, 7 px). Only points are selectable;
-  segments are never selected — clicking a segment starts plotting (§4.6)
-  or feeds the polar tool (§4.5) instead.
+- In **Select** mode, click a point, edge, circle, or dimension. Its inline
+  fields appear; linked front/top/side projections and the 3D wire highlight.
+  The legacy Ctrl-click bank still drives plotting and polar construction.
 - Only one point is selected (amber ring) at a time; multi-select lives
   in the pick bank instead (Ctrl+click, §4.3).
 - The selection is a *reference*: it drives the axis lock for the next
@@ -1110,7 +1110,9 @@ New points take the first free name in the sequence `a`…`z`, then `a1`…`z1`,
 
 ### 5.5 Deleting
 
-There is no erase tool and no Delete key. Exactly two deletions exist:
+**Select**, then click **Delete** or press Delete/Backspace to remove geometry.
+Deleting a point also removes its dependent edges. Undo restores the whole
+gesture. Two legacy deletion actions remain available:
 
 1. **Blank delete**: double-click a point, erase the whole name with
    Backspace (or leave only spaces), press **Enter**. The point is removed,
@@ -1127,17 +1129,23 @@ Moving the mouse (no buttons) updates the coordinates readout, the plane
 pill, the turquoise snap ring, and any active tool preview. Hovering never
 selects anything and never changes the cursor, except:
 
+- the text tools show a crosshair, and dragging points shows a grabbing hand;
 - crosshair while the pick bank is non-empty;
 - grabbing hand while panning.
 
-### 5.7 What you cannot do (recap)
+### 5.7 Editing and history
 
-No drag-move, no multi-select, no segment editing (endpoints are fixed once
-drawn). If you misplace a point, press Ctrl+Z (Cmd+Z) to undo the last
-change, or delete it (§5.5) and place it again; if you misdraw a segment,
-delete either endpoint point to remove the segment (then re-place the
-point), or **Clear Sheet** and redraw, or reload a demo.
-See [Limitations](#12-limitations--not-implemented).
+Select a point to drag it or apply exact X/Y coordinates. Select an edge to edit
+its endpoints or style. Named counterparts preserve shared front/top stations,
+front/side heights, and top/side depths. Connected edges and assisted circle
+centre/radius references update together; a move that collapses an edge is
+rejected before anything changes. Rename through the inline Name field to update
+corresponding labels together. Double-click renaming remains a legacy gesture.
+
+**Undo / Redo** keep up to 50 whole gestures. A drag, cascade deletion, compound
+line/circle creation, or layout change is one entry. Cancelled previews create
+no entry; a new edit clears redo. History is local to the current page session.
+Multi-selection and dragging entire groups are not implemented.
 
 ---
 
@@ -1156,7 +1164,7 @@ always active, with fixed priority:
 | 3 | MIDPOINT | Segment midpoints |
 | 4 | CENTER | Circle/arc centers |
 | 5 (lowest) | LOCUS | Pinned locus lines (§3.11): height snaps along the line; crossings snap as INTERSECTION above |
-| — (not wired) | PROJECTOR | Needs a plan-x list the page never sends: never fires |
+| 5 | PROJECTOR | The text drafting tools snap front/top points to shared X stations. |
 
 Rules that matter to your hand:
 
@@ -1350,7 +1358,7 @@ as a textbook 2D sketch until you orbit it.
 ### 8.3 Pen-sketch look and hidden edges
 
 - Ink strokes only: solid edges draw 1.75 px in `#1e293b` with round caps;
-  vertices draw as filled 3 px dots in `#0f172a`. No fills, shading,
+  vertices draw as filled 3 px dots in `#0f172a`. No shading,
   lights, or colors on the object. View mode adds faint warm-gray HP and
   gray-blue VP surfaces behind the wireframe, with small labels and XY.
 - **Hidden edges** (edges whose every adjacent face turns away from you)
@@ -1358,7 +1366,9 @@ as a textbook 2D sketch until you orbit it.
   default cube geometry this yields exactly 9 solid + 3 dashed edges at the
   isometric rest pose, the dashed three meeting at the far corner.
   In View mode, hidden strokes are finer (1.15 px, 32% opacity) and
-  hidden vertex dots are quieter; the object's faces remain unfilled.
+  hidden vertex dots are quieter; closed faces fill opaque sheet-paper
+  so the solid occludes the planes behind it, with only the hidden
+  ink showing through.
 - Faceless wireframes (§8.6) have no faces to hide behind, so all
   their edges draw solid. But when your wire provably closes into a
   solid — flat loops, every edge shared by two faces — the view infers
@@ -1566,14 +1576,14 @@ conventional construction drawn around it.
 - **What to look at.** Each plan depth `d` reappears in the profile at
   `x' = xRef ± (d − d0)`; the horizontal projectors carry each height
   across from the elevation; the miter turns plan depths into profile
-  widths. The side view validates depth: the solid must explain all three
-  views at once.
+  widths. The drafting status compares the side view against the front/top
+  reconstruction and marks inconsistent or missing projections.
 - **What it teaches.** Three-view (first-angle) reading: plan + elevation +
   profile, the reference axis, and why the miter sits at 45°.
 - **In 3D.** Renders as a live-wireframe prism: 12 vertices, 18 edges,
-  drawn 35:70 proportions. The side view never moves the wire — it is
-  there for your reading practice, and the same prism without it lifts
-  the identical 12 vertices and 18 edges.
+  drawn 35:70 proportions. The side view never moves the wire by itself.
+  Consistency feedback remains separate so unfinished side geometry does not
+  hide the valid front/top preview.
 
 #### `Profile Square (40mm)` — wire now, face on claims
 
@@ -1762,7 +1772,7 @@ lands (step 77), before a single verdict is judged. The finale grades
 
 | Action | Context | Result |
 |--------|---------|--------|
-| Left-click empty sheet | No tool armed | Place point (axis-locked if a selection exists) |
+| Left-click empty sheet | Point tool | Place a point with the current view role and object snaps |
 | Left-click a point | No tool armed | Select it (amber ring) |
 | Left-click empty sheet | Menu open / polar sweeping | Abort the tool, nothing created |
 | Left-click empty sheet | Banking | Abort the bank, nothing created |
@@ -1774,7 +1784,7 @@ lands (step 77), before a single verdict is judged. The finale grades
 | Left-click anywhere | Polar angle sweep | Lock the angle |
 | Left-click anywhere | Polar distance sweep | Commit the polar point |
 | Left-click anywhere | Polar invalid | Drop the tool |
-| Left-click a segment | Nothing armed | Begin line-referenced plotting |
+| Left-click a segment | Select tool | Select the edge for editing; Ctrl-bank gestures retain polar/plot construction |
 | Alt+click near the VP/HP fold (within 14 px) | Nothing armed | Focus the ground line for plotting |
 | Left-click anywhere | Plotting | Commit the plotted point |
 | Left-click | During 300 ms line animation | Ignored |
@@ -1811,7 +1821,7 @@ lands (step 77), before a single verdict is judged. The finale grades
 | Tab | Command line, suggestions open | Accept the highlighted suggestion |
 | Up / Down | Command line | Walk suggestions, else recall history |
 | Escape | Command line focused | Close the bar without running |
-| `Tab` | Sheet focused | Enter pose mode, or exit it (§3.13) |
+| `Tab` | Sheet / controls | Navigate controls; in Pose, exit it (§3.13) |
 | `G` / `R` / `S` | Pose mode, no gesture | Start move / rotate / scale |
 | `X` / `Y` / `Z` | Pose gesture running | Lock the gesture to one world axis |
 | `Ctrl` | Pose gesture running | Snap to 5 mm / 5° / 0.1 |
@@ -1825,7 +1835,7 @@ lands (step 77), before a single verdict is judged. The finale grades
 | Ctrl/Cmd/Alt + any key | Renaming | Ignored (modifier combos never edit) |
 | Any key | Not renaming (except Escape) | Nothing |
 
-There are no tool hotkeys, no Delete shortcut, no zoom
+The Draw menu exposes tools; Delete removes selection. There are no zoom
 keys. Drawing is mouse-driven or typed (`/` command line, §3.11).
 
 ### 10.3 Tool summary
@@ -1844,7 +1854,7 @@ keys. Drawing is mouse-driven or typed (`/` command line, §3.11).
 | Pan / zoom / Home | Middle- or Shift-drag / wheel / buttons | View only | — |
 | 3D orbit / zoom / pan / reset | On-ink gestures (§8.2) | View only | — |
 | Command line | `/`, type, Enter (§3.11) | All nine types (`POINT` `SEGMENT` `RAY` `LINE` `CIRCLE` `CIRCULAR_ARC` `TEXT` `DIMENSION` `DATUM_AXIS`) + demos/tutorials/check/mode | Escape clears the bar |
-| Pose mode | Pose button / `Tab` (§3.13) | Ghosts only (visualization) | `Tab` exits, table untouched |
+| Pose mode | Pose button (§3.13) | Ghosts only (visualization) | `Tab` exits, table untouched |
 | Ray, arc, projector, ruler, compass, solver, save | **Not in UI** | — | — |
 
 ### 10.4 Entity types
@@ -1917,7 +1927,7 @@ priority order within 14 px wins):
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Click does nothing / no point appears | A tool is armed (clicks feed it), or you clicked within 14 px of a point (re-select), or during the 300 ms line animation (ignored) | Right-click or Escape to disarm, then click clearly empty sheet |
+| No point appears | Select mode selects without drawing | Choose Draw → Point or Draw → Line. |
 | Line-type popup never opens | You clicked empty sheet (aborts the bank), clicked P1 itself (no-op), banked two (third click circles), or never banked P1 | Ctrl+click P1 (crosshair + numeral appear), then click a *different* point |
 | Popup shows dash samples but no text | By design: rows are preview-only | Hover a row for its `… — Type X` tooltip |
 | Polar tool dies after baseline click | Clicked line misses P0 by > 0.5 mm → invalid state; next click drops it | Bank P0 again (Ctrl+click) and click a segment through P0 |
@@ -1927,7 +1937,7 @@ priority order within 14 px wins):
 | Rename typing does nothing | Not in rename mode (double-click first), or line/polar tool armed (dblclick ignored), or key is non-printable | Disarm tools, double-click the point, type letters/digits/Space |
 | Enter does nothing visible | Name unchanged (no write by design) | Change at least one character, or Escape out |
 | Point vanished after rename | You committed a blank/whitespace-only name: that deletes the point | Re-place the point, or press Ctrl+Z to undo the rename |
-| Segment stays after deleting its points | Segments store positions, not point references | Nothing to fix: redraw, or Clear Sheet and start over |
+| Attached segment disappeared after deleting a point | Point deletion cascades to dependent geometry | Undo restores the complete deletion. |
 | Grid won't show / won't hide | Wrong menu option, or menu dismissed by pointer-down elsewhere | Right-click empty sheet → `Box Mesh` (show) / `Plain (No Mesh)` (hide); confirm on the sheet (no checkmark is drawn) |
 | Sheet looks empty after demo click | Demo always clears first, then loads; a failed load would leave it empty | Click the demo button again; check the 3D message |
 | 3D shows `3D unavailable` | Nothing with both views drawn (§8.8) | Draw the missing mate, or load a demo |
@@ -1950,60 +1960,29 @@ priority order within 14 px wins):
 
 ## 12. Limitations / not implemented
 
-Each item was verified absent: no gesture, button, key, or menu triggers
-it, and (unless noted) no remnant wires it to the screen.
+The text tools support points, lines, polylines, centre/radius circles,
+projectors, dimensions, single-entity editing, and gesture Undo/Redo. The side
+view has explicit roles, first-angle left/right layouts, transfer guides,
+consistency feedback, linked highlighting, and live pose projection.
 
-**Drawing & editing.**
+Remaining limits:
 
-1. No save, open, export, print, or persistence of any kind; reload loses
-   the sheet. (An SVG exporter exists only in the developer API.)
-2. No drag-move of points or segments; misplaced geometry must be deleted
-   (points) or abandoned (segments) and redrawn.
-3. No erase/delete tool and no Delete key; only blank-rename delete and
-   Clear Sheet.
-4. No segment selection at all; multi-select banks points only
-   (two slots, §4.3).
-5. No arc, ray, dimension, text, axis, datum, or projector creation
-   gestures (circles bank two points plus a finalizer, §4.9). No virtual ruler/compass
-   gestures (engines exist, unwired).
-6. No line-thickness picker; on-screen weights are fixed 1 px / 2 px.
-7. BIS Type H is not offered in the line-type popup.
-8. No rubber-band preview before P2; no segment editing after commit.
-9. No snap toggles, no snap badge text, no PROJECTOR/LOCUS snap tiers
-   (engine supports six tiers; the page wires four and draws only the ring).
-
-**Views, sheet, 3D.**
-
-10. No sections, perspectives, shading, or 3D export;
-    hidden-line rendering is the only 3D analysis. (A first-angle
-    side/profile view is supported — §8.6.)
-11. Arc-only sheets report `curves not supported yet`;
-    full-circle cylinders and cones do reconstruct (revolved, §8.6–§8.7).
-12. Faces are never inferred: the 3D view is wireframe only, concave and
-    convex alike. Coincident same-name dots pair nothing; draw one corner
-    per name per station.
-13. The 3D display uses uniform scaling; View-mode distances and
-    coordinate tables retain the original reconstructed millimeters.
-14. 3D warnings (`curves-ignored`, `on-datum-placed`, `helpers-ignored`)
-    are computed but never displayed.
-15. No grid customization (fixed steps, fixed style); no layers panel; no
-    background/paper options.
-
-**Platform & workflow.**
-
-16. No touch/pen input on desktop and no accessibility claims — untested
-    (`[unverified]` if you need them: try before teaching with them).
-    Touch-only small screens are blocked outright by the desktop gate
-    (§3.8), so there is no mobile layout to claim.
-17. No browser-driven tests inside `npm test` (Node plus a local
-    throwaway C++ server only); browser behavior beyond one obscura
-    smoke check is `[unverified]`, and no specific browser versions
-    are claimed.
-18. Demo-only accounts (three roles + guest, `localStorage` session, no
-    real security — see §3.8). Demo passwords ship in `tools/users.json`
-    and `educad-seed` hashes them into SQLite on first run. No sharing,
-    printing pipeline, or print-accurate (mm-true) output; print/export
-    scaling helpers exist only as code functions.
+- Multi-selection, group dragging, arbitrary constraints, and layer management
+  are not exposed in the text tools. Ray, arc, text, ellipse, polygon, and hatch
+  creation may be available through commands; virtual instruments remain unwired.
+- Arbitrary 2D drawings do not uniquely determine 3D. The existing reconstruction
+  rules still require matching named points and drawn front/top projectors.
+  Arc-only sheets are unsupported; full-circle cylinder/cone readers are supported.
+- Profile validation compares geometry at a 0.15 mm tolerance. It does not grade
+  hidden/visible line-style verdicts; **Check hidden** retains that separate task.
+- Orthographic silhouettes of curved solids use the reconstruction mesh's sampled
+  rims. Print-accurate export, sections, shading, and 3D export are not implemented.
+- Guest sheets are local to the open page; logged-in sheets use Save/Drawings.
+  There is no automatic recovery or autosave. History does not survive reload.
+- Touch-only small devices remain blocked; desktop browser interactions have been
+  exercised, but this is not a claim of complete touch or accessibility coverage.
+- `npm test` uses Node and local C++ server checks. Browser workflow checks are
+  separate from that command.
 
 ---
 
@@ -2011,9 +1990,9 @@ it, and (unless noted) no remnant wires it to the screen.
 
 ### 13.1 Module map
 
-App shell: [`mirror/index.html`](../mirror/index.html) (all UI wiring,
+App shell: [`public/index.html`](../public/index.html) (all UI wiring,
 rendering, and event handling). Library modules in
-[`mirror/files/www.geogebra.org/`](../mirror/files/www.geogebra.org/):
+[`public/lib/`](../public/lib/):
 
 | File | Role | Wired to UI? |
 |------|------|--------------|
@@ -2040,7 +2019,7 @@ Server: [`backend/src/main.cpp`](../backend/src/main.cpp) (`npm start`
 builds and runs `educad-server`, 127.0.0.1:8124, static files plus the
 JSON API).
 Manual page: `tools/build-manual.js` (`npm run build:manual` renders
-`docs/MANUAL.md` → `mirror/manual.html`, opened from the demo bar).
+`docs/MANUAL.md` → `public/manual.html`, opened from the demo bar).
 Tests: [`tools/test-*.js`](../tools/) (1013 checks, all green at writing
 time — see the repo README for the per-phase list), including
 `tools/test-phase11-manual.js` (manual build, in-app link, freshness),
@@ -2069,7 +2048,7 @@ older rows predate the tutorial / Check / login additions and may have
 drifted — the demo-bar, gate, and session rows were re-verified for this
 revision).
 
-- Status HUD + demo bar (10 buttons, Manual last): `mirror/index.html:200-215`
+- Status HUD + demo bar (10 buttons, Manual last): `public/index.html:200-215`
 - Login gate + mobile gate + session chip: `index.html:142-152`, `:160-199`,
   `:218-244`
 - Boot + module wiring: `index.html:97-101`, `educad-boot.js:80-136`
@@ -2126,7 +2105,7 @@ demo buttons remain the only in-app lesson loaders.
 | 7 | Demo-bar button labels (10, Manual last) | `index.html:205-215`; `test-phase11` #18, `test-phase20` #22 |
 | 8 | Zoom labels `+ - Home`, ×1.25, home s=2 | `edugraphics-common.js:27`; `educad-canvas.js:143-151` |
 | 9 | Menu labels + 14 px suppression | `educad-canvas.js:23-26`, `:62-68`; `test-phase1` 2-option/14px |
-| 10 | No toolbar/palette exists | grep: zero matches for toolbar/palette/toolbox/ribbon |
+| 10 | Minimal text tools and contextual selection row | `public/lib/educad-drafting.js`; `tools/test-drafting.js` |
 | 11 | 5 BIS popup rows + tooltips; no H | `index.html:136-142`, `:155` |
 | 12 | Watermarks + X/Y marks | `index.html:366-376` |
 | 13 | Place/select click flows, 14 px | `index.html:771-901`; `educad-canvas.js:266-287` |

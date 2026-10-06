@@ -15,7 +15,7 @@ var ROOT = path.join(__dirname, '..');
 var SERVER = path.join(ROOT, 'backend', 'build', 'educad-server');
 var SEED = path.join(ROOT, 'backend', 'build', 'educad-seed');
 var USERS = path.join(__dirname, 'users.json');
-var MIRROR = path.join(ROOT, 'mirror');
+var MIRROR = path.join(ROOT, 'public');
 
 var TOTAL = 18;
 var n = 0;

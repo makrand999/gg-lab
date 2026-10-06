@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./educad-geometry.js'));
   } else {
-    root.EduCADPose = factory();
+    root.EduCADPose = factory(root.EduCADGeometry);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+})(typeof window !== 'undefined' ? window : globalThis, function (Geometry) {
   'use strict';
   // EduCAD pose mode: grab the 3D model Blender-style and the
   // already-drawn 2D Monge views ride along in real time. All numbers
@@ -582,14 +582,18 @@
       var rs = scalesOf(csim);
       out.radius = ent.radius * Math.sqrt(Math.abs(rs.sx * rs.sy));
     }
-    if (typeof ent.startAngle === 'number' && typeof ent.endAngle === 'number') {
-      if (scalesOf(csim).sx < 0) {
-        out.startAngle = followAngle(csim, ent.endAngle);
-        out.endAngle = followAngle(csim, ent.startAngle);
+    if (ent.type === 'CIRCULAR_ARC' && typeof ent.startAngle === 'number' && typeof ent.endAngle === 'number') {
+      var scale = scalesOf(csim);
+      function angle(value) { return followAngle(csim, value * Geometry.RAD) / Geometry.RAD; }
+      if (scale.sx * scale.sy < 0) {
+        out.startAngle = angle(ent.endAngle);
+        out.endAngle = angle(ent.startAngle);
       } else {
-        out.startAngle = followAngle(csim, ent.startAngle);
-        out.endAngle = followAngle(csim, ent.endAngle);
+        out.startAngle = angle(ent.startAngle);
+        out.endAngle = angle(ent.endAngle);
       }
+      // Retain a normalized positive CCW sweep across the atan2 branch cut.
+      out.endAngle = out.startAngle + Geometry.arcSweep(out.startAngle, out.endAngle);
     }
     return out;
   }

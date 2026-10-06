@@ -19,7 +19,7 @@
   // winding is irrelevant (occlusion is double-sided).
   var WORLD_UNITS = 'mm';
   var VERSION = '1.0.0-educad';
-  var VIEWS = ['front', 'top'];
+  var VIEWS = ['front', 'top', 'left', 'right'];
   // A face pierced at or below this ray distance does not occlude:
   // the edge midpoint starts on its own faces (t ~ 0), and only a
   // face strictly between the midpoint and the viewer hides it.
@@ -131,13 +131,16 @@
   // elevation (x, y) seen from +Z; view 'top' is the plan (x, -z)
   // seen from +Y. Returns [{ax, ay, bx, by, hidden}] in edge order,
   // so callers can diff rest vs posed segment by segment.
-  function projectSolid(verts, edges, faces, view) {
+  function projectSolid(verts, edges, faces, view, profileMap) {
     checkVerts(verts);
     checkEdges(edges, verts.length);
     checkFaces(faces, verts.length);
-    if (view !== 'front' && view !== 'top') {
-      fail('view must be front or top');
+    if (VIEWS.indexOf(view) === -1) {
+      fail('view must be front, top, left or right');
     }
+    var map = profileMap || { xRef: 0, dRef: 0, s: view === 'right' ? -1 : 1 };
+    assertFinite(map.xRef, map.dRef, map.s);
+    if (map.s !== 1 && map.s !== -1) fail('profile direction must be 1 or -1');
     var adj = {};
     for (var g = 0; g < faces.length; g++) {
       var lp = faces[g];
@@ -149,7 +152,8 @@
     }
     var dx = 0, dy = 0, dz = 0;
     if (view === 'front') dz = 1;
-    else dy = 1;
+    else if (view === 'top') dy = 1;
+    else dx = view === 'left' ? -1 : 1;
     var out = [];
     for (var e = 0; e < edges.length; e++) {
       var a = verts[edges[e][0]], b = verts[edges[e][1]];
@@ -157,9 +161,12 @@
       if (view === 'front') {
         pa = { x: a.x, y: a.y };
         pb = { x: b.x, y: b.y };
-      } else {
+      } else if (view === 'top') {
         pa = { x: a.x, y: -a.z };
         pb = { x: b.x, y: -b.z };
+      } else {
+        pa = { x: map.xRef + map.s * (a.z - map.dRef), y: a.y };
+        pb = { x: map.xRef + map.s * (b.z - map.dRef), y: b.y };
       }
       out.push({
         ax: pa.x, ay: pa.y, bx: pb.x, by: pb.y,
@@ -170,11 +177,41 @@
     return out;
   }
 
+  // Revolved readers use a polygon mesh for 3D display. Its internal
+  // generators are sampling lines, not drafting edges. Keep the rims and
+  // generators at the silhouette, for every posed orthographic direction.
+  function projectGeometry(geometry, view, profileMap) {
+    var out = projectSolid(geometry.vertices, geometry.edges, geometry.faces || [], view, profileMap);
+    if (geometry.name !== 'cylinder' && geometry.name !== 'cone') return out;
+    var direction = view === 'front' ? [0, 0, 1] : view === 'top' ? [0, 1, 0] : view === 'left' ? [-1, 0, 0] : [1, 0, 0];
+    var sideSize = geometry.name === 'cylinder' ? 4 : 3;
+    var sides = (geometry.faces || []).filter(function (face) { return face.length === sideSize; });
+    function facing(face) {
+      var a = geometry.vertices[face[0]], b = geometry.vertices[face[1]], c = geometry.vertices[face[2]];
+      var ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z;
+      var vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
+      return (uy * vz - uz * vy) * direction[0] + (uz * vx - ux * vz) * direction[1] + (ux * vy - uy * vx) * direction[2];
+    }
+    return out.filter(function (segment, i) {
+      var edge = geometry.edges[i];
+      var adjacent = sides.filter(function (face) {
+        for (var k = 0; k < face.length; k++) {
+          var a = face[k], b = face[(k + 1) % face.length];
+          if ((a === edge[0] && b === edge[1]) || (a === edge[1] && b === edge[0])) return true;
+        }
+        return false;
+      });
+      if (adjacent.length !== 2) return true;
+      var f1 = facing(adjacent[0]), f2 = facing(adjacent[1]);
+      return f1 * f2 < 0 || (Math.abs(f1) < 1e-7 && Math.abs(f2) >= 1e-7) || (Math.abs(f2) < 1e-7 && Math.abs(f1) >= 1e-7);
+    });
+  }
+
   return {
     VERSION: VERSION,
     WORLD_UNITS: WORLD_UNITS,
     VIEWS: VIEWS,
     HIT_EPS: HIT_EPS,
-    projectSolid: projectSolid
+    projectSolid: projectSolid, projectGeometry: projectGeometry
   };
 });

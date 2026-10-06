@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./educad-geometry.js'));
   } else {
-    root.EduCADMeasure = factory();
+    root.EduCADMeasure = factory(root.EduCADGeometry);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+})(typeof window !== 'undefined' ? window : globalThis, function (Geometry) {
   'use strict';
   // EduCAD select-and-measure: the read-only View mode behind the
   // Edit/View toggle. Edit keeps every existing gesture; View inspects
@@ -133,10 +133,9 @@
         'r ' + fmtMm(ent.radius) + ' mm, Dia ' + fmtMm(2 * ent.radius) + ' mm'];
       if (ent.type === 'CIRCULAR_ARC') {
         if (!finite(ent.startAngle) || !finite(ent.endAngle)) return null;
-        var sweep = Math.abs(ent.endAngle - ent.startAngle);
-        rows.push('arc ' + fmtMm(ent.radius * sweep) + ' mm, ' +
-          fmtDeg(ent.startAngle * 180 / Math.PI) + '° to ' +
-          fmtDeg(ent.endAngle * 180 / Math.PI) + '°');
+        var sweep = Geometry.arcSweep(ent.startAngle, ent.endAngle);
+        rows.push('arc ' + fmtMm(ent.radius * sweep * Geometry.RAD) + ' mm, ' +
+          fmtDeg(ent.startAngle) + '° to ' + fmtDeg(ent.endAngle) + '°');
       }
       return { kind: 'round', title: ent.type === 'CIRCLE' ? 'Circle' : 'Arc', rows: rows };
     }
@@ -177,7 +176,7 @@
   function hitTestAll(entities, cursorPx, view, tolPx) {
     if (!Array.isArray(entities) || !cursorPx || !view) return null;
     if (!finite(cursorPx.x) || !finite(cursorPx.y)) return null;
-    if (!finite(view.s) || !finite(view.tx) || !finite(view.ty)) return null;
+    if (!finite(view.s) || view.s <= 0 || !finite(view.tx) || !finite(view.ty)) return null;
     var tol = (tolPx === undefined || tolPx === null) ? MEASURE_TOL_PX : tolPx;
     if (!finite(tol) || tol < 0) return null;
     var best = null, bestD = tol;
@@ -200,17 +199,15 @@
       if (!finite(e.x) || !finite(e.y) || !finite(e.x2) || !finite(e.y2)) continue;
       var ax = e.x * view.s + view.tx, ay = view.ty - e.y * view.s;
       var bx = e.x2 * view.s + view.tx, by = view.ty - e.y2 * view.s;
-      var abx = bx - ax, aby = by - ay;
-      var len2 = abx * abx + aby * aby;
-      var t = 0;
-      if (len2 > 0) {
-        t = ((cursorPx.x - ax) * abx + (cursorPx.y - ay) * aby) / len2;
-        if (t < 0) t = 0;
-        if (t > 1) t = 1;
+      d = Geometry.spanDistance(cursorPx, { x: ax, y: ay }, { x: bx, y: by }, e.type);
+      if (e.type === 'DIMENSION') {
+        var offset = e.meta && e.meta.offsetMm !== undefined ? e.meta.offsetMm : 10;
+        var length = Math.hypot(bx - ax, by - ay);
+        if (length && finite(offset)) {
+          var ox = (by - ay) / length * offset * view.s, oy = -(bx - ax) / length * offset * view.s;
+          d = Math.min(d, Geometry.spanDistance(cursorPx, { x: ax + ox, y: ay + oy }, { x: bx + ox, y: by + oy }, 'SEGMENT'));
+        }
       }
-      dx = ax + abx * t - cursorPx.x;
-      dy = ay + aby * t - cursorPx.y;
-      d = Math.sqrt(dx * dx + dy * dy);
       if (d <= tol && (best === null || d < bestD)) { best = e.id; bestD = d; }
     }
     if (best !== null) return best;
@@ -224,8 +221,8 @@
       dx = p.x - cursorPx.x;
       dy = p.y - cursorPx.y;
       d = Math.sqrt(dx * dx + dy * dy);
-      var rim = Math.abs(d - e.radius * view.s);
-      var score = (d < rim) ? d : rim;
+      var score = Geometry.roundDistance({ x: (cursorPx.x - view.tx) / view.s, y: (view.ty - cursorPx.y) / view.s }, e) * view.s;
+      if (e.type === 'CIRCLE' && e.radius * view.s <= tol) score = Math.min(d, score);
       if (score <= tol && (best === null || score < bestD)) { best = e.id; bestD = score; }
     }
     return best;

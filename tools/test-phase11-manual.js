@@ -13,10 +13,10 @@ var ROOT = path.join(__dirname, '..');
 var SERVER = path.join(ROOT, 'backend', 'build', 'educad-server');
 var SEED = path.join(ROOT, 'backend', 'build', 'educad-seed');
 var USERS = path.join(ROOT, 'tools', 'users.json');
-var MIRROR = path.join(ROOT, 'mirror');
+var MIRROR = path.join(ROOT, 'public');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
-var HTML_PATH = path.join(ROOT, 'mirror', 'manual.html');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var HTML_PATH = path.join(ROOT, 'public', 'manual.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 
 var TOTAL = 22;
 var n = 0;

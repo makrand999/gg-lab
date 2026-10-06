@@ -17,7 +17,7 @@ var ROOT = path.join(__dirname, '..');
 var SERVER = path.join(ROOT, 'backend', 'build', 'educad-server');
 var SEED = path.join(ROOT, 'backend', 'build', 'educad-seed');
 var USERS = path.join(__dirname, 'users.json');
-var MIRROR = path.join(ROOT, 'mirror');
+var MIRROR = path.join(ROOT, 'public');
 
 var TOTAL = 18;
 var n = 0;
@@ -26,7 +26,7 @@ function eq(a, b, msg) { assert.strictEqual(a, b, msg); }
 function ok(v, msg) { assert.ok(v, msg); }
 
 function readMirror(f) {
-  return fs.readFileSync(path.join(__dirname, '..', 'mirror', f), 'utf8');
+  return fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
 }
 
 function freePort() {

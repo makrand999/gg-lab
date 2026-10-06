@@ -3,12 +3,15 @@
 EduCAD is a zero-dependency teaching CAD for first-angle Monge projection
 (engineering drawing): a millimetre-precise 2D sheet with elevation above
 and plan below the XY ground line, plus a live pen-sketch 3D widget that
-reconstructs the drawn views.
+reconstructs the drawn views. A small Draw menu keeps the canvas clear; Settings
+holds drawing preferences. Contextual tools provide linked editing,
+gesture Undo/Redo, guided front/top/side projection, and three-view consistency
+feedback. Pose previews update all enabled views.
 
 - **User manual:** [`docs/MANUAL.md`](docs/MANUAL.md) — the complete guide
   for students and teachers (drawing, editing, precision, 3D view, demos,
   lessons, reference, troubleshooting).
-- The in-app manual page ([`mirror/manual.html`](mirror/manual.html),
+- The in-app manual page ([`public/manual.html`](public/manual.html),
   opened from the demo-bar **Manual** button) is generated from
   `docs/MANUAL.md` — run `npm run build:manual` after editing the Markdown.
 - **Design note:** [`docs/2d3d-problem-statement.md`](docs/2d3d-problem-statement.md)
@@ -22,7 +25,7 @@ npm start      # build + seed + serve on http://127.0.0.1:8124/ (localhost only)
 
 `npm start` compiles the C++ backend on first run (needs CMake, a C++17
 compiler and libsodium headers — see Development below), seeds the demo
-accounts into `backend/data/educad.db`, and serves `mirror/` plus the
+accounts into `backend/data/educad.db`, and serves `public/` plus the
 JSON API. Open the printed URL in a browser. If port 8124 is busy the
 server picks the next free port and prints it; `npm start -- <port>` or
 `PORT=<port>` overrides the port.
@@ -33,16 +36,16 @@ source: after editing `docs/MANUAL.md`, run `npm run build:manual`.
 
 ## Login
 
-Opening the app redirects to [`mirror/login.html`](mirror/login.html):
+Opening the app redirects to [`public/login.html`](public/login.html):
 pick the **Academics**, **Teacher**, or **Student** tab and log in, or
 **Continue as guest** (guest skips the server entirely: no saves, the
 sheet stays local). Each role lands on its own home: teachers and
-academics on the **Teacher studio** ([`mirror/teacher.html`](mirror/teacher.html):
+academics on the **Teacher studio** ([`public/teacher.html`](public/teacher.html):
 create classes, post question sets (single, bulk text, or file upload)
 to a class or as open sets, attach model-answer drawings per question
 with a strict auto-check toggle, review submissions grouped by question
 in read-only View mode, and grade with remarks and pass/fail), students
-on the **Student workspace** ([`mirror/student.html`](mirror/student.html):
+on the **Student workspace** ([`public/student.html`](public/student.html):
 join classes, solve sets, verify drawings against the hidden model
 answer (pass/fail only, the model is never shown), manage drawings,
 track submissions, grades and tutorial progress),
@@ -72,7 +75,7 @@ a ✓ next visit.
 ## Test
 
 ```sh
-npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatial inspection
+npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatial inspection, drafting, and drawing regressions
 ```
 
 | Command | Suite |
@@ -88,7 +91,10 @@ npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatia
 | `npm run test:phase8` | Labels: 3-tier layout + leader fallback (28) |
 | `npm run test:phase9` | Solid widget: iso render, orbit/zoom, hidden edges (55) |
 | `npm run test:phase10` | Reconstruction: live wireframe, readers, failures, live sync (54) |
-| `npm run test:spatial` | View-mode HP/VP coordinates, projections, picking, distances, angles, and wireframe rendering (14) |
+| `npm run test:drafting` | Linked editing, profile consistency, left/right projection, curved silhouettes and saved layouts (37) |
+| `npm run test:drawing-audit` | Generalized drawing/Edit/View/Pose regressions: atomic edits, dependencies, cancellation, degree arcs, picking, coverage and connected profile projections (48) |
+| `npm run test:drawing-browser` | Mounted guest-sheet interactions and mode transitions (27); requires a running app and optional Playwright with Chromium |
+| `npm run test:spatial` | View-mode HP/VP coordinates, projections, picking, distances, angles, wireframe rendering, datum gaps, and face fills (18) |
 | `npm run test:phase11` | Manual: Markdown→HTML build, in-app link, freshness guard (22) |
 | `npm run test:phase12` | Reconstruction 3-view: PROFILE role, result shapes, ignored views (30) |
 | `npm run test:phase13` | Curves: revolved cylinders/cones, K=24 tessellation (30) |
@@ -109,7 +115,7 @@ npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatia
 | `npm run test:phase28` | View mode: Edit/View toggle, select-and-measure inspect (12) |
 | `npm run test:phase29` | View dimensions: drafting-style overlay (extension lines, leaders) (12) |
 | `npm run test:phase30` | Model + grade: model answers, strict verify, remarks, pass/fail (18) |
-| `npm run test:phase31` | Undo: Ctrl+Z sheet history, batch-atomic snapshots (12) |
+| `npm run test:phase31` | Undo/Redo: grouped gestures, cancelled previews, exact restores (12) |
 | `npm run test:phase32` | Slash commands: Minecraft-style `/cmd` draw, autocomplete, Settings prefs (16) |
 | `npm run test:phase33` | Words to drawing: student `/ words` NL, teacher auto-draw via local gateway (16) |
 | `npm run test:phase34` | Pose mode: Blender-style 3D moves drag the drawn 2D views (19) |
@@ -130,8 +136,8 @@ npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatia
 | `npm run test:cpp` | C++ backend: static serving, auth, drawings/progress, question sets, classes (43) |
 | `npm run test:saves` | Saves module: snapshot/restore, API client incl. sets, guest gate, UI ships (20) |
 
-App entry point: [`mirror/index.html`](mirror/index.html).
-Library modules: [`mirror/files/www.geogebra.org/`](mirror/files/www.geogebra.org/).
+App entry point: [`public/index.html`](public/index.html).
+Library modules: [`public/files/www.geogebra.org/`](public/files/www.geogebra.org/).
 
 ## Development
 
@@ -141,11 +147,11 @@ Short version:
 - Prerequisites: Node.js 22 (`.nvmrc`), CMake ≥ 3.16, a C++17 compiler,
   and libsodium headers (`sudo apt-get install -y cmake g++ libsodium-dev`
   on Ubuntu). No `npm install` needed — zero npm dependencies.
-- Layout: `mirror/` app, `tools/` tests, `backend/` C++ server, `docs/`
+- Layout: `public/` app, `tools/` tests, `backend/` C++ server, `docs/`
   manual source.
 - `npm test` builds the backend, then runs baseline + phases 1–46
   (1047 checks); CI additionally runs the login/lab/saves/cpp suites on
   every PR.
-- `mirror/manual.html` is generated — edit `docs/MANUAL.md` and run
+- `public/manual.html` is generated — edit `docs/MANUAL.md` and run
   `npm run build:manual`.
 - License: MIT — see [`LICENSE`](LICENSE).

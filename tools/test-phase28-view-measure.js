@@ -88,7 +88,7 @@ assert.deepStrictEqual(c4.rows,
   ['C (1.00, 2.00) mm', 'r 10.00 mm, Dia 20.00 mm']);
 var a4 = M.inspectEntity({
   id: 'a', type: 'CIRCULAR_ARC', x: 0, y: 0, radius: 10,
-  startAngle: 0, endAngle: Math.PI / 2, visible: true
+  startAngle: 0, endAngle: 90, visible: true
 });
 eq(a4.title, 'Arc');
 eq(a4.rows[1], 'r 10.00 mm, Dia 20.00 mm');
@@ -118,7 +118,8 @@ eq(M.hitTestAll([], { x: 100, y: 200 }, view), null, 'no entities');
 eq(M.hitTestAll(ents, { x: 100, y: 200 }, view, 0), 'pt', 'zero tolerance still hits exact');
 var rim = [{ id: 'cc', type: 'CIRCLE', x: 0, y: 0, radius: 10, visible: true }];
 eq(M.hitTestAll(rim, { x: 100 + 20, y: 200 }, view), 'cc', 'rim hit');
-eq(M.hitTestAll(rim, { x: 100, y: 200 }, view), 'cc', 'tiny-circle center grab');
+eq(M.hitTestAll(rim, { x: 100, y: 200 }, view), null, 'large-circle empty center skipped');
+eq(M.hitTestAll([{ id: 'tiny', type: 'CIRCLE', x: 0, y: 0, radius: 3 }], { x: 100, y: 200 }, view), 'tiny', 'tiny-circle center grab');
 eq(M.hitTestAll(rim, { x: 300, y: 200 }, view), null, 'far from rim');
 eq(M.hitTestAll(null, { x: 0, y: 0 }, view), null, 'never throws on bad input');
 pass('phase28 hit test prefers point span rim');

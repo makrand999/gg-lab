@@ -231,7 +231,7 @@ async function main() {
   var src = fs.readFileSync(
     path.join(__dirname, '..', 'public', 'lib', 'educad-saves.js'), 'utf8');
   ok(src.indexOf('EduCADSaves') !== -1, 'global export');
-  var html = fs.readFileSync(path.join(__dirname, '..', 'mirror', 'index.html'), 'utf8');
+  var html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   ok(html.indexOf('educad-saves.js') !== -1, 'index includes module');
   ok(html.indexOf('id="btn-save"') !== -1, 'save button ships');
   ok(html.indexOf('id="btn-drawings"') !== -1, 'drawings button ships');
@@ -292,7 +292,7 @@ async function main() {
   pass('saves sets guest blocked');
 
   // 20 sets UI ships: session-bar button + panel + role views
-  var html2 = fs.readFileSync(path.join(__dirname, '..', 'mirror', 'index.html'), 'utf8');
+  var html2 = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   ok(html2.indexOf('id="btn-sets"') !== -1, 'sets button ships');
   ok(html2.indexOf('id="sets-panel"') !== -1, 'sets panel ships');
   ok(html2.indexOf('class="cf-panel"') !== -1, 'panels share login theme');

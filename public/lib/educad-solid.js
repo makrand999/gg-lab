@@ -27,6 +27,10 @@
   var VERTEX_R_PX = 3;
   var HIDDEN_DASH = [4, 4];
   var HIDDEN_OPACITY = 0.45;
+  // Inspection face paint: opaque sheet paper, so a closed solid reads
+  // as filled and occludes the reference planes behind it. Hidden ink
+  // draws over the fills, so only dashed edges and quiet dots show.
+  var FACE_FILL = '#f8fafc';
   var ISO_YAW_RAD = Math.PI / 4;
   var ISO_PITCH_RAD = Math.atan(1 / Math.sqrt(2));
   var ORBIT_RAD_PER_PX = 0.008;
@@ -91,8 +95,9 @@
     [0, 2], [1, 2], [0, 3], [1, 3]
   ];
   // Cube faces as index loops into VERTICES, wound so Newell normals come
-  // out as FACE_NORMALS (-X/+X/-Y/+Y/-Z/+Z). Faces are never drawn; they
-  // only decide which edges read as hidden (dashed).
+  // out as FACE_NORMALS (-X/+X/-Y/+Y/-Z/+Z). Faces fill paper-opaque in
+  // inspection (renderFast) so the solid occludes the reference planes;
+  // otherwise they only decide which edges read as hidden (dashed).
   var CUBE_FACES = [
     [0, 4, 6, 2], [1, 3, 7, 5],
     [0, 1, 5, 4], [2, 6, 7, 3],
@@ -1029,6 +1034,26 @@
     ctx.strokeStyle = LINE_COLOR;
     ctx.lineWidth = LINE_WIDTH_PX;
     var i, e;
+    // Filled-solid read: in inspection, closed faces paint paper-opaque
+    // first, occluding the reference planes (and the dimmed sheet)
+    // behind the solid. One fill per face; fill() closes each loop.
+    // Hidden, front, and dot ink all draw over the fills.
+    var solid = geometryOf(st);
+    if (st.inspection && solid.faces && solid.faces.length > 0) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = FACE_FILL;
+      for (i = 0; i < solid.faces.length; i++) {
+        var loop = solid.faces[i], whole = loop.length > 2;
+        for (var k = 0; whole && k < loop.length; k++) whole = !!pts[loop[k]];
+        if (!whole) continue;
+        ctx.beginPath();
+        for (var j = 0; j < loop.length; j++) {
+          if (j) ctx.lineTo(pts[loop[j]].x, pts[loop[j]].y);
+          else ctx.moveTo(pts[loop[j]].x, pts[loop[j]].y);
+        }
+        ctx.fill();
+      }
+    }
     ctx.beginPath();
     var drewHidden = false;
     for (i = 0; i < edges.length; i++) {
@@ -1260,6 +1285,7 @@
     LINE_COLOR: LINE_COLOR, LINE_WIDTH_PX: LINE_WIDTH_PX,
     VERTEX_FILL: VERTEX_FILL, VERTEX_R_PX: VERTEX_R_PX,
     HIDDEN_DASH: HIDDEN_DASH, HIDDEN_OPACITY: HIDDEN_OPACITY,
+    FACE_FILL: FACE_FILL,
     ISO_YAW_RAD: ISO_YAW_RAD, ISO_PITCH_RAD: ISO_PITCH_RAD,
     ORBIT_RAD_PER_PX: ORBIT_RAD_PER_PX,
     PITCH_LIMIT_RAD: PITCH_LIMIT_RAD,

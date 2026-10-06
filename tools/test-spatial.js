@@ -119,4 +119,77 @@ check('inspection vertex passes keep isolated points visible and never fill face
   assert.equal(arcs.find(function (a) { return a.x === lone.x && a.y === lone.y; }).alpha, 1);
   assert.ok(arcs.some(function (a) { return a.alpha === 0.32; }));
 });
+check('scanline gaps cut panel, quad, segment, and dot coverage', function () {
+  assert.deepStrictEqual(R.scanGaps(100, [{ x0: 10, y0: 90, x1: 50, y1: 110 }], [], [], []), [[10, 50]]);
+  assert.deepStrictEqual(R.scanGaps(80, [{ x0: 10, y0: 90, x1: 50, y1: 110 }], [], [], []), []);
+  assert.deepStrictEqual(R.scanGaps(100, [{ x0: 10, y0: 90, x1: 10, y1: 110 }], [], [], []), []);
+  var diamond = [[{ x: 0, y: 80 }, { x: 20, y: 100 }, { x: 0, y: 120 }, { x: -20, y: 100 }]];
+  assert.deepStrictEqual(R.scanGaps(100, [], diamond, [], []), [[-21, 21]]);
+  assert.deepStrictEqual(R.scanGaps(60, [], diamond, [], []), []);
+  assert.deepStrictEqual(R.scanGaps(100, [], [], [{ ax: 0, ay: 90, bx: 10, by: 110, pad: 2 }], []), [[3, 7]]);
+  assert.deepStrictEqual(R.scanGaps(100, [], [], [{ ax: 0, ay: 102, bx: 10, by: 110, pad: 2 }], []), []);
+  assert.deepStrictEqual(R.scanGaps(100, [], [], [], [{ x: 30, y: 102, pad: 3 }]), [[27, 33]]);
+  assert.deepStrictEqual(R.scanGaps(100, [], [], [], [{ x: 30, y: 104, pad: 3 }]), []);
+});
+check('scanline gaps merge overlaps and span collinear edges', function () {
+  assert.deepStrictEqual(R.scanGaps(100,
+    [{ x0: 25, y0: 90, x1: 50, y1: 110 }, { x0: 10, y0: 90, x1: 30, y1: 110 }],
+    [], [{ ax: 62, ay: 90, bx: 62, by: 110, pad: 2 }], []), [[10, 50], [60, 64]]);
+  assert.deepStrictEqual(R.scanGaps(100,
+    [{ x0: 0, y0: 90, x1: 10, y1: 110 }, { x0: 10, y0: 90, x1: 20, y1: 110 }],
+    [], [], []), [[0, 20]]);
+  assert.deepStrictEqual(R.scanGaps(100, [], [], [{ ax: 5, ay: 100, bx: 15, by: 100, pad: 2 }], []), [[3, 17]]);
+  assert.deepStrictEqual(R.scanGaps(100, [], [], [{ ax: 5, ay: 105, bx: 15, by: 105, pad: 2 }], []), []);
+});
+check('projected plane fills gap the datum row they cross', function () {
+  var g = wire([{ x: 0, y: 10, z: 10 }, { x: 40, y: 10, z: 10 }], [[0, 1]]);
+  var view = S.createGlassState({ w: 1280, h: 800, yaw: 0.7, pitch: 0.5 });
+  S.setGeometry(view, g);
+  var refs = R.references(g);
+  function proj(p) { return R.projectMm(p, view, S); }
+  var hp = refs.hp.map(proj);
+  var ys = hp.map(function (p) { return p.y; });
+  var midY = (Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2;
+  var gaps = R.scanGaps(midY, [], [hp], [], []);
+  assert.equal(gaps.length, 1);
+  var xs = hp.map(function (p) { return p.x; });
+  assert.ok(gaps[0][0] >= Math.min.apply(null, xs) - 1.01);
+  assert.ok(gaps[0][1] <= Math.max.apply(null, xs) + 1.01);
+  assert.ok(gaps[0][1] - gaps[0][0] > 0);
+  assert.deepStrictEqual(R.scanGaps(-1000, [], [hp], [], []), []);
+  var pts = g.vertices.map(proj);
+  var eg = R.scanGaps((pts[0].y + pts[1].y) / 2, [], [],
+    [{ ax: pts[0].x, ay: pts[0].y, bx: pts[1].x, by: pts[1].y, pad: 3 }], []);
+  assert.equal(eg.length, 1); near(eg[0][1] - eg[0][0], 6);
+});
+check('inspection fills solid faces paper-opaque under hidden ink', function () {
+  assert.equal(S.FACE_FILL, '#f8fafc');
+  var cube = S.createGeometry({ vertices: S.VERTICES, edges: S.EDGES, faces: S.CUBE_FACES });
+  function callsFor(geometry, inspection) {
+    var view = S.createSolidState({ geometry: geometry });
+    view.inspection = inspection;
+    var calls = [], fills = [], style = '#000';
+    var ctx = {
+      save: function () {}, restore: function () {}, beginPath: function () {},
+      moveTo: function () {}, lineTo: function () {}, arc: function () {},
+      stroke: function () { calls.push('stroke'); },
+      fill: function () { calls.push('fill'); fills.push(style); },
+      setLineDash: function () {}
+    };
+    Object.defineProperty(ctx, 'globalAlpha', { get: function () { return 1; }, set: function () {} });
+    Object.defineProperty(ctx, 'fillStyle', { get: function () { return style; }, set: function (v) { style = v; } });
+    S.renderFast(ctx, view);
+    return { calls: calls, fills: fills };
+  }
+  function preStrokeFills(run) {
+    return run.calls.slice(0, run.calls.indexOf('stroke')).filter(function (c) { return c === 'fill'; }).length;
+  }
+  var on = callsFor(cube, true);
+  var faceFills = preStrokeFills(on);
+  assert.equal(faceFills, 6);
+  on.fills.slice(0, faceFills).forEach(function (s) { assert.equal(s, '#f8fafc'); });
+  assert.equal(preStrokeFills(callsFor(cube, false)), 0);
+  var wire = S.createGeometry({ vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }], edges: [[0, 1]], faces: [] });
+  assert.equal(preStrokeFills(callsFor(wire, true)), 0);
+});
 console.log('OK ' + n + ' spatial checks passed');

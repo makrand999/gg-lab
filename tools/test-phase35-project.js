@@ -52,7 +52,7 @@ function hiddenSet(segs) {
 
 // 1 module ships; bad shapes throw with useful errors
 eq(typeof P.projectSolid, 'function', 'ships projectSolid');
-deep(P.VIEWS, ['front', 'top'], 'two Monge views');
+deep(P.VIEWS, ['front', 'top', 'left', 'right'], 'orthographic views');
 eq(P.WORLD_UNITS, 'mm', 'mm units');
 eq(P.HIT_EPS, 1e-7, 'hit epsilon');
 throws(function () { P.projectSolid([], BOX_E, BOX_F, 'front'); }, 'empty verts');
@@ -228,7 +228,7 @@ pass('phase35 overlay datum invariant');
 
 // 9 the page overlays exact edges over faded riding ink in pose mode
 var index = fs.readFileSync(INDEX_PATH, 'utf8');
-ok(index.indexOf('<script src="lib/educad-project.js"></script>') !== -1,
+ok(/<script src="lib\/educad-project\.js(?:\?[^"]*)?"><\/script>/.test(index),
   'project module loaded');
 ['poseProjectedEdges', 'poseState.overlay', 'POSE_FADE',
   'window.educadPoseViews', 'overlay:'].forEach(function (str) {

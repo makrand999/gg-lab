@@ -1,0 +1,56 @@
+/* Text controls sit on the paper: no cards, button boxes or floating palettes. */
+.drafting-controls { position: absolute; z-index: 11; top: 12px; left: 12px; width: max-content; max-width: calc(100vw - 24px); color: #64748b; font: 12px/1.6 system-ui,sans-serif; }
+.drafting-tools, .drafting-options, .drafting-editor, .drafting-selection, .drafting-history { display: flex; align-items: center; flex-wrap: wrap; column-gap: 15px; row-gap: 3px; min-height: 28px; }
+.drafting-controls [hidden], .drafting-status[hidden] { display: none !important; }
+.drafting-controls button, .drafting-controls select, .drafting-controls input, .drafting-settings button, .drafting-settings select { background: transparent; border: 0; border-radius: 0; box-shadow: none; font: inherit; color: inherit; }
+.drafting-controls button { cursor: pointer; padding: 3px 0; }
+.drafting-controls button:hover, .drafting-controls select:hover { color: #334155; }
+.drafting-controls button[aria-pressed="true"] { color: #415c74; text-decoration: underline; text-underline-offset: 4px; }
+.drafting-controls button:disabled { opacity: .38; cursor: default; text-decoration: none; }
+.drafting-controls select { cursor: pointer; padding: 2px 0; max-width: 110px; }
+.drafting-controls select option { background: #f8fafc; }
+.drafting-controls label { display: inline-flex; align-items: baseline; gap: 5px; }
+.drafting-controls input { width: 65px; padding: 1px 0; border-bottom: 1px solid #dce2e8; font-variant-numeric: tabular-nums; }
+.drafting-controls input[name="caption"] { width: 85px; }
+.drafting-controls input::-webkit-inner-spin-button { appearance: none; }
+.drafting-controls :focus-visible { outline: 2px solid #9aafc0; outline-offset: 3px; }
+.drafting-editor { margin-top: 4px; column-gap: 11px; }
+.drafting-kind { color: #415c74; }
+.drafting-project-actions { display: inline-flex; gap: 8px; }
+.drafting-launch::after { content: ' ▾'; font-size: 10px; color: #94a3b8; }
+.drafting-menu { margin-top: 5px; padding: 8px 0; background: #f8fafc; }
+.drafting-selection { margin-top: 8px; }
+.drafting-history { column-gap: 18px; color: #8190a0; }
+.drafting-settings .drafting-options { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 8px; }
+.drafting-settings label { display: contents; }
+.drafting-settings select { cursor: pointer; padding: 2px 0; }
+.drafting-settings button { cursor: pointer; padding: 0; justify-self: start; }
+.drafting-settings button[aria-pressed="true"] { text-decoration: underline; text-underline-offset: 4px; }
+.drafting-settings button:disabled, .drafting-settings select:disabled { opacity: .4; }
+.drafting-settings [hidden] { display: none !important; }
+#settings-panel { max-height: calc(100vh - 72px); overflow-y: auto; border: 0; border-radius: 0; box-shadow: none; padding: 16px; color: #64748b; font: 12px/1.6 system-ui,sans-serif; }
+#settings-panel .cmd-settings-head { font-size: 13px; font-weight: 500; border: 0; padding-bottom: 8px; }
+#settings-panel .cmd-settings-section { color: #334155; font-weight: 500; border: 0; margin-top: 12px; margin-bottom: 5px; }
+#settings-panel #settings-reset { border: 0; background: none; padding: 4px 0; color: #64748b; font: inherit; }
+#settings-panel #settings-reset:hover { background: none; color: #334155; }
+#settings-sheet { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+#settings-sheet .clean-select-wrap { flex-basis: 100%; justify-content: space-between; }
+#settings-sheet .clean-select { max-width: 220px; font-size: 11px; font-weight: 400; }
+#settings-sheet .demo-btn { padding: 3px 0; }
+#session-bar { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
+.edugraphics-hud .edugraphics-btn { background: transparent; border: 0; border-radius: 0; box-shadow: none; color: #64748b; font: 12px/1 system-ui,sans-serif; }
+.edugraphics-hud .edugraphics-btn:hover { color: #334155; }
+.edugraphics-hud .edugraphics-btn:focus-visible { outline: 2px solid #9aafc0; outline-offset: 2px; }
+.drafting-status { position: absolute; bottom: 45px; left: 12px; max-width: 58vw; z-index: 9; font: 11px/1.5 system-ui,sans-serif; color: #7d8997; pointer-events: none; }
+.drafting-status[data-state="mismatch"] { color: #a46d37; }
+body:has(#cmd-bar:not([hidden])) .drafting-status { bottom: 100px; }
+.drafting-readonly .drafting-options label { display: none; }
+.drafting-readonly .spatial-panel { top: 88px !important; }
+.drafting-readonly #pose-panel { top: 88px; }
+@media (max-width: 1000px) {
+  .demo-bar { right: 12px; gap: 6px; }
+  .demo-bar .clean-select-wrap { max-width: 180px; }
+  .demo-bar .clean-select { max-width: 135px; }
+  .drafting-tools, .drafting-options { column-gap: 11px; }
+  .drafting-controls { max-width: calc(100vw - 24px); }
+}

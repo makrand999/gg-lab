@@ -104,6 +104,54 @@
     pts.forEach(function (p, i) { if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
     if (close) ctx.closePath();
   }
+  // Scanline gaps: runs of a horizontal screen row covered by boxes
+  // ({x0,y0,x1,y1} panels, label backings), quads (translucent plane
+  // fills), segments ({ax,ay,bx,by,pad} wire and guide lines), and
+  // dots ({x,y,pad} vertices). Returns merged [x0,x1] runs, sorted.
+  function scanGaps(datumY, rects, quads, segs, dots) {
+    var gaps = [];
+    (rects || []).forEach(function (r) {
+      if (datumY >= r.y0 && datumY <= r.y1 && r.x1 > r.x0) gaps.push([r.x0, r.x1]);
+    });
+    (quads || []).forEach(function (q) {
+      var xs = [];
+      for (var i = 0; i < q.length; i++) {
+        var a = q[i], b = q[(i + 1) % q.length];
+        if (Math.abs(b.y - a.y) > EPS) {
+          if ((a.y - datumY) * (b.y - datumY) <= 0) {
+            xs.push(a.x + (datumY - a.y) / (b.y - a.y) * (b.x - a.x));
+          }
+        } else if (Math.abs(a.y - datumY) <= 0.5) {
+          xs.push(a.x, b.x);
+        }
+      }
+      if (xs.length >= 2) {
+        gaps.push([Math.min.apply(null, xs) - 1, Math.max.apply(null, xs) + 1]);
+      }
+    });
+    (segs || []).forEach(function (s) {
+      var pad = s.pad || 0;
+      if (Math.abs(s.by - s.ay) <= EPS) {
+        if (Math.abs(s.ay - datumY) <= 0.5 + pad) {
+          gaps.push([Math.min(s.ax, s.bx) - pad, Math.max(s.ax, s.bx) + pad]);
+        }
+      } else if ((s.ay - datumY) * (s.by - datumY) <= 0) {
+        var x = s.ax + (datumY - s.ay) / (s.by - s.ay) * (s.bx - s.ax);
+        gaps.push([x - pad, x + pad]);
+      }
+    });
+    (dots || []).forEach(function (d) {
+      if (Math.abs(d.y - datumY) <= d.pad) gaps.push([d.x - d.pad, d.x + d.pad]);
+    });
+    gaps.sort(function (a, b) { return a[0] - b[0]; });
+    var merged = [];
+    gaps.forEach(function (g) {
+      var last = merged[merged.length - 1];
+      if (last && g[0] <= last[1]) last[1] = Math.max(last[1], g[1]);
+      else merged.push([g[0], g[1]]);
+    });
+    return merged;
+  }
   function underlay(ctx, st, solid, refs) {
     var planes = [{ points: refs.hp, fill: 'rgba(160, 147, 120, 0.065)', stroke: 'rgba(142, 132, 110, 0.22)' },
       { points: refs.vp, fill: 'rgba(120, 148, 175, 0.065)', stroke: 'rgba(116, 140, 162, 0.22)' }];
@@ -243,11 +291,12 @@
       rows.forEach(function (r) { var row = body.insertRow(); cell(row, r[0]); cell(row, r[1]); });
     }
     function positionPanel() {
-      // The panel occupies its own space below the diagram; expanded details
-      // scroll inside that space and never cover the wireframe.
-      var top = Math.min(70 + sceneHeight() + 24, st.h - 170);
-      panel.style.top = Math.max(90, top) + 'px';
-      panel.style.maxHeight = Math.max(90, st.h - top - 70) + 'px';
+      // The panel lives in the top-left corner, the same corner as the
+      // pose panel; the 3D diagram keeps the right side. Expanded details
+      // scroll inside the panel and never cover the wireframe.
+      var top = 44;
+      panel.style.top = top + 'px';
+      panel.style.maxHeight = Math.max(90, st.h - top - 24) + 'px';
     }
     function sceneHeight() { return Math.min(390, st.h * 0.5, Math.max(100, st.h - 300)); }
     function fit() {
@@ -279,7 +328,7 @@
     }
     function choose(value) {
       selection = value;
-      if (selection && options.onSelect) options.onSelect();
+      if (options.onSelect) options.onSelect(selection);
       selectionReadout(); widget.scheduleDraw();
     }
     panel.addEventListener('click', function (e) {
@@ -311,10 +360,67 @@
       overlay: function (ctx) { if (enabled && refs) overlay(ctx, st, solid, refs, selection, planesVisible); },
       inspectAt: function (x, y) { if (!enabled) return false; var hit = pick(st, x, y, solid); if (!hit) return false; choose(hit); return true; },
       clear: function () { choose(null); },
+      datumGaps: function (datumY, measure) {
+        if (!enabled) return [];
+        var rects = [], quads = [], segs = [], dots = [];
+        if (panel && !panel.hidden && typeof panel.getBoundingClientRect === 'function') {
+          var box = panel.getBoundingClientRect();
+          rects.push({ x0: box.left, y0: box.top, x1: box.right, y1: box.bottom });
+        }
+        var g = st.geometryMm, rf = (g && st.geometryTransform) ? references(g) : null;
+        if (g && rf) {
+          var pts = g.vertices.map(function (p) { return projectMm(p, st, solid); });
+          pts.forEach(function (p, i) {
+            var ring = selection && selection.kind === 'point' && selection.index === i;
+            dots.push({ x: p.x, y: p.y, pad: ring ? 7 : 4 });
+          });
+          g.edges.forEach(function (e) {
+            var a = pts[e[0]], b = pts[e[1]];
+            if (a && b) segs.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, pad: 3 });
+          });
+          if (planesVisible) {
+            quads.push(rf.hp.map(function (p) { return projectMm(p, st, solid); }));
+            quads.push(rf.vp.map(function (p) { return projectMm(p, st, solid); }));
+            var xyl = rf.xy.map(function (p) { return projectMm(p, st, solid); });
+            segs.push({ ax: xyl[0].x, ay: xyl[0].y, bx: xyl[1].x, by: xyl[1].y, pad: 2 });
+            if (typeof measure === 'function') {
+              rf.labels.forEach(function (label) {
+                var p = projectMm(label.p, st, solid);
+                var half = measure(label.text) / 2 + 5;
+                rects.push({ x0: p.x - half, y0: p.y + 6, x1: p.x + half, y1: p.y + 24 });
+              });
+            }
+            if (selection && selection.kind === 'point') {
+              var v = g.vertices[selection.index];
+              if (v) {
+                var point = projectMm(v, st, solid);
+                [{ p: { x: v.x, y: 0, z: v.z }, value: fmt(Math.abs(v.y)) + ' mm' },
+                  { p: { x: v.x, y: v.y, z: 0 }, value: fmt(Math.abs(v.z)) + ' mm' }
+                ].forEach(function (guide) {
+                  var foot = projectMm(guide.p, st, solid);
+                  segs.push({ ax: point.x, ay: point.y, bx: foot.x, by: foot.y, pad: 2 });
+                  if (typeof measure === 'function' &&
+                      Math.hypot(foot.x - point.x, foot.y - point.y) > 45) {
+                    var mx = (point.x + foot.x) / 2, my = (point.y + foot.y) / 2;
+                    var tw = measure(guide.value) / 2 + 4;
+                    rects.push({ x0: mx - tw, y0: my - 9, x1: mx + tw, y1: my + 9 });
+                  }
+                });
+                if (typeof measure === 'function') {
+                  var tag = 'P' + (selection.index + 1);
+                  rects.push({ x0: point.x + 9, y0: point.y - 16,
+                    x1: point.x + 9 + measure(tag), y1: point.y - 2 });
+                }
+              }
+            }
+          }
+        }
+        return scanGaps(datumY, rects, quads, segs, dots);
+      },
       fit: function () { fit(); widget.scheduleDraw(); },
       selection: function () { return selection; }
     };
   }
   return { bounds: bounds, references: references, toStage: toStage, projectMm: projectMm,
-    summary: summary, edgeInfo: edgeInfo, pick: pick, fmt: fmt, mount: mount };
+    summary: summary, edgeInfo: edgeInfo, pick: pick, fmt: fmt, scanGaps: scanGaps, mount: mount };
 });

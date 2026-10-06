@@ -1,0 +1,160 @@
+{
+  "passed": 27,
+  "failed": 0,
+  "results": [
+    {
+      "name": "Smoke: drawing a line and undo/redo is one gesture",
+      "status": "PASS",
+      "evidence": {
+        "drawn": 3,
+        "afterUndo": 0,
+        "afterRedo": 3
+      }
+    },
+    {
+      "name": "F06 valid endpoint swap is accepted",
+      "status": "PASS"
+    },
+    {
+      "name": "F06 circle can translate onto its old rim position",
+      "status": "PASS"
+    },
+    {
+      "name": "F03 editing a command line moves its referenced endpoints",
+      "status": "PASS"
+    },
+    {
+      "name": "F07 disabled side view cannot be picked in View mode",
+      "status": "PASS"
+    },
+    {
+      "name": "Smoke: ordinary View click preserves the table",
+      "status": "PASS",
+      "evidence": {
+        "inspectId": "E26",
+        "tableUnchanged": true
+      }
+    },
+    {
+      "name": "F02 Settings Clear Sheet cannot mutate View mode",
+      "status": "PASS"
+    },
+    {
+      "name": "F02 clearing in Pose cannot leave a stale solid",
+      "status": "PASS"
+    },
+    {
+      "name": "Smoke: Pose G/Y motion and Escape preserve stored geometry",
+      "status": "PASS",
+      "evidence": {
+        "tableUnchanged": true,
+        "gestureCancelled": true
+      }
+    },
+    {
+      "name": "F09 posed profile copies correspond to real projected edges",
+      "status": "PASS"
+    },
+    {
+      "name": "F01 cancelling a drag restores once without an exception",
+      "status": "PASS"
+    },
+    {
+      "name": "F01 drag cancellation through Escape permits the next gesture",
+      "status": "PASS",
+      "evidence": {
+        "restored": true,
+        "nextClickWorks": true
+      }
+    },
+    {
+      "name": "F01 drag cancellation through pointercancel permits the next gesture",
+      "status": "PASS",
+      "evidence": {
+        "restored": true,
+        "nextClickWorks": true
+      }
+    },
+    {
+      "name": "F01 drag cancellation through tool permits the next gesture",
+      "status": "PASS",
+      "evidence": {
+        "restored": true,
+        "nextClickWorks": true
+      }
+    },
+    {
+      "name": "F01 drag cancellation through view permits the next gesture",
+      "status": "PASS",
+      "evidence": {
+        "restored": true,
+        "nextClickWorks": true
+      }
+    },
+    {
+      "name": "F01 drag cancellation through pose permits the next gesture",
+      "status": "PASS",
+      "evidence": {
+        "restored": true,
+        "nextClickWorks": true
+      }
+    },
+    {
+      "name": "F02 mutation boundary blocks API bypasses in view",
+      "status": "PASS",
+      "evidence": {
+        "mode": "view",
+        "tableUnchanged": true
+      }
+    },
+    {
+      "name": "F02 mutation boundary blocks API bypasses in pose",
+      "status": "PASS",
+      "evidence": {
+        "mode": "pose",
+        "tableUnchanged": true
+      }
+    },
+    {
+      "name": "F02 entering Pose immediately after an edit captures current geometry",
+      "status": "PASS"
+    },
+    {
+      "name": "F02 invalid mode and invalid load preserve the active pose",
+      "status": "PASS"
+    },
+    {
+      "name": "F02 explicit sheet replacement leaves Pose and removes old overlays",
+      "status": "PASS",
+      "evidence": {
+        "mode": "edit",
+        "oldPoseRemoved": true
+      }
+    },
+    {
+      "name": "Smoke: confirmed rotation, translation, and scale preserve stored geometry",
+      "status": "PASS"
+    },
+    {
+      "name": "Smoke: Draw circle keeps linked geometry through edit and history",
+      "status": "PASS"
+    },
+    {
+      "name": "Smoke: Draw polyline keeps linked geometry through edit and history",
+      "status": "PASS"
+    },
+    {
+      "name": "Smoke: Draw dimension keeps linked geometry through edit and history",
+      "status": "PASS"
+    },
+    {
+      "name": "Smoke: Draw Projector pairs points that stay linked during editing",
+      "status": "PASS"
+    },
+    {
+      "name": "F07 hidden guides neither snap nor absorb newly drawn points",
+      "status": "PASS"
+    }
+  ],
+  "pageErrors": []
+}

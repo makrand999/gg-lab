@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EduCAD - 2D Engineering Graphics CAD</title>
   <link rel="stylesheet" href="css/edugraphics-hud.css">
-  <link rel="stylesheet" href="css/educad-spatial.css?v=hp-vp-1">
+  <link rel="stylesheet" href="css/educad-spatial.css?v=hp-vp-2">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -512,6 +512,7 @@
     }
     #pose-panel .pose-actions button:hover { text-decoration: underline; }
   </style>
+  <link rel="stylesheet" href="css/educad-drafting.css?v=quiet-20261006-3">
 </head>
 <body>
   <script>
@@ -648,6 +649,10 @@
 
   <div id="settings-panel" hidden>
     <div class="cmd-settings-head"><span>Settings</span><button id="settings-close" type="button" aria-label="Close settings">×</button></div>
+    <div class="cmd-settings-section">Drawing</div>
+    <div id="settings-drafting"></div>
+    <div class="cmd-settings-section">Sheet</div>
+    <div id="settings-sheet"></div>
     <div class="cmd-settings-section">Preferences</div>
     <div id="settings-rows"></div>
     <button id="settings-reset" type="button">Reset to defaults</button>
@@ -701,6 +706,7 @@
   </script>
 
   <!-- Core Modules -->
+  <script src="lib/educad-geometry.js"></script>
   <script src="lib/educad-viewport.js"></script>
   <script src="lib/educad-canvas.js"></script>
   <script src="lib/educad-entities.js"></script>
@@ -708,21 +714,22 @@
   <script src="lib/educad-solver.js"></script>
   <script src="lib/edugraphics-snapping.js"></script>
   <script src="lib/edugraphics-instruments.js"></script>
-  <script src="lib/educad-curriculum.js"></script>
+  <script src="lib/educad-curriculum.js?v=quiet-20261006-2"></script>
   <script src="lib/educad-labels.js"></script>
-  <script src="lib/educad-solid.js?v=hp-vp-1"></script>
-  <script src="lib/educad-spatial.js?v=hp-vp-1"></script>
-  <script src="lib/educad-reconstruct.js"></script>
+  <script src="lib/educad-solid.js?v=hp-vp-2"></script>
+  <script src="lib/educad-spatial.js?v=hp-vp-3"></script>
+  <script src="lib/educad-reconstruct.js?v=quiet-20261006-2"></script>
   <script src="lib/educad-verify.js"></script>
   <script src="lib/educad-measure.js"></script>
   <script src="lib/educad-tutorial.js"></script>
   <script src="lib/edugraphics-common.js"></script>
   <script src="lib/educad-boot.js"></script>
   <script src="lib/educad-saves.js"></script>
-  <script src="lib/educad-settings.js"></script>
+  <script src="lib/educad-settings.js?v=quiet-20261006-2"></script>
   <script src="lib/educad-command.js"></script>
   <script src="lib/educad-pose.js"></script>
-  <script src="lib/educad-project.js"></script>
+  <script src="lib/educad-project.js?v=quiet-20261006-2"></script>
+  <script src="lib/educad-drafting.js?v=quiet-20261006-2"></script>
 
   <script>
     (function () {
@@ -744,6 +751,7 @@
       // here so renderLayer1 can honor display prefs (locus lines).
       // Null until Settings loads; renderers treat null as defaults.
       var settingsStore = null;
+      var drafting = null;
       // Pinned loci: pointId -> true. L toggles the selected point's
       // entry; renderers draw one ephemeral Type K line per pinned
       // point (locus of <name>) plus its snaps. Dangling ids (deleted
@@ -751,86 +759,32 @@
       // read, so no other flow needs to maintain this map.
       var pinnedLocus = {};
 
-      // Sheet undo (Ctrl+Z): snapshot history over the live table. The
-      // subscriber records the pre-batch sheet: mutations landing in one
-      // synchronous run (cascade deletes, demo loads, restores) finalize
-      // as a single undo step on microtask, so one Ctrl+Z reverses one
-      // user gesture. Depth 50; undo only, no redo stack.
-      var UNDO_MAX = 50;
-      var undoStack = [];
-      var undoRestoring = false;
-      var undoPending = false;
-      function snapshotSheet() {
-        return JSON.parse(JSON.stringify(handle.table.list()));
-      }
-      var undoBase = snapshotSheet();
-      function finalizeUndoBatch() {
-        if (!undoPending) return;
-        undoPending = false;
-        if (undoRestoring) return;
-        undoStack.push(undoBase);
-        if (undoStack.length > UNDO_MAX) undoStack.shift();
-        undoBase = snapshotSheet();
-      }
-      function queueUndoBatch() {
-        if (undoPending) return;
-        undoPending = true;
-        if (typeof window.Promise === 'function') {
-          window.Promise.resolve().then(finalizeUndoBatch, finalizeUndoBatch);
-        } else {
-          setTimeout(finalizeUndoBatch, 0);
-        }
-      }
-      handle.table.subscribe(function () {
-        if (undoRestoring) return;
-        queueUndoBatch();
-      });
-      // userUndo: restore the previous sheet snapshot (Ctrl+Z). Returns
-      // false on an empty stack. Drops selection/inspect/tools parked on
-      // entities the restore removed, then redraws both layers; the live
-      // 2D->3D bridge rebuilds off the same table events.
-      function userUndo() {
-        if (typeof EduCADSaves === 'undefined' ||
-            typeof EduCADEntities === 'undefined') {
-          return false;
-        }
-        if (undoPending) {
-          undoPending = false;
-          undoStack.push(undoBase);
-          if (undoStack.length > UNDO_MAX) undoStack.shift();
-        }
-        if (undoStack.length === 0) return false;
-        var snap = undoStack.pop();
-        var beforeIds = {};
-        var before = handle.table.list();
-        for (var bi = 0; bi < before.length; bi++) {
-          beforeIds[String(before[bi].id)] = true;
-        }
-        undoRestoring = true;
-        try {
-          EduCADSaves.restoreTable(EduCADEntities, handle.table,
-            { entities: snap });
-        } finally {
-          undoRestoring = false;
-        }
-        undoBase = snapshotSheet();
-        var gone = [];
-        for (var gid in beforeIds) {
-          if (Object.prototype.hasOwnProperty.call(beforeIds, gid) &&
-              !handle.table.has(gid)) {
-            gone.push(gid);
-          }
-        }
-        if (gone.length > 0) cleanupAfterPointDelete(gone);
-        if (handle.sel.selectedId !== null &&
-            handle.table.get(handle.sel.selectedId) === null) {
-          EduCADCanvas.deselect(handle.sel);
-          stopCaretTimer();
-        }
+      // Snapshot history groups complete gestures, including drag previews.
+      var history = EduCADDrafting.createHistory(handle.table, function (snapshot) {
+        EduCADSaves.restoreTable(EduCADEntities, handle.table, { entities: snapshot });
+        cancelAuthoring();
         EduCADMeasure.clearInspect(handle.measure);
-        renderLayer1();
-        renderLayer2(null, null);
-        return true;
+        if (drafting) drafting.cancel();
+      });
+      function userUndo() {
+        var changed = history.undo();
+        if (changed) { renderLayer1(); renderLayer2(null, null); }
+        return changed;
+      }
+      function userRedo() {
+        var changed = history.redo();
+        if (changed) { renderLayer1(); renderLayer2(null, null); }
+        return changed;
+      }
+      function cancelAuthoring() {
+        if (handle.sel) EduCADCanvas.deselect(handle.sel);
+        stopCaretTimer();
+        if (handle.line) abortLineTask();
+        if (handle.polar) abortPolarTask();
+        if (handle.plot) abortPlotTask();
+        if (handle.circlePicks) clearBank();
+        if (handle.typedDist) EduCADCanvas.clearTypedDist(handle.typedDist);
+        if (handle.mount) handle.mount.menu.classList.remove('open');
       }
 
       var mount = handle.mount;
@@ -999,6 +953,10 @@
       // User actions: every click/key gesture funnels through these named
       // functions, and the tutorial stepper calls the same ones — one
       // implementation serves the hand and the script.
+      function drawingWarning(message) {
+        if (typeof console !== 'undefined' && console.warn) console.warn(message);
+        if (drafting) drafting.notify(message.replace(/^EduCAD (?:distance|plot|circle|bank): /, ''));
+      }
       function userPlacePoint(xMm, yMm, cursorPx) {
         var pname = EduCADCanvas.nextPointName(handle.table.list());
         var placed = handle.table.create('POINT', {
@@ -1056,7 +1014,7 @@
       // their crossings stay snappable.
       function liveEntities() {
         return handle.table.list().filter(function (e) {
-          return !(e.meta && e.meta.kind === 'locus');
+          return e.visible !== false && !(e.meta && e.meta.kind === 'locus') && (!drafting || drafting.isVisible(e));
         });
       }
       // Snap inputs: live entities plus pinned loci (their projector
@@ -1106,7 +1064,8 @@
           EduCADCanvas.deselect(handle.sel);
           EduCADCanvas.clearTypedDist(handle.typedDist);
         } else if (w && handle.table.get(w.id)) {
-          handle.table.update(w.id, { name: w.name, caption: w.name });
+          if (drafting) EduCADDrafting.renamePoint(handle.table, w.id, w.name);
+          else handle.table.update(w.id, { name: w.name, caption: w.name });
         }
         renderLayer1();
         renderLayer2(null, null);
@@ -1152,7 +1111,7 @@
             caption: '', showLabel: false, meta: { kind: 'user-circle' }
           });
         } else if (typeof console !== 'undefined' && console.warn) {
-          console.warn('EduCAD circle: ' + cres.message);
+          drawingWarning('EduCAD circle: ' + cres.message);
         }
         clearBank();
         renderLayer1();
@@ -1187,7 +1146,7 @@
         if (ref === null || buf === '') return false;
         if (!cursorPx) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('EduCAD distance: move the cursor onto the X or Y axis first');
+            drawingWarning('EduCAD distance: move the cursor onto the X or Y axis first');
           }
           return false;
         }
@@ -1197,7 +1156,7 @@
           EduCADCanvas.SELECT_TOL_PX * EduCADCanvas.SELECT_TOL_PX;
         if (onRef) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('EduCAD distance: move off the point to choose a direction');
+            drawingWarning('EduCAD distance: move off the point to choose a direction');
           }
           return false;
         }
@@ -1205,14 +1164,14 @@
           { x: ref.x, y: ref.y });
         if (lock.lock === null || lock.readout === null) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('EduCAD distance: aim onto the X or Y axis of the selection first');
+            drawingWarning('EduCAD distance: aim onto the X or Y axis of the selection first');
           }
           return false;
         }
         var parsed = EduCADCanvas.parseTypedDist(buf);
         if (!parsed.ok) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('EduCAD distance: ' + parsed.message);
+            drawingWarning('EduCAD distance: ' + parsed.message);
           }
           return false;
         }
@@ -1222,7 +1181,7 @@
           lock.lock, sign, parsed.value);
         if (tgt === null) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('EduCAD distance: move off the point to choose a direction');
+            drawingWarning('EduCAD distance: move off the point to choose a direction');
           }
           return false;
         }
@@ -1249,7 +1208,7 @@
         if (dab === null || buf === '') return false;
         if (!cursorPx) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('EduCAD plot: move the cursor off the datum first');
+            drawingWarning('EduCAD plot: move the cursor off the datum first');
           }
           return false;
         }
@@ -1257,7 +1216,7 @@
         var parsed = EduCADCanvas.parseTypedDist(buf);
         if (!parsed.ok) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('EduCAD plot: ' + parsed.message);
+            drawingWarning('EduCAD plot: ' + parsed.message);
           }
           return false;
         }
@@ -1266,7 +1225,7 @@
           EduCADCanvas.plotTypedPoint(dab.aMm, dab.bMm, wpt, parsed.value);
         if (tgt === null) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('EduCAD plot: move off the datum to choose a side');
+            drawingWarning('EduCAD plot: move off the datum to choose a side');
           }
           return false;
         }
@@ -1336,7 +1295,7 @@
       function bankOverflow(cursor) {
         if (handle.circlePicks.picks.length < 2) return false;
         if (typeof console !== 'undefined' && console.warn) {
-          console.warn('EduCAD bank: two banked already — plain-click finalizes, Ctrl+click unbanks');
+          drawingWarning('EduCAD bank: two banked already — plain-click finalizes, Ctrl+click unbanks');
         }
         renderLayer2(cursor, null);
         return true;
@@ -1401,6 +1360,7 @@
       handle.typedDist = EduCADCanvas.createTypedDistState();
       // Edit/View mode + inspected pick (View is read-only measuring).
       handle.measure = EduCADMeasure.createViewState();
+      handle.table.setMutationGuard(function () { return EduCADMeasure.isEdit(handle.measure); });
       var spatialView = null;
       function abortPlotTask() {
         EduCADCanvas.abortPlotTool(handle.plot);
@@ -1442,6 +1402,7 @@
         poseSavedMode = (handle.measure.mode === 'view') ? 'view' : 'edit';
         var rest = EduCADSolid.normalizeGeometry(handle.solidMm).transform;
         var restMm = {
+          name: handle.solidMm.name,
           vertices: handle.solidMm.vertices.map(function (v) {
             return { x: v.x, y: v.y, z: v.z };
           }),
@@ -1518,6 +1479,7 @@
           return [ent];
         }
         var sims = poseState.sims;
+        if (drafting && ent.viewRole === 'PROFILE') return drafting.projectCopies(ent, sims.posed) || [ent];
         var out = [];
         EduCADPose.routeCopies(ent).forEach(function (force) {
           var copies = (poseState.exactIndex &&
@@ -1557,7 +1519,7 @@
         var list = handle.table.visibleEntities();
         for (var i = 0; i < list.length; i++) {
           // Pinned ink never moves, so its ghost must not clamp gestures.
-          if (EduCADPose.isPosePinned(list[i])) continue;
+          if (EduCADPose.isPosePinned(list[i]) || list[i].viewRole === 'PROFILE') continue;
           var forces = EduCADPose.routeCopies(list[i]);
           for (var k = 0; k < forces.length; k++) {
             var pts = EduCADPose.contactPoints(list[i], sims.elev,
@@ -1602,12 +1564,23 @@
       // verts, so it needs no clamp of its own.
       function poseProjectedEdges(posed) {
         var faces = poseState.mm.faces || [];
-        return {
+        var result = {
           front: EduCADProject.projectSolid(posed, poseState.mm.edges,
             faces, 'front'),
           top: EduCADProject.projectSolid(posed, poseState.mm.edges,
             faces, 'top')
         };
+        if (drafting && drafting.layout().three) {
+          var layout = drafting.layout();
+          result.side = EduCADProject.projectSolid(posed, poseState.mm.edges, faces, layout.side, layout);
+        }
+        if (poseState.mm.name === 'cylinder' || poseState.mm.name === 'cone') {
+          var shape = { name: poseState.mm.name, vertices: posed, edges: poseState.mm.edges, faces: faces };
+          result.front = EduCADProject.projectGeometry(shape, 'front');
+          result.top = EduCADProject.projectGeometry(shape, 'top');
+          if (drafting && drafting.layout().three) result.side = EduCADProject.projectGeometry(shape, drafting.layout().side, drafting.layout());
+        }
+        return result;
       }
 
       function updatePoseView() {
@@ -1760,13 +1733,21 @@
       }
 
       function setSheetMode(mode) {
+        if (['edit', 'view', 'pose'].indexOf(mode) === -1) return handle.measure.mode;
+        // A preview must roll back while the table is still editable, before
+        // the new mode freezes it or captures its reconstructed pose source.
+        if (drafting) drafting.cancel();
+        cancelAuthoring();
+        if (mode === 'pose' && handle.measure.mode !== 'pose' && handle.rebuildSolid) handle.rebuildSolid();
         if (mode === 'pose' && handle.measure.mode !== 'pose') {
           if (!enterPose()) return handle.measure.mode;
         } else if (mode !== 'pose' && handle.measure.mode === 'pose') {
           exitPose();
         }
         var next = EduCADMeasure.setMode(handle.measure, mode);
+        if (next !== 'pose' && handle.rebuildSolid) handle.rebuildSolid();
         if (spatialView) spatialView.setEnabled(next === 'view');
+        if (drafting) drafting.modeChanged();
         var be = document.getElementById('btn-mode-edit');
         var bv = document.getElementById('btn-mode-view');
         var bp = document.getElementById('btn-mode-pose');
@@ -1793,6 +1774,9 @@
           EduCADCanvas.clearTypedDist(handle.typedDist);
           mount.menu.classList.remove('open');
         }
+        ['btn-clear', 'sel-demo', 'sel-tut'].forEach(function (id) {
+          var control = document.getElementById(id); if (control) control.disabled = next !== 'edit';
+        });
         renderLayer1();
         renderLayer2(null, null);
         return next;
@@ -1813,6 +1797,7 @@
             handle.view, cursor);
         }
         EduCADMeasure.setInspect(handle.measure, id, side);
+        if (drafting) drafting.select(id);
         renderLayer2(cursor, null);
       }
       // View-mode readout, drafting style: a linear dimension
@@ -1984,6 +1969,7 @@
         renderLayer2(cursorPx, null);
       }
       function startLineStroke(code) {
+        if (drafting) drafting.setStyle(code);
         if (!EduCADCanvas.beginLineStroke(handle.line, code)) return;
         hideLineMenu();
         var st = EduCADEntities.BIS_STYLES[code];
@@ -2074,6 +2060,7 @@
         var visible = [];
         for (var vi = 0; vi < entities.length; vi++) {
           if (!entities[vi].visible) continue;
+          if (drafting && !drafting.isVisible(entities[vi])) continue;
           if (entities[vi].meta && entities[vi].meta.kind === 'locus') continue;
           visible.push(entities[vi]);
         }
@@ -2118,8 +2105,31 @@
           ctx1.lineWidth = 1.5;
           ctx1.strokeStyle = '#334155';
           ctx1.beginPath();
-          ctx1.moveTo(0, xyY);
-          ctx1.lineTo(v.w, xyY);
+          // In View mode the datum breaks where inspection content
+          // covers it: the Spatial card, the translucent HP/VP fills,
+          // wire edges, vertices, and overlay text. One path with no
+          // gaps draws exactly the original full-width stroke.
+          var datumGaps = (EduCADMeasure.isView(handle.measure) && spatialView &&
+              typeof spatialView.datumGaps === 'function') ?
+            spatialView.datumGaps(xyY, function (text) {
+              ctx1.save();
+              ctx1.font = '11px system-ui, sans-serif';
+              var tw = ctx1.measureText(text).width;
+              ctx1.restore();
+              return tw;
+            }) : [];
+          var runX = 0;
+          datumGaps.forEach(function (gp) {
+            if (gp[0] > runX) {
+              ctx1.moveTo(runX, xyY);
+              ctx1.lineTo(Math.min(gp[0], v.w), xyY);
+            }
+            runX = Math.max(runX, gp[1]);
+          });
+          if (runX < v.w) {
+            ctx1.moveTo(runX, xyY);
+            ctx1.lineTo(v.w, xyY);
+          }
           ctx1.stroke();
 
           // Sheet X/Y end marks (knockout halo). Skipped when a datum
@@ -2138,6 +2148,8 @@
           ctx1.fillText('H.P. (Top View / Plan)', 40, xyY + 16);
           ctx1.restore();
         }
+
+        if (drafting) drafting.drawSheet(ctx1, v);
 
         // 3. Render Committed Entities from CadEntityTable (geometry
         // only). In pose mode the already-drawn views ride the 3D pose:
@@ -2168,6 +2180,7 @@
         }
         if (poseState && poseState.overlay) {
           var ovLists = [poseState.overlay.front, poseState.overlay.top];
+          if (poseState.overlay.side) ovLists.push(poseState.overlay.side);
           for (var pass = 0; pass < 2; pass++) {
             for (var li = 0; li < ovLists.length; li++) {
               for (var oi = 0; oi < ovLists[li].length; oi++) {
@@ -2206,6 +2219,7 @@
 
       // Render Single Entity on Canvas2D with BIS SP 46 Linestyle
       function renderEntity(ctx, v, ent) {
+        if (drafting && ent.type === 'DIMENSION') { drafting.drawDimension(ctx, v, ent); return; }
         var style = EduCADEntities.resolveStyle(ent);
         var strokeColor = ent.color || '#0f172a';
         if (ent.bisCode === 'B') strokeColor = '#475569';
@@ -2228,7 +2242,9 @@
           // Construction geometry spans the sheet: LINE extends both
           // ways, RAY extends past its second point (the canvas clips
           // the excess, so one long stroke covers every viewport).
-          if (ent.type === 'LINE' || ent.type === 'RAY') {
+          // Tagged centre axes use their stored extent so they stay beside
+          // their views instead of running through the controls.
+          if ((ent.type === 'LINE' || ent.type === 'RAY') && !(ent.meta && ent.meta.kind === 'axis')) {
             var rdx = p2.x - p1.x, rdy = p2.y - p1.y;
             var rlen = Math.sqrt(rdx * rdx + rdy * rdy);
             if (rlen > 1e-9) {
@@ -2509,6 +2525,7 @@
 
         // View-mode inspect readout (no-op unless View has a pick).
         drawInspectOverlay(cursorPx);
+        if (drafting) drafting.drawDynamic(ctx2, handle.view);
 
         ctx2.restore();
       }
@@ -2539,6 +2556,7 @@
           window.performance.now() : Date.now();
       }
       function solidAt(cursor) {
+        if (drafting && !drafting.solidVisible()) return false;
         if (!handle.solid || typeof handle.solid.hitTest !== 'function') {
           return false;
         }
@@ -2554,6 +2572,7 @@
       // Shift+left always pans the sheet; Alt+click always clicks
       // through to the sheet. Both are escape hatches from the aura.
       function sheetToolActive() {
+        if (drafting && drafting.active()) return true;
         return handle.sel.editing !== null ||
           EduCADCanvas.isLineToolActive(handle.line) ||
           EduCADCanvas.isPolarToolActive(handle.polar) ||
@@ -3271,6 +3290,8 @@
       // edits; only loading another sheet replaces it.
       var demoTruth = null;
       function loadDemo(type) {
+        if (!EduCADMeasure.isEdit(handle.measure)) { drawingWarning('Switch to Edit to replace the drawing.'); return; }
+        if (drafting) drafting.cancel();
         handle.table.clear();
         EduCADCanvas.deselect(handle.sel);
         stopCaretTimer();
@@ -3375,6 +3396,17 @@
       // Deep-link bridge: the query handler below forces view mode for
       // submission review through this handle.
       window.educadSetSheetMode = setSheetMode;
+      // Explicit sheet loads validate before leaving inspection/pose, then
+      // replace in Edit. No loader can accidentally retain an old pose source.
+      window.educadReplaceSheet = function (data) {
+        var staging = EduCADEntities.createTable();
+        var count = EduCADSaves.restoreTable(EduCADEntities, staging, data);
+        setSheetMode('edit');
+        EduCADSaves.restoreTable(EduCADEntities, handle.table, { entities: staging.list() });
+        if (handle.rebuildSolid) handle.rebuildSolid();
+        renderLayer1(); renderLayer2(null, null);
+        return count;
+      };
 
       // Inline selects for Demo & Tutorial options
       (function initInlineSelects() {
@@ -3624,6 +3656,7 @@
       }
       function startTutorial(which) {
         if (typeof EduCADTutorial === 'undefined') return;
+        if (!EduCADMeasure.isEdit(handle.measure)) { drawingWarning('Switch to Edit to start a drawing tutorial.'); return; }
         // Tutorials draw, so they always run in Edit.
         setSheetMode('edit');
         tutRefs = [];
@@ -3671,7 +3704,7 @@
         handle.solid = EduCADSolid.mountSolidGlass(container, {
           w: window.innerWidth, h: window.innerHeight, dpr: dpr,
           drawUnderlay: function (ctx) { if (spatialView) spatialView.underlay(ctx); },
-          drawOverlay: function (ctx) { if (spatialView) spatialView.overlay(ctx); }
+          drawOverlay: function (ctx) { if (spatialView) spatialView.overlay(ctx); if (drafting) drafting.drawSolid(ctx, handle.solid.state); }
         });
       } else if (typeof EduCADSolid !== 'undefined') {
         handle.solid = EduCADSolid.mountSolidWidget(container, { size: 260 });
@@ -3679,7 +3712,8 @@
       if (handle.solid && !handle.solid.headless &&
           typeof EduCADSpatial !== 'undefined' && handle.solid.state.baseR) {
         spatialView = EduCADSpatial.mount(handle.solid, container, EduCADSolid, {
-          onSelect: function () {
+          onSelect: function (value) {
+            if (drafting) drafting.selectSolid(value);
             EduCADMeasure.clearInspect(handle.measure);
             renderLayer2(null, null);
           }
@@ -3702,7 +3736,7 @@
             // it, and rebuilds must not wipe the live pose.
             if (EduCADMeasure.isPose(handle.measure)) return;
             var res = EduCADReconstruct.reconstructLive(
-              handle.table.visibleEntities());
+              handle.table.visibleEntities(), { ignoreProfile: true });
             if (res.status === 'ok') {
               handle.solidMm = res.geometry;
               EduCADSolid.setGeometry(solid3d, res.geometry);
@@ -3710,6 +3744,7 @@
               handle.solidMm = null;
               EduCADSolid.setUnavailable(solid3d, res.reason, res.label);
             }
+            if (drafting) { drafting.refresh(); renderLayer2(null, null); }
           }
           handle.solidMm = null;
           handle.rebuildSolid = rebuildSolid;
@@ -3721,6 +3756,25 @@
           rebuildSolid();
         })();
       }
+
+      drafting = EduCADDrafting.mount({
+        handle: handle, entities: EduCADEntities, viewport: EduCADViewport,
+        canvas: EduCADCanvas, project: EduCADProject, measure: EduCADMeasure,
+        snapping: EduCADSnapping, history: history,
+        redraw: renderLayer1,
+        redrawDynamic: function (cursor) { renderLayer2(cursor || null, null); },
+        cancelLegacy: cancelAuthoring, selectLegacy: function (id) { userSelectPoint(id, null); },
+        undo: userUndo, redo: userRedo, solidAt: solidAt,
+        solidSuppressed: function () { return solidSuppressClick; },
+        legacyActive: function () { return handle.sel.editing !== null ||
+          handle.circlePicks.picks.length > 0 || EduCADCanvas.isLineToolActive(handle.line) ||
+          EduCADCanvas.isPolarToolActive(handle.polar) || EduCADCanvas.isPlotToolActive(handle.plot); },
+        getPose: function () { return poseState; }
+      });
+      handle.drafting = drafting;
+      handle.history = history;
+      drafting.refresh();
+      renderLayer1();
 
       // Slash command line + Settings. Users and agents draw without the
       // mouse via Minecraft-style /<cmd> with autocomplete; Settings holds
@@ -3764,6 +3818,10 @@
           }
           var coordsEl = document.getElementById('coords-display');
           if (coordsEl) coordsEl.style.display = coords ? '' : 'none';
+          if (drafting) drafting.preferences({
+            guides: EduCADSettings.get(settingsStore, 'projectionGuides'),
+            solid: EduCADSettings.get(settingsStore, 'solidPreview')
+          });
           try {
             if (typeof window.localStorage !== 'undefined') {
               EduCADSettings.save(window.localStorage, settingsStore);
@@ -4433,7 +4491,7 @@
         var t = table();
         if (!t || !window.EduCADEntities) { status('Sheet not ready.'); return; }
         Saves.getDrawing(window.fetch.bind(window), s, it.id).then(function (data) {
-          var count = Saves.restoreTable(window.EduCADEntities, t, data.data);
+          var count = window.educadReplaceSheet(data.data);
           current.id = it.id;
           current.title = data.title || '';
           var h = window.educadHandle;
@@ -4591,7 +4649,7 @@
           status('Sheet not ready.');
           return 0;
         }
-        var count = Saves.restoreTable(window.EduCADEntities, t, data);
+        var count = window.educadReplaceSheet(data);
         deselectAll();
         status(what + ' (' + count + ' entities) ' + stamp());
         return count;
@@ -5238,7 +5296,7 @@
           status('Sheet not ready.');
           return -1;
         }
-        var count = Saves.restoreTable(window.EduCADEntities, t, data);
+        var count = window.educadReplaceSheet(data);
         var h = window.educadHandle;
         if (h && h.sel && window.EduCADCanvas &&
             typeof window.EduCADCanvas.deselect === 'function') {

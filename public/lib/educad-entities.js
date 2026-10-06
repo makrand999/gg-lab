@@ -248,11 +248,58 @@
   }
 
   function CadEntityTable() {
-    this._map = {};
+    this._map = Object.create(null);
     this._order = [];
     this._rev = 0;
     this._listeners = [];
+    this._mutationGuard = null;
   }
+
+  // IDs own dependencies; names are resolved only at legacy/input boundaries.
+  // Ambiguous names never guess which coincident object the user intended.
+  function resolveReference(entities, ref, type) {
+    var exact = entities.find(function (e) { return e.id === ref; });
+    if (exact) return !type || exact.type === type ? exact : null;
+    var matches = entities.filter(function (e) { return (!type || e.type === type) && (e.name === ref || e.caption === ref); });
+    return matches.length === 1 ? matches[0] : null;
+  }
+  function normalizeMeta(entities, entity) {
+    var m = JSON.parse(JSON.stringify(entity.meta || {}));
+    function id(ref) { var e = resolveReference(entities, ref); return e ? e.id : ref; }
+    ['refs', 'vertices', 'endpointRefs'].forEach(function (key) { if (Array.isArray(m[key])) m[key] = m[key].map(id); });
+    ['centerRef', 'radiusRef', 'polygon'].forEach(function (key) { if (typeof m[key] === 'string') m[key] = id(m[key]); });
+    if ((entity.type === 'CIRCLE' || entity.type === 'CIRCULAR_ARC') && !m.centerRef && m.refs && m.refs.length <= 2) {
+      var c = resolveReference(entities, m.refs[0], 'POINT');
+      if (c && pointsCoincideMm(c.x, c.y, entity.x, entity.y)) m.centerRef = c.id;
+    }
+    if (CASCADE_LINE_TYPES.indexOf(entity.type) !== -1 && m.refs && m.refs.length > 2 && !m.endpointRefs) {
+      // Old polygon/polyline edges stored the entire chain in refs.
+      m.endpointRefs = [[entity.x, entity.y], [entity.x2, entity.y2]].map(function (xy) {
+        var pts = m.refs.map(function (r) { return resolveReference(entities, r, 'POINT'); }).filter(function (p) { return p && pointsCoincideMm(p.x, p.y, xy[0], xy[1]); });
+        return pts.length === 1 ? pts[0].id : null;
+      });
+    }
+    return m;
+  }
+  function endpointReferences(entities, entity, tolMm) {
+    var m = normalizeMeta(entities, entity), refs = m.endpointRefs || m.refs;
+    if (refs && refs.length) return [resolveReference(entities, refs[0], 'POINT'), resolveReference(entities, refs[1], 'POINT')];
+    if (m.endpointRefs) return [null, null]; // Declared ownership never guesses.
+    function role(e) { return e.viewRole && e.viewRole !== 'BOTH' ? e.viewRole : e.y < 0 ? 'PLAN' : 'ELEVATION'; }
+    return [[entity.x, entity.y], [entity.x2, entity.y2]].map(function (xy) {
+      var points = entities.filter(function (p) {
+        return p.type === 'POINT' && (entity.viewRole === 'BOTH' || role(entity) === role(p) || m.kind === 'projector') && pointsCoincideMm(p.x, p.y, xy[0], xy[1], tolMm);
+      });
+      return points.length === 1 ? points[0] : null;
+    });
+  }
+  CadEntityTable.prototype.setMutationGuard = function (fn) {
+    if (fn !== null && typeof fn !== 'function') throw new Error('mutation guard must be a function');
+    this._mutationGuard = fn;
+  };
+  CadEntityTable.prototype._assertWritable = function () {
+    if (this._mutationGuard && !this._mutationGuard()) throw new Error('This mode is read-only. Switch to Edit to change the drawing.');
+  };
 
   // Monotonic change counter: every add/remove/update/move/clear bumps it.
   CadEntityTable.prototype.revision = function () { return this._rev; };
@@ -277,12 +324,14 @@
   };
 
   CadEntityTable.prototype.add = function (entity) {
+    this._assertWritable();
     if (!entity || typeof entity.id !== 'string' || entity.id === '') {
       throw new Error('entity must have a non-empty string id');
     }
     if (this._map[entity.id] !== undefined) throw new Error('duplicate entity id: ' + entity.id);
     if (!isValidType(entity.type)) throw new Error('unknown entity type: ' + String(entity.type));
     assertTwoPoints(entity.type, entity.x, entity.y, entity.x2, entity.y2);
+    entity.meta = normalizeMeta(this.list().concat([entity]), entity);
     this._map[entity.id] = entity;
     this._order.push(entity.id);
     this._emit('add', entity);
@@ -301,6 +350,7 @@
   CadEntityTable.prototype.has = function (id) { return this._map[id] !== undefined; };
 
   CadEntityTable.prototype.remove = function (id) {
+    this._assertWritable();
     if (this._map[id] === undefined) return false;
     var gone = this._map[id];
     delete this._map[id];
@@ -320,13 +370,15 @@
   CadEntityTable.prototype.getAll = CadEntityTable.prototype.list;
 
   CadEntityTable.prototype.clear = function () {
-    this._map = {};
+    this._assertWritable();
+    this._map = Object.create(null);
     this._order = [];
     this._emit('clear', null);
   };
 
   // Locked XY datum: locked entities reject x/y/x2/y2 changes.
   CadEntityTable.prototype.update = function (id, patch) {
+    this._assertWritable();
     var e = this._map[id];
     if (e === undefined) throw new Error('unknown entity id: ' + String(id));
     patch = patch || {};
@@ -363,6 +415,7 @@
   };
 
   CadEntityTable.prototype.move = function (id, dxMm, dyMm) {
+    this._assertWritable();
     var e = this._map[id];
     if (e === undefined) throw new Error('unknown entity id: ' + String(id));
     assertFinite(dxMm, dyMm);
@@ -373,6 +426,7 @@
   };
 
   CadEntityTable.prototype.lock = function (id) {
+    this._assertWritable();
     var e = this._map[id];
     if (e === undefined) throw new Error('unknown entity id: ' + String(id));
     e.locked = true;
@@ -380,6 +434,7 @@
   };
 
   CadEntityTable.prototype.unlock = function (id) {
+    this._assertWritable();
     var e = this._map[id];
     if (e === undefined) throw new Error('unknown entity id: ' + String(id));
     e.locked = false;
@@ -406,6 +461,21 @@
     return this.list().filter(function (e) { return e.visible; });
   };
 
+  // Validate every final entity before committing any change. All observers
+  // see the completed graph, and existing entity objects retain their identity.
+  CadEntityTable.prototype.updateMany = function (patches) {
+    this._assertWritable();
+    var self = this, temp = createTable(), ids = Object.keys(patches);
+    ids.forEach(function (id) {
+      var e = self.get(id); if (!e) throw new Error('unknown entity id: ' + id);
+      temp.add(createEntity(e.type, JSON.parse(JSON.stringify(e))));
+      temp.update(id, patches[id]);
+    });
+    ids.forEach(function (id) { Object.assign(self.get(id), temp.get(id)); });
+    ids.forEach(function (id) { self._emit('update', self.get(id)); });
+    return ids;
+  };
+
   // Point-cascade delete: a line must not survive its points. Deleting a
   // POINT also deletes line-like entities (SEGMENT/LINE/RAY/DIMENSION)
   // that reference it via meta.refs or whose endpoint coincides with it
@@ -426,18 +496,18 @@
     if (!Array.isArray(entities)) throw new Error('entities must be an array');
     var tol = (tolMm === undefined || tolMm === null) ? COINCIDENT_TOL_MM : tolMm;
     assertFinite(tol);
-    var byId = {};
+    var byId = Object.create(null);
     for (var i = 0; i < entities.length; i++) {
       var e = entities[i];
       if (e && typeof e.id === 'string') byId[e.id] = e;
     }
     if (!byId[rootId]) return [];
-    var doomed = {};
+    var doomed = Object.create(null);
     doomed[rootId] = true;
     var order = [rootId];
     var deadPoints = [];
     if (byId[rootId].type === 'POINT') {
-      deadPoints.push({ x: byId[rootId].x, y: byId[rootId].y });
+      deadPoints.push(byId[rootId]);
     }
     var changed = true;
     while (changed) {
@@ -447,7 +517,7 @@
         if (!c || doomed[c.id]) continue;
         if (c.locked) continue;
         if (c.type === 'DATUM_AXIS') continue;
-        var m = c.meta || {};
+        var m = normalizeMeta(entities, c);
         var hit = false;
         if (!hit && typeof m.polygon === 'string' && m.polygon !== '' &&
             doomed[m.polygon]) {
@@ -463,22 +533,16 @@
             if (doomed[m.vertices[v]]) { hit = true; break; }
           }
         }
+        if (!hit && (doomed[m.centerRef] || doomed[m.radiusRef] || (m.endpointRefs || []).some(function (id) { return doomed[id]; }))) hit = true;
         if (!hit && deadPoints.length > 0 &&
-            CASCADE_LINE_TYPES.indexOf(c.type) !== -1) {
-          for (var d = 0; d < deadPoints.length; d++) {
-            var px = deadPoints[d].x, py = deadPoints[d].y;
-            if (pointsCoincideMm(c.x, c.y, px, py, tol) ||
-                pointsCoincideMm(c.x2, c.y2, px, py, tol)) {
-              hit = true;
-              break;
-            }
-          }
+            CASCADE_LINE_TYPES.indexOf(c.type) !== -1 && !(m.refs && m.refs.length) && !m.endpointRefs) {
+          hit = endpointReferences(entities, c, tol).some(function (p) { return p && doomed[p.id]; });
         }
         if (hit) {
           doomed[c.id] = true;
           order.push(c.id);
           if (c.type === 'POINT') {
-            deadPoints.push({ x: c.x, y: c.y });
+            deadPoints.push(c);
           }
           changed = true;
         }
@@ -510,6 +574,7 @@
     ARROW_RATIO: ARROW_RATIO, ARROW_FLIP_PX: ARROW_FLIP_PX,
     ARROW_FLIP_THRESHOLD_PX: ARROW_FLIP_PX,
     assertFinite: assertFinite,
+    resolveReference: resolveReference, normalizeMeta: normalizeMeta, endpointReferences: endpointReferences,
     resetIdCounter: resetIdCounter, nextId: nextId,
     clampRadius: clampRadius,
     createEntity: createEntity, CadEntity: createEntity,

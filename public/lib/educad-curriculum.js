@@ -624,8 +624,7 @@
           if (cy0 < planY0) planY0 = cy0;
           if (cy1 > planY1) planY1 = cy1;
         } else if (be.type === 'POINT') {
-          if (apexPlan === null &&
-              (solid === 'PYRAMID' || solid === 'CONE')) apexPlan = be;
+          if ((solid === 'PYRAMID' || solid === 'CONE') && be.caption === 's') apexPlan = be;
         }
       } else if (be.viewRole === 'ELEVATION' &&
           (be.bisCode === 'A' || be.bisCode === 'B')) {
@@ -672,8 +671,8 @@
             'PROFILE', 'A', 'pf-facet', pMeta));
         }
       }
-      extra.push(segSpec(pLo, (z0 + z1) / 2, pHi, (z0 + z1) / 2,
-        'PROFILE', 'E', 'pf-hidden', { kind: 'hidden' }));
+      // A prism has no horizontal edge halfway up its side view.
+      // Coincident visible edges take precedence over hidden ones.
     } else if (solid === 'CYLINDER') {
       extra.push(segSpec(pLo, z0, pHi, z0, 'PROFILE', 'A', "pf-b", pMeta));
       extra.push(segSpec(pHi, z0, pHi, z1, 'PROFILE', 'A', "pf-R", pMeta));

@@ -34,10 +34,11 @@ function freshEnv(extra) {
   return env;
 }
 
-// 1 settings ship seven on-by-default preferences with labels
-eq(S.KEYS.length, 7, 'seven keys');
+// 1 settings ship on-by-default preferences with labels
+eq(S.KEYS.length, 9, 'nine keys');
 deep(S.KEYS, ['commandPreview', 'commandSuggestions', 'showDemos',
-  'showTutorials', 'commandHistory', 'coordsHud', 'showLocusLines']);
+  'showTutorials', 'commandHistory', 'coordsHud', 'showLocusLines',
+  'projectionGuides', 'solidPreview']);
 Object.keys(S.DEFAULTS).forEach(function (k) {
   eq(S.DEFAULTS[k], true, k + ' defaults on');
 });
@@ -82,6 +83,11 @@ deep(S.parse('{"showDemos":"yes"}').values, S.createStore().values,
   'non-boolean defaulted');
 eq(S.parse('{"showDemos":false}').values.showLocusLines, true,
   'stored prefs without the locus key default it on');
+eq(S.parse('{"showDemos":false}').values.projectionGuides, true,
+  'older preferences retain projection guides by default');
+deep(S.parse(S.serialize(S.createStore({ projectionGuides: false, solidPreview: false }))).values,
+  S.createStore({ projectionGuides: false, solidPreview: false }).values,
+  'drawing display preferences round-trip');
 deep(S.parse(S.serialize(S.createStore({ showLocusLines: false }))).values,
   S.createStore({ showLocusLines: false }).values, 'locus round-trip');
 var mem = {};
@@ -396,7 +402,7 @@ pass('phase32 help text');
 
 // 14 the page ships the bar, the panel, and the wiring
 var index = fs.readFileSync(INDEX_PATH, 'utf8');
-ok(index.indexOf('<script src="lib/educad-settings.js"></script>') !== -1,
+ok(/<script src="lib\/educad-settings\.js(?:\?[^\"]*)?"><\/script>/.test(index),
   'settings loaded');
 ok(index.indexOf('<script src="lib/educad-command.js"></script>') !== -1,
   'command loaded');

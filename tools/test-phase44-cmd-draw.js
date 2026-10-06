@@ -12,9 +12,9 @@ var E = require('../public/lib/educad-entities.js');
 var D = require('./edc.js');
 
 var ROOT = path.join(__dirname, '..');
-var INDEX_PATH = path.join(ROOT, 'mirror', 'index.html');
+var INDEX_PATH = path.join(ROOT, 'public', 'index.html');
 var MD_PATH = path.join(ROOT, 'docs', 'MANUAL.md');
-var HTML_PATH = path.join(ROOT, 'mirror', 'manual.html');
+var HTML_PATH = path.join(ROOT, 'public', 'manual.html');
 var README_PATH = path.join(ROOT, 'README.md');
 var PKG_PATH = path.join(ROOT, 'package.json');
 
@@ -104,7 +104,7 @@ eq(plo.ids.length, 2, 'two edges, open');
 var e0 = plEnv.table.get(plo.ids[0]), e1 = plEnv.table.get(plo.ids[1]);
 eq(e0.type, 'SEGMENT', 'edges are segments');
 ok(e0.x2 === e1.x && e0.y2 === e1.y, 'chain connects');
-deep(e0.meta.vertices, ['a', 'b', 'd'], 'vertices ride along');
+deep(e0.meta.vertices, ['a', 'b', 'd'].map(function (name) { return plEnv.table.list().find(function (e) { return e.name === name; }).id; }), 'vertices retain stable IDs');
 ['/polyline a', '/polyline a z', '/polyline a a'].forEach(function (l) {
   eq(run(plEnv, l).ok, false, l + ' refused');
 });

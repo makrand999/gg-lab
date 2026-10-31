@@ -190,9 +190,17 @@
     return apiRequest(fetchImpl, 'POST', 'api/sets/' + code + '/verify', session,
       { question_index: questionIndex, data: data });
   }
-  function setQuestionModel(fetchImpl, session, code, qi, data) {
+  function setQuestionModel(fetchImpl, session, code, qi, data, extra) {
+    var body = { data: data };
+    // Fresh 3D preview derived from the model by the caller (see
+    // educad-ref3d.js). Omit it and the server erases the stored preview
+    // so students never draw from a stale shape.
+    if (extra && typeof extra === 'object') {
+      if (extra.model3d !== undefined) body.model3d = extra.model3d;
+      if (extra.show_3d !== undefined) body.show_3d = extra.show_3d;
+    }
     return apiRequest(fetchImpl, 'PUT',
-      'api/sets/' + code + '/questions/' + qi + '/model', session, { data: data });
+      'api/sets/' + code + '/questions/' + qi + '/model', session, body);
   }
   function clearQuestionModel(fetchImpl, session, code, qi) {
     return apiRequest(fetchImpl, 'DELETE',
@@ -203,9 +211,14 @@
       'api/sets/' + code + '/questions/' + qi + '/check', session,
       { enabled: !!enabled });
   }
-  function interpretWords(fetchImpl, session, text, points, mode) {
+  function setQuestionShow3d(fetchImpl, session, code, qi, enabled) {
+    return apiRequest(fetchImpl, 'PUT',
+      'api/sets/' + code + '/questions/' + qi + '/show3d', session,
+      { enabled: !!enabled });
+  }
+  function interpretWords(fetchImpl, session, text, points, mode, pointData, feedback) {
     return apiRequest(fetchImpl, 'POST', 'api/interpret', session,
-      { text: text, points: points || [], mode: mode || 'draw' });
+      { text: text, points: points || [], mode: mode || 'draw', pointData: pointData || {}, feedback: feedback || '' });
   }
   function gradeSubmission(fetchImpl, session, id, verdict, remarks) {
     return apiRequest(fetchImpl, 'PUT', 'api/submissions/' + id + '/grade', session,
@@ -272,7 +285,8 @@
     listMembers: listMembers, listClassSets: listClassSets,
     submitSolution: submitSolution, verifySolution: verifySolution,
     setQuestionModel: setQuestionModel, clearQuestionModel: clearQuestionModel,
-    setQuestionCheck: setQuestionCheck, gradeSubmission: gradeSubmission,
+    setQuestionCheck: setQuestionCheck, setQuestionShow3d: setQuestionShow3d,
+    gradeSubmission: gradeSubmission,
     listSubmissions: listSubmissions, getSubmission: getSubmission,
     listMySubmissions: listMySubmissions,
     listProgress: listProgress, putProgress: putProgress,

@@ -192,4 +192,60 @@ check('inspection fills solid faces paper-opaque under hidden ink', function () 
   var wire = S.createGeometry({ vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }], edges: [[0, 1]], faces: [] });
   assert.equal(preStrokeFills(callsFor(wire, true)), 0);
 });
+check('glass frames notify afterDraw after the overlay on every motion path', function () {
+  var savedDocument = global.document, savedWindow = global.window;
+  function makeCtx() {
+    var stub = new Proxy(function () {}, {
+      get: function (t, k) { return typeof k === 'symbol' ? undefined : stub; },
+      set: function () { return true; },
+      apply: function () { return stub; }
+    });
+    return stub;
+  }
+  function makeEl(tag) {
+    var el = { tagName: tag, className: '', style: {}, children: [],
+      setAttribute: function () {}, appendChild: function (c) { this.children.push(c); return c; } };
+    if (tag === 'canvas') el.getContext = function () { return makeCtx(); };
+    return el;
+  }
+  global.document = { createElement: makeEl };
+  global.window = { innerWidth: 1280, innerHeight: 800 }; // no rAF: scheduleDraw runs synchronously
+  try {
+    var container = { clientWidth: 1280, clientHeight: 800, children: [],
+      appendChild: function (c) { this.children.push(c); return c; } };
+    var log = [], states = [];
+    var glass = S.mountSolidGlass(container, { w: 1280, h: 800, dpr: 1,
+      drawUnderlay: function () { log.push('under'); },
+      drawOverlay: function () { log.push('over'); },
+      afterDraw: function (st) { log.push('after'); states.push(st); } });
+    assert.equal(glass.headless, false);
+    assert.deepStrictEqual(log, ['under', 'over', 'after']);
+    assert.strictEqual(states[0], glass.state);
+    [['draw', function () { glass.draw(); }],
+      ['orbitBy', function () { glass.orbitBy(10, 5); }],
+      ['panBy', function () { glass.panBy(3, 4); }],
+      ['zoomAt', function () { glass.zoomAt(100, 100, 1.2); }],
+      ['resetView', function () { glass.resetView(); }],
+      ['resize', function () { glass.resize(800, 600); }],
+      ['scheduleDraw', function () { glass.scheduleDraw(); }]
+    ].forEach(function (entry) {
+      log.length = 0; states.length = 0;
+      entry[1]();
+      assert.deepStrictEqual(log, ['under', 'over', 'after'], entry[0]);
+      assert.strictEqual(states[0], glass.state, entry[0]);
+    });
+    var bare = S.mountSolidGlass(container, { w: 320, h: 200, dpr: 1 });
+    assert.equal(bare.headless, false);
+    bare.draw(); bare.orbitBy(5, 5);
+    var headlessCalls = 0;
+    var headless = S.mountSolidGlass(null, { afterDraw: function () { headlessCalls++; } });
+    assert.equal(headless.headless, true);
+    headless.draw(); headless.orbitBy(5, 5);
+    assert.equal(headlessCalls, 0);
+  } finally {
+    if (savedDocument === undefined) delete global.document; else global.document = savedDocument;
+    if (savedWindow === undefined) delete global.window; else global.window = savedWindow;
+  }
+  assert.equal(typeof document, 'undefined'); assert.equal(typeof window, 'undefined');
+});
 console.log('OK ' + n + ' spatial checks passed');

@@ -97,7 +97,7 @@ async function main() {
   var port = await freePort();
   var errLog = '';
   var srv = child.spawn(SERVER, [String(port)], {
-    env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+    env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
     stdio: ['ignore', 'ignore', 'pipe']
   });
   srv.stderr.on('data', function (c) { errLog += c; });
@@ -183,7 +183,7 @@ async function main() {
     var r12js = await req(port, 'GET', '/menu-lava.js');
     eq(r12js.status, 200);
     ok(String(r12js.headers['content-type']).indexOf('text/javascript') !== -1, 'js type');
-    var r12css = await req(port, 'GET', '/login.css');
+    var r12css = await req(port, 'GET', '/css/login.css');
     eq(r12css.status, 200);
     ok(String(r12css.headers['content-type']).indexOf('text/css') !== -1, 'css type');
     var r12png = await req(port, 'GET', '/images/menu/lava-left.png');
@@ -207,7 +207,7 @@ async function main() {
     eq(r13b.status, 200);
     var r13c = await req(port, 'GET', '/fonts/');
     eq(r13c.status, 200);
-    ok(r13c.body.indexOf('EduCAD mirror') !== -1, 'listing');
+    ok(r13c.body.indexOf('EduCAD') !== -1 && r13c.body.indexOf('cuprum-latin.woff2') !== -1, 'listing');
     var r13d = await req(port, 'HEAD', '/login.html');
     eq(r13d.status, 200);
     eq(r13d.body, '');
@@ -254,7 +254,7 @@ async function main() {
     // 18 busy port retries upward
     var port2 = await freePort();
     var srv2 = child.spawn(SERVER, [String(port2)], {
-      env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+      env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
       stdio: ['ignore', 'ignore', 'pipe']
     });
     var err2 = '';
@@ -262,7 +262,7 @@ async function main() {
     try {
       await waitReady(port2, srv2, 10000);
       var srv3 = child.spawn(SERVER, [String(port2)], {
-        env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+        env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
         stdio: ['ignore', 'ignore', 'pipe']
       });
       var err3 = '';
@@ -414,7 +414,7 @@ async function main() {
     srv.kill('SIGTERM');
     await new Promise(function (resolve) { srv.on('exit', resolve); });
     srv = child.spawn(SERVER, [String(port)], {
-      env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+      env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
       stdio: ['ignore', 'ignore', 'pipe']
     });
     srv.stderr.on('data', function (c) { errLog += c; });
@@ -828,7 +828,7 @@ async function main() {
     ok(pB !== pA, 'distinct ports ' + pA + '/' + pB);
     var srv43a = child.spawn(SERVER, [String(pB)], {
       env: Object.assign({}, process.env,
-        { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: String(pA) }),
+        { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: String(pA) }),
       stdio: ['ignore', 'ignore', 'pipe']
     });
     var err43a = '';
@@ -844,7 +844,7 @@ async function main() {
     var pC = await freePort();
     var srv43b = child.spawn(SERVER, [], {
       env: Object.assign({}, process.env,
-        { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: String(pC) }),
+        { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: String(pC) }),
       stdio: ['ignore', 'ignore', 'ignore']
     });
     try {
@@ -856,7 +856,7 @@ async function main() {
     var pD = await freePort();
     var srv43c = child.spawn(SERVER, [String(pD)], {
       env: Object.assign({}, process.env,
-        { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: 'bogus' }),
+        { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR, PORT: 'bogus' }),
       stdio: ['ignore', 'ignore', 'ignore']
     });
     try {
@@ -866,7 +866,7 @@ async function main() {
       await new Promise(function (res) { srv43c.on('exit', res); });
     }
     var env43d = Object.assign({}, process.env,
-      { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR });
+      { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR });
     delete env43d.PORT;
     var srv43d = child.spawn(SERVER, [], {
       env: env43d, stdio: ['ignore', 'pipe', 'pipe']

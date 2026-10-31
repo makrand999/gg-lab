@@ -1,0 +1,855 @@
+{
+  "model": "gemini-3.8-flash-high",
+  "date": "2026-10-07T03:12:59.913Z",
+  "passed": 21,
+  "failed": 2,
+  "results": [
+    {
+      "name": "circle",
+      "text": "Draw a circle centered at (10,20) with radius 15 mm.",
+      "status": "PASS",
+      "elapsedMs": 8324,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/point c 10 20",
+              "/circle c 15 A",
+              "/point cl1 -8 20",
+              "/point cl2 28 20",
+              "/point cl3 10 2",
+              "/point cl4 10 38",
+              "/line cl1 cl2 G",
+              "/line cl3 cl4 G"
+            ],
+            "ok": true,
+            "reply": "Drawn a circle with radius 15 mm centered at (10, 20) with standard center lines."
+          }
+        }
+      ],
+      "commands": [
+        "/point c 10 20",
+        "/circle c 15 A",
+        "/point cl1 -8 20",
+        "/point cl2 28 20",
+        "/point cl3 10 2",
+        "/point cl4 10 38",
+        "/line cl1 cl2 G",
+        "/line cl3 cl4 G"
+      ],
+      "reply": "Drawn a circle with radius 15 mm centered at (10, 20) with standard center lines."
+    },
+    {
+      "name": "triangle",
+      "text": "Draw triangle with vertices a=(0,10), b=(30,10), c=(15,35). Close all three sides.",
+      "status": "PASS",
+      "elapsedMs": 5455,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/point a 0 10",
+              "/point b 30 10",
+              "/point c 15 35",
+              "/polygon a b c"
+            ],
+            "ok": true,
+            "reply": "Drawn triangle abc with vertices at (0, 10), (30, 10), and (15, 35)."
+          }
+        }
+      ],
+      "commands": [
+        "/point a 0 10",
+        "/point b 30 10",
+        "/point c 15 35",
+        "/polygon a b c"
+      ],
+      "reply": "Drawn triangle abc with vertices at (0, 10), (30, 10), and (15, 35)."
+    },
+    {
+      "name": "arc",
+      "text": "Draw only a circular arc centered at (0,20), radius 10 mm, from 30 degrees to 150 degrees counterclockwise.",
+      "status": "PASS",
+      "elapsedMs": 8684,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/arc 0 20 10 30 150"
+            ],
+            "ok": true,
+            "reply": "Circular arc drawn with radius 10 mm centered at (0, 20) from 30° to 150°."
+          }
+        }
+      ],
+      "commands": [
+        "/arc 0 20 10 30 150"
+      ],
+      "reply": "Circular arc drawn with radius 10 mm centered at (0, 20) from 30° to 150°."
+    },
+    {
+      "name": "ellipse",
+      "text": "Draw an ellipse centered at (0,30), with horizontal semi-axis 20 mm and vertical semi-axis 10 mm, using 24 segments.",
+      "status": "PASS",
+      "elapsedMs": 6743,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/point c 0 30",
+              "/point h1 -25 30",
+              "/point h2 25 30",
+              "/point v1 0 16",
+              "/point v2 0 44",
+              "/line h1 h2 G",
+              "/line v1 v2 G",
+              "/ellipse c 20 10 24 A"
+            ],
+            "ok": true,
+            "reply": "Drew an ellipse centered at (0, 30) with rx = 20 mm, ry = 10 mm approximated by 24 segments, complete with centre lines."
+          }
+        }
+      ],
+      "commands": [
+        "/point c 0 30",
+        "/point h1 -25 30",
+        "/point h2 25 30",
+        "/point v1 0 16",
+        "/point v2 0 44",
+        "/line h1 h2 G",
+        "/line v1 v2 G",
+        "/ellipse c 20 10 24 A"
+      ],
+      "reply": "Drew an ellipse centered at (0, 30) with rx = 20 mm, ry = 10 mm approximated by 24 segments, complete with centre lines."
+    },
+    {
+      "name": "polyline",
+      "text": "Draw an open polyline through a=(0,10), b=(10,25), c=(20,15), d=(30,30). Do not close it.",
+      "status": "PASS",
+      "elapsedMs": 4455,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/point a 0 10",
+              "/point b 10 25",
+              "/point c 20 15",
+              "/point d 30 30",
+              "/polyline a b c d"
+            ],
+            "ok": true,
+            "reply": "Drew an open polyline through points a(0, 10), b(10, 25), c(20, 15), and d(30, 30)."
+          }
+        }
+      ],
+      "commands": [
+        "/point a 0 10",
+        "/point b 10 25",
+        "/point c 20 15",
+        "/point d 30 30",
+        "/polyline a b c d"
+      ],
+      "reply": "Drew an open polyline through points a(0, 10), b(10, 25), c(20, 15), and d(30, 30)."
+    },
+    {
+      "name": "hatch",
+      "text": "Draw 45-degree section hatching inside the rectangle x=0..40 and y=10..30, with spacing 5 mm. Do not draw the boundary.",
+      "status": "PASS",
+      "elapsedMs": 4461,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/hatch 0 10 40 30 5 45"
+            ],
+            "ok": true,
+            "reply": "Drawn 45° section hatching inside the rectangle [0, 40] × [10, 30] with 5 mm spacing."
+          }
+        }
+      ],
+      "commands": [
+        "/hatch 0 10 40 30 5 45"
+      ],
+      "reply": "Drawn 45° section hatching inside the rectangle [0, 40] × [10, 30] with 5 mm spacing."
+    },
+    {
+      "name": "dimension",
+      "text": "Draw a=(0,10), b=(30,50), their segment, and a dimension showing the distance between them.",
+      "status": "PASS",
+      "elapsedMs": 3526,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/point a 0 10",
+              "/point b 30 50",
+              "/line a b A",
+              "/dimension a b"
+            ],
+            "ok": true,
+            "reply": "Drawn points a(0, 10) and b(30, 50), the line segment connecting them, and the dimension line."
+          }
+        }
+      ],
+      "commands": [
+        "/point a 0 10",
+        "/point b 30 50",
+        "/line a b A",
+        "/dimension a b"
+      ],
+      "reply": "Drawn points a(0, 10) and b(30, 50), the line segment connecting them, and the dimension line."
+    },
+    {
+      "name": "quadrant-III",
+      "text": "Monge first-angle projection: point A is 20 mm below HP and 30 mm behind VP, x=10 mm. Draw its plan a and elevation a' and XY datum, with explicit plan and elevation roles.",
+      "status": "PASS",
+      "elapsedMs": 17067,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/datum -40 60",
+              "/point X -40 0 both",
+              "/point Y 60 0 both",
+              "/line X Y B both",
+              "/text -38 3 X",
+              "/text 55 3 Y",
+              "/point a 10 30 plan",
+              "/point a' 10 -20 elevation",
+              "/line a a' B both",
+              "/text 13 30 a",
+              "/text 13 -20 a'",
+              "/point a0 10 0 both",
+              "/dimension a0 a B plan",
+              "/dimension a0 a' B elevation"
+            ],
+            "ok": true,
+            "reply": "Point A is in the third quadrant (20 mm below HP, 30 mm behind VP). In Monge projection, its plan a lies 30 mm above the XY line (y = +30) and its elevation a' lies 20 mm below the XY line (y = -20)."
+          }
+        }
+      ],
+      "commands": [
+        "/datum -40 60",
+        "/point X -40 0 both",
+        "/point Y 60 0 both",
+        "/line X Y B both",
+        "/text -38 3 X",
+        "/text 55 3 Y",
+        "/point a 10 30 plan",
+        "/point a' 10 -20 elevation",
+        "/line a a' B both",
+        "/text 13 30 a",
+        "/text 13 -20 a'",
+        "/point a0 10 0 both",
+        "/dimension a0 a B plan",
+        "/dimension a0 a' B elevation"
+      ],
+      "reply": "Point A is in the third quadrant (20 mm below HP, 30 mm behind VP). In Monge projection, its plan a lies 30 mm above the XY line (y = +30) and its elevation a' lies 20 mm below the XY line (y = -20)."
+    },
+    {
+      "name": "quadrant-I",
+      "text": "Monge first-angle point A at x=10, signed height=20 mm (positive above HP), signed depth=30 mm (positive in front of VP). Draw a plan and a' elevation with explicit roles and XY datum.",
+      "status": "PASS",
+      "elapsedMs": 12528,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/datum -30 50",
+              "/point a0 10 0 both",
+              "/point a' 10 20 elevation",
+              "/point a 10 -30 plan",
+              "/line a a' B",
+              "/dimension a0 a' B elevation",
+              "/dimension a0 a B plan"
+            ],
+            "ok": true,
+            "reply": "Point A plotted in first-angle Monge projection with elevation a' at (10, 20), plan a at (10, -30), projection line, and XY datum."
+          }
+        }
+      ],
+      "commands": [
+        "/datum -30 50",
+        "/point a0 10 0 both",
+        "/point a' 10 20 elevation",
+        "/point a 10 -30 plan",
+        "/line a a' B",
+        "/dimension a0 a' B elevation",
+        "/dimension a0 a B plan"
+      ],
+      "reply": "Point A plotted in first-angle Monge projection with elevation a' at (10, 20), plan a at (10, -30), projection line, and XY datum."
+    },
+    {
+      "name": "quadrant-II",
+      "text": "Monge first-angle point A at x=10, signed height=20 mm (positive above HP), signed depth=-30 mm (positive in front of VP). Draw a plan and a' elevation with explicit roles and XY datum.",
+      "status": "PASS",
+      "elapsedMs": 11473,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/datum -40 60",
+              "/point X -40 0 both",
+              "/point Y 60 0 both",
+              "/line X Y A both",
+              "/text -46 -2 X",
+              "/text 62 -2 Y",
+              "/point a0 10 0 both",
+              "/point a' 10 20 elevation",
+              "/point a 10 30 plan",
+              "/line a0 a' B both",
+              "/line a' a B both",
+              "/text 13 20 a'",
+              "/text 13 30 a"
+            ],
+            "ok": true,
+            "reply": "Monge first-angle projection of point A (x=10, depth=-30, height=20): elevation a' is at (10, 20) and plan a is at (10, 30), with projector line to the XY datum."
+          }
+        }
+      ],
+      "commands": [
+        "/datum -40 60",
+        "/point X -40 0 both",
+        "/point Y 60 0 both",
+        "/line X Y A both",
+        "/text -46 -2 X",
+        "/text 62 -2 Y",
+        "/point a0 10 0 both",
+        "/point a' 10 20 elevation",
+        "/point a 10 30 plan",
+        "/line a0 a' B both",
+        "/line a' a B both",
+        "/text 13 20 a'",
+        "/text 13 30 a"
+      ],
+      "reply": "Monge first-angle projection of point A (x=10, depth=-30, height=20): elevation a' is at (10, 20) and plan a is at (10, 30), with projector line to the XY datum."
+    },
+    {
+      "name": "quadrant-IV",
+      "text": "Monge first-angle point A at x=10, signed height=-20 mm (positive above HP), signed depth=30 mm (positive in front of VP). Draw a plan and a' elevation with explicit roles and XY datum.",
+      "status": "PASS",
+      "elapsedMs": 11332,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/datum -30 50",
+              "/point a0 10 0 both",
+              "/point a' 10 -20 elevation",
+              "/point a 10 -30 plan",
+              "/line a0 a' B both",
+              "/line a' a B both"
+            ],
+            "ok": true,
+            "reply": "Plotted point A in Monge projection: elevation a' at (10, -20) below HP and plan a at (10, -30) in front of VP, with projector line and XY datum."
+          }
+        }
+      ],
+      "commands": [
+        "/datum -30 50",
+        "/point a0 10 0 both",
+        "/point a' 10 -20 elevation",
+        "/point a 10 -30 plan",
+        "/line a0 a' B both",
+        "/line a' a B both"
+      ],
+      "reply": "Plotted point A in Monge projection: elevation a' at (10, -20) below HP and plan a at (10, -30) in front of VP, with projector line and XY datum."
+    },
+    {
+      "name": "on-HP",
+      "text": "Monge first-angle point A at x=10, signed height=0 mm (positive above HP), signed depth=30 mm (positive in front of VP). Draw a plan and a' elevation with explicit roles and XY datum.",
+      "status": "PASS",
+      "elapsedMs": 11111,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/datum -30 50",
+              "/point a' 10 0 elevation",
+              "/point a 10 -30 plan",
+              "/line a' a B",
+              "/text 12 3 a'",
+              "/text 12 -30 a",
+              "/text -30 2 X",
+              "/text 48 2 Y"
+            ],
+            "ok": true,
+            "reply": "Point A projected in first-angle Monge projection: elevation a' lies on the reference line XY at (10, 0) and plan a lies 30 mm below XY at (10, -30)."
+          }
+        }
+      ],
+      "commands": [
+        "/datum -30 50",
+        "/point a' 10 0 elevation",
+        "/point a 10 -30 plan",
+        "/line a' a B",
+        "/text 12 3 a'",
+        "/text 12 -30 a",
+        "/text -30 2 X",
+        "/text 48 2 Y"
+      ],
+      "reply": "Point A projected in first-angle Monge projection: elevation a' lies on the reference line XY at (10, 0) and plan a lies 30 mm below XY at (10, -30)."
+    },
+    {
+      "name": "on-VP",
+      "text": "Monge first-angle point A at x=10, signed height=20 mm (positive above HP), signed depth=0 mm (positive in front of VP). Draw a plan and a' elevation with explicit roles and XY datum.",
+      "status": "PASS",
+      "elapsedMs": 9582,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/datum -30 50",
+              "/point a 10 0 plan",
+              "/point a' 10 20 elevation",
+              "/line a a' B",
+              "/text 13 20 a'",
+              "/text 13 -5 a"
+            ],
+            "ok": true,
+            "reply": "Point A projected in first-angle Monge projection: elevation a' is at (10, 20) above the ground line, and plan a lies directly on the XY datum line at (10, 0) since depth is 0 mm."
+          }
+        }
+      ],
+      "commands": [
+        "/datum -30 50",
+        "/point a 10 0 plan",
+        "/point a' 10 20 elevation",
+        "/line a a' B",
+        "/text 13 20 a'",
+        "/text 13 -5 a"
+      ],
+      "reply": "Point A projected in first-angle Monge projection: elevation a' is at (10, 20) above the ground line, and plan a lies directly on the XY datum line at (10, 0) since depth is 0 mm."
+    },
+    {
+      "name": "tilted-square",
+      "text": "Square lamina side 40 mm, edge AB along x parallel XY: A at x=0, height=10, depth=10; B at x=40, height=10, depth=10. The plane is tilted 45 degrees to HP about AB. The other two corners C and D lie further in front of VP and higher than AB. Draw closed plan a,b,c,d and elevation a',b',c',d', projectors and XY. Calculate the projected dimensions.",
+      "status": "PASS",
+      "elapsedMs": 27266,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/point x1 -20 0 both",
+              "/point x2 60 0 both",
+              "/line x1 x2 A both",
+              "/text -20 3 X",
+              "/text 56 3 Y",
+              "/point a 0 -10 plan",
+              "/point b 40 -10 plan",
+              "/point c 40 -38.28 plan",
+              "/point d 0 -38.28 plan",
+              "/polygon a b c d",
+              "/point a' 0 10 elevation",
+              "/point b' 40 10 elevation",
+              "/point c' 40 38.28 elevation",
+              "/point d' 0 38.28 elevation",
+              "/polygon a' b' c' d'",
+              "/line d d' B both",
+              "/line c c' B both",
+              "/dimension a b B plan",
+              "/dimension b c B plan",
+              "/dimension a' b' B elevation",
+              "/dimension b' c' B elevation"
+            ],
+            "ok": true,
+            "reply": "Square lamina ABCD (side 40 mm) is inclined at 45° to the HP about edge AB. Both the plan and elevation project as rectangles of dimensions 40 mm × 28.28 mm (40·cos 45° = 40·sin 45° ≈ 28.28 mm)."
+          }
+        }
+      ],
+      "commands": [
+        "/point x1 -20 0 both",
+        "/point x2 60 0 both",
+        "/line x1 x2 A both",
+        "/text -20 3 X",
+        "/text 56 3 Y",
+        "/point a 0 -10 plan",
+        "/point b 40 -10 plan",
+        "/point c 40 -38.28 plan",
+        "/point d 0 -38.28 plan",
+        "/polygon a b c d",
+        "/point a' 0 10 elevation",
+        "/point b' 40 10 elevation",
+        "/point c' 40 38.28 elevation",
+        "/point d' 0 38.28 elevation",
+        "/polygon a' b' c' d'",
+        "/line d d' B both",
+        "/line c c' B both",
+        "/dimension a b B plan",
+        "/dimension b c B plan",
+        "/dimension a' b' B elevation",
+        "/dimension b' c' B elevation"
+      ],
+      "reply": "Square lamina ABCD (side 40 mm) is inclined at 45° to the HP about edge AB. Both the plan and elevation project as rectangles of dimensions 40 mm × 28.28 mm (40·cos 45° = 40·sin 45° ≈ 28.28 mm)."
+    },
+    {
+      "name": "line-inclinations",
+      "text": "Monge first angle: AB length 75 mm, inclined 30 degrees to HP and 45 degrees to VP. A is 12 mm above HP and 10 mm in front of VP at x=0. B is to the right, higher and further in front of VP. Draw plan a,b and elevation a',b', both segments, and XY. Calculate exact projections.",
+      "status": "FAIL",
+      "elapsedMs": 7295,
+      "error": "{\"error\":\"interpret_failed\",\"ok\":false}\n\n502 !== 200\n\n\nfalse !== true\n",
+      "attempts": [
+        {
+          "status": 502,
+          "feedback": "",
+          "response": {
+            "error": "interpret_failed",
+            "ok": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "complete-cube",
+      "text": "Draw front and top views of a cube with every named vertex and every edge in both views (24 edges total), XY and 8 projectors. Cube vertices in 3D (x,depth,height): a=(0,10,10), b=(30,10,10), c=(30,40,10), d=(0,40,10), e=(0,10,40), f=(30,10,40), g=(30,40,40), h=(0,40,40). Plan names a..h at (x,-depth), elevation a'..h' at (x,height). Edges ab,bc,cd,da,ef,fg,gh,he,ae,bf,cg,dh. Omit zero-length projected edges. Use E for hidden edges. Explicit view roles.",
+      "status": "FAIL",
+      "elapsedMs": 30030,
+      "error": "{\"error\":\"interpret_failed\",\"ok\":false}\n\n502 !== 200\n\n\nfalse !== true\n",
+      "attempts": [
+        {
+          "status": 502,
+          "feedback": "",
+          "response": {
+            "error": "interpret_failed",
+            "ok": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "cylinder",
+      "text": "Draw first-angle plan and elevation of a cylinder with vertical axis, diameter 30 mm and height 50 mm. Axis x=0, depth=40 mm in front of VP. Base is 10 mm above HP, top 60 mm above HP. Plan is a circle, elevation a rectangle. Add XY and centerlines with explicit view roles.",
+      "status": "PASS",
+      "elapsedMs": 4112,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/point x1 -50 0 both",
+              "/point x2 50 0 both",
+              "/line x1 x2 B both",
+              "/text -48 2 X",
+              "/text 44 2 Y",
+              "/point c 0 -40 plan",
+              "/circle c 15 A plan",
+              "/point ch1 -22 -40 plan",
+              "/point ch2 22 -40 plan",
+              "/line ch1 ch2 G plan",
+              "/point cv1 0 -62 plan",
+              "/point cv2 0 -18 plan",
+              "/line cv1 cv2 G plan",
+              "/point e1 -15 10 elevation",
+              "/point e2 15 10 elevation",
+              "/point e3 15 60 elevation",
+              "/point e4 -15 60 elevation",
+              "/line e1 e2 A elevation",
+              "/line e2 e3 A elevation",
+              "/line e3 e4 A elevation",
+              "/line e4 e1 A elevation",
+              "/point ea1 0 5 elevation",
+              "/point ea2 0 65 elevation",
+              "/line ea1 ea2 G elevation",
+              "/point pl -15 -40 plan",
+              "/point pr 15 -40 plan",
+              "/line pl e1 B both",
+              "/line pr e2 B both"
+            ],
+            "ok": true,
+            "reply": "Drawn the first-angle projections of the vertical cylinder: circular plan (diameter 30 mm, center at depth 40 mm) and rectangular elevation (30 mm × 50 mm, base 10 mm above HP), complete with XY reference axis, centerlines, and projection lines."
+          }
+        }
+      ],
+      "commands": [
+        "/point x1 -50 0 both",
+        "/point x2 50 0 both",
+        "/line x1 x2 B both",
+        "/text -48 2 X",
+        "/text 44 2 Y",
+        "/point c 0 -40 plan",
+        "/circle c 15 A plan",
+        "/point ch1 -22 -40 plan",
+        "/point ch2 22 -40 plan",
+        "/line ch1 ch2 G plan",
+        "/point cv1 0 -62 plan",
+        "/point cv2 0 -18 plan",
+        "/line cv1 cv2 G plan",
+        "/point e1 -15 10 elevation",
+        "/point e2 15 10 elevation",
+        "/point e3 15 60 elevation",
+        "/point e4 -15 60 elevation",
+        "/line e1 e2 A elevation",
+        "/line e2 e3 A elevation",
+        "/line e3 e4 A elevation",
+        "/line e4 e1 A elevation",
+        "/point ea1 0 5 elevation",
+        "/point ea2 0 65 elevation",
+        "/line ea1 ea2 G elevation",
+        "/point pl -15 -40 plan",
+        "/point pr 15 -40 plan",
+        "/line pl e1 B both",
+        "/line pr e2 B both"
+      ],
+      "reply": "Drawn the first-angle projections of the vertical cylinder: circular plan (diameter 30 mm, center at depth 40 mm) and rectangular elevation (30 mm × 50 mm, base 10 mm above HP), complete with XY reference axis, centerlines, and projection lines."
+    },
+    {
+      "name": "cone",
+      "text": "Draw first-angle plan and elevation of a cone with vertical axis, base diameter 30 mm, height 50 mm. Axis x=0, depth=40 in front of VP, base 10 above HP, apex 60 above HP. Plan is a circle, elevation a triangle. Add XY and centerlines with explicit roles.",
+      "status": "PASS",
+      "elapsedMs": 5315,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/datum -50 50",
+              "/point v_elev 0 60 elevation",
+              "/point b1 -15 10 elevation",
+              "/point b2 15 10 elevation",
+              "/line b1 b2 A elevation",
+              "/line b1 v_elev A elevation",
+              "/line b2 v_elev A elevation",
+              "/point ce1 0 5 elevation",
+              "/point ce2 0 65 elevation",
+              "/line ce1 ce2 G elevation",
+              "/point o 0 -40 plan",
+              "/circle o 15 A plan",
+              "/point cp1 -22 -40 plan",
+              "/point cp2 22 -40 plan",
+              "/line cp1 cp2 G plan",
+              "/point cp3 0 -62 plan",
+              "/point cp4 0 -18 plan",
+              "/line cp3 cp4 G plan"
+            ],
+            "ok": true,
+            "reply": "Drawn the first-angle projection of the vertical cone with a circular plan and triangular elevation, complete with reference line XY and centerlines."
+          }
+        }
+      ],
+      "commands": [
+        "/datum -50 50",
+        "/point v_elev 0 60 elevation",
+        "/point b1 -15 10 elevation",
+        "/point b2 15 10 elevation",
+        "/line b1 b2 A elevation",
+        "/line b1 v_elev A elevation",
+        "/line b2 v_elev A elevation",
+        "/point ce1 0 5 elevation",
+        "/point ce2 0 65 elevation",
+        "/line ce1 ce2 G elevation",
+        "/point o 0 -40 plan",
+        "/circle o 15 A plan",
+        "/point cp1 -22 -40 plan",
+        "/point cp2 22 -40 plan",
+        "/line cp1 cp2 G plan",
+        "/point cp3 0 -62 plan",
+        "/point cp4 0 -18 plan",
+        "/line cp3 cp4 G plan"
+      ],
+      "reply": "Drawn the first-angle projection of the vertical cone with a circular plan and triangular elevation, complete with reference line XY and centerlines."
+    },
+    {
+      "name": "plate-holes",
+      "text": "Draw an elevation of a rectangular plate from x=-60 to 60 mm, y=10 to 30 mm. Draw two circular holes, diameter 10 mm, centered at (-30,20) and (30,20). Add dimension of the plate width. Do not hatch the holes.",
+      "status": "PASS",
+      "elapsedMs": 3654,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/datum -70 70",
+              "/point a' -60 10 elevation",
+              "/point b' 60 10 elevation",
+              "/point c' 60 30 elevation",
+              "/point d' -60 30 elevation",
+              "/line a' b' A elevation",
+              "/line b' c' A elevation",
+              "/line c' d' A elevation",
+              "/line d' a' A elevation",
+              "/point o1' -30 20 elevation",
+              "/circle o1' 5 A elevation",
+              "/point cl1_1 -38 20 elevation",
+              "/point cl1_2 -22 20 elevation",
+              "/line cl1_1 cl1_2 G elevation",
+              "/point cl1_3 -30 12 elevation",
+              "/point cl1_4 -30 28 elevation",
+              "/line cl1_3 cl1_4 G elevation",
+              "/point o2' 30 20 elevation",
+              "/circle o2' 5 A elevation",
+              "/point cl2_1 22 20 elevation",
+              "/point cl2_2 38 20 elevation",
+              "/line cl2_1 cl2_2 G elevation",
+              "/point cl2_3 30 12 elevation",
+              "/point cl2_4 30 28 elevation",
+              "/line cl2_3 cl2_4 G elevation",
+              "/dimension a' b' B elevation"
+            ],
+            "ok": true,
+            "reply": "Elevation of the rectangular plate with two 10 mm diameter holes and width dimension."
+          }
+        }
+      ],
+      "commands": [
+        "/datum -70 70",
+        "/point a' -60 10 elevation",
+        "/point b' 60 10 elevation",
+        "/point c' 60 30 elevation",
+        "/point d' -60 30 elevation",
+        "/line a' b' A elevation",
+        "/line b' c' A elevation",
+        "/line c' d' A elevation",
+        "/line d' a' A elevation",
+        "/point o1' -30 20 elevation",
+        "/circle o1' 5 A elevation",
+        "/point cl1_1 -38 20 elevation",
+        "/point cl1_2 -22 20 elevation",
+        "/line cl1_1 cl1_2 G elevation",
+        "/point cl1_3 -30 12 elevation",
+        "/point cl1_4 -30 28 elevation",
+        "/line cl1_3 cl1_4 G elevation",
+        "/point o2' 30 20 elevation",
+        "/circle o2' 5 A elevation",
+        "/point cl2_1 22 20 elevation",
+        "/point cl2_2 38 20 elevation",
+        "/line cl2_1 cl2_2 G elevation",
+        "/point cl2_3 30 12 elevation",
+        "/point cl2_4 30 28 elevation",
+        "/line cl2_3 cl2_4 G elevation",
+        "/dimension a' b' B elevation"
+      ],
+      "reply": "Elevation of the rectangular plate with two 10 mm diameter holes and width dimension."
+    },
+    {
+      "name": "vague-refusal",
+      "text": "Draw the correct model answer for the question I have not provided.",
+      "status": "PASS",
+      "elapsedMs": 1219,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [],
+            "ok": true,
+            "reply": "Please provide the question or problem statement, including any specific dimensions, views, or geometry to be drawn."
+          }
+        }
+      ],
+      "commands": [],
+      "reply": "Please provide the question or problem statement, including any specific dimensions, views, or geometry to be drawn."
+    },
+    {
+      "name": "impossible-refusal",
+      "text": "Draw an engineering triangle with sides 10 mm, 20 mm, 100 mm. Do not alter these lengths.",
+      "status": "PASS",
+      "elapsedMs": 1639,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [],
+            "ok": true,
+            "reply": "A triangle with side lengths of 10 mm, 20 mm, and 100 mm cannot be drawn because it violates the triangle inequality (10 + 20 < 100). The sum of any two sides must be strictly greater than the third side."
+          }
+        }
+      ],
+      "commands": [],
+      "reply": "A triangle with side lengths of 10 mm, 20 mm, and 100 mm cannot be drawn because it violates the triangle inequality (10 + 20 < 100). The sum of any two sides must be strictly greater than the third side."
+    },
+    {
+      "name": "reuse-context",
+      "text": "Draw a circle centered at existing point a, passing through existing point b. Use their actual coordinates.",
+      "status": "PASS",
+      "elapsedMs": 2097,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/circle a 50 A"
+            ],
+            "ok": true,
+            "reply": "Drawn a circle with radius 50 mm centered at point a passing through point b."
+          }
+        }
+      ],
+      "commands": [
+        "/circle a 50 A"
+      ],
+      "reply": "Drawn a circle with radius 50 mm centered at point a passing through point b."
+    },
+    {
+      "name": "unicode",
+      "text": "Draw a circle centered at (0,20), diameter 20 mm. Add annotation “Ø20 — diamètre”.",
+      "status": "PASS",
+      "elapsedMs": 2931,
+      "attempts": [
+        {
+          "status": 200,
+          "feedback": "",
+          "response": {
+            "commands": [
+              "/point c 0 20",
+              "/circle c 10 A",
+              "/point cx1 -14 20",
+              "/point cx2 14 20",
+              "/line cx1 cx2 G",
+              "/point cy1 0 6",
+              "/point cy2 0 34",
+              "/line cy1 cy2 G",
+              "/text 14 24 Ø20 — diamètre"
+            ],
+            "ok": true,
+            "reply": "Cercle de diamètre 20 mm tracé en (0, 20) avec ses axes et l'annotation demandée."
+          }
+        }
+      ],
+      "commands": [
+        "/point c 0 20",
+        "/circle c 10 A",
+        "/point cx1 -14 20",
+        "/point cx2 14 20",
+        "/line cx1 cx2 G",
+        "/point cy1 0 6",
+        "/point cy2 0 34",
+        "/line cy1 cy2 G",
+        "/text 14 24 Ø20 — diamètre"
+      ],
+      "reply": "Cercle de diamètre 20 mm tracé en (0, 20) avec ses axes et l'annotation demandée."
+    }
+  ]
+}

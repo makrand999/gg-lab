@@ -1,0 +1,420 @@
+{
+  "model": "gemini-3.8-flash-high",
+  "date": "2026-10-07T03:06:44.958Z",
+  "passed": 22,
+  "failed": 1,
+  "results": [
+    {
+      "name": "circle",
+      "status": "PASS",
+      "elapsedMs": 9479,
+      "commands": [
+        "/point c 10 20",
+        "/circle c 15 A",
+        "/point c1 -8 20",
+        "/point c2 28 20",
+        "/line c1 c2 G",
+        "/point c3 10 2",
+        "/point c4 10 38",
+        "/line c3 c4 G"
+      ],
+      "reply": "Drawn a circle with radius 15 mm centered at (10, 20) with standard center lines."
+    },
+    {
+      "name": "triangle",
+      "status": "PASS",
+      "elapsedMs": 6817,
+      "commands": [
+        "/point a 0 10",
+        "/point b 30 10",
+        "/point c 15 35",
+        "/polygon a b c"
+      ],
+      "reply": "Drawn triangle abc with vertices at (0, 10), (30, 10), and (15, 35)."
+    },
+    {
+      "name": "arc",
+      "status": "PASS",
+      "elapsedMs": 7122,
+      "commands": [
+        "/arc 0 20 10 30 150"
+      ],
+      "reply": "Drawn a circular arc centered at (0, 20) with radius 10 mm from 30° to 150°."
+    },
+    {
+      "name": "ellipse",
+      "status": "PASS",
+      "elapsedMs": 9031,
+      "commands": [
+        "/point c 0 30",
+        "/point h1 -25 30",
+        "/point h2 25 30",
+        "/point v1 0 16",
+        "/point v2 0 44",
+        "/line h1 h2 G",
+        "/line v1 v2 G",
+        "/ellipse c 20 10 24 A"
+      ],
+      "reply": "Drawn the ellipse centered at (0, 30) with semi-axes 20 mm and 10 mm using 24 segments, complete with centre lines."
+    },
+    {
+      "name": "polyline",
+      "status": "PASS",
+      "elapsedMs": 3912,
+      "commands": [
+        "/point a 0 10",
+        "/point b 10 25",
+        "/point c 20 15",
+        "/point d 30 30",
+        "/polyline a b c d"
+      ],
+      "reply": "Drawn the open polyline through points a, b, c, and d."
+    },
+    {
+      "name": "hatch",
+      "status": "PASS",
+      "elapsedMs": 5416,
+      "commands": [
+        "/hatch 0 10 40 30 5 45 B"
+      ],
+      "reply": "Drew 45° section hatching inside the region x=0..40, y=10..30 with 5 mm spacing without drawing boundary lines."
+    },
+    {
+      "name": "dimension",
+      "status": "PASS",
+      "elapsedMs": 4435,
+      "commands": [
+        "/point a 0 10",
+        "/point b 30 50",
+        "/line a b A",
+        "/dimension a b"
+      ],
+      "reply": "Drew segment ab from (0, 10) to (30, 50) with its dimension line."
+    },
+    {
+      "name": "quadrant-III",
+      "status": "PASS",
+      "elapsedMs": 9018,
+      "commands": [
+        "/point x1 -40 0 both",
+        "/point x2 60 0 both",
+        "/line x1 x2 A both",
+        "/text -38 3 X",
+        "/text 55 3 Y",
+        "/point a0 10 0 both",
+        "/point a 10 30 plan",
+        "/point a' 10 -20 elevation",
+        "/line a a' B both",
+        "/dimension a0 a B plan",
+        "/dimension a0 a' B elevation"
+      ],
+      "reply": "Constructed Monge projections for point A (third quadrant): plan a at (10, 30) above the XY datum and elevation a' at (10, -20) below the XY datum, with projector and datum lines."
+    },
+    {
+      "name": "quadrant-I",
+      "status": "PASS",
+      "elapsedMs": 8745,
+      "commands": [
+        "/datum -40 60",
+        "/point a' 10 20 elevation",
+        "/point a 10 -30 plan",
+        "/point a0 10 0 both",
+        "/line a' a B both",
+        "/dimension a0 a' B elevation",
+        "/dimension a0 a B plan"
+      ],
+      "reply": "Plotted point A in first-angle Monge projection with elevation a' at (10, 20) and plan a at (10, -30), connected by a vertical projector crossing the XY ground line."
+    },
+    {
+      "name": "quadrant-II",
+      "status": "PASS",
+      "elapsedMs": 13241,
+      "commands": [
+        "/datum -40 60",
+        "/point X -40 0 both",
+        "/point Y 60 0 both",
+        "/line X Y A both",
+        "/point a0 10 0 both",
+        "/point a' 10 20 elevation",
+        "/point a 10 30 plan",
+        "/line a0 a' B both",
+        "/line a' a B both",
+        "/text -38 3 X",
+        "/text 55 3 Y",
+        "/text 13 20 a'",
+        "/text 13 30 a"
+      ],
+      "reply": "Point A (depth = -30 mm, height = +20 mm) is plotted in Monge projection: elevation a' is at (10, 20) and plan a is at (10, 30), both situated above the XY ground line due to being in the second quadrant."
+    },
+    {
+      "name": "quadrant-IV",
+      "status": "PASS",
+      "elapsedMs": 10530,
+      "commands": [
+        "/point xL -40 0 both",
+        "/point xR 40 0 both",
+        "/line xL xR A both",
+        "/text -45 2 X",
+        "/text 42 2 Y",
+        "/point a0 10 0 both",
+        "/point a' 10 -20 elevation",
+        "/point a 10 -30 plan",
+        "/line a0 a' B elevation",
+        "/line a' a B plan",
+        "/text 13 -20 a'",
+        "/text 13 -30 a"
+      ],
+      "reply": "Constructed Monge projections of point A at x=10 mm with plan a at (10, -30) and elevation a' at (10, -20), showing the projector from the XY reference line."
+    },
+    {
+      "name": "on-HP",
+      "status": "PASS",
+      "elapsedMs": 6003,
+      "commands": [
+        "/point X -40 0 both",
+        "/point Y 60 0 both",
+        "/line X Y A both",
+        "/point a' 10 0 elevation",
+        "/point a 10 -30 plan",
+        "/line a' a B both",
+        "/text -40 3 X",
+        "/text 55 3 Y",
+        "/text 12 3 a'",
+        "/text 12 -32 a"
+      ],
+      "reply": "Point A (x=10, depth=30, height=0) is projected into first-angle Monge projection: elevation a' lies on the XY datum line at (10, 0), and plan a lies at (10, -30)."
+    },
+    {
+      "name": "on-VP",
+      "status": "PASS",
+      "elapsedMs": 7848,
+      "commands": [
+        "/datum -30 50",
+        "/point a 10 0 plan",
+        "/point a' 10 20 elevation",
+        "/line a a' B both"
+      ],
+      "reply": "Monge projections of point A constructed with plan a on the XY reference line (depth = 0 mm) and elevation a' at height = 20 mm."
+    },
+    {
+      "name": "tilted-square",
+      "status": "PASS",
+      "elapsedMs": 18220,
+      "commands": [
+        "/datum -20 60",
+        "/point a 0 -10 plan",
+        "/point b 40 -10 plan",
+        "/point c 40 -38.28 plan",
+        "/point d 0 -38.28 plan",
+        "/polygon a b c d",
+        "/point a' 0 10 elevation",
+        "/point b' 40 10 elevation",
+        "/point c' 40 38.28 elevation",
+        "/point d' 0 38.28 elevation",
+        "/polygon a' b' c' d'",
+        "/line d d' B",
+        "/line c c' B",
+        "/text -18 3 X",
+        "/text 55 3 Y",
+        "/dimension a b B plan",
+        "/dimension d a B plan",
+        "/dimension b' c' B elevation"
+      ],
+      "reply": "Square lamina ABCD tilted 45° to HP about AB. Both the plan and elevation project as rectangles of dimensions 40 mm × 28.28 mm (40·cos 45°)."
+    },
+    {
+      "name": "line-inclinations",
+      "status": "FAIL",
+      "elapsedMs": 16264,
+      "error": "The drawing needs 1–128 commands.\n\nfalse !== true\n",
+      "commands": [],
+      "reply": "The model gave an unusable drawing plan — no steps were applied. Try again with concrete dimensions."
+    },
+    {
+      "name": "complete-cube",
+      "status": "PASS",
+      "elapsedMs": 20540,
+      "commands": [
+        "/point X -20 0 both",
+        "/point Y 50 0 both",
+        "/line X Y B both",
+        "/point a 0 -10 plan",
+        "/point b 30 -10 plan",
+        "/point c 30 -40 plan",
+        "/point d 0 -40 plan",
+        "/point e 0 -10 plan",
+        "/point f 30 -10 plan",
+        "/point g 30 -40 plan",
+        "/point h 0 -40 plan",
+        "/point a' 0 10 elevation",
+        "/point b' 30 10 elevation",
+        "/point c' 30 10 elevation",
+        "/point d' 0 10 elevation",
+        "/point e' 0 40 elevation",
+        "/point f' 30 40 elevation",
+        "/point g' 30 40 elevation",
+        "/point h' 0 40 elevation",
+        "/line a a' B both",
+        "/line b b' B both",
+        "/line c c' B both",
+        "/line d d' B both",
+        "/line e e' B both",
+        "/line f f' B both",
+        "/line g g' B both",
+        "/line h h' B both",
+        "/line a b E plan",
+        "/line b c E plan",
+        "/line c d E plan",
+        "/line d a E plan",
+        "/line e f B plan",
+        "/line f g B plan",
+        "/line g h B plan",
+        "/line h e B plan",
+        "/line a' b' B elevation",
+        "/line c' d' E elevation",
+        "/line e' f' B elevation",
+        "/line g' h' E elevation",
+        "/line a' e' B elevation",
+        "/line b' f' B elevation",
+        "/line c' g' E elevation",
+        "/line d' h' E elevation"
+      ],
+      "reply": "Front and top views of the cube drawn with all named vertices, non-zero projected edges (using style E for hidden edges), reference line XY, and 8 vertical projectors."
+    },
+    {
+      "name": "cylinder",
+      "status": "PASS",
+      "elapsedMs": 6533,
+      "commands": [
+        "/point x1 -50 0 both",
+        "/point x2 50 0 both",
+        "/line x1 x2 B both",
+        "/text -48 3 X",
+        "/text 44 3 Y",
+        "/point a' -15 10 elevation",
+        "/point b' 15 10 elevation",
+        "/point c' 15 60 elevation",
+        "/point d' -15 60 elevation",
+        "/line a' b' A elevation",
+        "/line b' c' A elevation",
+        "/line c' d' A elevation",
+        "/line d' a' A elevation",
+        "/point e1' 0 5 elevation",
+        "/point e2' 0 65 elevation",
+        "/line e1' e2' G elevation",
+        "/point o 0 -40 plan",
+        "/circle o 15 A plan",
+        "/point c1 -22 -40 plan",
+        "/point c2 22 -40 plan",
+        "/line c1 c2 G plan",
+        "/point c3 0 -62 plan",
+        "/point c4 0 -18 plan",
+        "/line c3 c4 G plan"
+      ],
+      "reply": "Drawn the first-angle projections of the cylinder: a 30 mm diameter circle in plan centered at (0, -40) and a 30 mm x 50 mm rectangle in elevation between y = 10 mm and y = 60 mm, complete with XY reference line and centerlines."
+    },
+    {
+      "name": "cone",
+      "status": "PASS",
+      "elapsedMs": 5424,
+      "commands": [
+        "/point x1 -50 0 both",
+        "/point x2 50 0 both",
+        "/line x1 x2 A both",
+        "/text -48 2 X",
+        "/text 44 2 Y",
+        "/point b1' -15 10 elevation",
+        "/point b2' 15 10 elevation",
+        "/point v' 0 60 elevation",
+        "/line b1' b2' A elevation",
+        "/line b1' v' A elevation",
+        "/line b2' v' A elevation",
+        "/point ce1 0 5 elevation",
+        "/point ce2 0 65 elevation",
+        "/line ce1 ce2 G elevation",
+        "/point v 0 -40 plan",
+        "/circle v 15 A plan",
+        "/point ch1 -22 -40 plan",
+        "/point ch2 22 -40 plan",
+        "/line ch1 ch2 G plan",
+        "/point cv1 0 -62 plan",
+        "/point cv2 0 -18 plan",
+        "/line cv1 cv2 G plan"
+      ],
+      "reply": "Drawn the first-angle projections of the cone: a triangular elevation resting 10 mm above HP with apex at height 60 mm, a circular plan of diameter 30 mm centered at depth 40 mm, together with the XY reference line and centerlines."
+    },
+    {
+      "name": "plate-holes",
+      "status": "PASS",
+      "elapsedMs": 3081,
+      "commands": [
+        "/point a' -60 10 elevation",
+        "/point b' 60 10 elevation",
+        "/point c' 60 30 elevation",
+        "/point d' -60 30 elevation",
+        "/line a' b' A elevation",
+        "/line b' c' A elevation",
+        "/line c' d' A elevation",
+        "/line d' a' A elevation",
+        "/point o1' -30 20 elevation",
+        "/circle o1' 5 A elevation",
+        "/point o2' 30 20 elevation",
+        "/circle o2' 5 A elevation",
+        "/point cl1' -38 20 elevation",
+        "/point cl2' -22 20 elevation",
+        "/line cl1' cl2' G elevation",
+        "/point cl3' -30 12 elevation",
+        "/point cl4' -30 28 elevation",
+        "/line cl3' cl4' G elevation",
+        "/point cr1' 22 20 elevation",
+        "/point cr2' 38 20 elevation",
+        "/line cr1' cr2' G elevation",
+        "/point cr3' 30 12 elevation",
+        "/point cr4' 30 28 elevation",
+        "/line cr3' cr4' G elevation",
+        "/dimension a' b' B elevation"
+      ],
+      "reply": "Elevation of the rectangular plate with two 10 mm diameter holes and plate width dimensioned."
+    },
+    {
+      "name": "vague-refusal",
+      "status": "PASS",
+      "elapsedMs": 1143,
+      "commands": [],
+      "reply": "Please provide the engineering drawing question or problem statement, including the object's dimensions and required views, so I can generate the correct model answer."
+    },
+    {
+      "name": "impossible-refusal",
+      "status": "PASS",
+      "elapsedMs": 1441,
+      "commands": [],
+      "reply": "A triangle with sides of 10 mm, 20 mm, and 100 mm cannot be drawn because it violates the triangle inequality theorem (10 + 20 < 100). The sum of any two sides must be strictly greater than the third side."
+    },
+    {
+      "name": "reuse-context",
+      "status": "PASS",
+      "elapsedMs": 2071,
+      "commands": [
+        "/circle a 50"
+      ],
+      "reply": "Drawn a circle of radius 50 mm centered at a and passing through b."
+    },
+    {
+      "name": "unicode",
+      "status": "PASS",
+      "elapsedMs": 3113,
+      "commands": [
+        "/point c 0 20",
+        "/circle c 10 A",
+        "/point cl -14 20",
+        "/point cr 14 20",
+        "/line cl cr G",
+        "/point cb 0 6",
+        "/point ct 0 34",
+        "/line cb ct G",
+        "/text 14 24 Ø20 — diamètre"
+      ],
+      "reply": "Drawn a 20 mm diameter circle centered at (0, 20) with centerlines and the requested annotation."
+    }
+  ]
+}

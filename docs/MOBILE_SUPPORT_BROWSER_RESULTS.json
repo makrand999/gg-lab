@@ -1,0 +1,1596 @@
+{
+  "date": "2026-10-07",
+  "environment": "T3 collaborative Chromium preview",
+  "method": "Touch-only capability simulation plus synthetic PointerEvents; physical-device and Safari validation still pending.",
+  "layout": "Plain text actions over canvas edges, 8px divider with invisible 44px drag area, two-row Pose dock with secondary options in More.",
+  "scenarios": [
+    {
+      "scenario": "desktopResults",
+      "discovery": {
+        "coarse": false,
+        "entryMode": "edit",
+        "fine": true,
+        "mobileModule": true,
+        "touchPoints": 0,
+        "viewport": {
+          "h": 800,
+          "w": 1280
+        }
+      },
+      "errors": [],
+      "failed": 0,
+      "passed": 8,
+      "results": [
+        {
+          "evidence": {
+            "inspection": false,
+            "mode": "edit",
+            "split": false
+          },
+          "name": "sheet usable at this viewport",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "mode": "edit"
+          },
+          "name": "desktop unaffected: wide viewport keeps one pane and edit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; narrow-desktop check needs it (narrow the viewport or use a touch-only device).",
+          "name": "narrow desktop: split layout but edit stays",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "inspectId": null
+          },
+          "name": "foundation: view tap preserves the table",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "counts": {
+              "redo": 0,
+              "undo": 35
+            },
+            "gestureCancelled": true
+          },
+          "name": "foundation: pose gesture and Escape preserve table and history",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "restored": true
+          },
+          "name": "foundation: exiting pose restores the sheet exactly",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clearanceMm": 0,
+            "limited": true
+          },
+          "name": "foundation: huge pose drag engages the datum clamp",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "gated": true
+          },
+          "name": "foundation: view stays read-only to commands",
+          "status": "PASS"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); entry mode needs a touch-only device.",
+          "name": "mobile entry: boots into view",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); authoring bar needs a touch-only device.",
+          "name": "mobile: edit refused centrally, inputs barred",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); drawing loads needs a touch-only device.",
+          "name": "mobile: drawing loads land in view, authoring stays barred",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; menu needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile menu: opens, bars tutorials and clear, loads demos",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; portrait layout needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile portrait: 3D top, 2D below, no page scroll",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; landscape layout needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile landscape: panes side by side",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; sheet semantics needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile 2D pane preserves XY, front, plan, and projectors",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; split interaction needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile split: divider drags, keyboard steps, expands and returns",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; chrome needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile chrome: 44px header, sheet toggles, touch-action locked",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; 2D touch needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile 2D touch: pan, pinch, tap inspect",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; chooser needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile 2D touch: close pair opens the chooser",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; 3D touch needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile 3D touch: orbit, two-finger pan/pinch, tap picks",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; gesture ownership needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile gestures: pane ownership, cancel recovery, drag never taps",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; pose dock needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile pose dock: 44px controls, op and axis switching",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; pose sliders needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile pose: sliders transform, snap grids, clamp holds, reset restores",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; pose gestures needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile pose: gestures orbit the camera, never the model",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "split layout inactive at 1280x800; dynamic pose layout needs it (narrow the viewport or use a touch-only device).",
+          "name": "mobile pose: options preserve canvas space and Fit frames both views",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); loading from Pose needs a touch-only device.",
+          "name": "mobile: loading another drawing exits Pose safely",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); empty model needs a touch-only device.",
+          "name": "mobile empty model: pose refused safely, taps stay safe",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "errors": 0,
+            "viewport": {
+              "h": 800,
+              "w": 1280
+            }
+          },
+          "name": "robustness: no window errors, split chrome inside viewport",
+          "status": "PASS"
+        }
+      ],
+      "skipped": 20
+    },
+    {
+      "scenario": "narrowResults",
+      "discovery": {
+        "coarse": false,
+        "entryMode": "edit",
+        "fine": true,
+        "mobileModule": true,
+        "touchPoints": 0,
+        "viewport": {
+          "h": 844,
+          "w": 390
+        }
+      },
+      "errors": [],
+      "failed": 0,
+      "passed": 21,
+      "results": [
+        {
+          "evidence": {
+            "inspection": false,
+            "mode": "edit",
+            "split": true
+          },
+          "name": "sheet usable at this viewport",
+          "status": "PASS"
+        },
+        {
+          "evidence": "split active; wide-desktop check needs >=920px width and a 640px min dimension.",
+          "name": "desktop unaffected: wide viewport keeps one pane and edit",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "editableSplit": true
+          },
+          "name": "narrow desktop: split layout but edit stays",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": null
+          },
+          "name": "foundation: view tap preserves the table",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "counts": {
+              "redo": 0,
+              "undo": 5
+            },
+            "gestureCancelled": true
+          },
+          "name": "foundation: pose gesture and Escape preserve table and history",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "restored": true
+          },
+          "name": "foundation: exiting pose restores the sheet exactly",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clearanceMm": 0,
+            "limited": true
+          },
+          "name": "foundation: huge pose drag engages the datum clamp",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "gated": true
+          },
+          "name": "foundation: view stays read-only to commands",
+          "status": "PASS"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); entry mode needs a touch-only device.",
+          "name": "mobile entry: boots into view",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); authoring bar needs a touch-only device.",
+          "name": "mobile: edit refused centrally, inputs barred",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); drawing loads needs a touch-only device.",
+          "name": "mobile: drawing loads land in view, authoring stays barred",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "loaded": 12,
+            "sections": 6
+          },
+          "name": "mobile menu: opens, bars tutorials and clear, loads demos",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "ratio3d": 0.514218009478673,
+            "splitY": 487
+          },
+          "name": "mobile portrait: 3D top, 2D below, no page scroll",
+          "status": "PASS"
+        },
+        {
+          "evidence": "needs a landscape viewport; re-run at e.g. 844x390 (now 390x844).",
+          "name": "mobile landscape: panes side by side",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "frontY": 92.66400000000002,
+            "planY": 201.864,
+            "xyY": 147.264
+          },
+          "name": "mobile 2D pane preserves XY, front, plan, and projectors",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "splitMoved": 60,
+            "stepped": 37
+          },
+          "name": "mobile split: divider drags, keyboard steps, expands and returns",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "compactPaneBar": [
+              "Fit=44x44",
+              "Expand=57x44",
+              "Fit=44x44",
+              "Expand=57x44"
+            ],
+            "dividerPx": [
+              390,
+              8
+            ],
+            "sheetDeltaH": 134
+          },
+          "name": "mobile chrome: 44px header, sheet toggles, touch-action locked",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "E163"
+          },
+          "name": "mobile 2D touch: pan, pinch, tap inspect",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "E164",
+            "options": 2
+          },
+          "name": "mobile 2D touch: close pair opens the chooser",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile 3D touch: orbit, two-finger pan/pinch, tap picks",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "ownership": true
+          },
+          "name": "mobile gestures: pane ownership, cancel recovery, drag never taps",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "dock44": true
+          },
+          "name": "mobile pose dock: 44px controls, op and axis switching",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clamped": true,
+            "sliders": true,
+            "snapped": true
+          },
+          "name": "mobile pose: sliders transform, snap grids, clamp holds, reset restores",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile pose: gestures orbit the camera, never the model",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "fit": true,
+            "glassH": 352,
+            "sheetH": 305
+          },
+          "name": "mobile pose: options preserve canvas space and Fit frames both views",
+          "status": "PASS"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); loading from Pose needs a touch-only device.",
+          "name": "mobile: loading another drawing exits Pose safely",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection-only verdict off (no coarse pointer); empty model needs a touch-only device.",
+          "name": "mobile empty model: pose refused safely, taps stay safe",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "errors": 0,
+            "panesInside": true,
+            "viewport": {
+              "h": 844,
+              "w": 390
+            }
+          },
+          "name": "robustness: no window errors, split chrome inside viewport",
+          "status": "PASS"
+        }
+      ],
+      "skipped": 7
+    },
+    {
+      "scenario": "phonePortraitResults",
+      "discovery": {
+        "coarse": true,
+        "entryMode": "view",
+        "fine": false,
+        "mobileModule": true,
+        "touchPoints": 5,
+        "viewport": {
+          "h": 844,
+          "w": 390
+        }
+      },
+      "errors": [],
+      "failed": 0,
+      "passed": 25,
+      "results": [
+        {
+          "evidence": {
+            "inspection": true,
+            "mode": "view",
+            "split": true
+          },
+          "name": "sheet usable at this viewport",
+          "status": "PASS"
+        },
+        {
+          "evidence": "split active; wide-desktop check needs >=920px width and a 640px min dimension.",
+          "name": "desktop unaffected: wide viewport keeps one pane and edit",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection verdict on; narrow-desktop check needs a fine pointer.",
+          "name": "narrow desktop: split layout but edit stays",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "inspectId": null
+          },
+          "name": "foundation: view tap preserves the table",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "counts": {
+              "redo": 0,
+              "undo": 6
+            },
+            "gestureCancelled": true
+          },
+          "name": "foundation: pose gesture and Escape preserve table and history",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "restored": true
+          },
+          "name": "foundation: exiting pose restores the sheet exactly",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clearanceMm": 0,
+            "limited": true
+          },
+          "name": "foundation: huge pose drag engages the datum clamp",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "gated": true
+          },
+          "name": "foundation: view stays read-only to commands",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "entryMode": "view"
+          },
+          "name": "mobile entry: boots into view",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "demoLandsInView": true,
+            "editRefused": true
+          },
+          "name": "mobile: edit refused centrally, inputs barred",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "loaded": 2,
+            "mode": "view"
+          },
+          "name": "mobile: drawing loads land in view, authoring stays barred",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "loaded": 12,
+            "sections": 6
+          },
+          "name": "mobile menu: opens, bars tutorials and clear, loads demos",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "ratio3d": 0.514218009478673,
+            "splitY": 487
+          },
+          "name": "mobile portrait: 3D top, 2D below, no page scroll",
+          "status": "PASS"
+        },
+        {
+          "evidence": "needs a landscape viewport; re-run at e.g. 844x390 (now 390x844).",
+          "name": "mobile landscape: panes side by side",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "frontY": 46.8,
+            "planY": 265.2,
+            "xyY": 156
+          },
+          "name": "mobile 2D pane preserves XY, front, plan, and projectors",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "splitMoved": 60,
+            "stepped": 37
+          },
+          "name": "mobile split: divider drags, keyboard steps, expands and returns",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "compactPaneBar": [
+              "Fit=44x44",
+              "Expand=57x44",
+              "Fit=44x44",
+              "Expand=57x44"
+            ],
+            "dividerPx": [
+              390,
+              8
+            ],
+            "sheetDeltaH": 134
+          },
+          "name": "mobile chrome: 44px header, sheet toggles, touch-action locked",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "s0"
+          },
+          "name": "mobile 2D touch: pan, pinch, tap inspect",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "s0",
+            "options": 2
+          },
+          "name": "mobile 2D touch: close pair opens the chooser",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile 3D touch: orbit, two-finger pan/pinch, tap picks",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "ownership": true
+          },
+          "name": "mobile gestures: pane ownership, cancel recovery, drag never taps",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "dock44": true
+          },
+          "name": "mobile pose dock: 44px controls, op and axis switching",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clamped": true,
+            "sliders": true,
+            "snapped": true
+          },
+          "name": "mobile pose: sliders transform, snap grids, clamp holds, reset restores",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile pose: gestures orbit the camera, never the model",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "fit": true,
+            "glassH": 352,
+            "sheetH": 305
+          },
+          "name": "mobile pose: options preserve canvas space and Fit frames both views",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "demoAndSavedLoad": true
+          },
+          "name": "mobile: loading another drawing exits Pose safely",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "emptySafe": true
+          },
+          "name": "mobile empty model: pose refused safely, taps stay safe",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "errors": 0,
+            "panesInside": true,
+            "viewport": {
+              "h": 844,
+              "w": 390
+            }
+          },
+          "name": "robustness: no window errors, split chrome inside viewport",
+          "status": "PASS"
+        }
+      ],
+      "skipped": 3
+    },
+    {
+      "scenario": "phoneLandscapeResults",
+      "discovery": {
+        "coarse": true,
+        "entryMode": "view",
+        "fine": false,
+        "mobileModule": true,
+        "touchPoints": 5,
+        "viewport": {
+          "h": 390,
+          "w": 844
+        }
+      },
+      "errors": [],
+      "failed": 0,
+      "passed": 25,
+      "results": [
+        {
+          "evidence": {
+            "inspection": true,
+            "mode": "view",
+            "split": true
+          },
+          "name": "sheet usable at this viewport",
+          "status": "PASS"
+        },
+        {
+          "evidence": "split active; wide-desktop check needs >=920px width and a 640px min dimension.",
+          "name": "desktop unaffected: wide viewport keeps one pane and edit",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection verdict on; narrow-desktop check needs a fine pointer.",
+          "name": "narrow desktop: split layout but edit stays",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "inspectId": null
+          },
+          "name": "foundation: view tap preserves the table",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "counts": {
+              "redo": 0,
+              "undo": 49
+            },
+            "gestureCancelled": true
+          },
+          "name": "foundation: pose gesture and Escape preserve table and history",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "restored": true
+          },
+          "name": "foundation: exiting pose restores the sheet exactly",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clearanceMm": 0,
+            "limited": true
+          },
+          "name": "foundation: huge pose drag engages the datum clamp",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "gated": true
+          },
+          "name": "foundation: view stays read-only to commands",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "entryMode": "view"
+          },
+          "name": "mobile entry: boots into view",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "demoLandsInView": true,
+            "editRefused": true
+          },
+          "name": "mobile: edit refused centrally, inputs barred",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "loaded": 2,
+            "mode": "view"
+          },
+          "name": "mobile: drawing loads land in view, authoring stays barred",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "loaded": 12,
+            "sections": 6
+          },
+          "name": "mobile menu: opens, bars tutorials and clear, loads demos",
+          "status": "PASS"
+        },
+        {
+          "evidence": "needs a portrait viewport; re-run at e.g. 390x844 (now 844x390).",
+          "name": "mobile portrait: 3D top, 2D below, no page scroll",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "splitX": 429
+          },
+          "name": "mobile landscape: panes side by side",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "frontY": 45,
+            "planY": 255,
+            "xyY": 150
+          },
+          "name": "mobile 2D pane preserves XY, front, plan, and projectors",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "splitMoved": 60,
+            "stepped": 42
+          },
+          "name": "mobile split: divider drags, keyboard steps, expands and returns",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "compactPaneBar": [
+              "Fit=44x44",
+              "Expand=57x44",
+              "Fit=44x44",
+              "Expand=57x44"
+            ],
+            "dividerPx": [
+              8,
+              300
+            ],
+            "sheetDeltaH": 134
+          },
+          "name": "mobile chrome: 44px header, sheet toggles, touch-action locked",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "s0"
+          },
+          "name": "mobile 2D touch: pan, pinch, tap inspect",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "s0",
+            "options": 2
+          },
+          "name": "mobile 2D touch: close pair opens the chooser",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile 3D touch: orbit, two-finger pan/pinch, tap picks",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "ownership": true
+          },
+          "name": "mobile gestures: pane ownership, cancel recovery, drag never taps",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "dock44": true
+          },
+          "name": "mobile pose dock: 44px controls, op and axis switching",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clamped": true,
+            "sliders": true,
+            "snapped": true
+          },
+          "name": "mobile pose: sliders transform, snap grids, clamp holds, reset restores",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile pose: gestures orbit the camera, never the model",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "fit": true,
+            "glassH": 211,
+            "sheetH": 211
+          },
+          "name": "mobile pose: options preserve canvas space and Fit frames both views",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "demoAndSavedLoad": true
+          },
+          "name": "mobile: loading another drawing exits Pose safely",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "emptySafe": true
+          },
+          "name": "mobile empty model: pose refused safely, taps stay safe",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "errors": 0,
+            "panesInside": true,
+            "viewport": {
+              "h": 390,
+              "w": 844
+            }
+          },
+          "name": "robustness: no window errors, split chrome inside viewport",
+          "status": "PASS"
+        }
+      ],
+      "skipped": 3
+    },
+    {
+      "scenario": "shortPhoneResults",
+      "discovery": {
+        "coarse": true,
+        "entryMode": "view",
+        "fine": false,
+        "mobileModule": true,
+        "touchPoints": 5,
+        "viewport": {
+          "h": 568,
+          "w": 320
+        }
+      },
+      "errors": [],
+      "failed": 0,
+      "passed": 25,
+      "results": [
+        {
+          "evidence": {
+            "inspection": true,
+            "mode": "view",
+            "split": true
+          },
+          "name": "sheet usable at this viewport",
+          "status": "PASS"
+        },
+        {
+          "evidence": "split active; wide-desktop check needs >=920px width and a 640px min dimension.",
+          "name": "desktop unaffected: wide viewport keeps one pane and edit",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection verdict on; narrow-desktop check needs a fine pointer.",
+          "name": "narrow desktop: split layout but edit stays",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "inspectId": null
+          },
+          "name": "foundation: view tap preserves the table",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "counts": {
+              "redo": 0,
+              "undo": 50
+            },
+            "gestureCancelled": true
+          },
+          "name": "foundation: pose gesture and Escape preserve table and history",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "restored": true
+          },
+          "name": "foundation: exiting pose restores the sheet exactly",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clearanceMm": 0,
+            "limited": true
+          },
+          "name": "foundation: huge pose drag engages the datum clamp",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "gated": true
+          },
+          "name": "foundation: view stays read-only to commands",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "entryMode": "view"
+          },
+          "name": "mobile entry: boots into view",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "demoLandsInView": true,
+            "editRefused": true
+          },
+          "name": "mobile: edit refused centrally, inputs barred",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "loaded": 2,
+            "mode": "view"
+          },
+          "name": "mobile: drawing loads land in view, authoring stays barred",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "loaded": 12,
+            "sections": 6
+          },
+          "name": "mobile menu: opens, bars tutorials and clear, loads demos",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "ratio3d": 0.4454225352112676,
+            "splitY": 306
+          },
+          "name": "mobile portrait: 3D top, 2D below, no page scroll",
+          "status": "PASS"
+        },
+        {
+          "evidence": "needs a landscape viewport; re-run at e.g. 844x390 (now 320x568).",
+          "name": "mobile landscape: panes side by side",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "frontY": 32.55,
+            "planY": 184.45,
+            "xyY": 108.5
+          },
+          "name": "mobile 2D pane preserves XY, front, plan, and projectors",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "splitMoved": 60,
+            "stepped": 24
+          },
+          "name": "mobile split: divider drags, keyboard steps, expands and returns",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "compactPaneBar": [
+              "Fit=44x44",
+              "Expand=57x44",
+              "Fit=44x44",
+              "Expand=57x44"
+            ],
+            "dividerPx": [
+              320,
+              8
+            ],
+            "sheetDeltaH": 152
+          },
+          "name": "mobile chrome: 44px header, sheet toggles, touch-action locked",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "s0"
+          },
+          "name": "mobile 2D touch: pan, pinch, tap inspect",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "s1",
+            "options": 2
+          },
+          "name": "mobile 2D touch: close pair opens the chooser",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile 3D touch: orbit, two-finger pan/pinch, tap picks",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "ownership": true
+          },
+          "name": "mobile gestures: pane ownership, cancel recovery, drag never taps",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "dock44": true
+          },
+          "name": "mobile pose dock: 44px controls, op and axis switching",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clamped": true,
+            "sliders": true,
+            "snapped": true
+          },
+          "name": "mobile pose: sliders transform, snap grids, clamp holds, reset restores",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile pose: gestures orbit the camera, never the model",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "fit": true,
+            "glassH": 224,
+            "sheetH": 157
+          },
+          "name": "mobile pose: options preserve canvas space and Fit frames both views",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "demoAndSavedLoad": true
+          },
+          "name": "mobile: loading another drawing exits Pose safely",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "emptySafe": true
+          },
+          "name": "mobile empty model: pose refused safely, taps stay safe",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "errors": 0,
+            "panesInside": true,
+            "viewport": {
+              "h": 568,
+              "w": 320
+            }
+          },
+          "name": "robustness: no window errors, split chrome inside viewport",
+          "status": "PASS"
+        }
+      ],
+      "skipped": 3
+    },
+    {
+      "scenario": "tabletResults",
+      "discovery": {
+        "coarse": true,
+        "entryMode": "view",
+        "fine": false,
+        "mobileModule": true,
+        "touchPoints": 5,
+        "viewport": {
+          "h": 768,
+          "w": 1024
+        }
+      },
+      "errors": [],
+      "failed": 0,
+      "passed": 25,
+      "results": [
+        {
+          "evidence": {
+            "inspection": true,
+            "mode": "view",
+            "split": true
+          },
+          "name": "sheet usable at this viewport",
+          "status": "PASS"
+        },
+        {
+          "evidence": "split active; wide-desktop check needs >=920px width and a 640px min dimension.",
+          "name": "desktop unaffected: wide viewport keeps one pane and edit",
+          "status": "SKIP"
+        },
+        {
+          "evidence": "inspection verdict on; narrow-desktop check needs a fine pointer.",
+          "name": "narrow desktop: split layout but edit stays",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "inspectId": null
+          },
+          "name": "foundation: view tap preserves the table",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "counts": {
+              "redo": 0,
+              "undo": 50
+            },
+            "gestureCancelled": true
+          },
+          "name": "foundation: pose gesture and Escape preserve table and history",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "restored": true
+          },
+          "name": "foundation: exiting pose restores the sheet exactly",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clearanceMm": 0,
+            "limited": true
+          },
+          "name": "foundation: huge pose drag engages the datum clamp",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "gated": true
+          },
+          "name": "foundation: view stays read-only to commands",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "entryMode": "view"
+          },
+          "name": "mobile entry: boots into view",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "demoLandsInView": true,
+            "editRefused": true
+          },
+          "name": "mobile: edit refused centrally, inputs barred",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "loaded": 2,
+            "mode": "view"
+          },
+          "name": "mobile: drawing loads land in view, authoring stays barred",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "loaded": 12,
+            "sections": 6
+          },
+          "name": "mobile menu: opens, bars tutorials and clear, loads demos",
+          "status": "PASS"
+        },
+        {
+          "evidence": "needs a portrait viewport; re-run at e.g. 390x844 (now 1024x768).",
+          "name": "mobile portrait: 3D top, 2D below, no page scroll",
+          "status": "SKIP"
+        },
+        {
+          "evidence": {
+            "splitX": 534
+          },
+          "name": "mobile landscape: panes side by side",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "frontY": 97.75,
+            "planY": 580.25,
+            "xyY": 339
+          },
+          "name": "mobile 2D pane preserves XY, front, plan, and projectors",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "splitMoved": 60,
+            "stepped": 51
+          },
+          "name": "mobile split: divider drags, keyboard steps, expands and returns",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "compactPaneBar": [
+              "Fit=44x44",
+              "Expand=57x44",
+              "Fit=44x44",
+              "Expand=57x44"
+            ],
+            "dividerPx": [
+              8,
+              678
+            ],
+            "sheetDeltaH": 134
+          },
+          "name": "mobile chrome: 44px header, sheet toggles, touch-action locked",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "s0"
+          },
+          "name": "mobile 2D touch: pan, pinch, tap inspect",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "inspectId": "s1",
+            "options": 2
+          },
+          "name": "mobile 2D touch: close pair opens the chooser",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile 3D touch: orbit, two-finger pan/pinch, tap picks",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "ownership": true
+          },
+          "name": "mobile gestures: pane ownership, cancel recovery, drag never taps",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "dock44": true
+          },
+          "name": "mobile pose dock: 44px controls, op and axis switching",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "clamped": true,
+            "sliders": true,
+            "snapped": true
+          },
+          "name": "mobile pose: sliders transform, snap grids, clamp holds, reset restores",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "orbited": true
+          },
+          "name": "mobile pose: gestures orbit the camera, never the model",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "fit": true,
+            "glassH": 589,
+            "sheetH": 589
+          },
+          "name": "mobile pose: options preserve canvas space and Fit frames both views",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "demoAndSavedLoad": true
+          },
+          "name": "mobile: loading another drawing exits Pose safely",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "emptySafe": true
+          },
+          "name": "mobile empty model: pose refused safely, taps stay safe",
+          "status": "PASS"
+        },
+        {
+          "evidence": {
+            "errors": 0,
+            "panesInside": true,
+            "viewport": {
+              "h": 768,
+              "w": 1024
+            }
+          },
+          "name": "robustness: no window errors, split chrome inside viewport",
+          "status": "PASS"
+        }
+      ],
+      "skipped": 3
+    }
+  ],
+  "desktopDrawingAudit": {
+    "failed": 0,
+    "passed": 28,
+    "results": [
+      {
+        "evidence": {
+          "afterRedo": 3,
+          "afterUndo": 0,
+          "drawn": 3
+        },
+        "name": "Smoke: drawing a line and undo/redo is one gesture",
+        "status": "PASS"
+      },
+      {
+        "name": "F06 valid endpoint swap is accepted",
+        "status": "PASS"
+      },
+      {
+        "name": "F06 circle can translate onto its old rim position",
+        "status": "PASS"
+      },
+      {
+        "name": "F03 editing a command line moves its referenced endpoints",
+        "status": "PASS"
+      },
+      {
+        "name": "F07 disabled side view cannot be picked in View mode",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "inspectId": "E165",
+          "tableUnchanged": true
+        },
+        "name": "Smoke: ordinary View click preserves the table",
+        "status": "PASS"
+      },
+      {
+        "name": "F02 Settings Clear Sheet cannot mutate View mode",
+        "status": "PASS"
+      },
+      {
+        "name": "F02 clearing in Pose cannot leave a stale solid",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "gestureCancelled": true,
+          "tableUnchanged": true
+        },
+        "name": "Smoke: Pose G/Y motion and Escape preserve stored geometry",
+        "status": "PASS"
+      },
+      {
+        "name": "F09 posed profile copies correspond to real projected edges",
+        "status": "PASS"
+      },
+      {
+        "name": "F01 cancelling a drag restores once without an exception",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "nextClickWorks": true,
+          "restored": true
+        },
+        "name": "F01 drag cancellation through Escape permits the next gesture",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "nextClickWorks": true,
+          "restored": true
+        },
+        "name": "F01 drag cancellation through pointercancel permits the next gesture",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "nextClickWorks": true,
+          "restored": true
+        },
+        "name": "F01 drag cancellation through tool permits the next gesture",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "nextClickWorks": true,
+          "restored": true
+        },
+        "name": "F01 drag cancellation through view permits the next gesture",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "nextClickWorks": true,
+          "restored": true
+        },
+        "name": "F01 drag cancellation through pose permits the next gesture",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "mode": "view",
+          "tableUnchanged": true
+        },
+        "name": "F02 mutation boundary blocks API bypasses in view",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "mode": "pose",
+          "tableUnchanged": true
+        },
+        "name": "F02 mutation boundary blocks API bypasses in pose",
+        "status": "PASS"
+      },
+      {
+        "name": "F02 entering Pose immediately after an edit captures current geometry",
+        "status": "PASS"
+      },
+      {
+        "name": "F02 invalid mode and invalid load preserve the active pose",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "mode": "edit",
+          "oldPoseRemoved": true
+        },
+        "name": "F02 explicit sheet replacement leaves Pose and removes old overlays",
+        "status": "PASS"
+      },
+      {
+        "name": "Smoke: confirmed rotation, translation, and scale preserve stored geometry",
+        "status": "PASS"
+      },
+      {
+        "name": "Smoke: Draw circle keeps linked geometry through edit and history",
+        "status": "PASS"
+      },
+      {
+        "name": "Smoke: Draw polyline keeps linked geometry through edit and history",
+        "status": "PASS"
+      },
+      {
+        "name": "Smoke: Draw dimension keeps linked geometry through edit and history",
+        "status": "PASS"
+      },
+      {
+        "name": "Smoke: Draw Projector pairs points that stay linked during editing",
+        "status": "PASS"
+      },
+      {
+        "name": "F07 hidden guides neither snap nor absorb newly drawn points",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "tracked": [
+            "orbit",
+            "pan",
+            "zoom",
+            "panOff"
+          ]
+        },
+        "name": "F11 datum occlusion tracks the 3D model across orbit, pan, and zoom",
+        "status": "PASS"
+      }
+    ]
+  },
+  "rotation": {
+    "cameraPreserved": true,
+    "centerPreserved": true,
+    "modePreserved": true,
+    "orientation": "mobile-inspect drafting-readonly mobile-layout mobile-landscape",
+    "posePreserved": true,
+    "tablePreserved": true
+  },
+  "canvasSpace": {
+    "pose": {
+      "canvasHeight": 657,
+      "fraction": 0.7784360189573459,
+      "screenHeight": 844
+    },
+    "touch": true,
+    "view": {
+      "canvasHeight": 746,
+      "fraction": 0.8838862559241706,
+      "screenHeight": 844
+    }
+  },
+  "portraitScreenshot": "/root/t3code/.t3/userdata/browser-artifacts/browser-screenshot-mitasia-in-muxkuvcc-ae3ee069.png"
+}

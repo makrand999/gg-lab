@@ -1,0 +1,105 @@
+/* Classroom sheets and the review board share the teacher studio. */
+.teacher-class-library { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.teacher-class-library .teacher-class-main { padding: 22px 21px 18px; }
+.teacher-class-library .teacher-class-diagram { margin-bottom: 18px; }
+.teacher-class-library .teacher-class-diagram > svg:first-child { height: 97px; }
+.teacher-class-library .teacher-class-main h3 { min-height: 47px; font-size: 17px; }
+.teacher-class-library .teacher-class-main p { font-size: 11px; }
+.teacher-class-library .teacher-class-code { padding-inline: 21px 12px; }
+.teacher-class-library .teacher-class-code code { font-size: 11px; }
+.teacher-class-result-count { margin: 14px 0 0; color: var(--muted); font: 9px var(--teacher-mono); }
+.teacher-class-hero h1 { overflow-wrap: anywhere; font-size: clamp(34px, 4vw, 56px); }
+.teacher-class-hero .teacher-overline a { color: var(--muted); text-decoration: none; }
+.teacher-class-hero .teacher-overline a:hover { color: var(--primary); }
+.teacher-class-share { display: flex; align-items: center; flex-wrap: wrap; gap: 15px; margin: -4px 0 10px; }
+.teacher-class-share > code { color: var(--primary); font: 12px var(--teacher-mono); overflow-wrap: anywhere; }
+.teacher-class-share .teacher-link { min-height: 44px; padding: 0; border: 0; background: transparent; font-size: 10px; }
+.teacher-class-actions { display: flex; align-items: center; gap: 19px; flex-wrap: wrap; }
+.teacher-class-remove { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 9px 0; border: 0; background: transparent; color: var(--danger); font-size: 10px; }
+.teacher-class-remove .icon { width: 16px; height: 16px; }
+.teacher-class-review-state { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 10px; }
+.teacher-class-review-state:not(:empty) { margin-bottom: 12px; }
+.teacher-class-review-state .teacher-link { padding: 0; border: 0; background: transparent; font-size: 10px; }
+.teacher-class-roster { margin-top: 30px; padding-top: 23px; border-top: 1px solid var(--studio-rule); }
+.teacher-class-roster .teacher-library-search { margin-bottom: 14px; }
+.teacher-member-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.teacher-member-sheet.item-row { display: flex; flex-direction: row; align-items: center; gap: 13px; min-width: 0; min-height: 78px; padding: 15px; border: 1px solid var(--studio-rule); border-radius: 0; background: color-mix(in srgb, var(--surface) 36%, var(--bg)); }
+.teacher-member-mark { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border: 1px solid var(--studio-rule); background: var(--bg); color: var(--primary); font: 10px var(--teacher-mono); }
+.teacher-member-sheet > div { min-width: 0; }
+.teacher-member-sheet h3 { margin: 0 0 4px; font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.teacher-member-sheet p { margin: 0; color: var(--muted); font: 9px var(--teacher-mono); overflow-wrap: anywhere; }
+.teacher-member-empty { margin-top: 15px; color: var(--muted); font-size: 12px; }
+.teacher-folio-index { max-width: 100%; overflow-wrap: anywhere; }
+.teacher-main-classes .page-heading h1 { font: 400 clamp(30px, 3.5vw, 48px)/1.1 Georgia, serif; letter-spacing: -1.4px; }
+.teacher-main-classes .page-heading p { font-size: 12px; }
+.teacher-main-classes .button { min-height: 44px; border-radius: 0; font-size: 12px; padding: 11px 14px; }
+.teacher-main-classes .card { border-radius: 0; border-color: var(--studio-rule); background: color-mix(in srgb, var(--surface) 40%, var(--bg)); box-shadow: none; }
+.teacher-main-classes .field > span { font-size: 14px; }
+.teacher-main-classes .field input, .teacher-main-classes .field select { border-radius: 0; font-size: 14px; }
+.teacher-main-classes .field small { font-size: 12px; }
+.teacher-review-totals { display: flex; align-items: stretch; gap: 26px; margin-top: 23px; }
+.teacher-review-totals > div { display: flex; align-items: baseline; gap: 10px; }
+.teacher-review-totals > div + div { border-left: 1px solid var(--studio-rule); padding-left: 26px; }
+.teacher-review-totals strong { color: var(--primary); font: 400 45px/1 Georgia, serif; letter-spacing: -1px; }
+.teacher-review-totals span { color: var(--muted); font: 9px var(--teacher-mono); }
+.teacher-review-board-status { display: flex; align-items: center; gap: 15px; color: var(--muted); font-size: 12px; }
+.teacher-review-board-status:not(:empty) { min-height: 75px; }
+.teacher-review-board-status .teacher-link { padding: 0; border: 0; background: transparent; }
+.teacher-review-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.teacher-review-sheet { min-width: 0; border: 1px solid var(--studio-rule); background: color-mix(in srgb, var(--surface) 40%, var(--bg)); }
+.teacher-review-sheet:hover { border-color: var(--primary); }
+.teacher-review-open { display: block; color: var(--text); text-decoration: none; }
+.teacher-review-preview-wrap { position: relative; margin: 11px; border: 1px solid #D8DDD7; background: #FAFCF8; }
+.teacher-review-preview { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; height: 169px; padding: 21px 11px 11px; overflow: hidden; background-image: linear-gradient(#D8E0D43B 1px, transparent 1px), linear-gradient(90deg, #D8E0D43B 1px, transparent 1px); background-size: 15px 15px; color: #657363; }
+.teacher-review-preview > svg:not(.icon) { width: 100%; height: 100%; }
+.teacher-review-preview > .icon { width: 28px; height: 28px; }
+.teacher-review-preview > span { font-size: 10px; }
+.teacher-review-sheet-number { position: absolute; left: 10px; top: 10px; color: #657363; font: 8px var(--teacher-mono); }
+.teacher-review-verdict { position: absolute; right: 8px; top: 8px; max-width: calc(100% - 53px); padding: 4px 7px; border: 1px solid #D8DDD7; background: #FAFCF8; color: #62675F; font: 8px var(--teacher-mono); }
+.teacher-review-verdict.pending { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 50%, transparent); background: var(--bg); }
+.teacher-review-verdict.good { color: #236440; border-color: #B6CEBC; background: #EDF7EE; }
+.teacher-review-verdict.bad { color: #9D3030; border-color: #DFBEB2; background: #FFF0EC; }
+.teacher-review-sheet-info { display: flex; align-items: center; gap: 11px; padding: 9px 16px 15px; }
+.teacher-review-sheet-info > div { flex: 1; min-width: 0; }
+.teacher-review-sheet-info h3 { margin: 0 0 4px; font-size: 14px; font-weight: 550; overflow-wrap: anywhere; }
+.teacher-review-sheet-info p { margin: 0 0 3px; font-size: 11px; overflow-wrap: anywhere; }
+.teacher-review-sheet-info div > span { display: block; color: var(--muted); font-size: 9px; overflow-wrap: anywhere; }
+.teacher-review-sheet-info > .icon { width: 17px; height: 17px; color: var(--primary); }
+.teacher-review-sheet-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding: 11px 16px; border-top: 1px solid var(--studio-rule); color: var(--muted); font: 8px var(--teacher-mono); }
+.teacher-preview-retry { margin: 0 16px; padding: 0; border: 0; background: transparent; font-size: 10px; }
+.teacher-review-feedback { padding: 11px 16px; border-top: 1px solid var(--studio-rule); color: var(--muted); font-size: 11px; }
+.teacher-review-feedback summary { min-height: 32px; cursor: pointer; }
+.teacher-review-feedback p { margin: 7px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.teacher-review-board + .teacher-library-empty { margin-top: 15px; }
+.teacher-review-desk .button { border-radius: 0; }
+.teacher-review-desk .desk-title strong { font: 400 21px Georgia, serif; }
+.teacher-review-desk .review-form input, .teacher-review-desk .review-form select, .teacher-review-desk .review-form textarea { border-radius: 0; }
+.teacher-review-desk .desk-guide { background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
+@media(max-width:1100px) {
+  .teacher-class-library, .teacher-review-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teacher-member-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media(max-width:680px) {
+  .teacher-class-library { gap: 13px; }
+  .teacher-class-library .teacher-class-main { padding-inline: 16px; }
+  .teacher-class-library .teacher-class-main h3 { font-size: 15px; }
+  .teacher-class-library .teacher-class-main p { font-size: 10px; }
+  .teacher-class-library .teacher-class-code { padding-inline: 16px 8px; }
+  .teacher-review-board { grid-template-columns: 1fr; gap: 14px; }
+  .teacher-review-preview { height: 193px; }
+  .teacher-review-totals { gap: 16px; }
+  .teacher-review-totals > div + div { padding-left: 16px; }
+  .teacher-review-totals > div { gap: 7px; }
+  .teacher-review-totals strong { font-size: 38px; }
+  .teacher-class-hero h1 { font-size: 37px; }
+}
+@media(max-width:440px) {
+  .teacher-class-library, .teacher-member-grid { grid-template-columns: 1fr; }
+  .teacher-class-library .teacher-class-main h3 { min-height: 0; font-size: 17px; }
+  .teacher-class-library .teacher-class-diagram > svg:first-child { height: 92px; }
+  .teacher-class-library .teacher-class-main p { font-size: 11px; }
+  .teacher-class-hero h1 { max-width: 100%; font-size: 37px; }
+  .teacher-class-hero .teacher-library-folio { opacity: .1; }
+  .teacher-review-feedback summary { min-height: 44px; }
+  .teacher-review-totals span { font-size: 8px; }
+}

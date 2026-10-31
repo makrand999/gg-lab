@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
-  else root.EduCADSpatial = factory();
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-settings.js'));
+  else root.EduCADSpatial = factory(root.EduCADSettings);
+})(typeof window !== 'undefined' ? window : globalThis, function (Settings) {
   'use strict';
 
   // World coordinates are millimeters: X along XY, Y above HP, Z in front
@@ -74,26 +74,163 @@
       hp: length > EPS ? Math.asin(Math.min(1, Math.abs(dy) / length)) * 180 / Math.PI : null,
       vp: length > EPS ? Math.asin(Math.min(1, Math.abs(dz) / length)) * 180 / Math.PI : null };
   }
+  function itemKey(item) { return item.kind + ':' + item.index; }
+  function itemTitle(g, item) {
+    if (item.kind === 'point') return 'P' + (item.index + 1);
+    var edge = g.edges[item.index];
+    return 'P' + (edge[0] + 1) + '–P' + (edge[1] + 1);
+  }
+  function numberText(value, prefs) {
+    if (value === null) return '—';
+    return String(Number(value.toFixed(prefs.precision)));
+  }
+  function measurementRows(g, item, prefs) {
+    prefs = Settings.normalizeInspection(prefs);
+    var rows = [], p, info;
+    function mm(n) { return numberText(n, prefs) + ' mm'; }
+    if (item.kind === 'point') {
+      p = g.vertices[item.index];
+      if (!p) return rows;
+      if (prefs.coordinates) rows.push(['X / Y / Z', [p.x, p.y, p.z].map(function (v) { return numberText(v, prefs); }).join(' / ') + ' mm']);
+      if (prefs.planeDistances) {
+        rows.push(['HP', Math.abs(p.y) < EPS ? 'On HP' : mm(Math.abs(p.y)) + (p.y > 0 ? ' above' : ' below')]);
+        rows.push(['VP', Math.abs(p.z) < EPS ? 'On VP' : mm(Math.abs(p.z)) + (p.z > 0 ? ' in front' : ' behind')]);
+      }
+    } else {
+      info = edgeInfo(g, item.index);
+      if (!info) return rows;
+      if (prefs.lengths) rows.push(['True length', mm(info.length)]);
+      if (prefs.inclinations) {
+        rows.push(['Inclination to HP', info.hp === null ? '—' : numberText(info.hp, prefs) + '°']);
+        rows.push(['Inclination to VP', info.vp === null ? '—' : numberText(info.vp, prefs) + '°']);
+      }
+    }
+    return rows;
+  }
+  function inspectionItems(g, selection, pins, prefs) {
+    if (!g) return [];
+    var items = [], seen = {};
+    function add(item) {
+      if (!item || !Number.isInteger(item.index) || item.index < 0 ||
+          !(item.kind === 'point' ? g.vertices[item.index] : item.kind === 'edge' && g.edges[item.index])) return;
+      var key = itemKey(item);
+      if (!seen[key]) { seen[key] = true; items.push({ kind: item.kind, index: item.index }); }
+    }
+    // The active selection stays visible in every scope and gets first
+    // choice of label placement. Pins survive ordinary clear-selection.
+    add(selection);
+    if (prefs.overlay !== 'selected') (pins || []).forEach(add);
+    if (prefs.overlay === 'all') {
+      // Alternate points and edges so neither category uses every label slot.
+      for (var i = 0; i < Math.max(g.vertices.length, g.edges.length); i++) {
+        if (prefs.coordinates || prefs.planeDistances) add({ kind: 'point', index: i });
+        if (prefs.lengths || prefs.inclinations) add({ kind: 'edge', index: i });
+      }
+    }
+    return items;
+  }
+  function togglePin(pins, item) {
+    var key = itemKey(item), found = pins.some(function (p) { return itemKey(p) === key; });
+    return found ? pins.filter(function (p) { return itemKey(p) !== key; }) : pins.concat([{ kind: item.kind, index: item.index }]);
+  }
+  function overlaps(a, b) {
+    return a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  }
+  function placeLabel(anchor, lines, measure, prefs, viewport, occupied, modelBounds) {
+    var width = Math.max.apply(null, lines.map(measure)) + 12;
+    var height = lines.length * (prefs.textSize + 4) + 8;
+    var positions = [[12, -height - 8], [12, 10], [-width - 12, -height - 8], [-width - 12, 10], [-width / 2, -height - 18], [-width / 2, 20]];
+    if (modelBounds) positions = positions.concat([
+      [modelBounds.x1 - anchor.x + 10, -height / 2], [modelBounds.x0 - anchor.x - width - 10, -height / 2],
+      [modelBounds.x1 - anchor.x + 10, -height - 8], [modelBounds.x0 - anchor.x - width - 10, -height - 8],
+      [modelBounds.x1 - anchor.x + 10, 10], [modelBounds.x0 - anchor.x - width - 10, 10]
+    ]);
+    for (var i = 0; i < positions.length; i++) {
+      var x = anchor.x + positions[i][0], y = anchor.y + positions[i][1];
+      var rect = { x0: x, y0: y, x1: x + width, y1: y + height };
+      if (x < 6 || y < 6 || rect.x1 > viewport.w - 6 || rect.y1 > viewport.h - 6) continue;
+      var padded = { x0: x - 3, y0: y - 3, x1: rect.x1 + 3, y1: rect.y1 + 3 };
+      if (occupied.some(function (r) { return overlaps(padded, r); })) continue;
+      occupied.push(rect);
+      return { rect: rect, lines: lines, anchor: anchor };
+    }
+    return null; // Values remain available in the panel when labels cannot fit.
+  }
+  function overlayLayout(st, solid, refs, selection, pins, prefs, measure, obstacles) {
+    var g = st.geometryMm, items = inspectionItems(g, selection, pins, prefs);
+    var layout = { labels: [], guides: [], marks: [], suppressed: 0 }, occupied = (obstacles || []).slice();
+    if (!g || !st.geometryTransform || !refs) return layout;
+    var points = g.vertices.map(function (p) { return projectMm(p, st, solid); });
+    var modelBounds = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+    points.forEach(function (p) {
+      modelBounds.x0 = Math.min(modelBounds.x0, p.x - 8); modelBounds.x1 = Math.max(modelBounds.x1, p.x + 8);
+      modelBounds.y0 = Math.min(modelBounds.y0, p.y - 8); modelBounds.y1 = Math.max(modelBounds.y1, p.y + 8);
+    });
+    occupied.push(modelBounds); // Labels stay beside the object, preserving its silhouette.
+    function label(anchor, lines, color) {
+      if (!prefs.labels) return;
+      var placed = placeLabel(anchor, lines, measure, prefs, st, occupied, modelBounds);
+      if (placed) { placed.color = color; layout.labels.push(placed); }
+      else layout.suppressed++;
+    }
+    items.forEach(function (item) {
+      var active = selection && itemKey(item) === itemKey(selection);
+      var pinned = pins.some(function (p) { return itemKey(p) === itemKey(item); });
+      var p, point, edge, ends, info, lines = [itemTitle(g, item)];
+      if (item.kind === 'point') {
+        p = g.vertices[item.index]; point = projectMm(p, st, solid);
+        if (active || pinned) layout.marks.push({ kind: 'point', points: [point], active: active });
+        if (prefs.coordinates) lines.push([p.x, p.y, p.z].map(function (v) { return numberText(v, prefs); }).join(', ') + ' mm');
+        if (prefs.planeDistances) {
+          lines.push(Math.abs(p.y) < EPS ? 'On HP' : 'HP ' + numberText(Math.abs(p.y), prefs) + ' mm ' + (p.y < 0 ? 'below' : 'above'));
+          lines.push(Math.abs(p.z) < EPS ? 'On VP' : 'VP ' + numberText(Math.abs(p.z), prefs) + ' mm ' + (p.z < 0 ? 'behind' : 'in front'));
+        }
+        if (prefs.planes && prefs.guides && prefs.planeDistances && (active || pinned)) {
+          [{ p: { x: p.x, y: 0, z: p.z }, color: '#9a8c72' },
+            { p: { x: p.x, y: p.y, z: 0 }, color: '#7a91ab' }].forEach(function (guide) {
+            layout.guides.push({ from: point, to: projectMm(guide.p, st, solid), color: guide.color });
+          });
+        }
+      } else {
+        edge = g.edges[item.index]; ends = edge.map(function (i) { return projectMm(g.vertices[i], st, solid); });
+        point = { x: (ends[0].x + ends[1].x) / 2, y: (ends[0].y + ends[1].y) / 2 };
+        if (active || pinned) layout.marks.push({ kind: 'edge', points: ends, active: active });
+        info = edgeInfo(g, item.index);
+        if (prefs.lengths) lines[0] += ' · ' + numberText(info.length, prefs) + ' mm';
+        if (prefs.inclinations) lines.push('HP ' + (info.hp === null ? '—' : numberText(info.hp, prefs) + '°') +
+          ' · VP ' + (info.vp === null ? '—' : numberText(info.vp, prefs) + '°'));
+      }
+      if (lines.length > 1 || (item.kind === 'edge' && prefs.lengths)) label(point, lines, active ? '#415c74' : '#64748b');
+    });
+    if (prefs.planes) refs.labels.forEach(function (entry) {
+      label(projectMm(entry.p, st, solid), [entry.text], entry.color);
+    });
+    return layout;
+  }
   // Vertex picks win near endpoints; frontmost wins when points overlap.
-  function pick(st, x, y, solid) {
+  // tolPx widens both thresholds for touch; omitted means desktop (10/9).
+  function pick(st, x, y, solid, tolPx) {
     if (!st.geometryMm || !solid.statusOf(st).available) return null;
+    var pointTol = (typeof tolPx === 'number' && tolPx > 0) ? tolPx : 10;
+    var edgeTol = (typeof tolPx === 'number' && tolPx > 0) ?
+      Math.max(9, tolPx - 2) : 9;
     var pts = st.geometryMm.vertices.map(function (p) { return projectMm(p, st, solid); });
-    var hit = null, dist = 10, depth = -Infinity;
+    var hit = null, dist = pointTol, depth = -Infinity;
     pts.forEach(function (p, i) {
       var d = Math.hypot(p.x - x, p.y - y);
-      if (d <= 10 && (d < dist - 0.5 || (Math.abs(d - dist) <= 0.5 && p.z > depth))) {
+      if (d <= pointTol && (d < dist - 0.5 || (Math.abs(d - dist) <= 0.5 && p.z > depth))) {
         hit = { kind: 'point', index: i }; dist = d; depth = p.z;
       }
     });
     if (hit) return hit;
-    dist = 9; depth = -Infinity;
+    dist = edgeTol; depth = -Infinity;
     st.geometryMm.edges.forEach(function (e, i) {
       var a = pts[e[0]], b = pts[e[1]];
       var d = solid.distPointSeg(x, y, a.x, a.y, b.x, b.y);
       var dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
       var t = l2 > EPS ? Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / l2)) : 0;
       var z = a.z + (b.z - a.z) * t;
-      if (d <= 9 && (d < dist - 0.5 || (Math.abs(d - dist) <= 0.5 && z > depth))) {
+      if (d <= edgeTol && (d < dist - 0.5 || (Math.abs(d - dist) <= 0.5 && z > depth))) {
         hit = { kind: 'edge', index: i }; dist = d; depth = z;
       }
     });
@@ -170,125 +307,204 @@
     ctx.strokeStyle = 'rgba(90, 105, 123, 0.5)'; ctx.lineWidth = 1; ctx.stroke();
     ctx.restore();
   }
-  function overlay(ctx, st, solid, refs, selection, planesVisible) {
-    ctx.save(); ctx.font = '11px system-ui, sans-serif'; ctx.textBaseline = 'middle';
-    if (planesVisible) refs.labels.forEach(function (label) {
-      var p = projectMm(label.p, st, solid);
-      var width = ctx.measureText(label.text).width;
-      ctx.fillStyle = 'rgba(248, 250, 252, 0.94)'; ctx.fillRect(p.x - width / 2 - 5, p.y + 6, width + 10, 18);
-      ctx.fillStyle = label.color; ctx.textAlign = 'center'; ctx.fillText(label.text, p.x, p.y + 15);
+  function drawOverlay(ctx, layout, prefs) {
+    ctx.save(); ctx.font = prefs.textSize + 'px system-ui, sans-serif'; ctx.textBaseline = 'middle';
+    layout.guides.forEach(function (guide) {
+      ctx.strokeStyle = guide.color; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+      path(ctx, [guide.from, guide.to]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(guide.to.x, guide.to.y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.stroke();
     });
-    if (selection && selection.kind === 'point') {
-      var v = st.geometryMm.vertices[selection.index];
-      if (v) {
-        var point = projectMm(v, st, solid);
-        if (planesVisible) [
-          { p: { x: v.x, y: 0, z: v.z }, color: '#9a8c72', value: fmt(Math.abs(v.y)) + ' mm' },
-          { p: { x: v.x, y: v.y, z: 0 }, color: '#7a91ab', value: fmt(Math.abs(v.z)) + ' mm' }
-        ].forEach(function (guide) {
-          var foot = projectMm(guide.p, st, solid);
-          ctx.strokeStyle = guide.color; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
-          path(ctx, [point, foot]); ctx.stroke(); ctx.setLineDash([]);
-          ctx.beginPath(); ctx.arc(foot.x, foot.y, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.stroke();
-          if (Math.hypot(foot.x - point.x, foot.y - point.y) > 45) {
-            var mx = (point.x + foot.x) / 2, my = (point.y + foot.y) / 2;
-            var tw = ctx.measureText(guide.value).width;
-            ctx.fillStyle = 'rgba(248, 250, 252, 0.96)'; ctx.fillRect(mx - tw / 2 - 4, my - 9, tw + 8, 18);
-            ctx.fillStyle = guide.color; ctx.textAlign = 'center'; ctx.fillText(guide.value, mx, my);
-          }
-        });
-        ctx.strokeStyle = '#58738c'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
-        ctx.beginPath(); ctx.arc(point.x, point.y, 6, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = '#58738c'; ctx.textAlign = 'left';
-        ctx.fillText('P' + (selection.index + 1), point.x + 9, point.y - 9);
+    layout.marks.forEach(function (mark) {
+      ctx.strokeStyle = mark.active ? '#58738c' : '#8a9dad'; ctx.setLineDash([]);
+      if (mark.kind === 'point') {
+        ctx.lineWidth = mark.active ? 1.5 : 1;
+        ctx.beginPath(); ctx.arc(mark.points[0].x, mark.points[0].y, mark.active ? 6 : 5, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        ctx.lineWidth = mark.active ? 2.5 : 1.75;
+        path(ctx, mark.points); ctx.stroke();
       }
-    } else if (selection && selection.kind === 'edge') {
-      var edge = st.geometryMm.edges[selection.index];
-      if (edge) {
-        path(ctx, edge.map(function (i) { return projectMm(st.geometryMm.vertices[i], st, solid); }));
-        ctx.strokeStyle = '#58738c'; ctx.lineWidth = 2.5; ctx.setLineDash([]); ctx.stroke();
-      }
-    }
+    });
+    layout.labels.forEach(function (label) {
+      var rect = label.rect;
+      var nearX = Math.max(rect.x0, Math.min(rect.x1, label.anchor.x));
+      var nearY = Math.max(rect.y0, Math.min(rect.y1, label.anchor.y));
+      ctx.strokeStyle = 'rgba(138, 157, 173, 0.45)'; ctx.lineWidth = 0.6; ctx.setLineDash([]);
+      path(ctx, [label.anchor, { x: nearX, y: nearY }]); ctx.stroke();
+      ctx.fillStyle = 'rgba(248, 250, 252, 0.96)'; ctx.fillRect(rect.x0, rect.y0, rect.x1 - rect.x0, rect.y1 - rect.y0);
+      ctx.fillStyle = label.color; ctx.textAlign = 'left';
+      label.lines.forEach(function (line, i) {
+        ctx.fillText(line, rect.x0 + 6, rect.y0 + 4 + (prefs.textSize + 4) * (i + 0.5));
+      });
+    });
     ctx.restore();
   }
 
   function mount(widget, container, solid, options) {
     options = options || {};
-    var st = widget.state, enabled = false, planesVisible = true, geometry = null, refs = null, selection = null;
+    var st = widget.state, enabled = false, geometry, refs = null, selection = null, pins = [];
+    var prefs = Settings.normalizeInspection(options.preferences), search = '';
+    var sourceRevision, geometryKey = '';
     var savedView = null;
     var panel = document.createElement('aside');
     panel.className = 'spatial-panel'; panel.hidden = true; panel.setAttribute('aria-label', '3D inspection');
     panel.innerHTML = '<div class="spatial-head"><span>Spatial view</span><div><button type="button" data-action="planes" aria-pressed="true" title="Show or hide reference planes">HP / VP</button><button type="button" data-action="fit" title="Fit model and reference planes">Fit</button></div></div>' +
       '<p class="spatial-summary"></p><p class="spatial-hint">Click a point or edge · Drag to orbit</p>' +
+      '<div class="spatial-tools" role="group" aria-label="Measurement overlays"><button type="button" data-overlay="selected">Selected</button><button type="button" data-overlay="pinned">Pinned</button><button type="button" data-overlay="all">All</button><details class="spatial-filter"><summary>Filter</summary><div class="spatial-filter-fields"></div></details></div>' +
       '<div class="spatial-selection" hidden aria-live="polite"></div>' +
-      '<details class="spatial-details"><summary>Geometry details</summary><div class="spatial-data"></div></details>';
+      '<div class="spatial-pins" hidden></div>' +
+      '<p class="spatial-label-note spatial-note" hidden></p>' +
+      '<details class="spatial-details"><summary>Geometry details</summary><input class="spatial-search" type="search" aria-label="Find a point or edge" placeholder="Find P1 or P1–P2"><div class="spatial-data"></div></details>';
     container.appendChild(panel);
     var summaryEl = panel.querySelector('.spatial-summary');
     var dataEl = panel.querySelector('.spatial-data');
     var selectionEl = panel.querySelector('.spatial-selection');
+    var pinsEl = panel.querySelector('.spatial-pins');
     var planesBtn = panel.querySelector('[data-action="planes"]');
+    var detailsEl = panel.querySelector('.spatial-details');
+    var labelNote = panel.querySelector('.spatial-label-note');
+    var filterEl = panel.querySelector('.spatial-filter-fields');
+    ['coordinates', 'planeDistances', 'lengths', 'inclinations'].forEach(function (key) {
+      var row = document.createElement('label'), box = document.createElement('input');
+      box.type = 'checkbox'; box.dataset.inspectionKey = key;
+      row.appendChild(box); row.appendChild(document.createTextNode(Settings.INSPECTION_FIELDS[key].label)); filterEl.appendChild(row);
+    });
+    function syncControls() {
+      planesBtn.setAttribute('aria-pressed', String(prefs.planes));
+      panel.querySelectorAll('[data-overlay]').forEach(function (button) {
+        button.setAttribute('aria-pressed', String(prefs.overlay === button.dataset.overlay));
+      });
+      filterEl.querySelectorAll('input').forEach(function (box) { box.checked = prefs[box.dataset.inspectionKey]; });
+    }
+    function updatePreferences(key, value) {
+      var next = Object.assign({}, prefs); next[key] = value;
+      setPreferences(next);
+      if (options.onPreferencesChange) options.onPreferencesChange(Object.assign({}, prefs));
+    }
+    function setPreferences(value) {
+      var previousScope = prefs.overlay;
+      prefs = Settings.normalizeInspection(value); syncControls();
+      if (prefs.overlay === 'all' && previousScope !== 'all') detailsEl.open = true;
+      populate(); selectionReadout(); pinReadout(); widget.scheduleDraw();
+    }
     function cell(row, value, heading) {
       var el = document.createElement(heading ? 'th' : 'td'); el.textContent = value; row.appendChild(el); return el;
     }
     function table(parent, headers) {
       var el = document.createElement('table'), thead = document.createElement('thead'), row = document.createElement('tr');
       headers.forEach(function (text) { cell(row, text, true); }); thead.appendChild(row); el.appendChild(thead);
-      var body = document.createElement('tbody'); el.appendChild(body); parent.appendChild(el); return body;
+      var body = document.createElement('tbody'); el.appendChild(body);
+      var scroll = document.createElement('div'); scroll.className = 'spatial-table-scroll'; scroll.appendChild(el); parent.appendChild(scroll); return body;
     }
-    function detailGroup(title) {
+    function detailGroup(title, kind) {
       var details = document.createElement('details'), titleEl = document.createElement('summary');
+      details.dataset.group = kind; details.open = prefs.overlay === 'all' || !!search;
       titleEl.textContent = title; details.appendChild(titleEl); dataEl.appendChild(details); return details;
     }
     function selectButton(parent, text, kind, index) {
       var button = document.createElement('button'); button.type = 'button'; button.textContent = text;
       button.dataset.kind = kind; button.dataset.index = index; parent.appendChild(button);
     }
+    function markRows() {
+      dataEl.querySelectorAll('button[data-kind]').forEach(function (button) {
+        var item = { kind: button.dataset.kind, index: Number(button.dataset.index) };
+        var active = !!selection && itemKey(selection) === itemKey(item);
+        var pinned = pins.some(function (p) { return itemKey(p) === itemKey(item); });
+        button.setAttribute('aria-pressed', String(active));
+        button.closest('tr').classList.toggle('spatial-active-row', active);
+        button.closest('tr').classList.toggle('spatial-pinned-row', pinned);
+        button.title = pinned ? 'Pinned measurement' : 'Inspect measurement';
+      });
+    }
     function populate() {
+      var openGroups = {};
+      dataEl.querySelectorAll('details[data-group]').forEach(function (group) { openGroups[group.dataset.group] = group.open; });
       dataEl.replaceChildren();
       if (!geometry) return;
       var b = bounds(geometry);
       var body = table(dataEl, ['Extent', 'mm']);
       [['Width along XY', b.maxX - b.minX], ['Height', b.maxY - b.minY], ['Depth', b.maxZ - b.minZ]].forEach(function (r) {
-        var row = body.insertRow(); cell(row, r[0]); cell(row, fmt(r[1]));
+        var row = body.insertRow(); cell(row, r[0]); cell(row, numberText(r[1], prefs));
       });
       body = table(dataEl, ['Position range', 'mm']);
       [['X along XY', b.minX, b.maxX], ['Height from HP', b.minY, b.maxY], ['Depth from VP', b.minZ, b.maxZ]].forEach(function (r) {
-        var row = body.insertRow(); cell(row, r[0]); cell(row, fmt(r[1]) + ' … ' + fmt(r[2]));
+        var row = body.insertRow(); cell(row, r[0]); cell(row, numberText(r[1], prefs) + ' … ' + numberText(r[2], prefs));
       });
       var note = document.createElement('p'); note.className = 'spatial-note';
-      note.textContent = 'Signed coordinates: + height is above HP; + depth is in front of VP. P1, P2… identify reconstructed vertices.'; dataEl.appendChild(note);
-      body = table(detailGroup('Points (' + geometry.vertices.length + ')'), ['Point', 'X', 'Height', 'Depth']);
+      note.textContent = 'Coordinates in mm: X along XY, Y above HP, Z in front of VP. Negative HP / VP values mean below / behind. P1, P2… identify reconstructed vertices.'; dataEl.appendChild(note);
+      var pointGroup = detailGroup('Points (' + geometry.vertices.length + ')', 'point');
+      var pointHeaders = ['Point'];
+      if (prefs.coordinates) pointHeaders = pointHeaders.concat(['X', 'Y', 'Z']);
+      if (prefs.planeDistances) pointHeaders = pointHeaders.concat(['HP (mm)', 'VP (mm)']);
+      body = table(pointGroup, pointHeaders);
       geometry.vertices.forEach(function (p, i) {
+        var item = { kind: 'point', index: i };
+        if (!itemTitle(geometry, item).toLowerCase().includes(search)) return;
         var row = body.insertRow(); selectButton(cell(row, ''), 'P' + (i + 1), 'point', i);
-        cell(row, fmt(p.x)); cell(row, fmt(p.y)); cell(row, fmt(p.z));
+        if (prefs.coordinates) [p.x, p.y, p.z].forEach(function (v) { cell(row, numberText(v, prefs)); });
+        if (prefs.planeDistances) { cell(row, numberText(p.y, prefs)); cell(row, numberText(p.z, prefs)); }
       });
       if (geometry.edges.length) {
-        body = table(detailGroup('Wire edges (' + geometry.edges.length + ')'), ['Edge', 'L (mm)', 'HP', 'VP']);
+        var edgeHeaders = ['Edge'];
+        if (prefs.lengths) edgeHeaders.push('L (mm)');
+        if (prefs.inclinations) edgeHeaders = edgeHeaders.concat(['HP', 'VP']);
+        body = table(detailGroup('Wire edges (' + geometry.edges.length + ')', 'edge'), edgeHeaders);
         geometry.edges.forEach(function (e, i) {
+          if (!itemTitle(geometry, { kind: 'edge', index: i }).toLowerCase().includes(search)) return;
           var info = edgeInfo(geometry, i), row = body.insertRow();
           selectButton(cell(row, ''), 'P' + (e[0] + 1) + '–P' + (e[1] + 1), 'edge', i);
-          cell(row, fmt(info.length)); cell(row, info.hp === null ? '—' : fmt(info.hp) + '°'); cell(row, info.vp === null ? '—' : fmt(info.vp) + '°');
+          if (prefs.lengths) cell(row, numberText(info.length, prefs));
+          if (prefs.inclinations) { cell(row, info.hp === null ? '—' : numberText(info.hp, prefs) + '°'); cell(row, info.vp === null ? '—' : numberText(info.vp, prefs) + '°'); }
         });
       }
+      dataEl.querySelectorAll('details[data-group]').forEach(function (group) {
+        if (search || prefs.overlay === 'all') group.open = true;
+        else if (group.dataset.group in openGroups) group.open = openGroups[group.dataset.group];
+      });
+      var empty = document.createElement('p'); empty.className = 'spatial-note';
+      empty.textContent = 'No matching points or edges.'; empty.hidden = !search || !!dataEl.querySelector('button[data-kind]'); dataEl.appendChild(empty);
+      markRows();
     }
     function selectionReadout() {
       selectionEl.replaceChildren(); selectionEl.hidden = !selection;
       if (!selection || !geometry) return;
       var title = document.createElement('div'); title.className = 'spatial-selection-head';
-      var label = document.createElement('strong'); title.appendChild(label);
-      var clear = document.createElement('button'); clear.type = 'button'; clear.dataset.action = 'clear'; clear.textContent = '×'; clear.setAttribute('aria-label', 'Clear 3D selection'); title.appendChild(clear); selectionEl.appendChild(title);
-      var body = table(selectionEl, ['Measure', 'Value']);
-      var rows;
-      if (selection.kind === 'point') {
-        var p = geometry.vertices[selection.index]; label.textContent = 'Point P' + (selection.index + 1);
-        rows = [['X along XY', fmt(p.x) + ' mm'], ['HP', Math.abs(p.y) < EPS ? 'On HP' : fmt(Math.abs(p.y)) + ' mm ' + (p.y > 0 ? 'above' : 'below')],
-          ['VP', Math.abs(p.z) < EPS ? 'On VP' : fmt(Math.abs(p.z)) + ' mm ' + (p.z > 0 ? 'in front' : 'behind')]];
+      var label = document.createElement('strong'); label.textContent = (selection.kind === 'point' ? 'Point ' : 'Edge ') + itemTitle(geometry, selection); title.appendChild(label);
+      var actions = document.createElement('div'); title.appendChild(actions);
+      var pin = document.createElement('button'); pin.type = 'button'; pin.dataset.action = 'pin';
+      var pinned = pins.some(function (p) { return itemKey(p) === itemKey(selection); });
+      pin.textContent = pinned ? 'Unpin' : 'Pin'; pin.setAttribute('aria-pressed', String(pinned)); actions.appendChild(pin);
+      var clear = document.createElement('button'); clear.type = 'button'; clear.dataset.action = 'clear'; clear.textContent = '×'; clear.setAttribute('aria-label', 'Clear 3D selection'); actions.appendChild(clear); selectionEl.appendChild(title);
+      var rows = measurementRows(geometry, selection, prefs);
+      if (rows.length) {
+        var body = table(selectionEl, ['Measure', 'Value']);
+        rows.forEach(function (r) { var row = body.insertRow(); cell(row, r[0]); cell(row, r[1]); });
       } else {
-        var info = edgeInfo(geometry, selection.index); label.textContent = 'Edge P' + (info.a + 1) + '–P' + (info.b + 1);
-        rows = [['True length', fmt(info.length) + ' mm'], ['Inclination to HP', info.hp === null ? '—' : fmt(info.hp) + '°'], ['Inclination to VP', info.vp === null ? '—' : fmt(info.vp) + '°']];
+        var note = document.createElement('p'); note.className = 'spatial-note'; note.textContent = 'Enable measurements in Filter.'; selectionEl.appendChild(note);
       }
-      rows.forEach(function (r) { var row = body.insertRow(); cell(row, r[0]); cell(row, r[1]); });
+    }
+    function pinReadout() {
+      pinsEl.replaceChildren(); pinsEl.hidden = !pins.length;
+      if (!pins.length || !geometry) return;
+      var head = document.createElement('div'); head.className = 'spatial-selection-head';
+      var title = document.createElement('span'); title.textContent = 'Pinned (' + pins.length + ')'; head.appendChild(title);
+      var clear = document.createElement('button'); clear.type = 'button'; clear.dataset.action = 'clear-pins'; clear.textContent = 'Clear pins'; head.appendChild(clear); pinsEl.appendChild(head);
+      pins.forEach(function (item) {
+        var row = document.createElement('div'); row.className = 'spatial-pin-row';
+        selectButton(row, itemTitle(geometry, item), item.kind, item.index);
+        var value = document.createElement('span');
+        value.textContent = measurementRows(geometry, item, prefs).map(function (r) { return r[0] + ' ' + r[1]; }).join(' · ');
+        row.appendChild(value);
+        var remove = document.createElement('button'); remove.type = 'button'; remove.dataset.removePin = itemKey(item); remove.textContent = '×';
+        remove.setAttribute('aria-label', 'Unpin ' + itemTitle(geometry, item)); row.appendChild(remove); pinsEl.appendChild(row);
+      });
+    }
+    function labelObstacles() {
+      var rect = panel.getBoundingClientRect(), origin = container.getBoundingClientRect();
+      return [{ x0: rect.left - origin.left, y0: rect.top - origin.top, x1: rect.right - origin.left, y1: rect.bottom - origin.top }];
+    }
+    function layoutWith(measure) {
+      return overlayLayout(st, solid, refs, selection, pins, prefs, measure, labelObstacles());
     }
     function positionPanel() {
       // The panel lives in the top-left corner, the same corner as the
@@ -296,49 +512,80 @@
       // scroll inside the panel and never cover the wireframe.
       var top = 44;
       panel.style.top = top + 'px';
-      panel.style.maxHeight = Math.max(90, st.h - top - 24) + 'px';
+      var mobile = typeof EduCADMobile !== 'undefined' && EduCADMobile.splitActive();
+      panel.style.maxHeight = mobile ? 'none' : Math.max(90, Math.min(st.h - top - 24,
+        window.innerHeight - panel.getBoundingClientRect().top - 24)) + 'px';
     }
     function sceneHeight() { return Math.min(390, st.h * 0.5, Math.max(100, st.h - 300)); }
     function fit() {
       if (!geometry || !refs) return;
-      var all = geometry.vertices.concat(refs.hp, refs.vp);
+      var mobile = typeof EduCADMobile !== 'undefined' && EduCADMobile.splitActive();
+      var all = mobile && !enabled ? geometry.vertices : geometry.vertices.concat(refs.hp, refs.vp);
       var rotated = all.map(function (p) { var q = toStage(p, st.geometryTransform); return solid.rotateDir(q.x, q.y, q.z, st.yaw, st.pitch); });
       var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       rotated.forEach(function (p) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
-      var width = Math.min(530, st.w * 0.46), height = sceneHeight();
-      var radius = Math.min((width - 72) / Math.max(maxX - minX, EPS), (height - 65) / Math.max(maxY - minY, EPS));
+      var width = mobile ? st.w : Math.min(530, st.w * 0.46);
+      var height = mobile ? st.h : sceneHeight();
+      var padding = mobile ? Math.min(48, width * 0.3, height * 0.3) : 0;
+      var radius = Math.min(Math.max(1, width - (mobile ? padding : 72)) / Math.max(maxX - minX, EPS), Math.max(1, height - (mobile ? padding : 65)) / Math.max(maxY - minY, EPS));
       // A lone point can be far from both datum planes. Let inspection
       // zoom out far enough to include them; restore editing limits on exit.
       st.minScale = Math.min(solid.GLASS_ZOOM_MIN, radius / st.baseR);
       st.scale = Math.max(st.minScale, Math.min(st.maxScale, radius / st.baseR)); radius = solid.projectionRadius(st);
-      st.cx = st.w - width / 2 - 24 - (minX + maxX) / 2 * radius;
-      st.cy = 70 + height / 2 + (minY + maxY) / 2 * radius;
+      st.cx = (mobile ? st.w / 2 : st.w - width / 2 - 24) - (minX + maxX) / 2 * radius;
+      st.cy = (mobile ? st.h / 2 : 70 + height / 2) + (minY + maxY) / 2 * radius;
       positionPanel();
     }
     function refresh() {
       positionPanel();
-      if (geometry === st.geometryMm) return;
+      var revision = options.sourceRevision ? options.sourceRevision() : null;
+      if (geometry === st.geometryMm && sourceRevision === revision) return;
+      var key = st.geometryMm ? JSON.stringify({ vertices: st.geometryMm.vertices, edges: st.geometryMm.edges }) : '';
+      if (key !== geometryKey || sourceRevision !== revision) pins = [];
+      sourceRevision = revision; geometryKey = key;
       geometry = st.geometryMm; refs = references(geometry); selection = null;
+      labelNote.hidden = true;
+      if (options.onSelect) options.onSelect(null);
       summaryEl.textContent = geometry ? summary(geometry) : 'Draw matching front and top views to inspect geometry.';
-      panel.querySelector('.spatial-details').hidden = !geometry;
+      detailsEl.hidden = !geometry;
+      panel.querySelector('.spatial-tools').hidden = !geometry;
       panel.querySelector('.spatial-hint').hidden = !geometry;
       planesBtn.disabled = !geometry;
       panel.querySelector('[data-action="fit"]').disabled = !geometry;
-      populate(); selectionReadout(); if (enabled) fit();
+      populate(); selectionReadout(); pinReadout(); if (enabled) fit();
     }
     function choose(value) {
       selection = value;
       if (options.onSelect) options.onSelect(selection);
-      selectionReadout(); widget.scheduleDraw();
+      selectionReadout(); markRows(); widget.scheduleDraw();
     }
     panel.addEventListener('click', function (e) {
       var button = e.target.closest('button'); if (!button) return;
-      if (button.dataset.action === 'planes') {
-        planesVisible = !planesVisible; button.setAttribute('aria-pressed', String(planesVisible)); widget.scheduleDraw();
-      } else if (button.dataset.action === 'fit') { fit(); widget.scheduleDraw(); }
+      if (button.dataset.action === 'planes') updatePreferences('planes', !prefs.planes);
+      else if (button.dataset.action === 'fit') { fit(); widget.scheduleDraw(); }
       else if (button.dataset.action === 'clear') choose(null);
+      else if (button.dataset.action === 'pin' && selection) {
+        pins = togglePin(pins, selection);
+        if (pins.length && prefs.overlay === 'selected') updatePreferences('overlay', 'pinned');
+        selectionReadout(); pinReadout(); markRows(); widget.scheduleDraw();
+      } else if (button.dataset.action === 'clear-pins') {
+        pins = []; selectionReadout(); pinReadout(); markRows(); widget.scheduleDraw();
+      } else if (button.dataset.removePin) {
+        pins = pins.filter(function (p) { return itemKey(p) !== button.dataset.removePin; });
+        selectionReadout(); pinReadout(); markRows(); widget.scheduleDraw();
+      } else if (button.dataset.overlay) updatePreferences('overlay', button.dataset.overlay);
       else if (button.dataset.kind) choose({ kind: button.dataset.kind, index: Number(button.dataset.index) });
     });
+    filterEl.addEventListener('change', function (e) {
+      var key = e.target.dataset.inspectionKey;
+      if (key) updatePreferences(key, e.target.checked);
+    });
+    panel.querySelector('.spatial-search').addEventListener('input', function (e) {
+      search = e.target.value.trim().toLowerCase().replace(/-/g, '–'); populate(); widget.scheduleDraw();
+    });
+    panel.addEventListener('toggle', function () { widget.scheduleDraw(); }, true);
+    syncControls();
+    if (prefs.overlay === 'all') detailsEl.open = true;
     panel.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') choose(null);
       e.stopPropagation();
@@ -351,14 +598,23 @@
       setEnabled: function (value) {
         if (enabled === value) return;
         enabled = value; st.inspection = value; panel.hidden = !value;
-        container.classList.toggle('spatial-inspection', value); selection = null; selectionReadout();
+        container.classList.toggle('spatial-inspection', value); selection = null; selectionReadout(); markRows();
+        if (options.onSelect) options.onSelect(null);
         if (value) { savedView = { cx: st.cx, cy: st.cy, scale: st.scale, minScale: st.minScale }; refresh(); fit(); }
         else if (savedView) { st.cx = savedView.cx; st.cy = savedView.cy; st.scale = savedView.scale; st.minScale = savedView.minScale; savedView = null; }
         widget.scheduleDraw();
       },
-      underlay: function (ctx) { if (!enabled) return; refresh(); if (refs && planesVisible) underlay(ctx, st, solid, refs); },
-      overlay: function (ctx) { if (enabled && refs) overlay(ctx, st, solid, refs, selection, planesVisible); },
-      inspectAt: function (x, y) { if (!enabled) return false; var hit = pick(st, x, y, solid); if (!hit) return false; choose(hit); return true; },
+      underlay: function (ctx) { if (!enabled) return; refresh(); if (refs && prefs.planes) underlay(ctx, st, solid, refs); },
+      overlay: function (ctx) {
+        if (!enabled || !refs) return;
+        ctx.save(); ctx.font = prefs.textSize + 'px system-ui, sans-serif';
+        var layout = layoutWith(function (text) { return ctx.measureText(text).width; }); ctx.restore();
+        drawOverlay(ctx, layout, prefs);
+        labelNote.hidden = !prefs.labels || !layout.suppressed;
+        var note = 'Some labels are hidden to avoid overlap. All values remain in Geometry details.';
+        if (labelNote.textContent !== note) labelNote.textContent = note;
+      },
+      inspectAt: function (x, y, tolPx) { if (!enabled) return false; var hit = pick(st, x, y, solid, tolPx); if (!hit) return false; choose(hit); return true; },
       clear: function () { choose(null); },
       datumGaps: function (datumY, measure) {
         if (!enabled) return [];
@@ -378,49 +634,38 @@
             var a = pts[e[0]], b = pts[e[1]];
             if (a && b) segs.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, pad: 3 });
           });
-          if (planesVisible) {
+          if (prefs.planes) {
             quads.push(rf.hp.map(function (p) { return projectMm(p, st, solid); }));
             quads.push(rf.vp.map(function (p) { return projectMm(p, st, solid); }));
             var xyl = rf.xy.map(function (p) { return projectMm(p, st, solid); });
             segs.push({ ax: xyl[0].x, ay: xyl[0].y, bx: xyl[1].x, by: xyl[1].y, pad: 2 });
-            if (typeof measure === 'function') {
-              rf.labels.forEach(function (label) {
-                var p = projectMm(label.p, st, solid);
-                var half = measure(label.text) / 2 + 5;
-                rects.push({ x0: p.x - half, y0: p.y + 6, x1: p.x + half, y1: p.y + 24 });
-              });
-            }
-            if (selection && selection.kind === 'point') {
-              var v = g.vertices[selection.index];
-              if (v) {
-                var point = projectMm(v, st, solid);
-                [{ p: { x: v.x, y: 0, z: v.z }, value: fmt(Math.abs(v.y)) + ' mm' },
-                  { p: { x: v.x, y: v.y, z: 0 }, value: fmt(Math.abs(v.z)) + ' mm' }
-                ].forEach(function (guide) {
-                  var foot = projectMm(guide.p, st, solid);
-                  segs.push({ ax: point.x, ay: point.y, bx: foot.x, by: foot.y, pad: 2 });
-                  if (typeof measure === 'function' &&
-                      Math.hypot(foot.x - point.x, foot.y - point.y) > 45) {
-                    var mx = (point.x + foot.x) / 2, my = (point.y + foot.y) / 2;
-                    var tw = measure(guide.value) / 2 + 4;
-                    rects.push({ x0: mx - tw, y0: my - 9, x1: mx + tw, y1: my + 9 });
-                  }
-                });
-                if (typeof measure === 'function') {
-                  var tag = 'P' + (selection.index + 1);
-                  rects.push({ x0: point.x + 9, y0: point.y - 16,
-                    x1: point.x + 9 + measure(tag), y1: point.y - 2 });
-                }
-              }
-            }
+          }
+          if (typeof measure === 'function') {
+            // Canvas labels and datum exclusions use the same layout.
+            var layout = layoutWith(measure);
+            layout.labels.forEach(function (label) {
+              rects.push(label.rect);
+              segs.push({ ax: label.anchor.x, ay: label.anchor.y,
+                bx: Math.max(label.rect.x0, Math.min(label.rect.x1, label.anchor.x)),
+                by: Math.max(label.rect.y0, Math.min(label.rect.y1, label.anchor.y)), pad: 1 });
+            });
+            layout.guides.forEach(function (guide) {
+              segs.push({ ax: guide.from.x, ay: guide.from.y, bx: guide.to.x, by: guide.to.y, pad: 2 });
+              dots.push({ x: guide.to.x, y: guide.to.y, pad: 4 });
+            });
           }
         }
         return scanGaps(datumY, rects, quads, segs, dots);
       },
-      fit: function () { fit(); widget.scheduleDraw(); },
-      selection: function () { return selection; }
+      fit: function () { refresh(); fit(); widget.scheduleDraw(); },
+      selection: function () { return selection && Object.assign({}, selection); },
+      pins: function () { return pins.map(function (p) { return Object.assign({}, p); }); },
+      preferences: function () { return Object.assign({}, prefs); },
+      setPreferences: setPreferences
     };
   }
   return { bounds: bounds, references: references, toStage: toStage, projectMm: projectMm,
-    summary: summary, edgeInfo: edgeInfo, pick: pick, fmt: fmt, scanGaps: scanGaps, mount: mount };
+    summary: summary, edgeInfo: edgeInfo, pick: pick, fmt: fmt, scanGaps: scanGaps, mount: mount,
+    measurementRows: measurementRows, inspectionItems: inspectionItems, togglePin: togglePin,
+    overlayLayout: overlayLayout, placeLabel: placeLabel };
 });

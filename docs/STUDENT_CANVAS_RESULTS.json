@@ -1,0 +1,435 @@
+{
+  "validatedAt": "2026-10-09T10:05:39.928406+00:00",
+  "scope": "Student drawing canvas, step 1 only",
+  "status": "PASS",
+  "canvasSuite": {
+    "command": "node tools/test-major2-canvas-browser.js",
+    "workflowGroups": 9,
+    "layouts": 144,
+    "results": [
+      "Workspace preferences validate, isolate accounts, and do not contain drawing entities",
+      "Guide and 3D visibility are independent, and Focus is always recoverable",
+      "Live layout preview and Cancel preserve geometry, pan, zoom, selection and the active line step",
+      "Saved paper, label, grid, snap and layout choices survive navigation; Reset does not erase work",
+      "Grid snapping acts on new pointer placements without moving existing geometry",
+      "3D uses the student construction; permitted references require an explicit choice",
+      "Hidden 3D remains recoverable for deliberate pose inspection and read-only review",
+      "Workspace presets, Escape and unavailable device storage have reversible behavior",
+      "Checked 144 canvas layouts",
+      "All layouts preserve paper, accessible controls and non-overlapping 3D across themes"
+    ],
+    "errors": [],
+    "artifacts": "/tmp/major2-canvas-Mb0GL9"
+  },
+  "classroomSuite": {
+    "command": "node tools/test-major2-browser.js",
+    "workflowGroups": 22,
+    "layouts": 96,
+    "results": [
+      {
+        "name": "New welcome and six themes persist",
+        "status": "PASS"
+      },
+      {
+        "name": "Guest drawing uses native paper, pointer tools, undo and redo",
+        "status": "PASS"
+      },
+      {
+        "name": "Draft restore survives navigation",
+        "status": "PASS"
+      },
+      {
+        "name": "Teacher creates a class and publishes a wizard assignment",
+        "status": "PASS"
+      },
+      {
+        "name": "Teacher saves a private model and a real 3D reference",
+        "status": "PASS"
+      },
+      {
+        "name": "Teacher studio shows real classes, assignments, and an empty review queue",
+        "status": "PASS"
+      },
+      {
+        "name": "Teacher assignment library searches and filters real briefs",
+        "status": "PASS"
+      },
+      {
+        "name": "Teacher class sheets search, open briefs, and preserve class deletion confirmation",
+        "status": "PASS"
+      },
+      {
+        "name": "Teacher drawing cabinet opens real previews; studio forms and practice keep their workflows",
+        "status": "PASS"
+      },
+      {
+        "name": "Student joins class; models stay private and 3D respects visibility",
+        "status": "PASS"
+      },
+      {
+        "name": "Student home puts the next real question before supporting artwork",
+        "status": "PASS"
+      },
+      {
+        "name": "Student checks, saves, and submits a drawing",
+        "status": "PASS"
+      },
+      {
+        "name": "Teacher reviews immutable submission; student receives feedback",
+        "status": "PASS"
+      },
+      {
+        "name": "Saved drawing reopens; rename and search use actual data",
+        "status": "PASS"
+      },
+      {
+        "name": "Point practice requires actions and records completion",
+        "status": "PASS"
+      },
+      {
+        "name": "Line, square, and solid lessons require actual practice",
+        "status": "PASS"
+      },
+      {
+        "name": "Editing dependencies, circle radius, cancellation, and invalid commands are safe",
+        "status": "PASS"
+      },
+      {
+        "name": "A failed save preserves drawing and offers an explicit retry",
+        "status": "PASS"
+      },
+      {
+        "name": "Malformed JSON import is rejected without changing the paper",
+        "status": "PASS"
+      },
+      {
+        "name": "Six themes and responsive layouts have no horizontal overflow",
+        "status": "PASS"
+      },
+      {
+        "name": "Touch-only devices keep authoring disabled and inspection available",
+        "status": "PASS"
+      },
+      {
+        "name": "No uncaught browser errors",
+        "status": "PASS"
+      }
+    ],
+    "errors": [],
+    "artifacts": "/tmp/major2-browser-kTkuwk"
+  },
+  "viewportSizes": [
+    [
+      1280,
+      844
+    ],
+    [
+      980,
+      720
+    ],
+    [
+      760,
+      844
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      320,
+      740
+    ],
+    [
+      1366,
+      600
+    ]
+  ],
+  "appThemes": [
+    "warm",
+    "blueprint",
+    "forest",
+    "lilac",
+    "midnight",
+    "sunlit"
+  ],
+  "liveAssetMatches": [
+    "index.html",
+    "core.js",
+    "drawing.js",
+    "student-workspaces.js",
+    "student-canvas.js",
+    "student-canvas.css"
+  ],
+  "syntax": "PASS for all changed JavaScript and the canvas browser test",
+  "testIsolation": "Canvas fixtures deny API mutations; classroom mutations use a disposable database.",
+  "remainingScope": "Steps 2–12 in STUDENT_CANVAS_PLAN.md; actual student observation has not yet been done.",
+  "drawingMethodSuite": {
+    "command": "node tools/test-major2-method-browser.js",
+    "workflowGroups": 14,
+    "layouts": 48,
+    "results": [
+      "Draw menu is the default and invalid method preferences are rejected",
+      "Preview and Cancel retain an active menu line; saving a method switch cancels only unfinished input",
+      "Native plain shortcut clicks place points without choosing a tool",
+      "Ctrl-click banks a point; the second point previews a line and commits its chosen style",
+      "Native shortcut undo and redo preserve geometry and dependencies",
+      "Two banked points and a third create the original three-point circle",
+      "Double-click renaming is editable, undoable and has a safe Escape path",
+      "Aim, type a distance and Enter places an exact axis projection; invalid input does not mutate work",
+      "Ctrl/Cmd banks toggle, Escape cancels, and method switching preserves committed entities",
+      "Slash opens commands from Focus and text fields keep their own keyboard input",
+      "The chosen method survives navigation and saved drawings reopen without false drafts",
+      "Both methods preserve immutable reviews and model inspection cannot edit submitted geometry",
+      "Reset restores Draw menu without erasing the drawing",
+      "Drawing methods, help and controls remain usable across themes and small screens"
+    ],
+    "errors": [],
+    "artifacts": "/tmp/major2-methods-NpCyQd"
+  },
+  "drawingMethodFollowup": "Workspace → Drawing method: Draw menu / Shortcuts, with a visible toolbar entry and tested original shortcut gestures.",
+  "floatingWindowFollowup": {
+    "validatedAt": "2026-10-09T10:55:45.802708+00:00",
+    "status": "PASS",
+    "scope": "Optional floating student 3D window and independent model gestures",
+    "browser": "T3 collaborative preview",
+    "checksSource": "tools/check-major2-window.js",
+    "workflowGroups": 9,
+    "results": [
+      "preferences",
+      "moveResize",
+      "keyboardPersistence",
+      "modelGestures",
+      "minimizeFocus",
+      "settings",
+      "unavailableReferenceReview",
+      "drawingHistory",
+      "lessonOrbit"
+    ],
+    "layoutCount": 168,
+    "layouts": [
+      {
+        "errors": [],
+        "height": 800,
+        "layouts": 24,
+        "width": 1280
+      },
+      {
+        "errors": [],
+        "height": 720,
+        "layouts": 24,
+        "width": 980
+      },
+      {
+        "errors": [],
+        "height": 600,
+        "layouts": 24,
+        "width": 761
+      },
+      {
+        "errors": [],
+        "height": 844,
+        "layouts": 24,
+        "width": 760
+      },
+      {
+        "errors": [],
+        "height": 844,
+        "layouts": 24,
+        "width": 390
+      },
+      {
+        "errors": [],
+        "height": 740,
+        "layouts": 24,
+        "width": 320
+      },
+      {
+        "errors": [],
+        "height": 600,
+        "layouts": 24,
+        "width": 1366
+      }
+    ],
+    "nativeKeyboardChecks": [
+      "Shift-arrow frame movement",
+      "Shift-arrow frame resizing",
+      "Model orbit arrow key"
+    ],
+    "nativeDrawingCheck": {
+      "lineCommitted": true,
+      "undoRestoresGeometryAndCleanDraft": true
+    },
+    "pointerCheckMethod": "Dispatched pointer/wheel events with temporary capture shims; no native drag automation tool was available.",
+    "saveCheck": "Local in-memory fixture only; no live API mutation.",
+    "priorSuitesRerun": false,
+    "errors": [],
+    "assets": [
+      {
+        "asset": "index.html",
+        "sha256": "39de6fd4e26c9a47e97ea21ee5c7329336b10a5d3732dd8af69918cbcd860b04",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "student-canvas-window.js",
+        "sha256": "4f008166dd2a977c88c836e2ef193800dcd95efc34ceee6e94649022ff051eed",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "student-canvas.js",
+        "sha256": "fe792b7029b944430390d7b79d17c3b3f929713547f8ecbf4ac6d2557789aa06",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "student-canvas.css",
+        "sha256": "f27018d380b4109e823e4cafe553c38bd08208cadcc4c5a7c788184bbf12a4fb",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "core.js",
+        "sha256": "4b48264ae41812c93a100648ee647638921d27ece79a6ad549403ec8bddc26d9",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "drawing.js",
+        "sha256": "8996a84d1e4482afcaa809a9a37b16f6185bd125fe0165fbff616cff16e079bd",
+        "liveMatchesLocal": true
+      }
+    ],
+    "screenshot": "/root/t3code/.t3/userdata/browser-artifacts/browser-screenshot-mitasia-in-mv0ueg9b-54ced971.png",
+    "lessonCheck": "Only model orbit completes exploration; moving the frame and clicking without rotation do not."
+  },
+  "lineTypeFollowup": {
+    "validatedAt": "2026-10-09T11:35:34.270Z",
+    "status": "PASS",
+    "scope": "Student line types for toolbar and shortcut drawing",
+    "workflowGroups": 7,
+    "results": [
+      "menuTypes",
+      "activeAnchorAndLength",
+      "previewPatterns",
+      "focusAndCircle",
+      "shortcuts",
+      "preferencesSaveReview",
+      "fallback"
+    ],
+    "layoutCount": 30,
+    "layouts": [
+      {
+        "width": 1280,
+        "height": 800,
+        "layouts": 6,
+        "errors": []
+      },
+      {
+        "width": 980,
+        "height": 720,
+        "layouts": 6,
+        "errors": []
+      },
+      {
+        "width": 760,
+        "height": 844,
+        "layouts": 6,
+        "errors": []
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "layouts": 6,
+        "errors": []
+      },
+      {
+        "width": 320,
+        "height": 740,
+        "layouts": 6,
+        "errors": []
+      }
+    ],
+    "errors": [],
+    "command": "node tools/test-major2-line-types-browser.js",
+    "browserChecksSource": "tools/check-major2-line-types.js",
+    "nativeChecks": {
+      "nativeChecks": [
+        "ArrowUp and Enter choose a line type",
+        "Escape preserves the first endpoint",
+        "Pointer drawing uses the chosen B type",
+        "Undo restores saved geometry"
+      ],
+      "passed": true
+    },
+    "artifactDirectory": "/tmp/major2-line-types-wWeDBZ",
+    "screenshot": "/tmp/major2-line-types-wWeDBZ/student-line-type-picker.png",
+    "assets": [
+      {
+        "asset": "index.html",
+        "sha256": "f8b5725d2130b4a32890e2b86dc6c9eb86bd9d4ccaae716ffde69194d7cffc5c",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "student-line-types.js",
+        "sha256": "3d527276b94d5fe064ccef7ed6f373e34aae4442b6630171fc269c84e0dcd5d8",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "student-canvas.js",
+        "sha256": "781785fb02d12c059d66541bcdd06f86b901c4cdcb4e091c45e646e3b4975c39",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "student-canvas.css",
+        "sha256": "45db094677959f44223b78f69259bb05ce928e89662c9461c94143362f0cd80d",
+        "liveMatchesLocal": true
+      },
+      {
+        "asset": "drawing.js",
+        "sha256": "6f5fef36da28341d97fc4bf4fa9d338b529163540fa69e7d5e16cff21ba80272",
+        "liveMatchesLocal": true
+      }
+    ],
+    "browserNote": "Used the collaborative preview for native keyboard and pointer checks. After preview_open explicitly reported unavailable, standalone Chromium completed the fallback and regression checks.",
+    "saveCheck": "In-memory fixture; no live API mutations.",
+    "regressions": {
+      "canvas": {
+        "workflowGroups": 9,
+        "layouts": 144,
+        "results": [
+          "Workspace preferences validate, isolate accounts, and do not contain drawing entities",
+          "Guide and 3D visibility are independent, and Focus is always recoverable",
+          "Live layout preview and Cancel preserve geometry, pan, zoom, selection and the active line step",
+          "Saved paper, label, grid, snap and layout choices survive navigation; Reset does not erase work",
+          "Grid snapping acts on new pointer placements without moving existing geometry",
+          "3D uses the student construction; permitted references require an explicit choice",
+          "Hidden 3D remains recoverable for deliberate pose inspection and read-only review",
+          "Workspace presets, Escape and unavailable device storage have reversible behavior",
+          "Checked 144 canvas layouts",
+          "All layouts preserve paper, accessible controls and non-overlapping 3D across themes"
+        ],
+        "errors": [],
+        "artifacts": "/tmp/major2-canvas-Mb0GL9"
+      },
+      "methods": {
+        "workflowGroups": 14,
+        "layouts": 48,
+        "results": [
+          "Draw menu is the default and invalid method preferences are rejected",
+          "Preview and Cancel retain an active menu line; saving a method switch cancels only unfinished input",
+          "Native plain shortcut clicks place points without choosing a tool",
+          "Ctrl-click banks a point; the second point previews a line and commits its chosen style",
+          "Native shortcut undo and redo preserve geometry and dependencies",
+          "Two banked points and a third create the original three-point circle",
+          "Double-click renaming is editable, undoable and has a safe Escape path",
+          "Aim, type a distance and Enter places an exact axis projection; invalid input does not mutate work",
+          "Ctrl/Cmd banks toggle, Escape cancels, and method switching preserves committed entities",
+          "Slash opens commands from Focus and text fields keep their own keyboard input",
+          "The chosen method survives navigation and saved drawings reopen without false drafts",
+          "Both methods preserve immutable reviews and model inspection cannot edit submitted geometry",
+          "Reset restores Draw menu without erasing the drawing",
+          "Drawing methods, help and controls remain usable across themes and small screens"
+        ],
+        "errors": [],
+        "artifacts": "/tmp/major2-methods-X8OjQf"
+      }
+    },
+    "classroomSuiteRerun": false
+  }
+}

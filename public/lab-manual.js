@@ -22,7 +22,7 @@
   var SECTIONS = {
     teacher: [
       '1-what-educad-is',
-      '38-login-session-chip-and-desktop-gate',
+      '38-login-session-chip-and-mobile-support',
       '39-edit-and-view-modes',
       '310-classes-and-question-sets-teachers-post-students-submit',
       '311-command-line--and-settings',

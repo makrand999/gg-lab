@@ -1213,6 +1213,10 @@
           }
         }
       } catch (err) { /* rect cache keeps its last value */ }
+      // Committed-frame hook: sheet occlusion painted from this same
+      // projection (datum gaps) refreshes here, so every motion path
+      // stays consistent without shadowing each entry point.
+      if (typeof opts.afterDraw === 'function') opts.afterDraw(st);
       return counts;
     }
     var rafPending = false;

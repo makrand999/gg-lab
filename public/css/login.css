@@ -4,7 +4,7 @@
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
-  src: url(fonts/cuprum-latin.woff2) format('woff2');
+  src: url(../fonts/cuprum-latin.woff2) format('woff2');
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: #e5e5e5; }
@@ -95,7 +95,7 @@ a:hover { color: #003d99; }
    Motion is driven frame-by-frame in menu-lava.js (CF easeOutBack,
    700ms) — no CSS transition here, it would fight the tween. */
 .menu-list li.backLava {
-  background: url(images/menu/lava-right.png) no-repeat top right;
+  background: url(../images/menu/lava-right.png) no-repeat top right;
   width: 9px;
   height: 20px;
   z-index: 8;
@@ -104,7 +104,7 @@ a:hover { color: #003d99; }
   padding: 0;
 }
 .menu-list li.backLava .leftLava {
-  background: url(images/menu/lava-left.png) no-repeat top left;
+  background: url(../images/menu/lava-left.png) no-repeat top left;
   height: 20px;
   margin-right: 9px;
 }

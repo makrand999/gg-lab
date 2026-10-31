@@ -68,6 +68,12 @@ throws(function () { S.toggle(st, 'nope'); }, 'toggle unknown');
 throws(function () { S.createStore({ nope: true }); }, 'seed unknown');
 throws(function () { S.createStore({ showDemos: 'yes' }); }, 'seed non-boolean');
 throws(function () { S.get(null, 'showDemos'); }, 'null store');
+eq(S.getDrawingMode(S.createStore()), 'menu', 'existing menu workflow remains the default');
+eq(S.setDrawingMode(st, 'shortcuts'), 'shortcuts');
+eq(S.getDrawingMode(st), 'shortcuts');
+throws(function () { S.setDrawingMode(st, 'unknown'); }, 'drawing methods are validated');
+S.reset(st);
+eq(S.getDrawingMode(st), 'menu', 'reset restores the drawing method');
 pass('phase32 settings store ops');
 
 // 3 persistence round-trips; corrupt or blocked storage falls back
@@ -107,6 +113,13 @@ var blocked = {
 };
 eq(S.load(blocked).values.showDemos, true, 'blocked load');
 eq(S.save(blocked, saved), false, 'blocked save');
+S.setDrawingMode(saved, 'shortcuts');
+S.setInspection(saved, 'precision', 3);
+S.save(fakeStorage, saved);
+eq(S.getDrawingMode(S.load(fakeStorage)), 'shortcuts', 'shortcut mode survives reload');
+eq(S.getInspection(S.load(fakeStorage)).precision, 3, 'drawing method preserves inspection settings');
+eq(S.getDrawingMode(S.parse('{"showDemos":false}')), 'menu', 'old settings migrate to menu mode');
+eq(S.getDrawingMode(S.parse('{"drawingMode":"unknown"}')), 'menu', 'invalid stored drawing method falls back');
 pass('phase32 settings persistence');
 
 // 4 twenty-three documented slash commands, each with usage + hint
@@ -404,7 +417,7 @@ pass('phase32 help text');
 var index = fs.readFileSync(INDEX_PATH, 'utf8');
 ok(/<script src="lib\/educad-settings\.js(?:\?[^\"]*)?"><\/script>/.test(index),
   'settings loaded');
-ok(index.indexOf('<script src="lib/educad-command.js"></script>') !== -1,
+ok(/<script src="lib\/educad-command\.js(?:\?[^\"]*)?"><\/script>/.test(index),
   'command loaded');
 ['id="cmd-bar"', 'id="cmd-input"', 'id="cmd-suggest"', 'id="cmd-preview"',
   'id="cmd-status"', 'id="settings-panel"', 'id="settings-rows"',
@@ -484,7 +497,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase32`') !== -1, 'phase32 row');
 ok(readme.indexOf('Slash commands: Minecraft-style `/cmd` draw, autocomplete, Settings prefs') !== -1,
   'phase32 label');
-ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–47 (1060 checks)') !== -1,
   'grand total 960');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase32'], 'node tools/test-phase32-command.js',

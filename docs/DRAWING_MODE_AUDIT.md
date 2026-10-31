@@ -1,7 +1,7 @@
 # Drawing, Edit, View, and Pose audit
 
 Reviewed and repaired on 2026-10-06 in the working tree, preserving the
-existing unrelated edits. **All ten confirmed defects F01–F10 are fixed.**
+existing unrelated edits. **All eleven confirmed defects F01–F11 are fixed.**
 
 ## Fixes and current verification
 
@@ -25,16 +25,21 @@ existing unrelated edits. **All ten confirmed defects F01–F10 are fixed.**
 - **F10:** analytic tolerance-capsule interval coverage replaces fixed samples.
   Curves use bounded chord error, and straight segments retain the full stated
   tolerance. Regression cases include gaps on spans up to `1e12` mm.
+- **F11:** the 3D glass reports every committed frame via `afterDraw`, and
+  View mode re-cuts the layer-1 datum there, so occlusion tracks orbit, pan,
+  zoom, reset, fit, and selection.
 
 Verification:
 
-- `npm test`: **1,150 passing checks**, including the new **48** generalized
-  drawing regressions. `npm run test:drawing-audit` runs that subset.
-- Mounted-app browser suite: **27 passed, 0 failed, 0 browser exceptions**.
+- `npm test`: **1,151 passing checks**, including the new **48** generalized
+  drawing regressions and the F11 glass-frame hook check.
+  `npm run test:drawing-audit` runs that subset.
+- Mounted-app browser suite: **28 passed, 0 failed, 0 browser exceptions**.
   Covers drawing line/circle/polyline/dimension/projector, linked coordinate
   edits, undo/redo, all drag cancellation paths, View/Pose mutation guards,
   immediate Pose entry after editing, invalid loads, explicit replacement,
-  hidden guides, and confirmed/cancelled pose gestures.
+  hidden guides, confirmed/cancelled pose gestures, and datum occlusion
+  tracking across 3D orbit, pan, and zoom.
 - Browser results: [DRAWING_MODE_AUDIT_RESULTS.json](DRAWING_MODE_AUDIT_RESULTS.json).
 
 The shared T3 preview returned an explicit unavailable error during repair.
@@ -74,6 +79,7 @@ loss of the read-only guarantee. P2 denotes interaction and consistency faults.
 | F08 | P2 | Edit / View picking | Hit testing disagrees with drawn line, ray, and arc geometry |
 | F09 | P2 | Pose / side view | Profile copies join unrelated vertices and fail to split coincident edges |
 | F10 | P2 | Three-view validation | Fixed samples miss extra geometry and report false agreement |
+| F11 | P2 | View / 3D inspection | Datum occlusion freezes while the 3D model moves |
 
 ## F01 — drag cancellation re-enters its own restore
 
@@ -255,6 +261,23 @@ falls between them, and the reverse coverage pass does not detect the extra ink.
 or use tolerance-bounded adaptive subdivision for curves. Check both missing
 and extra coverage. Scale the sampling resolution to the geometric error
 tolerance rather than the number of endpoints.
+
+## F11 — datum occlusion freezes while the 3D model moves
+
+**Reproduce:** load `/demo 3view`, enter View mode, and drag the 3D model
+(or call `orbitBy`/`panBy`/`zoomAt`). The datum breaks stay where the model
+was: the line shows through the moved model and stays cut where it left.
+
+The datum breaks are painted on layer 1 from the live 3D projection (the
+`renderLayer1` datum pass via `spatialView.datumGaps`), but orbit, pan,
+zoom, reset, `fit`, plane toggle, and selection redraw only the glass canvas
+(`scheduleDraw`), never layer 1.
+
+**General fix:** the glass reports every committed frame through a new
+`afterDraw(state)` mount option, fired after the overlay once per `draw()`.
+The app refreshes layer 1 from that single hook while in View mode, so every
+current and future motion path stays consistent without shadowing each entry
+point. Mounts without the option, and headless mounts, behave as before.
 
 ## Shared improvements and next test matrix
 

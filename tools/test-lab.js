@@ -91,7 +91,7 @@ async function main() {
   pass('lab student page ships');
 
   // 3 lab css: link actions, no boxed buttons
-  var css = readMirror('lab.css');
+  var css = readMirror('css/lab.css');
   ok(css.indexOf('.lab-act') !== -1, 'link actions');
   ok(css.indexOf('.lab-row') !== -1, 'rows');
   eq(css.indexOf('.cf-btn'), -1, 'no boxed buttons');
@@ -210,7 +210,7 @@ async function main() {
   eq(seed.status, 0, 'seed exit 0: ' + (seed.stderr || ''));
   var port = await freePort();
   var srv = child.spawn(SERVER, [String(port)], {
-    env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+    env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
     stdio: ['ignore', 'ignore', 'ignore']
   });
   try {
@@ -227,7 +227,7 @@ async function main() {
     pass('lab pages serve');
 
     // 13 lab css + scripts serve with content types
-    var r13a = await get(port, '/lab.css');
+    var r13a = await get(port, '/css/lab.css');
     eq(r13a.status, 200);
     ok(String(r13a.headers['content-type']).indexOf('text/css') !== -1, 'css type');
     var r13b = await get(port, '/teacher.js');

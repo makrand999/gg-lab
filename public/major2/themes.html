@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Major 2 — theme explorer</title>
+  <link rel="stylesheet" href="./theme-preview.css">
+  <script src="./theme-preview.js" defer></script>
+</head>
+<body>
+  <main class="explorer">
+    <header class="explorer-header">
+      <div class="project-label"><span class="project-dot" aria-hidden="true"></span> EduCAD / Major 2 design concepts</div>
+      <a href="./">Back to preview home →</a>
+      <h1>Same easy workspace.<br>Six different personalities.</h1>
+      <p class="explorer-intro">Choose a theme, then compare the home and drawing screens. These are design examples with sample content; they do not access your account or edit a real drawing.</p>
+    </header>
+
+    <fieldset class="theme-picker">
+      <legend>Choose a visual theme</legend>
+      <div class="theme-grid">
+        <label class="theme-option" style="--choice-bg:#F6F2EA;--choice-primary:#A8442E">
+          <input type="radio" name="theme" value="warm" checked>
+          <span class="theme-choice"><span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span><strong>Warm Studio</strong><span>Ivory + terracotta</span><span class="recommended">Recommended</span></span>
+        </label>
+        <label class="theme-option" style="--choice-bg:#F3F6FB;--choice-primary:#2457C5">
+          <input type="radio" name="theme" value="blueprint">
+          <span class="theme-choice"><span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span><strong>Blueprint</strong><span>Cool white + cobalt</span><span class="theme-character">Precise and crisp</span></span>
+        </label>
+        <label class="theme-option" style="--choice-bg:#F1F6F2;--choice-primary:#1F6B52">
+          <input type="radio" name="theme" value="forest">
+          <span class="theme-choice"><span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span><strong>Forest Classroom</strong><span>Sage + deep green</span><span class="theme-character">Calm and grounded</span></span>
+        </label>
+        <label class="theme-option" style="--choice-bg:#F6F3FB;--choice-primary:#6841BB">
+          <input type="radio" name="theme" value="lilac">
+          <span class="theme-choice"><span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span><strong>Soft Lilac</strong><span>Lavender + violet</span><span class="theme-character">Gentle and expressive</span></span>
+        </label>
+        <label class="theme-option" style="--choice-bg:#151923;--choice-primary:#C1ABFF">
+          <input type="radio" name="theme" value="midnight">
+          <span class="theme-choice"><span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span><strong>Midnight Lab</strong><span>Charcoal + lavender</span><span class="theme-character">Optional dark theme</span></span>
+        </label>
+        <label class="theme-option" style="--choice-bg:#FFF8EB;--choice-primary:#8F5708">
+          <input type="radio" name="theme" value="sunlit">
+          <span class="theme-choice"><span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span><strong>Sunlit Paper</strong><span>Cream + ochre</span><span class="theme-character">Bright and welcoming</span></span>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="preview-heading">
+      <div><h2 id="theme-name">Warm Studio</h2><p id="theme-description">Ivory paper, terracotta actions, and a welcoming studio feel.</p></div>
+      <div class="screen-switch" role="group" aria-label="Choose a sample screen">
+        <button id="show-home" type="button" aria-pressed="true">Student home</button>
+        <button id="show-drawing" type="button" aria-pressed="false">Drawing desk</button>
+      </div>
+    </div>
+
+    <section class="concept-preview" id="concept-preview" aria-label="Interactive Major 2 design example" data-theme="warm">
+      <section id="mock-home" aria-label="Sample student home">
+        <header class="mock-header">
+          <div class="mock-brand"><span class="logo-shape" aria-hidden="true">E</span><span>EduCAD <small>Your learning workspace</small></span></div>
+          <button class="ui-button secondary" type="button" data-demo="Help would show short instructions for the current task.">Help</button>
+        </header>
+        <div class="home-layout">
+          <nav class="mock-nav" aria-label="Sample account navigation">
+            <button class="nav-item current" type="button" data-home><span aria-hidden="true">⌂</span> Home</button>
+            <button class="nav-item" type="button" data-demo="My classes would list the classes you have joined."><span aria-hidden="true">▦</span> My classes</button>
+            <button class="nav-item" type="button" data-demo="My drawings would show your saved drawings with previews."><span aria-hidden="true">▱</span> My drawings</button>
+            <button class="nav-item" type="button" data-demo="Learn would offer guided practice in points, lines, planes, and solids."><span aria-hidden="true">▤</span> Learn</button>
+          </nav>
+          <div class="home-content">
+            <p class="sample-label">Sample student home</p>
+            <h3>What would you like<br class="wide-break"> to work on?</h3>
+            <p class="ui-muted home-lead">Continue your assignment, or try a short practice drawing.</p>
+            <article class="continue-card">
+              <div class="task-art" aria-hidden="true"><svg viewBox="0 0 180 150"><path d="M40 43 64 28H112L136 43 112 58H64Z"/><path d="M40 43V103L64 124H112L136 103V43M64 58V124M112 58V124"/><path class="hidden-line" d="M40 103 64 88H112L136 103M64 28V88M112 28V88"/></svg></div>
+              <div class="task-copy"><span class="ui-kicker">Your next step</span><h4>Projection of a hexagonal prism</h4><p class="ui-muted">Engineering Graphics · Sample class</p><div class="task-meta"><span>Question 1 of 3</span><span class="ui-badge">Not submitted</span></div><button class="ui-button primary" id="continue-drawing" type="button">Start drawing <span aria-hidden="true">→</span></button></div>
+            </article>
+            <div class="support-grid">
+              <article class="support-card"><span class="support-icon" aria-hidden="true">▱</span><h4>Keep your drawings together</h4><p class="ui-muted">Open and continue the work you saved.</p><button class="ui-button secondary" type="button" data-demo="This would open your saved drawings. The concept preview contains sample content only.">My drawings</button></article>
+              <article class="support-card"><span class="support-icon" aria-hidden="true">✦</span><h4>Try it one step at a time</h4><p class="ui-muted">Start with points and a simple line.</p><button class="ui-button secondary" type="button" data-demo="This would open a guided practice lesson with one instruction at a time.">Start a practice lesson</button></article>
+            </div>
+            <div class="join-strip"><div><strong>Joining a new class?</strong><p class="ui-muted">Ask your teacher for the class code.</p></div><button class="ui-button secondary" type="button" data-demo="Join class would open one large code field and a clearly labeled Join button.">Join a class</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="mock-drawing" aria-label="Sample drawing workspace" hidden>
+        <header class="mock-header drawing-header"><button class="ui-button secondary" type="button" data-home>← Back to assignment</button><div class="drawing-title"><strong>Hexagonal prism</strong><span class="ui-muted">Question 1 · Sample assignment</span></div><button class="ui-button primary" type="button" data-demo="Save would store this drawing after the server confirms it. This is only a visual example.">Save drawing</button></header>
+        <div class="drawing-toolbar" role="group" aria-label="Sample drawing tools">
+          <button class="tool-button" type="button" data-tool="point" aria-pressed="false">● Point</button>
+          <button class="tool-button selected" type="button" data-tool="line" aria-pressed="true">╱ Line</button>
+          <button class="tool-button" type="button" data-tool="circle" aria-pressed="false">○ Circle</button>
+          <button class="tool-button" type="button" data-tool="measure" aria-pressed="false">↔ Measure</button>
+          <span class="toolbar-space"></span>
+          <button class="tool-button" type="button" data-demo="Undo would restore the previous drawing action.">↶ Undo</button>
+          <button class="tool-button" type="button" data-demo="Fit drawing would put the entire construction in view.">Fit drawing</button>
+        </div>
+        <div class="drawing-layout">
+          <div class="paper-wrap">
+            <div class="paper-heading"><span>Drawing paper</span><span>Units: mm</span></div>
+            <svg class="drawing-paper" viewBox="0 0 650 470" aria-labelledby="paper-title paper-description" role="img">
+              <title id="paper-title">Illustrative front and top views of a prism</title><desc id="paper-description">A rectangular front view above the XY ground line and a hexagonal top view below it. These are sample diagrams, not an editable drawing.</desc>
+              <defs><pattern id="paper-grid" width="25" height="25" patternUnits="userSpaceOnUse"><path d="M25 0H0V25" fill="none" stroke="#E3E6E4" stroke-width=".8"/></pattern></defs>
+              <rect width="650" height="470" fill="#FCFDFB"/><rect x="20" y="20" width="610" height="430" fill="url(#paper-grid)"/>
+              <g fill="#36434B" font-family="system-ui,sans-serif" font-size="16"><text x="40" y="52">Front view (VP)</text><text x="40" y="308">Top view (HP)</text><text x="42" y="227">X</text><text x="593" y="227">Y</text></g>
+              <path d="M40 240H610" stroke="#3E4F5B" stroke-width="1.6"/>
+              <path d="M245 200V87H395V200Z M282 87V200 M358 87V200" fill="none" stroke="#253442" stroke-width="2.2"/>
+              <path d="M245 87V394 M282 87V413 M358 87V413 M395 87V394" stroke="#5D7690" stroke-width="1" stroke-dasharray="5 5"/>
+              <path d="M245 361 282 334H358L395 361 358 388H282Z" fill="#EEF3F5" stroke="#253442" stroke-width="2.2"/>
+              <g fill="#204E85" stroke="#FCFDFB" stroke-width="2"><circle cx="245" cy="361" r="5"/><circle cx="282" cy="334" r="5"/><circle cx="358" cy="334" r="5"/></g>
+              <g fill="#253442" font-family="system-ui,sans-serif" font-size="16"><text x="223" y="371">a</text><text x="270" y="322">b</text><text x="360" y="322">c</text></g>
+            </svg>
+            <p class="paper-note">Illustrative drawing. Tool buttons show example instructions.</p>
+          </div>
+          <aside class="drawing-guide">
+            <span class="ui-kicker">Your question</span><h4>Draw the front and top views.</h4><p class="ui-muted">Use the reference model to understand the shape.</p>
+            <div class="step-guide"><strong>What to do next</strong><p id="tool-instruction">Choose the first point of your line.</p><span class="ui-muted">You can undo a mistake at any time.</span></div>
+            <h4 class="model-heading">3D reference</h4><div class="model-preview" aria-hidden="true"><svg viewBox="0 0 210 155"><path d="M48 42 80 24 132 24 165 42 132 60H80Z" fill="#DDE7ED"/><path d="M48 42V105L80 126H132L165 105V42M80 60V126M132 60V126" fill="none"/><path d="M48 42 80 24H132L165 42 132 60H80Z" fill="none"/></svg></div>
+            <button class="ui-button secondary" type="button" data-demo="Reset view would return the 3D reference to its starting orientation.">Reset 3D view</button>
+          </aside>
+        </div>
+        <footer class="drawing-footer"><span class="ui-muted">Sample drawing · no account data</span><div><button class="ui-button secondary" type="button" data-demo="Check would use only the feedback allowed by your teacher, without revealing their model answer.">Check my drawing</button><button class="ui-button primary" type="button" data-demo="Submit would show a review panel before sending this drawing to your teacher.">Submit drawing</button></div></footer>
+      </section>
+      <p class="demo-message" id="demo-message" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <section class="palette-panel" aria-labelledby="palette-title"><div><h2 id="palette-title">The working palette</h2><p>Colors change. Navigation, readable labels, and engineering paper stay consistent.</p></div><dl id="palette-values"></dl><p class="contrast-note" id="contrast-note"></p><p class="contrast-caveat">Ratios cover the listed text pairs only. A complete accessibility review must also check focus, controls, drawing graphics, and behavior.</p></section>
+    <footer class="explorer-footer">A design direction for a friendlier engineering graphics workspace. No external fonts, account requests, or project dependencies.</footer>
+  </main>
+</body>
+</html>

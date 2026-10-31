@@ -274,7 +274,7 @@ async function main() {
   eq(seed22.status, 0, 'seed exit 0: ' + (seed22.stderr || ''));
   var port22 = await freePort();
   var srv = child.spawn(SERVER, [String(port22)], {
-    env: Object.assign({}, process.env, { EDUCAD_DB: db22, EDUCAD_ROOT: MIRROR }),
+    env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db22, EDUCAD_ROOT: MIRROR }),
     stdio: ['ignore', 'ignore', 'ignore']
   });
   try {

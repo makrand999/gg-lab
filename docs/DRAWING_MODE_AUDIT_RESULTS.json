@@ -1,5 +1,5 @@
 {
-  "passed": 27,
+  "passed": 28,
   "failed": 0,
   "results": [
     {
@@ -154,6 +154,18 @@
     {
       "name": "F07 hidden guides neither snap nor absorb newly drawn points",
       "status": "PASS"
+    },
+    {
+      "name": "F11 datum occlusion tracks the 3D model across orbit, pan, and zoom",
+      "status": "PASS",
+      "evidence": {
+        "tracked": [
+          "orbit",
+          "pan",
+          "zoom",
+          "panOff"
+        ]
+      }
     }
   ],
   "pageErrors": []

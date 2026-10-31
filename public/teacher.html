@@ -26,13 +26,15 @@
     <main class="cf-content">
       <p class="lab-who"><span id="lab-who"></span><a href="login.html" id="lab-logout">Logout</a></p>
       <h1>Teacher studio</h1>
-      <p class="lab-flash" id="lab-flash" role="status"></p>
+      <p class="lab-flash" id="lab-flash" role="status" aria-live="polite" aria-atomic="true"></p>
       <div id="lab-root"><p class="lab-muted">Loading&hellip;</p></div>
     </main>
     <footer class="cf-footer">EduCAD &middot; zero-dependency teaching CAD &middot; demo login, no real security</footer>
   </div>
   <script src="menu-lava.js"></script>
   <script src="lib/educad-saves.js"></script>
+  <script src="lib/educad-reconstruct.js"></script>
+  <script src="lib/educad-ref3d.js"></script>
   <script src="lab-manual.js"></script>
   <script src="teacher.js"></script>
 </body>

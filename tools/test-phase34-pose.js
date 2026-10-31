@@ -373,7 +373,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase34`') !== -1, 'phase34 row');
 ok(readme.indexOf('Pose mode: Blender-style 3D moves drag the drawn 2D views') !== -1,
   'phase34 label');
-ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–47 (1060 checks)') !== -1,
   'grand total 960');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase34'], 'node tools/test-phase34-pose.js',

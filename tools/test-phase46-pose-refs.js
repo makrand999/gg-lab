@@ -200,8 +200,8 @@ pass('phase46 rest untouched');
   ok(readme.indexOf('`npm run test:phase46`') !== -1, 'phase46 row');
   ok(readme.indexOf('Pose reference ink: pinned axes, datum seats, stack parts seat') !== -1,
     'phase46 label');
-  ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
-    'grand total 1047');
+  ok(readme.indexOf('baseline + phases 1–47 (1060 checks)') !== -1,
+    'grand total 1060');
   var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
   eq(pkg.scripts['test:phase46'], 'node tools/test-phase46-pose-refs.js',
     'test:phase46 script');

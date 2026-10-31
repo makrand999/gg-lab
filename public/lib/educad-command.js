@@ -187,7 +187,8 @@
 
   function parseNum(tok) {
     if (!isNumTok(tok)) return null;
-    return parseFloat(tok);
+    var value = parseFloat(tok);
+    return Math.abs(value) <= 1e6 ? value : null;
   }
 
   // splitArgs: whitespace split; double quotes group words ("a b" stays
@@ -254,6 +255,10 @@
         error: 'no-command', message: 'Type a command — /help lists all ' +
           COMMANDS.length + '.' };
     }
+    if ((body.match(/"/g) || []).length % 2) {
+      return { ok: false, slash: true, name: '', args: [], argText: '',
+        error: 'unclosed-quote', message: 'Close the double quote before running the command.' };
+    }
     var toks = splitArgs(body);
     var spec = specOf(toks[0]);
     if (spec === null) {
@@ -317,7 +322,7 @@
   function kindCandidates(kind, ctx) {
     if (kind === 'point-name') return pointNames(ctx);
     if (kind === 'entity-name') {
-      var seen = {};
+      var seen = Object.create(null);
       var out = [];
       var lists = [pointNames(ctx), entityNames(ctx)];
       for (var li = 0; li < lists.length; li++) {
@@ -588,7 +593,8 @@
   // hatchLines(x1, y1, x2, y2, spacing, angleDeg): parallel chords at
   // angleDeg clipped to the rect (slab-method clip). Lines sit strictly
   // inside the rect so the boundary stays the owner's to draw.
-  function hatchLines(x1, y1, x2, y2, spacing, angleDeg) {
+  function hatchLines(x1, y1, x2, y2, spacing, angleDeg, limit) {
+    limit = limit || 10000;
     var xa = Math.min(x1, x2), xb = Math.max(x1, x2);
     var ya = Math.min(y1, y2), yb = Math.max(y1, y2);
     var th = angleDeg * Math.PI / 180;
@@ -599,8 +605,12 @@
     var tmin = Math.min(corners[0], corners[1], corners[2], corners[3]);
     var tmax = Math.max(corners[0], corners[1], corners[2], corners[3]);
     var out = [];
+    if (!(spacing > 0) || !isFinite(tmin) || !isFinite(tmax)) return out;
     var k0 = Math.floor(tmin / spacing) + 1;
     var k1 = Math.ceil(tmax / spacing) - 1;
+    if (!Number.isSafeInteger(k0) || !Number.isSafeInteger(k1) || k1 - k0 + 1 > limit) {
+      throw new Error('Hatch spacing needs too many lines (over ' + limit + ') — widen it or shrink the area.');
+    }
     for (var k = k0; k <= k1; k++) {
       var t = k * spacing;
       var px = nx * t, py = ny * t;
@@ -642,8 +652,8 @@
   // angle) followed by [bis] [role]. Pure shape split; validation of
   // the number itself stays with the caller.
   function splitCountTail(tail) {
-    if (tail.length > 0 && isNumTok(tail[0])) {
-      return { num: parseFloat(tail[0]), rest: tail.slice(1) };
+    if (tail.length > 0 && parseNum(tail[0]) !== null) {
+      return { num: parseNum(tail[0]), rest: tail.slice(1) };
     }
     return { num: null, rest: tail.slice() };
   }
@@ -696,6 +706,7 @@
           ('Detail for /' + args[0].toLowerCase() + '.') :
           ('Unknown command "/' + args[0] + '" — try /help.');
       case 'point': {
+        if (!args[0].trim()) return 'Point name must not be empty.';
         var px = parseNum(args[1]), py = parseNum(args[2]);
         if (px === null || py === null) return 'x and y must be numbers (mm) — usage: ' + spec.usage;
         if (hasPoint(ctx, args[0])) return 'There is already a point "' + args[0] + '".';
@@ -897,7 +908,9 @@
     if (br.error !== '') return br.error + ' — usage: ' + usage;
     var style = (br.bis !== null ? ', type ' + br.bis : '') +
       (br.role !== null ? ', ' + br.role + ' view' : '');
-    var lines = hatchLines(nums[0], nums[1], nums[2], nums[3], nums[4], angle);
+    var lines;
+    try { lines = hatchLines(nums[0], nums[1], nums[2], nums[3], nums[4], angle, HATCH_LINES_MAX); }
+    catch (err) { return err.message; }
     if (lines.length === 0) {
       return 'That spacing leaves no lines inside the area — tighten the spacing.';
     }
@@ -959,8 +972,8 @@
       var e = entities[i];
       if (!e || e.type !== 'POINT') continue;
       var label = displayName(e);
-      if (label === '' || map[label] !== undefined) continue;
-      map[label] = { x: e.x, y: e.y };
+      if (label === '' || Object.prototype.hasOwnProperty.call(map, label)) continue;
+      Object.defineProperty(map, label, { value: { x: e.x, y: e.y }, enumerable: true, writable: true, configurable: true });
     }
     return map;
   }
@@ -977,8 +990,8 @@
       var e = entities[i];
       if (!e || typeof e.id !== 'string') continue;
       var label = displayName(e);
-      if (label === '' || map[label] !== undefined) continue;
-      map[label] = e.id;
+      if (label === '' || Object.prototype.hasOwnProperty.call(map, label)) continue;
+      Object.defineProperty(map, label, { value: e.id, enumerable: true, writable: true, configurable: true });
     }
     return map;
   }
@@ -1008,7 +1021,13 @@
       'dimension', 'polygon', 'polyline', 'ellipse', 'hatch', 'rename',
       'delete', 'style', 'datum', 'clear', 'undo', 'demo',
       'tutorial'].indexOf(p.name) !== -1;
+    // Mobile inspection still loads demos (the page replaces the sheet
+    // and stays in View); every other mutating command stays refused.
+    if (p.name === 'demo' && env.mobileDemoLoad === true) mutating = false;
     if (readOnly && mutating) {
+      if (env.mobileNoEdit === true) {
+        return fail('Inspection-only on this device — drawing is read-only. Demos and saved drawings open in View.');
+      }
       return fail('View mode is read-only — /mode edit to draw.');
     }
 
@@ -1051,6 +1070,7 @@
       case 'point': {
         var bp = arity(3, 4);
         if (bp) return bp;
+        if (!args[0].trim()) return fail('Point name must not be empty.');
         var px = parseNum(args[1]), py = parseNum(args[2]);
         if (px === null || py === null) {
           return fail('x and y must be numbers (mm) — usage: ' + spec.usage);
@@ -1192,7 +1212,7 @@
         }
         for (var di = 0; di < pts.length; di++) {
           var nx = pts[(di + 1) % pts.length];
-          if (pts[di].id === nx.id) {
+          if (pts[di].id === nx.id || (pts[di].x === nx.x && pts[di].y === nx.y)) {
             return fail('Two different points needed — "' + args[di] + '" repeats.');
           }
         }
@@ -1220,7 +1240,7 @@
           opts.push(op.ent);
         }
         for (var oj = 0; oj + 1 < opts.length; oj++) {
-          if (opts[oj].id === opts[oj + 1].id) {
+          if (opts[oj].id === opts[oj + 1].id || (opts[oj].x === opts[oj + 1].x && opts[oj].y === opts[oj + 1].y)) {
             return fail('Two different points needed — "' + args[oj] + '" repeats.');
           }
         }
@@ -1309,7 +1329,9 @@
         if (hbr.error !== '') return fail(hbr.error + ' — usage: ' + spec.usage);
         var hbis = hbr.bis !== null ? hbr.bis : 'B';
         var hrole = hbr.role !== null ? hbr.role : 'BOTH';
-        var hlines = hatchLines(hx1, hy1, hx2, hy2, hsp, hang);
+        var hlines;
+        try { hlines = hatchLines(hx1, hy1, hx2, hy2, hsp, hang, HATCH_LINES_MAX); }
+        catch (err) { return fail(err.message); }
         if (hlines.length === 0) {
           return fail('That spacing leaves no lines inside the area — tighten the spacing.');
         }
@@ -1334,6 +1356,7 @@
       case 'rename': {
         var br = arity(2, 2);
         if (br) return br;
+        if (!args[1].trim()) return fail('New name must not be empty.');
         var ro = findEntity(table, args[0]);
         if (ro === null) return fail('Unknown point "' + args[0] + '".');
         if (findEntity(table, args[1]) !== null) {
@@ -1494,6 +1517,9 @@
         if (bm) return bm;
         var mn = String(args[0]).toLowerCase();
         if (MODES.indexOf(mn) === -1) return fail('Mode must be edit or view.');
+        if (mn === 'edit' && env.mobileNoEdit === true) {
+          return fail('Inspection-only on this device — the sheet stays in View.');
+        }
         if (typeof env.setMode !== 'function') {
           return fail('Modes are unavailable here.');
         }

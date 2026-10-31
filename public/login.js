@@ -8,7 +8,8 @@
     teacher: { username: 'teacher', password: 'teach123' },
     student: { username: 'student', password: 'learn123' }
   };
-  var role = 'academics';
+  var role = 'student';
+  var config = {student_auth:'erp',email_domains:['mit.asia']};
 
   function $(id) { return document.getElementById(id); }
 
@@ -48,6 +49,13 @@
 
   function renderHint() {
     if (!hint) return;
+    var erp = role==='student' && config.student_auth !== 'demo';
+    var label = document.querySelector('label[for=username]');
+    if(label)label.textContent=erp?'College ERP email:':'Username:';
+    userInput.type=erp?'email':'text';userInput.maxLength=erp?254:64;
+    passInput.maxLength=1024;
+    document.querySelector('label[for=password]').textContent=erp?'ERP password:':'Password:';
+    if(erp){hint.textContent='Use your college ERP email'+(config.email_domains.length?' (@'+config.email_domains.join(', @')+')':'')+' and password. Your student details are loaded from college ERP.';return;}
     var d = DEMO[role];
     hint.innerHTML = '';
     hint.appendChild(document.createTextNode('Demo ' + role + ' account: '));
@@ -74,6 +82,7 @@
     });
   });
   renderHint();
+  window.fetch('api/auth/config').then(function(res){if(!res.ok)throw new Error();return res.json();}).then(function(data){config=data;renderHint();}).catch(function(){});
 
   if (form) form.addEventListener('submit', function (e) {
     e.preventDefault();
@@ -81,7 +90,7 @@
     var username = userInput ? userInput.value : '';
     var password = passInput ? passInput.value : '';
     if (!String(username).trim() || !password) {
-      showError('Enter username and password.');
+      showError(role==='student'&&config.student_auth!=='demo'?'Enter your college ERP email and password.':'Enter username and password.');
       return;
     }
     if (submitBtn) submitBtn.disabled = true;
@@ -96,13 +105,14 @@
     }).then(function (out) {
       if (!out.res.ok || !out.data || !out.data.ok) {
         var msg = (out.data && out.data.error) || 'Login failed.';
-        if (out.res.status === 401) msg = 'Invalid username or password.';
+        if (out.res.status === 401) msg = role==='student'&&config.student_auth!=='demo'?'Invalid college ERP email or password.':'Invalid username or password.';
         showError(msg);
         if (submitBtn) submitBtn.disabled = false;
         return;
       }
       save({ role: out.data.role, username: out.data.username,
-        name: out.data.name, token: out.data.token });
+        name: out.data.name, token: out.data.token, profile: out.data.profile });
+      passInput.value='';
       goApp(out.data.role);
     }).catch(function () {
       showError('Server unreachable. Is `npm start` running?');

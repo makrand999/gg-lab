@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>EduCAD - 2D Engineering Graphics CAD</title>
   <link rel="stylesheet" href="css/edugraphics-hud.css">
-  <link rel="stylesheet" href="css/educad-spatial.css?v=hp-vp-2">
+  <link rel="stylesheet" href="css/educad-spatial.css?v=ortho-20261007-1">
+  <link rel="stylesheet" href="css/educad-mobile.css?v=mobile-20261007-5">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -150,72 +151,11 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     }
     #session-bar .demo-btn { box-shadow: none; }
+    body.mobile-inspect #btn-attach-reviewed-model { display: none !important; }
 
-    /* Mobile gate: CAD canvas is desktop-only. Opaque overlay intercepts all input. */
-    #mobile-block {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: #f8fafc;
-      padding: 24px;
-    }
-    body.mobile-blocked #mobile-block { display: flex; }
-    .mobile-block-card {
-      text-align: center;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      padding: 34px 38px;
-      max-width: 440px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-    }
-    .monitor-glyph {
-      display: block;
-      width: 64px;
-      height: 42px;
-      margin: 0 auto 22px;
-      border: 3px solid #334155;
-      border-radius: 5px;
-      position: relative;
-    }
-    .monitor-glyph::before {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 100%;
-      width: 4px;
-      height: 9px;
-      margin-top: 2px;
-      background: #334155;
-      transform: translateX(-50%);
-    }
-    .monitor-glyph::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: calc(100% + 11px);
-      width: 30px;
-      height: 4px;
-      background: #334155;
-      border-radius: 2px;
-      transform: translateX(-50%);
-    }
-    .mobile-block-card h2 {
-      font-size: 22px;
-      font-weight: 700;
-      color: #0f172a;
-      margin-bottom: 10px;
-    }
-    .mobile-block-card p {
-      font-size: 14px;
-      line-height: 1.55;
-      color: #475569;
-      margin-bottom: 18px;
-    }
-    .mobile-block-card .demo-btn { font-size: 13px; }
+    /* Mobile inspection replaces the retired desktop-only overlay:
+       touch-only devices get View + Pose in split panes (see
+       css/educad-mobile.css), enforced centrally in the app script. */
   </style>
   <style id="cf-panels">
     /* Account panels (Drawings, Sets): same clean Codeforces look as the
@@ -512,7 +452,7 @@
     }
     #pose-panel .pose-actions button:hover { text-decoration: underline; }
   </style>
-  <link rel="stylesheet" href="css/educad-drafting.css?v=quiet-20261006-3">
+  <link rel="stylesheet" href="css/educad-drafting.css?v=drawing-method-20261007-1">
 </head>
 <body>
   <script>
@@ -539,49 +479,28 @@
       } catch (err) { /* storage blocked: fail open to avoid a redirect loop */ }
     })();
   </script>
-  <div id="mobile-block" role="alertdialog" aria-label="Desktop required" aria-hidden="true">
-    <div class="mobile-block-card">
-      <span class="monitor-glyph" aria-hidden="true"></span>
-      <h2>Desktop required</h2>
-      <p>The EduCAD canvas needs a keyboard, mouse, and a wide screen. Please open this page on a desktop or laptop.</p>
-      <a class="demo-btn" href="tutorials.html">Open the tutorials sheet instead</a>
-    </div>
-  </div>
   <script>
-    // Mobile gate: block touch-only devices entirely. Runs before the CAD
-    // modules load so phones never flash the canvas. Touchscreen laptops
-    // (fine pointer present) are allowed; no dismiss, no bypass.
-    (function gateMobile() {
-      function isMobile() {
+    // Early mobile verdict: marks inspection-only input before the app
+    // loads so phones never flash desktop chrome. No blocking, no
+    // reload: the mobile shell refines layout after load and preserves
+    // the model and view across input or orientation changes.
+    (function classifyMobile() {
+      try {
         var coarse = false, fine = false;
-        try {
-          if (window.matchMedia) {
-            coarse = window.matchMedia('(pointer: coarse)').matches;
-            fine = window.matchMedia('(pointer: fine)').matches;
-          }
-        } catch (err) {}
-        if (coarse && !fine) return true;
-        if (fine) return false;
-        var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        var small = Math.min(window.innerWidth || 0, window.innerHeight || 0) < 720;
-        return touch && small;
-      }
-      function applyGate() {
-        var blocked = isMobile();
-        var was = document.body.classList.contains('mobile-blocked');
-        document.body.classList.toggle('mobile-blocked', blocked);
-        var ov = document.getElementById('mobile-block');
-        if (ov) ov.setAttribute('aria-hidden', blocked ? 'false' : 'true');
-        var app = document.getElementById('app-container');
-        if (app) app.inert = blocked;
-        var demo = document.querySelector('.demo-bar');
-        if (demo) demo.inert = blocked;
-        // Input environment changed mid-session (e.g. mouse plugged in): reboot cleanly.
-        if (was && !blocked && window.location && window.location.reload) window.location.reload();
-      }
-      applyGate();
-      window.addEventListener('resize', applyGate);
-      window.addEventListener('orientationchange', function() { setTimeout(applyGate, 150); });
+        if (window.matchMedia) {
+          coarse = window.matchMedia('(pointer: coarse)').matches;
+          fine = window.matchMedia('(pointer: fine)').matches;
+        }
+        var touchOnly = false;
+        if (fine) touchOnly = false;
+        else if (coarse) touchOnly = true;
+        else {
+          var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+          var small = Math.min(window.innerWidth || 0, window.innerHeight || 0) < 720;
+          touchOnly = touch && small;
+        }
+        if (touchOnly) document.body.classList.add('mobile-inspect');
+      } catch (err) { /* the shell classifies again after load */ }
     })();
   </script>
   <div id="app-container"></div>
@@ -650,7 +569,12 @@
   <div id="settings-panel" hidden>
     <div class="cmd-settings-head"><span>Settings</span><button id="settings-close" type="button" aria-label="Close settings">×</button></div>
     <div class="cmd-settings-section">Drawing</div>
-    <div id="settings-drafting"></div>
+    <div id="settings-drafting">
+      <div class="drafting-method">
+        <label>Drawing method <select id="settings-drawing-mode" aria-label="Drawing method"><option value="menu">Draw menu</option><option value="shortcuts">Shortcuts</option></select></label>
+        <p id="drawing-method-help"></p>
+      </div>
+    </div>
     <div class="cmd-settings-section">Sheet</div>
     <div id="settings-sheet"></div>
     <div class="cmd-settings-section">Preferences</div>
@@ -717,19 +641,23 @@
   <script src="lib/educad-curriculum.js?v=quiet-20261006-2"></script>
   <script src="lib/educad-labels.js"></script>
   <script src="lib/educad-solid.js?v=hp-vp-2"></script>
-  <script src="lib/educad-spatial.js?v=hp-vp-3"></script>
+  <script src="lib/educad-settings.js?v=drawing-method-20261007-1"></script>
+  <script src="lib/educad-spatial.js?v=inspect-20261007-1"></script>
   <script src="lib/educad-reconstruct.js?v=quiet-20261006-2"></script>
+  <script src="lib/educad-ref3d.js"></script>
   <script src="lib/educad-verify.js"></script>
   <script src="lib/educad-measure.js"></script>
+  <script src="lib/educad-orthographic.js?v=ortho-20261007-1"></script>
   <script src="lib/educad-tutorial.js"></script>
   <script src="lib/edugraphics-common.js"></script>
   <script src="lib/educad-boot.js"></script>
   <script src="lib/educad-saves.js"></script>
-  <script src="lib/educad-settings.js?v=quiet-20261006-2"></script>
-  <script src="lib/educad-command.js"></script>
+  <script src="lib/educad-command.js?v=mobile-20261007-5"></script>
+  <script src="lib/educad-auto.js"></script>
   <script src="lib/educad-pose.js"></script>
   <script src="lib/educad-project.js?v=quiet-20261006-2"></script>
-  <script src="lib/educad-drafting.js?v=quiet-20261006-2"></script>
+  <script src="lib/educad-drafting.js?v=drawing-method-20261007-1"></script>
+  <script src="lib/educad-mobile.js?v=mobile-20261007-5"></script>
 
   <script>
     (function () {
@@ -747,6 +675,34 @@
       // Saves UI bridge: the session-bar script below is a separate block
       // and reaches the live table only through this handle.
       window.educadHandle = handle;
+      // Mobile inspection verdict (input-based, fixed for the session):
+      // touch-only devices default to View, may enter Pose, and never
+      // enter Edit. mobileShell owns the split layout once mounted.
+      var mobileInspection = (typeof EduCADMobile !== 'undefined') ?
+        EduCADMobile.detectFromWindow(window).touchOnly : false;
+      var mobileShell = null;
+      var mobilePrivileged = false;
+      var lastDemoTitle = 'EduCAD';
+      function mobileSplitActive() {
+        return (typeof EduCADMobile !== 'undefined') &&
+          EduCADMobile.splitActive();
+      }
+      function mobileIgnore(e) {
+        return (typeof EduCADMobile !== 'undefined') &&
+          EduCADMobile.shouldDesktopIgnore(e);
+      }
+      function mobileClickEaten() {
+        return (typeof EduCADMobile !== 'undefined') &&
+          EduCADMobile.clickSuppressed();
+      }
+      // Privileged sheet replacement: demos and saved sheets load while
+      // the sheet stays in View. Synchronous only; user gestures never
+      // set this flag, so authoring stays refused.
+      function withMobilePrivileged(fn) {
+        mobilePrivileged = true;
+        try { return fn(); }
+        finally { mobilePrivileged = false; }
+      }
       // Settings store, owned by the commandLine block below. Hoisted
       // here so renderLayer1 can honor display prefs (locus lines).
       // Null until Settings loads; renderers treat null as defaults.
@@ -793,6 +749,22 @@
       var ctx1 = c1.getContext('2d');
       var ctx2 = c2.getContext('2d');
       var dpr = mount.dpr || window.devicePixelRatio || 1;
+      // Pane-relative cursor math: each canvas fills the window on
+      // desktop (identical values) and one split pane on mobile.
+      function sheetCursorFromClient(x, y) {
+        try {
+          var r = c2.getBoundingClientRect();
+          return { x: x - r.left, y: y - r.top };
+        } catch (err) { return { x: x, y: y }; }
+      }
+      function glassCursorFromClient(x, y) {
+        try {
+          var cv = handle.solid && handle.solid.canvas;
+          if (!cv) return { x: x, y: y };
+          var r = cv.getBoundingClientRect();
+          return { x: x - r.left, y: y - r.top };
+        } catch (err) { return { x: x, y: y }; }
+      }
 
       // In-canvas selection + on-site rename (no DOM inputs; Layer 2 only).
       handle.sel = EduCADCanvas.createSelectionState();
@@ -878,8 +850,8 @@
       }
       function showLineMenu(px) {
         var m = ensureLineMenu();
-        m.style.left = Math.max(4, Math.min(px.x + 10, window.innerWidth - 150)) + 'px';
-        m.style.top = Math.max(4, Math.min(px.y + 10, window.innerHeight - 170)) + 'px';
+        m.style.left = Math.max(4, Math.min(px.x + 10, handle.view.w - 150)) + 'px';
+        m.style.top = Math.max(4, Math.min(px.y + 10, handle.view.h - 170)) + 'px';
         m.classList.add('open');
       }
       function hideLineMenu() {
@@ -946,8 +918,8 @@
         });
         document.getElementById('app-container').appendChild(m);
         dotMenu = m;
-        dotMenu.style.left = Math.max(4, Math.min(px.x + 10, window.innerWidth - 170)) + 'px';
-        dotMenu.style.top = Math.max(4, Math.min(px.y + 10, window.innerHeight - 170)) + 'px';
+        dotMenu.style.left = Math.max(4, Math.min(px.x + 10, handle.view.w - 170)) + 'px';
+        dotMenu.style.top = Math.max(4, Math.min(px.y + 10, handle.view.h - 170)) + 'px';
         dotMenu.classList.add('open');
       }
       // User actions: every click/key gesture funnels through these named
@@ -956,6 +928,9 @@
       function drawingWarning(message) {
         if (typeof console !== 'undefined' && console.warn) console.warn(message);
         if (drafting) drafting.notify(message.replace(/^EduCAD (?:distance|plot|circle|bank): /, ''));
+        if (mobileShell && mobileShell.active()) {
+          mobileShell.flash(message.replace(/^EduCAD (?:distance|plot|circle|bank): /, ''));
+        }
       }
       function userPlacePoint(xMm, yMm, cursorPx) {
         var pname = EduCADCanvas.nextPointName(handle.table.list());
@@ -1360,8 +1335,11 @@
       handle.typedDist = EduCADCanvas.createTypedDistState();
       // Edit/View mode + inspected pick (View is read-only measuring).
       handle.measure = EduCADMeasure.createViewState();
-      handle.table.setMutationGuard(function () { return EduCADMeasure.isEdit(handle.measure); });
+      handle.table.setMutationGuard(function () {
+        return mobilePrivileged || (!mobileInspection && EduCADMeasure.isEdit(handle.measure));
+      });
       var spatialView = null;
+      var orthographicView = null;
       function abortPlotTask() {
         EduCADCanvas.abortPlotTool(handle.plot);
         EduCADCanvas.clearTypedDist(handle.typedDist);
@@ -1385,6 +1363,7 @@
       function poseStatus(msg) {
         var el = document.getElementById('save-status');
         if (el) el.textContent = msg;
+        if (msg && mobileShell && mobileShell.active()) mobileShell.flash(msg);
       }
 
       function enterPose() {
@@ -1396,7 +1375,9 @@
         var st = (handle.solid && handle.solid.state) ? handle.solid.state : null;
         if (!handle.solid || !handle.solidMm || !st ||
             !EduCADSolid.statusOf(st).available) {
-          poseStatus('Pose needs a point — draw a point in both views first.');
+          poseStatus(mobileInspection ?
+            'Pose needs a 3D model — open a demo or saved drawing first.' :
+            'Pose needs a point — draw a point in both views first.');
           return false;
         }
         poseSavedMode = (handle.measure.mode === 'view') ? 'view' : 'edit';
@@ -1622,6 +1603,79 @@
           'Rotation  ' + f(e[0]) + '°  ' + f(e[1]) + '°  ' + f(e[2]) + '°\n' +
           'Scale     ' + (Math.round(p.s * 1000) / 1000).toFixed(3) + '\n' +
           op;
+        if (mobileShell) mobileShell.updatePoseReadout(el.textContent);
+      }
+      // Touchscreen pose control: one op + axis per call, exact
+      // EduCADPose math with the same datum clamp as drag gestures.
+      // Move/scale set absolute values; rotate applies the commanded
+      // delta about the world axis. Returns the applied value (the
+      // clamp may shorten it) or null outside pose mode.
+      function mobilePoseSync() {
+        if (!poseState) return null;
+        return { t: poseState.pose.t.slice(), s: poseState.pose.s };
+      }
+      function mobilePoseSet(op, axis, value, snap, prevAngle) {
+        if (!poseState || typeof EduCADPose === 'undefined') return null;
+        var idx = { X: 0, Y: 1, Z: 2 }[axis];
+        if (idx === undefined) return null;
+        var prev = isFinite(prevAngle) ? prevAngle : 0;
+        var start = EduCADPose.clonePose(poseState.pose);
+        var target = EduCADPose.clonePose(poseState.pose);
+        if (op === 'move') {
+          target.t[idx] = value;
+        } else if (op === 'scale') {
+          target.s = value;
+        } else if (op === 'rotate') {
+          var full = (value - prev) * Math.PI / 180;
+          target.rm = EduCADPose.rotateAboutAxis(start.rm,
+            EduCADPose.AXES[axis], full);
+        } else {
+          return null;
+        }
+        function at(f) {
+          var p = EduCADPose.clonePose(start);
+          for (var i = 0; i < 3; i++) {
+            p.t[i] = start.t[i] + (target.t[i] - start.t[i]) * f;
+          }
+          p.s = start.s + (target.s - start.s) * f;
+          if (op === 'rotate') {
+            var d = (value - prev) * Math.PI / 180;
+            p.rm = EduCADPose.rotateAboutAxis(start.rm,
+              EduCADPose.AXES[axis], d * f);
+          } else {
+            p.rm = target.rm.slice();
+          }
+          return p;
+        }
+        var cand = at(1);
+        var f = 1;
+        if (!poseHoldsSides(cand)) {
+          f = EduCADPose.limitFraction(at, poseHoldsSides);
+          cand = at(f);
+        }
+        poseState.pose = cand;
+        poseState.limited = f < 0.999;
+        updatePoseView();
+        var applied = value;
+        if (op === 'move') applied = cand.t[idx];
+        else if (op === 'scale') applied = cand.s;
+        else if (op === 'rotate') applied = prev + (value - prev) * f;
+        return { value: applied, angle: applied,
+          limited: poseState.limited };
+      }
+      function mobilePoseReset() {
+        if (!poseState || typeof EduCADPose === 'undefined') return;
+        poseState.gesture = null;
+        poseState.gestureStart = null;
+        poseState.limited = false;
+        EduCADPose.resetPose(poseState.pose);
+        updatePoseView();
+      }
+      function mobilePoseAvailable() {
+        if (typeof EduCADSolid === 'undefined') return false;
+        var st = (handle.solid && handle.solid.state) ? handle.solid.state : null;
+        return !!(handle.solid && handle.solidMm && st &&
+          EduCADSolid.statusOf(st).available);
       }
 
       function startPoseGesture(op) {
@@ -1732,22 +1786,36 @@
         if (action.indexOf('view-') === 0) { poseSetView(action.slice(5)); return; }
       }
 
+      var sheetModeRevision = 0;
       function setSheetMode(mode) {
         if (['edit', 'view', 'pose'].indexOf(mode) === -1) return handle.measure.mode;
+        // Central inspection-only enforcement: touch-only devices never
+        // enter Edit, whatever asked (buttons, commands, deep links,
+        // tutorials, programmatic bridges). View and Pose stay open.
+        if (mobileInspection && mode === 'edit') {
+          poseStatus('Inspection-only on this device — the sheet stays in View.');
+          if (mobileShell) mobileShell.setMode(handle.measure.mode);
+          return handle.measure.mode;
+        }
         // A preview must roll back while the table is still editable, before
         // the new mode freezes it or captures its reconstructed pose source.
         if (drafting) drafting.cancel();
         cancelAuthoring();
         if (mode === 'pose' && handle.measure.mode !== 'pose' && handle.rebuildSolid) handle.rebuildSolid();
         if (mode === 'pose' && handle.measure.mode !== 'pose') {
-          if (!enterPose()) return handle.measure.mode;
+          if (!enterPose()) {
+            if (mobileShell) mobileShell.setMode(handle.measure.mode);
+            return handle.measure.mode;
+          }
         } else if (mode !== 'pose' && handle.measure.mode === 'pose') {
           exitPose();
         }
+        if (mode !== handle.measure.mode) sheetModeRevision++;
         var next = EduCADMeasure.setMode(handle.measure, mode);
         if (next !== 'pose' && handle.rebuildSolid) handle.rebuildSolid();
         if (spatialView) spatialView.setEnabled(next === 'view');
         if (drafting) drafting.modeChanged();
+        if (orthographicView) orthographicView.modeChanged();
         var be = document.getElementById('btn-mode-edit');
         var bv = document.getElementById('btn-mode-view');
         var bp = document.getElementById('btn-mode-pose');
@@ -1775,22 +1843,38 @@
           mount.menu.classList.remove('open');
         }
         ['btn-clear', 'sel-demo', 'sel-tut'].forEach(function (id) {
-          var control = document.getElementById(id); if (control) control.disabled = next !== 'edit';
+          var control = document.getElementById(id);
+          if (!control) return;
+          // Inspection devices load demos into View; tutorials and Clear
+          // stay Edit-only everywhere.
+          if (id === 'sel-demo' && mobileInspection) control.disabled = false;
+          else control.disabled = next !== 'edit';
         });
         renderLayer1();
         renderLayer2(null, null);
+        if (mobileShell) {
+          mobileShell.setMode(next);
+          updateMobileInspect();
+        }
         return next;
       }
+      // Inspection devices start in View; demos load into it below.
+      if (mobileInspection) setSheetMode('view');
       // View-mode click: inspect the topmost measurable entity under
       // the cursor, or clear the readout on empty sheet. Read-only:
       // no placement, no selection, no banking, no menus. The cursor's
       // side of the span is stored so the dimension opens toward it.
-      function viewClickInspect(cursor, sheetOnly) {
-        if (!sheetOnly && spatialView && handle.measure.mode === 'view' &&
+      function viewClickInspect(cursor, sheetOnly, tolPx) {
+        // Split panes own their picks: a 2D tap never reaches the 3D
+        // model (and sheet/glass coordinates differ there anyway).
+        if (!sheetOnly && !mobileSplitActive() && spatialView &&
+            handle.measure.mode === 'view' &&
             spatialView.inspectAt(cursor.x, cursor.y)) return;
         if (spatialView) spatialView.clear();
+        var tol = (tolPx === undefined || tolPx === null) ?
+          EduCADCanvas.SELECT_TOL_PX : tolPx;
         var id = EduCADMeasure.hitTestAll(liveEntities(), cursor,
-          handle.view, EduCADCanvas.SELECT_TOL_PX);
+          handle.view, tol);
         var side = null;
         if (id !== null) {
           side = EduCADMeasure.dimSideFor(handle.table.get(id),
@@ -1799,6 +1883,170 @@
         EduCADMeasure.setInspect(handle.measure, id, side);
         if (drafting) drafting.select(id);
         renderLayer2(cursor, null);
+        updateMobileInspect();
+      }
+      // Mirror the 2D inspect pick into the mobile bottom sheet.
+      function updateMobileInspect() {
+        if (orthographicView) {
+          if (handle.measure.inspectId !== null) orthographicView.selectionChanged();
+          else orthographicView.sync();
+        }
+        if (!mobileShell) return;
+        var id = handle.measure.inspectId;
+        if (id === null) {
+          mobileShell.setInspect('', null);
+          return;
+        }
+        var ent = handle.table.get(id);
+        var rep = ent ? EduCADMeasure.inspectEntity(ent) : null;
+        if (!rep) {
+          mobileShell.setInspect('', null);
+          return;
+        }
+        mobileShell.setSpatialNote('');
+        if (orthographicView && handle.measure.mode === 'view') {
+          mobileShell.setInspect(rep.title, null);
+          return;
+        }
+        mobileShell.setInspect(rep.title,
+          rep.title + '\n' + rep.rows.join('\n'));
+      }
+      // Mobile 2D Fit: frame live ink plus the XY datum in the sheet
+      // pane; empty sheets center the origin with the datum across it.
+      function fitSheetMobile() {
+        if (typeof EduCADMobile === 'undefined') return;
+        var bbox = EduCADMobile.extentOf(liveEntities());
+        var v = EduCADMobile.fitSheetView(handle.view.w, handle.view.h,
+          bbox, {});
+        handle.view.s = v.s;
+        handle.view.tx = v.tx;
+        handle.view.ty = v.ty;
+        renderLayer1();
+        renderLayer2(null, null);
+      }
+      function mobileTouchTol() {
+        return (typeof EduCADMobile !== 'undefined') ?
+          EduCADMobile.TOUCH_TOL_PX : 24;
+      }
+      // Touch tap on the sheet: stacked points open the chooser, one
+      // pick inspects, Edit taps (narrow desktop + touch) run the full
+      // click flow at the tap point. Returns 'chooser' when the shell
+      // should list candidates.
+      function mobilePressSheet(x, y) {
+        if (handle.measure.mode === 'pose') return 'done';
+        if (EduCADMeasure.isView(handle.measure)) {
+          if (mobileCandidates(x, y).length >= 2) return 'chooser';
+          mobileTapSheet(x, y);
+          return 'done';
+        }
+        handleSheetClick({ x: x, y: y }, { button: 0, shiftKey: false,
+          ctrlKey: false, metaKey: false, altKey: false });
+        return 'done';
+      }
+      function mobileCandidates(x, y) {
+        var out = [];
+        var ids = [];
+        try {
+          ids = EduCADCanvas.hitTestPointAll(liveEntities(), { x: x, y: y },
+            handle.view, mobileTouchTol());
+        } catch (err) { ids = []; }
+        ids.slice(0, 6).forEach(function (id) {
+          var ent = handle.table.get(id);
+          var rep = ent ? EduCADMeasure.inspectEntity(ent) : null;
+          if (rep) out.push({ id: id, label: rep.title + ' — ' + rep.rows[0] });
+        });
+        return out;
+      }
+      function mobileInspectChoice(id) {
+        var ent = handle.table.get(id);
+        var cursor = lastCursor || { x: 0, y: 0 };
+        var side = ent ?
+          EduCADMeasure.dimSideFor(ent, handle.view, cursor) : null;
+        EduCADMeasure.setInspect(handle.measure, id, side);
+        if (drafting) drafting.select(id);
+        renderLayer2(cursor, null);
+        updateMobileInspect();
+      }
+      function mobileTapSheet(x, y) {
+        viewClickInspect({ x: x, y: y }, true, mobileTouchTol());
+      }
+      function mobileTapGlass(x, y) {
+        if (!spatialView || handle.measure.mode !== 'view') return;
+        if (!spatialView.inspectAt(x, y, mobileTouchTol())) {
+          spatialView.clear();
+          if (mobileShell) mobileShell.setSpatialNote('');
+        }
+      }
+      function mobilePanSheet(dx, dy) {
+        handle.view.tx += dx;
+        handle.view.ty += dy;
+        renderLayer1();
+        renderLayer2(null, null);
+      }
+      function mobilePinchSheet(factor, cx, cy) {
+        if (!(factor > 0)) return;
+        var nv = EduCADViewport.zoomAt(handle.view, { x: cx, y: cy }, factor);
+        handle.view.s = nv.s;
+        handle.view.tx = nv.tx;
+        handle.view.ty = nv.ty;
+        renderLayer1();
+        renderLayer2(null, null);
+      }
+      function mobileOrbitGlass(dx, dy) {
+        if (handle.solid && typeof handle.solid.orbitBy === 'function') {
+          handle.solid.orbitBy(dx, dy);
+        }
+      }
+      function mobilePanGlass(dx, dy) {
+        if (handle.solid && typeof handle.solid.panBy === 'function') {
+          handle.solid.panBy(dx, dy);
+        }
+      }
+      function mobilePinchGlass(factor, cx, cy) {
+        if (!(factor > 0)) return;
+        if (handle.solid && typeof handle.solid.zoomAt === 'function') {
+          // zoomAt takes window coords and subtracts its own canvas rect.
+          var ox = 0, oy = 0;
+          try {
+            var r = handle.solid.canvas.getBoundingClientRect();
+            ox = r.left;
+            oy = r.top;
+          } catch (err) { /* glass fills the window */ }
+          handle.solid.zoomAt(cx + ox, cy + oy, factor);
+        }
+      }
+      function mobileFitGlass() {
+        if (handle.measure.mode === 'pose' && handle.solid) {
+          var st = handle.solid.state;
+          var points = st.geometry.vertices.map(function (p) {
+            return EduCADSolid.rotateDir(p.x, p.y, p.z, st.yaw, st.pitch);
+          });
+          if (!points.length) return;
+          var xs = points.map(function (p) { return p.x; });
+          var ys = points.map(function (p) { return p.y; });
+          var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+          var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+          var padding = Math.min(24, st.w * 0.15, st.h * 0.15);
+          var radius = Math.min(Math.max(1, st.w - padding * 2) / Math.max(1e-8, x1 - x0),
+            Math.max(1, st.h - padding * 2) / Math.max(1e-8, y1 - y0));
+          st.minScale = Math.min(st.minScale, radius / st.baseR);
+          st.scale = Math.min(st.maxScale, radius / st.baseR);
+          radius = EduCADSolid.projectionRadius(st);
+          st.cx = st.w / 2 - (x0 + x1) / 2 * radius;
+          st.cy = st.h / 2 + (y0 + y1) / 2 * radius;
+          handle.solid.scheduleDraw();
+          return;
+        }
+        if (spatialView) spatialView.fit();
+        else if (handle.solid && typeof handle.solid.resetView === 'function') {
+          handle.solid.resetView();
+        }
+      }
+      function mobileResetGlass() {
+        if (handle.solid && typeof handle.solid.resetView === 'function') {
+          handle.solid.resetView();
+        }
+        if (spatialView && handle.measure.mode === 'view') spatialView.fit();
       }
       // View-mode readout, drafting style: a linear dimension
       // (extension lines, arrows, centered value) for spans, a radius
@@ -1808,6 +2056,10 @@
       // refuse falls through to the plain badge below.
       function drawInspectOverlay(cursorPx) {
         if (!EduCADMeasure.isView(handle.measure)) return;
+        if (orthographicView && handle.measure.mode === 'view') {
+          orthographicView.drawOverlay(ctx2, handle.view);
+          return;
+        }
         if (handle.measure.inspectId === null) return;
         var ent = handle.table.get(handle.measure.inspectId);
         if (ent === null) return;
@@ -2028,19 +2280,68 @@
         }
       }
 
-      // Handle window resizing
-      window.addEventListener('resize', function () {
-        var w = window.innerWidth, h = window.innerHeight;
-        handle.view.w = w; handle.view.h = h;
-        handle.canvasState.view.w = w; handle.canvasState.view.h = h;
-        var sz = EduGraphicsCommon.hidpiBufferSize(w, h, dpr);
-        EduGraphicsCommon.sizeCanvasForDpr(c1, sz);
-        EduGraphicsCommon.sizeCanvasForDpr(c2, sz);
+      // Pane-aware resize: the mobile shell measures the real pane
+      // rectangles and calls back here; desktop keeps fullscreen math.
+      function applyMobileSizes(sizes) {
+        if (!sizes) {
+          var w = window.innerWidth, h = window.innerHeight;
+          handle.view.w = w; handle.view.h = h;
+          handle.canvasState.view.w = w; handle.canvasState.view.h = h;
+          var sz = EduGraphicsCommon.hidpiBufferSize(w, h, dpr);
+          EduGraphicsCommon.sizeCanvasForDpr(c1, sz);
+          EduGraphicsCommon.sizeCanvasForDpr(c2, sz);
+          if (handle.solid && typeof handle.solid.resize === 'function') {
+            handle.solid.resize(w, h);
+            if (spatialView && handle.measure.mode === 'view') spatialView.fit();
+          }
+          renderLayer1();
+          return;
+        }
+        // Split: keep the 2D world center and the 3D framing fixed, so
+        // orientation changes preserve the model and view. No auto-fit
+        // here; the explicit Fit buttons own the framing.
+        var vw = handle.view;
+        if (sizes.sheetVisible === false) {
+          sizes.sheetW = vw.w;
+          sizes.sheetH = vw.h;
+        }
+        var keep = (typeof EduCADMobile !== 'undefined') ?
+          EduCADMobile.preserveCenterTxTy(vw.w, vw.h, sizes.sheetW,
+            sizes.sheetH, vw.s, vw.tx, vw.ty) :
+          { tx: vw.tx, ty: vw.ty };
+        vw.w = sizes.sheetW; vw.h = sizes.sheetH;
+        vw.tx = keep.tx; vw.ty = keep.ty;
+        handle.canvasState.view.w = sizes.sheetW;
+        handle.canvasState.view.h = sizes.sheetH;
+        var ssz = EduGraphicsCommon.hidpiBufferSize(sizes.sheetW,
+          sizes.sheetH, dpr);
+        EduGraphicsCommon.sizeCanvasForDpr(c1, ssz);
+        EduGraphicsCommon.sizeCanvasForDpr(c2, ssz);
         if (handle.solid && typeof handle.solid.resize === 'function') {
-          handle.solid.resize(w, h);
-          if (spatialView && handle.measure.mode === 'view') spatialView.fit();
+          var st = handle.solid.state;
+          if (sizes.glassVisible === false) {
+            sizes.glassW = st.w;
+            sizes.glassH = st.h;
+          }
+          var dw = sizes.glassW - ((st && st.w) || sizes.glassW);
+          var dh = sizes.glassH - ((st && st.h) || sizes.glassH);
+          var keepCx = st.cx + dw / 2, keepCy = st.cy + dh / 2;
+          handle.solid.resize(sizes.glassW, sizes.glassH);
+          if (st && typeof st.cx === 'number') {
+            st.cx = keepCx;
+            st.cy = keepCy;
+          }
         }
         renderLayer1();
+        renderLayer2(null, null);
+      }
+      // Handle window resizing
+      window.addEventListener('resize', function () {
+        if (mobileShell) {
+          mobileShell.scheduleSync();
+          return;
+        }
+        applyMobileSizes(null);
       });
 
       // Render Base Layer 1 (Static: Grid, Datum Ground Line XY, Committed CAD Entities)
@@ -2109,11 +2410,14 @@
           // covers it: the Spatial card, the translucent HP/VP fills,
           // wire edges, vertices, and overlay text. One path with no
           // gaps draws exactly the original full-width stroke.
+          // Split panes never overlap, so the 3D model cannot cover the
+          // 2D datum there: no gaps needed (and the panel/window boxes
+          // would be in the wrong coordinate space anyway).
           var datumGaps = (EduCADMeasure.isView(handle.measure) && spatialView &&
-              typeof spatialView.datumGaps === 'function') ?
+              typeof spatialView.datumGaps === 'function' && !mobileSplitActive()) ?
             spatialView.datumGaps(xyY, function (text) {
               ctx1.save();
-              ctx1.font = '11px system-ui, sans-serif';
+              ctx1.font = spatialView.preferences().textSize + 'px system-ui, sans-serif';
               var tw = ctx1.measureText(text).width;
               ctx1.restore();
               return tw;
@@ -2581,6 +2885,9 @@
       }
 
       window.addEventListener('pointerdown', function (e) {
+        // Touch on a split layout belongs to the pane gesture
+        // controllers; the mouse path below is untouched.
+        if (mobileIgnore(e)) return;
         if (e.target.closest('.edugraphics-hud') || e.target.closest('.demo-bar') || e.target.closest('.edugraphics-menu')) return;
         // A live pose gesture owns the press: no orbit, no pan, no
         // sheet tool starts under it (click confirms, menu cancels).
@@ -2644,7 +2951,9 @@
       });
 
       window.addEventListener('pointermove', function (e) {
-        var cursor = { x: e.clientX, y: e.clientY };
+        if (mobileIgnore(e)) return;
+        var winCursor = { x: e.clientX, y: e.clientY };
+        var cursor = sheetCursorFromClient(e.clientX, e.clientY);
         lastCursor = cursor;
         var wPt = EduCADViewport.inverse(handle.view, cursor);
 
@@ -2700,7 +3009,7 @@
             !e.target.closest('.edugraphics-hud') &&
             !e.target.closest('.demo-bar') &&
             !e.target.closest('.edugraphics-menu') &&
-            solidAt(cursor)) {
+            solidAt(winCursor)) {
           c2.style.cursor = 'grab';
           renderLayer2(cursor, null);
           return;
@@ -2717,9 +3026,11 @@
       });
 
       window.addEventListener('pointerup', function (e) {
+        if (mobileIgnore(e)) return;
         if (solidOrbiting || solidPanning) {
           if (solidOrbiting && !solidDragged && spatialView && handle.measure.mode === 'view') {
-            spatialView.inspectAt(e.clientX, e.clientY);
+            var gcur = glassCursorFromClient(e.clientX, e.clientY);
+            spatialView.inspectAt(gcur.x, gcur.y);
           }
           solidOrbiting = false;
           solidPanning = false;
@@ -2747,11 +3058,11 @@
       // Wheel Zoom anchored at cursor
       window.addEventListener('wheel', function (e) {
         if (e.target.closest('.demo-bar')) return;
-        var cursor = { x: e.clientX, y: e.clientY };
+        var winCursor = { x: e.clientX, y: e.clientY };
         if (!sheetToolActive() &&
             !e.target.closest('.edugraphics-hud') &&
             !e.target.closest('.edugraphics-menu') &&
-            solidAt(cursor)) {
+            solidAt(winCursor)) {
           // Smooth 3D zoom into the ink: continuous exponential step
           // (trackpad-friendly), clamped per event against jumps.
           var dy = e.deltaY;
@@ -2760,11 +3071,12 @@
           if (!(zf > 0)) zf = 1;
           if (zf > 1.25) zf = 1.25;
           if (zf < 0.8) zf = 0.8;
-          handle.solid.zoomAt(cursor.x, cursor.y, zf);
+          handle.solid.zoomAt(winCursor.x, winCursor.y, zf);
           e.preventDefault();
           return;
         }
         e.preventDefault();
+        var cursor = sheetCursorFromClient(e.clientX, e.clientY);
         var factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
         var nv = EduCADViewport.zoomAt(handle.view, cursor, factor);
         handle.view.s = nv.s;
@@ -2838,10 +3150,10 @@
           renderLayer2(null, null);
           return;
         }
-        var cursor = { x: e.clientX, y: e.clientY };
+        var cursor = sheetCursorFromClient(e.clientX, e.clientY);
         var snap = EduCADSnapping.snapAt(cursor, handle.view, snapOptions());
         var hitDist = snap && snap.snap ? snap.snap.distPx : 999;
-        var menuPos = EduCADCanvas.onEmptyRightClick(handle.canvasState, e.clientX, e.clientY, hitDist, { w: window.innerWidth, h: window.innerHeight });
+        var menuPos = EduCADCanvas.onEmptyRightClick(handle.canvasState, cursor.x, cursor.y, hitDist, { w: handle.view.w, h: handle.view.h });
 
         if (menuPos.visible) {
           mount.menu.style.left = menuPos.x + 'px';
@@ -2871,10 +3183,24 @@
         // A press that started on 3D ink belongs to the model (orbit),
         // never to the sheet: swallow the click it trails.
         if (solidSuppressClick) { solidSuppressClick = false; return; }
+        // Synthetic clicks trailing a handled touch gesture are dead.
+        if (mobileClickEaten()) return;
         if (e.button !== 0 || e.shiftKey) return;
         // Pose gesture: click confirms the live transform.
         if (poseState && poseState.gesture) { confirmPoseGesture(); return; }
-        var cursor = { x: e.clientX, y: e.clientY };
+        var cursor = sheetCursorFromClient(e.clientX, e.clientY);
+        // View mode owns the whole click: inspect, never edit. Placed
+        // before banking so Ctrl+click is read-only here too.
+        if (EduCADMeasure.isView(handle.measure)) {
+          viewClickInspect(cursor, e.altKey);
+          return;
+        }
+        handleSheetClick(cursor, e);
+      });
+      // Touch taps in Edit run the same flow through this function: the
+      // cursor is pane-relative sheet coords, e carries the modifiers.
+      // (The mouse listener above already claimed View clicks.)
+      function handleSheetClick(cursor, e) {
         // View mode owns the whole click: inspect, never edit. Placed
         // before banking so Ctrl+click is read-only here too.
         if (EduCADMeasure.isView(handle.measure)) {
@@ -3069,7 +3395,7 @@
           if (snapAxes.y && (lock === null || lock.lock !== 'y')) py = placeSnap.yMm;
         }
         userPlacePoint(px, py, cursor);
-      });
+      }
 
       // Double-click a point starts on-site renaming (single click only
       // selects). The two preceding clicks harmlessly re-select first.
@@ -3079,6 +3405,8 @@
         // press-path double-tap above is the primary reset, and a
         // second reset here is idempotent). Anywhere else keeps the
         // rename behavior.
+        // Synthetic double-taps trailing touch gestures are dead.
+        if (mobileClickEaten()) return;
         var dcur = { x: e.clientX, y: e.clientY };
         if (!e.altKey && !sheetToolActive() && solidAt(dcur)) {
           handle.solid.resetView();
@@ -3090,7 +3418,7 @@
         if (EduCADMeasure.isView(handle.measure)) return;
         if (EduCADCanvas.isLineToolActive(handle.line) ||
             EduCADCanvas.isPolarToolActive(handle.polar)) return;
-        var cursor = { x: e.clientX, y: e.clientY };
+        var cursor = sheetCursorFromClient(e.clientX, e.clientY);
         var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
         if (id === null) return;
         if (handle.sel.editing && handle.sel.editing.id === id) return;
@@ -3107,6 +3435,13 @@
       // With no edit running, digits feed the typed axis distance (§6.2)
       // and Enter stakes the point; the first Escape clears the buffer.
       window.addEventListener('keydown', function (e) {
+        if (e.defaultPrevented) return;
+        // Real form fields and focusable controls own their keys. This
+        // includes numeric Pose entry and ordinary Tab navigation.
+        var target = e.target;
+        if (target && typeof target.closest === 'function' &&
+            target.closest('input, textarea, select, button, summary, a, [contenteditable="true"]')) return;
+        if (mobileSplitActive() && e.key === 'Tab') return;
         // Pose mode owns the keyboard: Blender map, nothing else.
         if (EduCADMeasure.isPose(handle.measure)) {
           poseKey(e);
@@ -3289,8 +3624,16 @@
       // verdicts report unverifiable). Positional truth survives student
       // edits; only loading another sheet replaces it.
       var demoTruth = null;
+      var DEMO_TITLES = { line: 'Line Rotation', points: 'Quadrant Points',
+        prism: 'Hex Prism', '3view': '3-View Prism', square: 'Profile Square',
+        clear: 'Blank sheet' };
       function loadDemo(type) {
-        if (!EduCADMeasure.isEdit(handle.measure)) { drawingWarning('Switch to Edit to replace the drawing.'); return; }
+        if (!EduCADMeasure.isEdit(handle.measure) && !mobileInspection) { drawingWarning('Switch to Edit to replace the drawing.'); return; }
+        // Inspection devices load demos into View; Clear stays refused.
+        if (mobileInspection && type === 'clear') { drawingWarning('Inspection-only: the sheet cannot be cleared here.'); return; }
+        if (mobileInspection && handle.measure.mode !== 'view') setSheetMode('view');
+        if (mobileInspection) mobilePrivileged = true;
+        try {
         if (drafting) drafting.cancel();
         handle.table.clear();
         EduCADCanvas.deselect(handle.sel);
@@ -3349,6 +3692,16 @@
         }
 
         renderLayer1();
+        } finally {
+          if (mobileInspection) mobilePrivileged = false;
+        }
+        lastDemoTitle = DEMO_TITLES[type] || lastDemoTitle;
+        if (mobileShell) {
+          mobileShell.setTitle(lastDemoTitle);
+          mobileShell.setInspect('', null);
+        }
+        // Fresh content frames itself; later resizes preserve the view.
+        if (mobileSplitActive()) fitSheetMobile();
       }
 
       document.getElementById('btn-demo-line').addEventListener('click', function () { loadDemo('line'); });
@@ -3397,15 +3750,32 @@
       // submission review through this handle.
       window.educadSetSheetMode = setSheetMode;
       // Explicit sheet loads validate before leaving inspection/pose, then
-      // replace in Edit. No loader can accidentally retain an old pose source.
+      // replace in Edit — or, on inspection devices, replace while
+      // staying in View. No loader can retain an old pose source.
       window.educadReplaceSheet = function (data) {
         var staging = EduCADEntities.createTable();
         var count = EduCADSaves.restoreTable(EduCADEntities, staging, data);
+        if (mobileInspection) {
+          setSheetMode('view');
+          withMobilePrivileged(function () {
+            EduCADSaves.restoreTable(EduCADEntities, handle.table, { entities: staging.list() });
+          });
+          if (handle.rebuildSolid) handle.rebuildSolid();
+          setSheetMode('view');
+          renderLayer1(); renderLayer2(null, null);
+          if (mobileSplitActive()) fitSheetMobile();
+          return count;
+        }
         setSheetMode('edit');
         EduCADSaves.restoreTable(EduCADEntities, handle.table, { entities: staging.list() });
         if (handle.rebuildSolid) handle.rebuildSolid();
         renderLayer1(); renderLayer2(null, null);
         return count;
+      };
+      // Mobile title bridge for the saves/deep-link blocks below.
+      window.educadMobileTitle = function (t) {
+        lastDemoTitle = String(t || lastDemoTitle);
+        if (mobileShell) mobileShell.setTitle(lastDemoTitle);
       };
 
       // Inline selects for Demo & Tutorial options
@@ -3656,6 +4026,8 @@
       }
       function startTutorial(which) {
         if (typeof EduCADTutorial === 'undefined') return;
+        // Tutorials draw step by step, so they need Edit (desktop).
+        if (mobileInspection) { drawingWarning('Tutorials draw step by step, so they need a desktop. Demos are ready under More.'); return; }
         if (!EduCADMeasure.isEdit(handle.measure)) { drawingWarning('Switch to Edit to start a drawing tutorial.'); return; }
         // Tutorials draw, so they always run in Edit.
         setSheetMode('edit');
@@ -3684,9 +4056,11 @@
         loadDemo('line');
         EduCADCanvas.applyMenuAction(handle.canvasState, 'mesh');
         EduGraphicsCommon.syncMenuChecked(mount, handle.canvasState.showGrid);
-        mount.menu.style.left = '380px';
-        mount.menu.style.top = '220px';
-        mount.menu.classList.add('open');
+        if (!mobileInspection) {
+          mount.menu.style.left = '380px';
+          mount.menu.style.top = '220px';
+          mount.menu.classList.add('open');
+        }
         renderLayer1();
       } else {
         loadDemo('line');
@@ -3704,7 +4078,14 @@
         handle.solid = EduCADSolid.mountSolidGlass(container, {
           w: window.innerWidth, h: window.innerHeight, dpr: dpr,
           drawUnderlay: function (ctx) { if (spatialView) spatialView.underlay(ctx); },
-          drawOverlay: function (ctx) { if (spatialView) spatialView.overlay(ctx); if (drafting) drafting.drawSolid(ctx, handle.solid.state); }
+          drawOverlay: function (ctx) { if (spatialView) spatialView.overlay(ctx); if (drafting) drafting.drawSolid(ctx, handle.solid.state); },
+          // Every glass frame re-cuts the layer-1 datum: orbit, pan,
+          // zoom, reset, fit, and selection redraw the glass only, so
+          // without this the datum gaps freeze wherever the model was.
+          // Split panes never overlap, so they skip the re-cut.
+          afterDraw: function () {
+            if (spatialView && EduCADMeasure.isView(handle.measure) && !mobileSplitActive()) renderLayer1();
+          }
         });
       } else if (typeof EduCADSolid !== 'undefined') {
         handle.solid = EduCADSolid.mountSolidWidget(container, { size: 260 });
@@ -3712,10 +4093,21 @@
       if (handle.solid && !handle.solid.headless &&
           typeof EduCADSpatial !== 'undefined' && handle.solid.state.baseR) {
         spatialView = EduCADSpatial.mount(handle.solid, container, EduCADSolid, {
+          sourceRevision: function () { return handle.table.revision(); },
+          onPreferencesChange: function (preferences) {
+            if (handle.setInspectionPreferences) handle.setInspectionPreferences(preferences);
+          },
           onSelect: function (value) {
+            if (value && orthographicView) orthographicView.activate('solid');
             if (drafting) drafting.selectSolid(value);
             EduCADMeasure.clearInspect(handle.measure);
             renderLayer2(null, null);
+            if (mobileShell) {
+              mobileShell.setInspect('', null);
+              mobileShell.setSpatialNote(value ?
+                (value.kind === 'point' ? '3D point P' + (value.index + 1) :
+                  '3D edge ' + (value.index + 1)) : '');
+            }
           }
         });
         handle.spatialView = spatialView;
@@ -3773,6 +4165,24 @@
       });
       handle.drafting = drafting;
       handle.history = history;
+      if (typeof EduCADOrthographic !== 'undefined') {
+        orthographicView = EduCADOrthographic.mount(handle, spatialView, container, {
+          entities: liveEntities,
+          layout: function () { return drafting.layout(); },
+          fit: function () { if (mobileSplitActive()) fitSheetMobile(); else drafting.fit(); },
+          redraw: function () { renderLayer1(); renderLayer2(null, null); },
+          select: function (id, side) {
+            if (id !== null && spatialView) spatialView.clear();
+            EduCADMeasure.setInspect(handle.measure, id, side);
+            drafting.select(id);
+            updateMobileInspect(); renderLayer2(null, null);
+          },
+          onPreferencesChange: function (preferences) {
+            if (handle.setSheetInspectionPreferences) handle.setSheetInspectionPreferences(preferences);
+          }
+        });
+        handle.orthographicView = orthographicView;
+      }
       drafting.refresh();
       renderLayer1();
 
@@ -3794,6 +4204,7 @@
         var cmdBar = document.getElementById('cmd-bar');
         var settingsPanel = document.getElementById('settings-panel');
         var settingsRows = document.getElementById('settings-rows');
+        var drawingModeSelect = document.getElementById('settings-drawing-mode');
         var sugActive = 0;
         var sugOpen = [];
         var cmdHistory = [];
@@ -3819,9 +4230,18 @@
           var coordsEl = document.getElementById('coords-display');
           if (coordsEl) coordsEl.style.display = coords ? '' : 'none';
           if (drafting) drafting.preferences({
+            drawingMode: EduCADSettings.getDrawingMode(settingsStore),
             guides: EduCADSettings.get(settingsStore, 'projectionGuides'),
             solid: EduCADSettings.get(settingsStore, 'solidPreview')
           });
+          if (drawingModeSelect) drawingModeSelect.value = EduCADSettings.getDrawingMode(settingsStore);
+          var drawingHelp = document.getElementById('drawing-method-help');
+          if (drawingHelp) drawingHelp.textContent = EduCADSettings.getDrawingMode(settingsStore) === 'shortcuts' ?
+            'Click to place · Ctrl/Cmd-click to bank points · double-click to rename. Aim, type a distance and press Enter.' :
+            'Choose a tool in Draw, then place it on the sheet. Select a point for projection actions.';
+          if (spatialView) spatialView.setPreferences(EduCADSettings.getInspection(settingsStore));
+          if (orthographicView) orthographicView.setPreferences(EduCADSettings.getSheetInspection(settingsStore));
+          syncInspectionSettings();
           try {
             if (typeof window.localStorage !== 'undefined') {
               EduCADSettings.save(window.localStorage, settingsStore);
@@ -3830,6 +4250,37 @@
           refreshCmdAssist();
           renderLayer1();
           renderLayer2(null, null);
+        }
+        if (drawingModeSelect) drawingModeSelect.addEventListener('change', function () {
+          EduCADSettings.setDrawingMode(settingsStore, drawingModeSelect.value);
+          applySettings();
+        });
+        handle.setInspectionPreferences = function (preferences) {
+          Object.keys(EduCADSettings.INSPECTION_FIELDS).forEach(function (key) {
+            EduCADSettings.setInspection(settingsStore, key, preferences[key]);
+          });
+          applySettings();
+        };
+        handle.setSheetInspectionPreferences = function (preferences) {
+          Object.keys(EduCADSettings.SHEET_INSPECTION_FIELDS).forEach(function (key) {
+            EduCADSettings.setSheetInspection(settingsStore, key, preferences[key]);
+          });
+          applySettings();
+        };
+        function syncInspectionSettings() {
+          if (!settingsRows) return;
+          var preferences = EduCADSettings.getInspection(settingsStore);
+          settingsRows.querySelectorAll('[data-inspection-key]').forEach(function (input) {
+            var value = preferences[input.dataset.inspectionKey];
+            if (input.type === 'checkbox') input.checked = value;
+            else input.value = String(value);
+          });
+          var sheetPreferences = EduCADSettings.getSheetInspection(settingsStore);
+          settingsRows.querySelectorAll('[data-sheet-inspection-key]').forEach(function (input) {
+            var value = sheetPreferences[input.dataset.sheetInspectionKey];
+            if (input.type === 'checkbox') input.checked = value;
+            else input.value = String(value);
+          });
         }
         function buildSettingsRows() {
           if (!settingsRows) return;
@@ -3851,6 +4302,56 @@
             row.appendChild(lab);
             settingsRows.appendChild(row);
           });
+          var inspection = document.createElement('details');
+          inspection.className = 'cmd-inspection-settings';
+          var heading = document.createElement('summary'); heading.textContent = '3D spatial inspection'; inspection.appendChild(heading);
+          var preferences = EduCADSettings.getInspection(settingsStore);
+          Object.keys(EduCADSettings.INSPECTION_FIELDS).forEach(function (key) {
+            var field = EduCADSettings.INSPECTION_FIELDS[key];
+            var row = document.createElement('label'); row.className = 'cmd-settings-row';
+            var input = document.createElement(field.options ? 'select' : 'input');
+            input.dataset.inspectionKey = key;
+            if (field.options) {
+              field.options.forEach(function (value) {
+                var option = document.createElement('option'); option.value = String(value);
+                option.textContent = key === 'textSize' ? ({ 11: 'Small', 13: 'Medium', 15: 'Large' })[value] :
+                  String(value).charAt(0).toUpperCase() + String(value).slice(1);
+                input.appendChild(option);
+              });
+              input.value = String(preferences[key]);
+            } else { input.type = 'checkbox'; input.checked = preferences[key]; }
+            input.addEventListener('change', function () {
+              var value = field.options ? (typeof field.default === 'number' ? Number(input.value) : input.value) : input.checked;
+              EduCADSettings.setInspection(settingsStore, key, value); applySettings();
+            });
+            var label = document.createElement('span'); label.textContent = field.label;
+            if (field.options) { row.appendChild(label); row.appendChild(input); }
+            else { row.appendChild(input); row.appendChild(label); }
+            inspection.appendChild(row);
+          });
+          settingsRows.appendChild(inspection);
+          var sheetInspection = document.createElement('details'); sheetInspection.className = 'cmd-inspection-settings';
+          var sheetHeading = document.createElement('summary'); sheetHeading.textContent = '2D orthographic inspection'; sheetInspection.appendChild(sheetHeading);
+          var sheetPreferences = EduCADSettings.getSheetInspection(settingsStore);
+          Object.keys(EduCADSettings.SHEET_INSPECTION_FIELDS).forEach(function (key) {
+            var field = EduCADSettings.SHEET_INSPECTION_FIELDS[key], row = document.createElement('label'); row.className = 'cmd-settings-row';
+            var input = document.createElement(field.options ? 'select' : 'input'); input.dataset.sheetInspectionKey = key;
+            if (field.options) {
+              field.options.forEach(function (value) {
+                var option = document.createElement('option'); option.value = String(value);
+                option.textContent = key === 'textSize' ? ({ 11: 'Small', 13: 'Medium', 15: 'Large' })[value] :
+                  key === 'view' ? ({ all: 'All views', elevation: 'Front', plan: 'Top', profile: 'Side' })[value] : String(value).charAt(0).toUpperCase() + String(value).slice(1);
+                input.appendChild(option);
+              }); input.value = String(sheetPreferences[key]);
+            } else { input.type = 'checkbox'; input.checked = sheetPreferences[key]; }
+            input.addEventListener('change', function () {
+              var value = field.options ? (typeof field.default === 'number' ? Number(input.value) : input.value) : input.checked;
+              EduCADSettings.setSheetInspection(settingsStore, key, value); applySettings();
+            });
+            var label = document.createElement('span'); label.textContent = field.label;
+            if (field.options) { row.appendChild(label); row.appendChild(input); } else { row.appendChild(input); row.appendChild(label); }
+            sheetInspection.appendChild(row);
+          }); settingsRows.appendChild(sheetInspection);
         }
         function hideSettings() {
           if (settingsPanel) settingsPanel.hidden = true;
@@ -4074,9 +4575,25 @@
             undo: function () { return userUndo(); },
             allowDemo: EduCADSettings.get(settingsStore, 'showDemos'),
             allowTutorial: EduCADSettings.get(settingsStore, 'showTutorials'),
-            readOnly: EduCADMeasure.isView(handle.measure)
+            readOnly: EduCADMeasure.isView(handle.measure),
+            mobileNoEdit: mobileInspection,
+            mobileDemoLoad: mobileInspection
           };
         }
+        // Mobile display bridges: the overflow menu reads and flips
+        // preferences without opening the desktop Settings panel.
+        window.educadGetSetting = function (key) {
+          try {
+            return EduCADSettings.get(settingsStore, key);
+          } catch (err) { return true; }
+        };
+        window.educadSetSetting = function (key, value) {
+          try {
+            EduCADSettings.set(settingsStore, key, !!value);
+            applySettings();
+            return true;
+          } catch (err) { return false; }
+        };
         function runCmdLine(line) {
           var res;
           try {
@@ -4118,7 +4635,7 @@
         }
         function isAutoLine(line) {
           var t = String(line).replace(/^\s+|\s+$/g, '');
-          return t === '/auto' || t.indexOf('/auto ') === 0;
+          return /^\/auto(?:\s|$)/.test(t);
         }
         function pushHistory(line) {
           if (EduCADSettings.get(settingsStore, 'commandHistory')) {
@@ -4138,60 +4655,46 @@
           if (m === 'interpret_failed') {
             return 'The model did not answer — try again in a moment.';
           }
+          if (m === 'interpret_timeout') return 'The model took too long — try again.';
           if (m === 'unauthorized') return 'Your session expired — log in again.';
           return 'Could not interpret that (' + m + ').';
         }
         // runInterpret: plain words to drawn steps. Students describe after
         // '/ '; teachers auto-draw models with /auto. Unusable answers and
         // honest refusals keep the bar open with the reason shown.
-        function runInterpret(text, mode) {
-          if (EduCADMeasure.isView(handle.measure)) {
-            var ro = 'View mode is read-only — /mode edit to draw.';
-            showCmdStatus(false, ro);
-            return Promise.resolve({ ok: false, message: ro, ids: [] });
-          }
+        var interpretRunner = EduCADAuto.createRunner({
+          table: handle.table,
+          maxAttempts: 2,
+          session: function () { return window.EduCADSaves.currentSession(); },
+          readOnly: function () { return EduCADMeasure.isView(handle.measure); },
+          modeRevision: function () { return sheetModeRevision; },
+          interpret: function (session, text, points, mode, pointData, feedback) {
+            return window.EduCADSaves.interpretWords(window.fetch.bind(window),
+              session, text, points, mode, pointData, feedback);
+          },
+          commit: function (data) {
+            cancelAuthoring();
+            if (drafting) drafting.cancel();
+            history.begin();
+            try { EduCADSaves.restoreTable(EduCADEntities, handle.table, data); }
+            finally { history.end(); }
+            if (handle.rebuildSolid) handle.rebuildSolid();
+            EduCADMeasure.clearInspect(handle.measure);
+            renderLayer1(); renderLayer2(null, null);
+          },
+          friendly: interpretFriendly
+        });
+        function runInterpret(text, mode, replace) {
           showCmdStatus(true, mode === 'auto' ? 'Drawing your model…' : 'Interpreting…');
-          var session = null;
-          try { session = window.EduCADSaves.currentSession(); } catch (err) { session = null; }
-          var pts = Object.keys(cmdPoints()).slice(0, 64);
-          return window.EduCADSaves.interpretWords(
-            window.fetch.bind(window), session, text, pts, mode).then(function (data) {
-            var cmds = (data && Array.isArray(data.commands)) ? data.commands : [];
-            var reply = (data && typeof data.reply === 'string') ? data.reply : '';
-            if (cmds.length === 0) {
-              var msg = reply !== '' ? reply :
-                'I could not turn that into drawing steps — try shorter, concrete words.';
-              showCmdStatus(false, msg);
-              return { ok: false, message: msg, ids: [] };
-            }
-            var drawn = 0;
-            var failed = [];
-            for (var i = 0; i < cmds.length; i++) {
-              var r = runCmdLine(cmds[i]);
-              if (r.ok) drawn++;
-              else failed.push(cmds[i] + ' — ' + r.message);
-            }
-            if (failed.length === 0) {
-              var done = (mode === 'auto' ? 'Model drawn' : 'Drawn') +
-                ' (' + drawn + ' step' + (drawn === 1 ? '' : 's') + ')' +
-                (reply !== '' ? ': ' + reply : '.');
-              showCmdStatus(true, done);
-              closeCmdBar();
-              return { ok: true, message: done, ids: [] };
-            }
-            var mix = 'Drew ' + drawn + ' of ' + cmds.length +
-              '; these failed:\n' + failed.join('\n');
-            showCmdStatus(false, mix);
-            return { ok: false, message: mix, ids: [] };
-          }, function (err) {
-            var msg = interpretFriendly(err);
-            showCmdStatus(false, msg);
-            return { ok: false, message: msg, ids: [] };
+          return interpretRunner(text, mode, replace).then(function (res) {
+            showCmdStatus(res.ok, res.message);
+            if (res.ok) closeCmdBar();
+            return res;
           });
         }
-        // Teacher bridge for the model deep link: auto-draw from a question.
-        window.educadAutoDraw = function (text) {
-          return runInterpret(String(text || ''), 'auto');
+        // Teacher bridge for the model deep link: replace only after validation.
+        window.educadAutoDraw = function (text, replace) {
+          return runInterpret(text, 'auto', replace === true);
         };
         // Console/agent bridge: window.educadRunCommand('/point a 10 20')
         // runs a line headlessly and mirrors the result onto the bar.
@@ -4346,6 +4849,105 @@
         applySettings();
       })();
 
+      // Mobile inspection shell: split panes, compact header, pane
+      // gestures, touchscreen pose dock, bottom sheet, overflow menu.
+      // Null-safe without the module; desktop keeps fullscreen math.
+      if (typeof EduCADMobile !== 'undefined' &&
+          typeof EduCADMobile.mount === 'function') {
+        try {
+          mobileShell = EduCADMobile.mount({
+            getMode: function () { return handle.measure.mode; },
+            isInspection: function () { return mobileInspection; },
+            canEdit: function () { return !mobileInspection; },
+            applySizes: applyMobileSizes,
+            setSheetMode: setSheetMode,
+            loadDemo: loadDemo,
+            runVerify: runVerify,
+            startTutorial: startTutorial,
+            clearSheet: function () { loadDemo('clear'); },
+            fitSheet: fitSheetMobile,
+            fitGlass: mobileFitGlass,
+            resetGlass: mobileResetGlass,
+            tapSheet: mobileTapSheet,
+            tapGlass: mobileTapGlass,
+            pressSheet: mobilePressSheet,
+            candidatesAt: mobileCandidates,
+            inspectChoice: mobileInspectChoice,
+            panSheetBy: mobilePanSheet,
+            pinchSheet: mobilePinchSheet,
+            orbitGlassBy: mobileOrbitGlass,
+            panGlassBy: mobilePanGlass,
+            pinchGlass: mobilePinchGlass,
+            poseSet: function (op, axis, value, snap, prevAngle) {
+              return mobilePoseSet(op, axis, value, snap, prevAngle);
+            },
+            poseReset: mobilePoseReset,
+            poseSyncAngles: mobilePoseSync,
+            poseIsAvailable: mobilePoseAvailable,
+            openDrawings: function () {
+              var b = document.getElementById('btn-drawings');
+              if (b) b.click();
+            },
+            openSets: function () {
+              var b = document.getElementById('btn-sets');
+              if (b) b.click();
+            },
+            doLogout: function () {
+              var b = document.getElementById('btn-logout');
+              if (b) b.click();
+            },
+            toggleGrid: function () {
+              handle.canvasState.showGrid = !handle.canvasState.showGrid;
+              EduGraphicsCommon.syncMenuChecked(mount,
+                handle.canvasState.showGrid);
+              renderLayer1();
+            },
+            isGridOn: function () { return !!handle.canvasState.showGrid; },
+            togglePlanes: function () {
+              if (!spatialView) return;
+              var b = spatialView.panel.querySelector('[data-action="planes"]');
+              if (b) b.click();
+            },
+            planesOn: function () {
+              if (!spatialView) return true;
+              var b = spatialView.panel.querySelector('[data-action="planes"]');
+              return !b || b.getAttribute('aria-pressed') !== 'false';
+            },
+            toggleCoords: function () {
+              if (typeof window.educadSetSetting === 'function' &&
+                  typeof window.educadGetSetting === 'function') {
+                window.educadSetSetting('coordsHud',
+                  !window.educadGetSetting('coordsHud'));
+              } else if (coordsDisp) {
+                coordsDisp.style.display =
+                  coordsDisp.style.display === 'none' ? '' : 'none';
+              }
+            },
+            coordsOn: function () {
+              if (typeof window.educadGetSetting === 'function') {
+                return !!window.educadGetSetting('coordsHud');
+              }
+              return !coordsDisp || coordsDisp.style.display !== 'none';
+            },
+            demosVisible: function () {
+              if (typeof window.educadGetSetting === 'function') {
+                return !!window.educadGetSetting('showDemos');
+              }
+              return true;
+            },
+            openSettings: function () {
+              var p = document.getElementById('settings-panel');
+              if (p) p.hidden = false;
+            }
+          });
+          mobileShell.setMode(handle.measure.mode);
+          mobileShell.setTitle(lastDemoTitle);
+          updateMobileInspect();
+        } catch (err) {
+          mobileShell = null;
+        }
+      }
+
       console.log('EduCAD Web App initialized successfully!');
     })();
   </script>
@@ -4371,11 +4973,25 @@
       }
 
       var current = { id: null, title: '' };
+      // Inspection devices load but never write: saves, deletes, and
+      // submits stay refused with a visible reason.
+      function mobileWriteBlocked(msg) {
+        var blocked = false;
+        try { blocked = document.body.classList.contains('mobile-inspect'); } catch (err) {}
+        if (blocked) {
+          status(msg);
+          if (typeof window.EduCADMobile !== 'undefined') window.EduCADMobile.flash(msg);
+        }
+        return blocked;
+      }
       // Deep-link bridge: ?drawing= notes the open drawing so the next
       // Save updates it instead of posting a copy.
       window.educadNoteDrawing = function (id, title) {
         current.id = id;
         current.title = title || '';
+        if (typeof window.educadMobileTitle === 'function') {
+          window.educadMobileTitle(current.title || 'Drawing');
+        }
       };
       var statusEl = $('save-status');
       function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
@@ -4400,6 +5016,7 @@
 
       var saveBtn = $('btn-save');
       if (saveBtn) saveBtn.addEventListener('click', function () {
+        if (mobileWriteBlocked('Saving is unavailable in mobile inspection.')) return;
         var s = Saves.currentSession();
         if (Saves.isGuest(s)) {
           status('Log in to save drawings (guest is local-only).');
@@ -4494,6 +5111,9 @@
           var count = window.educadReplaceSheet(data.data);
           current.id = it.id;
           current.title = data.title || '';
+          if (typeof window.educadMobileTitle === 'function') {
+            window.educadMobileTitle(current.title || 'Drawing');
+          }
           var h = window.educadHandle;
           if (h && h.sel && window.EduCADCanvas &&
               typeof window.EduCADCanvas.deselect === 'function') {
@@ -4504,6 +5124,7 @@
         }, fail('Load failed'));
       }
       function onDelete(it) {
+        if (mobileWriteBlocked('Deleting is unavailable in mobile inspection.')) return;
         if (!window.confirm('Delete "' + (it.title || 'Untitled') + '"?')) return;
         var s = Saves.currentSession();
         if (Saves.isGuest(s)) return;
@@ -4574,6 +5195,17 @@
         return function (err) {
           status(msg + (err && err.message ? ': ' + err.message : ''));
         };
+      }
+      // Inspection devices load starters, models, and submissions but
+      // never write: creates, deletes, grades, and submits stay refused.
+      function mobileWriteBlocked(msg) {
+        var blocked = false;
+        try { blocked = document.body.classList.contains('mobile-inspect'); } catch (err) {}
+        if (blocked) {
+          status(msg);
+          if (typeof window.EduCADMobile !== 'undefined') window.EduCADMobile.flash(msg);
+        }
+        return blocked;
       }
 
       var panel = $('sets-panel');
@@ -4664,7 +5296,11 @@
       function teacherHome(s) {
         clearPanel();
         header('Question sets');
-        panel.appendChild(el('div', 'New set', { marginTop: '6px' }, 'cf-section'));
+        panel.appendChild(el('div', 'New open set', { marginTop: '6px' }, 'cf-section'));
+        panel.appendChild(el('div', 'Open sets are available to any student with the code.', null, 'cf-muted'));
+        var studioLink = document.createElement('a');
+        studioLink.href = 'teacher.html'; studioLink.className = 'cf-link';
+        studioLink.textContent = 'Create a class set in Studio'; panel.appendChild(studioLink);
         var codeIn = textInput('Set code, e.g. geo-101');
         var titleIn = textInput('Title, e.g. Projections 1');
         panel.appendChild(codeIn);
@@ -4689,7 +5325,9 @@
             if (q.model) {
               row.appendChild(el('div',
                 'Model: ' + (q.model.entities || []).length + ' entities · auto-check ' +
-                (q.check_enabled === false ? 'off' : 'on'),
+                (q.check_enabled === false ? 'off' : 'on') +
+                (q.model3d ? ' · 3D preview ' + (q.show_3d === false ? 'off' : 'on')
+                  : ' · no 3D preview'),
                 null, 'cf-muted'));
             }
             var rm = btn('Remove', function () {
@@ -4718,7 +5356,7 @@
         modelBox.type = 'checkbox';
         modelWrap.appendChild(modelBox);
         modelWrap.appendChild(
-          document.createTextNode(' Attach current sheet as model answer (students never see it)'));
+          document.createTextNode(' Attach current sheet as model answer (2D never shown to students)'));
         panel.appendChild(modelWrap);
         var checkWrap = el('label', null, { display: 'block', marginTop: '4px' });
         var checkBox = document.createElement('input');
@@ -4728,6 +5366,14 @@
         checkWrap.appendChild(
           document.createTextNode(' Auto-check against the model (strict pass/fail)'));
         panel.appendChild(checkWrap);
+        var showWrap = el('label', null, { display: 'block', marginTop: '4px' });
+        var showBox = document.createElement('input');
+        showBox.type = 'checkbox';
+        showBox.checked = true;
+        showWrap.appendChild(showBox);
+        showWrap.appendChild(
+          document.createTextNode(' Show 3D preview to students (reference for drawing the views)'));
+        panel.appendChild(showWrap);
         var bulkIn = areaInput('Bulk: one question per block, blank line between. "Hint:" lines become hints.', 3);
         panel.appendChild(bulkIn);
         function parseBulk(text) {
@@ -4793,6 +5439,13 @@
             try {
               q.model = Saves.snapshotTable(mt);
               q.check_enabled = checkBox.checked;
+              q.show_3d = showBox.checked;
+              if (typeof EduCADRef3d !== 'undefined' &&
+                  typeof EduCADReconstruct !== 'undefined') {
+                var pv = EduCADRef3d.buildPreview((q.model.entities || []),
+                  EduCADReconstruct);
+                if (pv) q.model3d = pv;
+              }
             } catch (err) {
               status('Model snapshot failed.');
               return;
@@ -4806,6 +5459,7 @@
           renderDraft();
         }, { marginRight: '6px' }));
         addRow.appendChild(btn('Create set', function () {
+          if (mobileWriteBlocked('Creating sets is unavailable in mobile inspection.')) return;
           var code = codeIn.value.trim();
           var title = titleIn.value.trim() || 'Untitled set';
           if (!draft.length) {
@@ -4844,6 +5498,7 @@
               teacherSetDetail(s, it.code);
             }, { marginRight: '6px' }));
             br.appendChild(btn('Delete', function () {
+              if (mobileWriteBlocked('Deleting sets is unavailable in mobile inspection.')) return;
               if (!window.confirm('Delete set "' + it.code +
                   '" and all its submissions?')) {
                 return;
@@ -4897,6 +5552,7 @@
           form.appendChild(rem);
           var brow = el('div', null, { marginTop: '4px' });
           brow.appendChild(btn('Save grade', function () {
+            if (mobileWriteBlocked('Grading is unavailable in mobile inspection.')) return;
             Saves.gradeSubmission(fi(), s, sub.id, sel.value, rem.value.trim())
               .then(function () {
                 status('Submission #' + sub.id + ' graded ' + stamp());
@@ -4914,11 +5570,17 @@
             var qrow = el('div', null, null, 'cf-row');
             qrow.appendChild(el('div', 'Q' + (i + 1) + ': ' + q.prompt, null, 'cf-name'));
             var has = !!q.has_model;
+            var has3d = !!q.has_3d;
             qrow.appendChild(el('div', has
-              ? ('Model attached · auto-check ' + (q.check_enabled === false ? 'OFF' : 'ON'))
+              ? ('Model attached · auto-check ' + (q.check_enabled === false ? 'OFF' : 'ON') +
+                (has3d ? ' · 3D preview ' + (q.show_3d === false ? 'OFF' : 'ON')
+                  : ' · no 3D preview'))
               : 'No model answer', null, 'cf-muted'));
             var qr = el('div', null, { marginTop: '4px' });
-            qr.appendChild(btn('Model := sheet', function () {
+            qr.appendChild(btn('Attach sheet as model', function (event) {
+              if (mobileWriteBlocked('Attaching models is unavailable in mobile inspection.')) return;
+              var attachButton = event.currentTarget;
+              if (attachButton.disabled) return;
               var t = table();
               if (!t) { status('Sheet not ready.'); return; }
               var snap;
@@ -4926,15 +5588,29 @@
                 status('Snapshot failed.');
                 return;
               }
-              Saves.setQuestionModel(fi(), s, code, i, snap).then(function () {
+              if (!snap.entities.length) { status('Draw a model first. The sheet is empty.'); return; }
+              if (has && !window.confirm('Replace the model for Q' + (i + 1) + ' with the current sheet?')) return;
+              var extra = { show_3d: q.show_3d !== false };
+              if (typeof EduCADRef3d !== 'undefined' &&
+                  typeof EduCADReconstruct !== 'undefined') {
+                try {
+                  var pv = EduCADRef3d.buildPreview((snap.entities || []),
+                    EduCADReconstruct);
+                  if (pv) extra.model3d = pv;
+                } catch (err) { /* stored without a preview */ }
+              }
+              attachButton.disabled = true;
+              Saves.setQuestionModel(fi(), s, code, i, snap, extra).then(function () {
+                attachButton.disabled = false;
                 status('Q' + (i + 1) + ' model attached ' + stamp());
-                teacherSetDetail(s, code);
-              }, fail('Attach failed'));
+                if (body.isConnected) teacherSetDetail(s, code);
+              }, function (err) { attachButton.disabled = false; fail('Attach failed')(err); });
             }, { marginRight: '6px' }));
             if (has) {
               qr.appendChild(btn('View model', function () {
                 try {
                   loadOntoSheet(q.model, 'Model loaded');
+                  if (typeof window.educadReviewModel === 'function') window.educadReviewModel(data, i);
                   hidePanel();
                 } catch (err) {
                   status('Model data is malformed.');
@@ -4943,6 +5619,7 @@
               qr.appendChild(btn(q.check_enabled === false ? 'Check on' : 'Check off',
                 (function (idx, cur) {
                   return function () {
+                    if (mobileWriteBlocked('Toggling auto-check is unavailable in mobile inspection.')) return;
                     Saves.setQuestionCheck(fi(), s, code, idx, cur === false)
                       .then(function () {
                         status('Q' + (idx + 1) + ' auto-check ' +
@@ -4951,8 +5628,22 @@
                       }, fail('Toggle failed'));
                   };
                 })(i, q.check_enabled), { marginRight: '6px' }));
+              if (has3d) {
+                qr.appendChild(btn(q.show_3d === false ? '3D on' : '3D off',
+                  (function (idx, cur) {
+                    return function () {
+                      Saves.setQuestionShow3d(fi(), s, code, idx, cur === false)
+                        .then(function () {
+                          status('Q' + (idx + 1) + ' 3D preview ' +
+                            (cur === false ? 'on' : 'off') + ' ' + stamp());
+                          teacherSetDetail(s, code);
+                        }, fail('Toggle failed'));
+                    };
+                  })(i, q.show_3d), { marginRight: '6px' }));
+              }
               qr.appendChild(btn('Clear model', (function (idx) {
                 return function () {
+                  if (mobileWriteBlocked('Clearing models is unavailable in mobile inspection.')) return;
                   if (!window.confirm('Remove the model for Q' + (idx + 1) + '?')) return;
                   Saves.clearQuestionModel(fi(), s, code, idx).then(function () {
                     status('Q' + (idx + 1) + ' model cleared.');
@@ -5115,6 +5806,11 @@
               checkNote.textContent = 'No auto-check for this question.';
             }
             row.appendChild(checkNote);
+            if (q.model3d) {
+              row.appendChild(el('div',
+                '3D reference available: it appears beside the sheet while solving.',
+                { marginTop: '2px' }, 'cf-muted'));
+            }
             var verdictLine = el('div', null, { marginTop: '2px' });
             verdictLine.hidden = true;
             row.appendChild(verdictLine);
@@ -5191,7 +5887,19 @@
                 }, fail('Verify failed'));
               }, { marginRight: '6px' }));
             }
+            if (q.model3d) {
+              br.appendChild(btn('Reference 3D', (function (qq, idx) {
+                return function () {
+                  if (window.educadRef3d) {
+                    window.educadRef3d.show(code, idx, qq.model3d);
+                  } else {
+                    status('Reference 3D is unavailable.');
+                  }
+                };
+              })(q, i), { marginRight: '6px' }));
+            }
             br.appendChild(btn('Submit my sheet', function () {
+              if (mobileWriteBlocked('Submitting is unavailable in mobile inspection.')) return;
               var t = table();
               if (!t) {
                 status('Sheet not ready.');
@@ -5247,10 +5955,119 @@
   </script>
 
   <script>
+    // Reference 3D card (window.educadRef3d): while solving, students see
+    // the teacher model's 3D preview in a small floating card beside the
+    // sheet and draw the 2D views from it. An independent boxed widget —
+    // the student's own live 3D glass is untouched.
+    (function ref3dCard() {
+      var CARD_ID = 'ref3d-card';
+      var SIZE = 220;
+      var widget = null;
+
+      function hide() {
+        if (widget && typeof widget.dispose === 'function') {
+          try { widget.dispose(); } catch (err) { /* already gone */ }
+        }
+        widget = null;
+        var card = document.getElementById(CARD_ID);
+        if (card && card.parentNode) card.parentNode.removeChild(card);
+      }
+
+      function show(code, qi, preview) {
+        hide();
+        if (typeof EduCADSolid === 'undefined' ||
+            typeof EduCADSolid.mountSolidWidget !== 'function' ||
+            typeof EduCADSolid.setGeometry !== 'function' ||
+            typeof EduCADSolid.setUnavailable !== 'function') {
+          return false;
+        }
+        var okPreview = !!(preview && preview.status === 'ok');
+        if (typeof EduCADRef3d !== 'undefined' &&
+            !EduCADRef3d.validPreview(preview)) {
+          okPreview = false;
+          preview = { status: 'unavailable', reason: 'preview-failed',
+            label: 'Reference 3D data is unreadable.' };
+        }
+        var card = document.createElement('div');
+        card.id = CARD_ID;
+        card.style.position = 'fixed';
+        card.style.right = '12px';
+        card.style.bottom = '12px';
+        card.style.zIndex = '55';
+        card.style.background = '#fff';
+        card.style.border = '1px solid #b9b9b9';
+        card.style.borderRadius = '6px';
+        card.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
+        card.style.padding = '8px 10px 10px';
+        card.style.fontFamily = 'Verdana, Geneva, Tahoma, sans-serif';
+        card.style.fontSize = '12px';
+        card.style.color = '#222';
+        var head = document.createElement('div');
+        head.style.display = 'flex';
+        head.style.justifyContent = 'space-between';
+        head.style.alignItems = 'center';
+        head.style.fontWeight = 'bold';
+        head.style.marginBottom = '6px';
+        var title = document.createElement('span');
+        title.textContent = 'Reference 3D · ' + code + ' Q' + (qi + 1);
+        var x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '\u00d7';
+        x.title = 'Hide reference 3D';
+        x.style.border = 'none';
+        x.style.background = 'none';
+        x.style.cursor = 'pointer';
+        x.style.fontSize = '16px';
+        x.style.color = '#222';
+        x.addEventListener('click', hide);
+        head.appendChild(title);
+        head.appendChild(x);
+        card.appendChild(head);
+        var host = document.createElement('div');
+        host.style.position = 'relative';
+        host.style.width = SIZE + 'px';
+        host.style.height = SIZE + 'px';
+        card.appendChild(host);
+        var foot = document.createElement('div');
+        foot.style.color = '#777';
+        foot.style.fontSize = '11px';
+        foot.style.marginTop = '6px';
+        foot.textContent =
+          'Draw the 2D views from this shape · drag orbits · wheel zooms';
+        card.appendChild(foot);
+        document.body.appendChild(card);
+        try {
+          widget = EduCADSolid.mountSolidWidget(host, { size: SIZE, x: 0, y: 0 });
+          if (widget && widget.el && widget.el.style) {
+            // The boxed widget leaves positioning to the page: pin it to
+            // the card corner. The grip pill is hidden — the card stays
+            // put; orbit, zoom, and double-click reset still work.
+            widget.el.style.position = 'absolute';
+            widget.el.style.left = '0px';
+            widget.el.style.top = '0px';
+          }
+          if (widget && widget.handle && widget.handle.style) {
+            widget.handle.style.display = 'none';
+          }
+          if (okPreview) EduCADSolid.setGeometry(widget, preview.geometry);
+          else EduCADSolid.setUnavailable(widget, preview.reason, preview.label);
+        } catch (err) {
+          hide();
+          return false;
+        }
+        return true;
+      }
+
+      window.educadRef3d = { show: show, hide: hide };
+    })();
+  </script>
+
+  <script>
     // Deep links from the studio and workspace. ?submission=<id> reviews
     // a submission (teachers and academics land in read-only View mode,
     // students get an editable copy); ?solve=<code>&q=<i> loads a
-    // question starter for solving; ?drawing=<id> opens a saved drawing;
+    // question starter for solving plus the teacher's 3D reference card
+    // when shared; ?drawing=<id> opens a saved drawing;
     // ?model=<code>&q=<i> loads the model answer for editing (teachers
     // only — students never receive the model payload).
     // ?draw=1 is a bare sheet (lets teachers past the studio gate).
@@ -5277,6 +6094,9 @@
         return (h && h.table) || null;
       }
       function setMode(mode) {
+        // Deep links land in View on inspection devices (the sheet
+        // loader would refuse Edit anyway; this skips the noise).
+        if (mobileInspect() && mode === 'edit') mode = 'view';
         if (typeof window.educadSetSheetMode === 'function') {
           window.educadSetSheetMode(mode);
           return;
@@ -5286,6 +6106,12 @@
       }
       var statusEl = $('save-status');
       function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
+      function mobileInspect() {
+        try { return document.body.classList.contains('mobile-inspect'); } catch (err) { return false; }
+      }
+      function mobileTitle(t) {
+        if (typeof window.educadMobileTitle === 'function') window.educadMobileTitle(t);
+      }
       function fmtDate(ts) {
         try { return new Date(ts * 1000).toLocaleString(); }
         catch (err) { return ''; }
@@ -5305,8 +6131,60 @@
         return count;
       }
 
+      // Keep the review-to-attachment journey on the intended question.
+      // An explicit teacher click attaches the reviewed snapshot.
+      function modelReviewActions(data, index) {
+        var home = $('btn-home');
+        if (home) {
+          home.href = 'teacher.html#set/' + encodeURIComponent(data.code);
+          home.title = 'Return to ' + data.code + ' Q' + (index + 1);
+        }
+        var old = $('btn-attach-reviewed-model');
+        if (old) old.remove();
+        if (mobileInspect()) return;
+        var button = document.createElement('button');
+        button.type = 'button'; button.id = 'btn-attach-reviewed-model'; button.className = 'demo-btn';
+        button.textContent = 'Attach model to Q' + (index + 1);
+        button.title = 'Attach the reviewed sheet to ' + data.code + ' Q' + (index + 1);
+        button.addEventListener('click', function () {
+          if (button.disabled || mobileInspect()) return;
+          var active = Saves.currentSession();
+          if (!active || active.token !== s.token || (active.role !== 'teacher' && active.role !== 'academics')) {
+            status('Your session changed. Reopen this question from the studio.'); return;
+          }
+          var snapshot;
+          try { snapshot = Saves.snapshotTable(table()); } catch (err) { status('Sheet not ready.'); return; }
+          if (!snapshot.entities.length) { status('Draw a model before attaching it. The sheet is empty.'); return; }
+          button.disabled = true;
+          Saves.getSet(fi, active, data.code).then(function (latest) {
+            var question = (latest.questions || [])[index];
+            if (!question) throw new Error('This question is no longer available.');
+            if (question.has_model && !window.confirm('Replace the model for ' + data.code + ' Q' + (index + 1) + ' with the reviewed sheet?')) return false;
+            var current = Saves.currentSession();
+            if (mobileInspect() || !current || current.token !== active.token || current.role !== active.role) throw new Error('Your session or device mode changed. Reopen the question from the studio.');
+            var extra = { show_3d: question.show_3d !== false };
+            if (window.EduCADRef3d && window.EduCADReconstruct) {
+              try {
+                var preview = window.EduCADRef3d.buildPreview(snapshot.entities, window.EduCADReconstruct);
+                if (preview) extra.model3d = preview;
+              } catch (err) { /* The model remains usable without a 3D preview. */ }
+            }
+            status('Attaching model to ' + data.code + ' Q' + (index + 1) + '…');
+            return Saves.setQuestionModel(fi, active, data.code, index, snapshot, extra).then(function () { return true; });
+          }).then(function (attached) {
+            button.disabled = false;
+            if (attached) status('Model attached to ' + data.code + ' Q' + (index + 1) + '. Auto-check is on. Return to Studio to review.');
+          }, function (err) {
+            button.disabled = false; status('Model could not be attached: ' + err.message + '. Your drawing is kept on the sheet.');
+          });
+        });
+        var sets = $('btn-sets');
+        if (sets && sets.parentNode) sets.parentNode.insertBefore(button, sets);
+      }
+
       var p = params();
       var s = Saves.currentSession();
+      if (s && (s.role === 'teacher' || s.role === 'academics')) window.educadReviewModel = modelReviewActions;
       if (Saves.isGuest(s)) {
         if (p.submission || p.solve || p.drawing || p.model) {
           status('Log in to open shared sheets (guest is local-only).');
@@ -5331,10 +6209,14 @@
           if (s.role === 'teacher' || s.role === 'academics') {
             setMode('view');
             status(label + ' · ' + fmtDate(full.created_at) + ' (view only)');
+          } else if (mobileInspect()) {
+            setMode('view');
+            status(label + ' loaded (view-only on this device).');
           } else {
             setMode('edit');
             status(label + ' loaded as an editable copy.');
           }
+          mobileTitle(label);
         }, function (err) {
           status('Submission failed to load' +
             (err && err.message ? ': ' + err.message : ''));
@@ -5358,10 +6240,13 @@
               return;
             }
             if (count < 0) return;
-            status('Q' + (qi + 1) + ': ' + q.prompt + ' (starter loaded)');
-          } else {
-            status('Q' + (qi + 1) + ': ' + q.prompt);
           }
+          var solveNote = q.starter ? ' (starter loaded)' : '';
+          if (q.model3d && window.educadRef3d &&
+              window.educadRef3d.show(p.solve, qi, q.model3d)) {
+            solveNote += ' · reference 3D shown — draw the views from it';
+          }
+          status('Q' + (qi + 1) + ': ' + q.prompt + solveNote);
         }, function (err) {
           status('Set failed to load' +
             (err && err.message ? ': ' + err.message : ''));
@@ -5382,26 +6267,25 @@
             return;
           }
           if (p.autodraw) {
-            // Teacher auto-draw: start from an empty sheet, then draft the
-            // model from the question words. Review and re-attach after.
-            var aq = qs[mqi];
-            var words = aq.prompt + (aq.hint ? ' Hint: ' + aq.hint : '');
-            try {
-              loadOntoSheet({ entities: [] });
-            } catch (err) {
-              status('Sheet not ready.');
+            if (mobileInspect()) {
+              status('Auto-draw needs a desktop.');
               return;
             }
+            // Draft a replacement from the question words. The current
+            // sheet stays intact until the complete plan passes validation.
+            var aq = qs[mqi];
+            var words = aq.prompt + (aq.hint ? ' Hint: ' + aq.hint : '');
             setMode('edit');
             status('Auto-drawing the model for ' + p.model + ' Q' + (mqi + 1) + '…');
             if (typeof window.educadAutoDraw !== 'function') {
               status('Auto-draw is unavailable (command line did not load).');
               return;
             }
-            window.educadAutoDraw(words).then(function (res) {
+            window.educadAutoDraw(words, true).then(function (res) {
+              if (res.ok) modelReviewActions(data, mqi);
               status(res.ok ?
                 ('Model drafted for ' + p.model + ' Q' + (mqi + 1) +
-                  ' — review it, then re-attach via the Sets panel.') :
+                  ' — review it, then use Attach model to Q' + (mqi + 1) + '.') :
                 ('Auto-draw could not finish: ' + res.message));
             });
             return;
@@ -5415,9 +6299,16 @@
           }
           if (count < 0) return;
           setMode('edit');
-          status('Model for ' + p.model + ' Q' + (mqi + 1) +
-            ' loaded as an editable copy (' + count + ' entities). ' +
-            'Re-attach via the Sets panel to update it.');
+          modelReviewActions(data, mqi);
+          if (mobileInspect()) {
+            status('Model for ' + p.model + ' Q' + (mqi + 1) +
+              ' loaded (view-only on this device).');
+          } else {
+            status('Model for ' + p.model + ' Q' + (mqi + 1) +
+              ' loaded as an editable copy (' + count + ' entities). ' +
+              'Review your changes, then use Attach model to Q' + (mqi + 1) + '.');
+          }
+          mobileTitle('Model ' + p.model + ' Q' + (mqi + 1));
         }, function (err) {
           status('Set failed to load' +
             (err && err.message ? ': ' + err.message : ''));

@@ -8,10 +8,10 @@ accepted under the same license (see [LICENSE](LICENSE)).
 
 - **Node.js 22** (see [`.nvmrc`](.nvmrc); `package.json` requires >= 18).
   With nvm: `nvm use`.
-- **CMake >= 3.16, a C++17 compiler, and the libsodium development
+- **CMake >= 3.16, a C++17 compiler, and the libsodium/libcurl development
   headers** (the server builds from source on `npm start`):
-  - Ubuntu/Debian: `sudo apt-get install -y cmake g++ libsodium-dev`
-  - macOS: `brew install cmake libsodium`
+  - Ubuntu/Debian: `sudo apt-get install -y cmake g++ libsodium-dev libcurl4-openssl-dev`
+  - macOS: `brew install cmake libsodium curl`
 - There are **zero npm dependencies**: no `npm install` step.
 
 ## Quick start

@@ -287,7 +287,7 @@ pass('phase42 page wiring');
   ok(readme.indexOf('`npm run test:phase42`') !== -1, 'phase42 row');
   ok(readme.indexOf('Pose ink rides exact: vertex dots, labels, projector feet track split views') !== -1,
     'phase42 label');
-  ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
+  ok(readme.indexOf('baseline + phases 1–47 (1060 checks)') !== -1,
     'grand total 1039');
   var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
   eq(pkg.scripts['test:phase42'], 'node tools/test-phase42-exact-ink.js',

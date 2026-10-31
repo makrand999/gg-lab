@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
+find_package(CURL REQUIRED)
 
 # Embed schema.sql into a generated header (single source of truth).
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/schema.sql" SCHEMA_SQL)
@@ -16,9 +17,9 @@ add_library(sqlite3 STATIC third_party/sqlite3.c)
 target_include_directories(sqlite3 PUBLIC third_party)
 target_compile_definitions(sqlite3 PRIVATE SQLITE_THREADSAFE=1)
 
-add_executable(educad-server src/main.cpp)
+add_executable(educad-server src/main.cpp src/erp.cpp)
 target_include_directories(educad-server PRIVATE third_party "${CMAKE_CURRENT_BINARY_DIR}")
-target_link_libraries(educad-server PRIVATE sqlite3 sodium Threads::Threads ${CMAKE_DL_LIBS})
+target_link_libraries(educad-server PRIVATE sqlite3 sodium CURL::libcurl Threads::Threads ${CMAKE_DL_LIBS})
 target_compile_options(educad-server PRIVATE -Wall -Wextra)
 
 add_executable(educad-seed src/seed.cpp)

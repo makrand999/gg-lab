@@ -1,0 +1,197 @@
+/* Shared drawing flow for the modern student, guest and teacher desks. */
+.drawing-screen .desk-tool-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.drawing-screen .desk-tool-group + .desk-tool-group {
+  border-left: 1px solid var(--border);
+  padding-left: 10px;
+  margin-left: 4px;
+}
+.drawing-screen .desk-toolbar .button:not(.active):not(.student-method-switch):not(.student-line-type-toggle) {
+  background: transparent;
+  border-color: transparent;
+}
+.drawing-screen .desk-toolbar .button:hover:not(:disabled) {
+  background: var(--soft);
+  border-color: var(--border);
+}
+.drawing-screen .desk-toolbar .button.active {
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+.drawing-screen .desk-context {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.drawing-screen .desk-context .desk-current-step {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+}
+.drawing-screen .desk-current-step > strong {
+  color: var(--primary);
+  font: 600 12px/1.5 system-ui,sans-serif;
+}
+.drawing-screen .desk-current-step > p {
+  margin: 0;
+  color: var(--text);
+  font: 12px/1.5 system-ui,sans-serif;
+}
+.drawing-screen .desk-context .button {
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.drawing-screen .desk-current-step .button { margin-left: auto; }
+.drawing-screen .desk-precision { display: flex; gap: 4px; flex-shrink: 0; }
+.drawing-screen .desk-precision .button { border-color: transparent; background: transparent; color: var(--muted); }
+.drawing-screen .desk-precision .button[aria-pressed=true] { background: var(--soft); color: var(--primary); }
+.drawing-screen .desk-precision .button[aria-pressed=true]::before { content: '✓'; }
+.drawing-screen #tool-options { margin-top: 16px; }
+.drawing-screen #tool-options summary { min-height: 44px; align-content: center; }
+.drawing-screen .paper-area { box-shadow: 0 2px 8px #00000006; }
+.drawing-screen .desk-disclosure { margin: 0; border-bottom: 1px solid var(--border); }
+.drawing-screen .desk-disclosure > summary,
+.drawing-screen .desk-precision-menu > summary {
+  min-height: 44px; padding: 12px 8px; cursor: pointer; color: var(--primary);
+  font: 600 12px/20px system-ui,sans-serif;
+}
+.drawing-screen .desk-disclosure[open] > summary { background: var(--soft); }
+.drawing-screen .desk-disclosure > div { padding: 12px 8px; }
+.drawing-screen .desk-disclosure #task-panel h2 { font-size: 19px; margin-top: 8px; }
+.drawing-screen .desk-disclosure #tool-options { margin-top: 0; }
+.drawing-screen .desk-disclosure #properties h3 { margin-top: 0; }
+.drawing-screen .desk-view-menu { border: 0; flex-shrink: 0; }
+.drawing-screen .desk-view-menu[open] { display: flex; align-items: center; }
+.drawing-screen .desk-view-menu > .desk-tool-group { padding: 0; }
+.drawing-screen .desk-precision-menu { flex-shrink: 0; }
+.drawing-screen .desk-precision-menu[open] { display: flex; align-items: center; }
+.drawing-screen .desk-context > .button { border-color: transparent; background: transparent; color: var(--primary); }
+.drawing-screen .desk-context > .button[aria-expanded=true] { background: var(--soft); }
+.drawing-screen .desk-disclosure[hidden] { display: none; }
+.drawing-screen:not([data-workspace-mode=draw]) [aria-label="Drawing history"],
+.drawing-screen:not([data-workspace-mode=draw]) .student-method-switch,
+.drawing-screen[data-workspace-mode=pose] .desk-tool-group[aria-label="Drawing tools"] { display: none; }
+@media (max-width:760px) {
+  .drawing-screen .desk-toolbar { flex-wrap: nowrap; overflow-x: auto; max-height: none; }
+  .drawing-screen .desk-toolbar > *, .drawing-screen .desk-tool-group { flex-shrink: 0; }
+  .drawing-screen .desk-tool-group { flex-wrap: nowrap; }
+  .drawing-screen .desk-toolbar:has(.student-shortcut-hud:not([hidden])) { flex-wrap: wrap; }
+  .drawing-screen .desk-context { flex-wrap: wrap; gap: 0 8px; padding: 4px 12px; }
+  .drawing-screen .desk-context .desk-current-step { flex-basis: 100%; gap: 4px 10px; }
+  .drawing-screen .desk-current-step > p { flex: 1; min-width: 160px; }
+  .drawing-screen .desk-precision { margin-left: auto; }
+  .drawing-screen .desk-tool-group + .desk-tool-group { padding-left: 6px; margin-left: 0; }
+}
+
+/* Keep instructions anchored while secondary controls float over the sheet. */
+.drawing-screen .desk-context { gap: 10px; background: var(--bg); }
+.drawing-screen .desk-current-step > strong {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.drawing-screen .desk-current-step[data-pending=true] > strong {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.drawing-screen .desk-view-menu[open],
+.drawing-screen .desk-precision-menu[open] { display: block; }
+.drawing-screen .desk-view-menu > .desk-tool-group,
+.drawing-screen .desk-precision-menu > .desk-precision {
+  position: fixed;
+  z-index: 50;
+  padding: 8px;
+  margin: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 8px 24px #0002;
+  max-width: calc(100vw - 16px);
+  flex-wrap: wrap;
+}
+.drawing-screen .desk-starter {
+  position: absolute;
+  left: 24px;
+  top: 48px;
+  width: min(330px,calc(100% - 48px));
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  background: var(--surface);
+  box-shadow: 0 8px 30px #00000008;
+}
+.drawing-screen .desk-starter .kicker { font-size: 9px; letter-spacing: .09em; }
+.drawing-screen .desk-starter h2 { margin: 8px 0; font-size: 25px; line-height: 1.15; }
+.drawing-screen .desk-starter p { margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.drawing-screen .desk-starter .actions { gap: 6px; flex-wrap: wrap; }
+.drawing-screen .desk-starter .button { min-height: 44px; font-size: 11px; }
+.drawing-screen .desk-starter[hidden] { display: none; }
+.drawing-screen .save-indicator { display: flex; align-items: center; gap: 7px; }
+.drawing-screen .save-indicator::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.drawing-screen .save-indicator[data-state=draft]::before { background: var(--primary); }
+.drawing-screen .save-indicator[data-state=error]::before { background: #b53e32; }
+@media(max-width:760px) {
+  .drawing-screen .desk-starter { left: 12px; top: 36px; width: min(300px,calc(100% - 24px)); padding: 12px; }
+  .drawing-screen .desk-starter h2 { font-size: 21px; }
+  .drawing-screen .desk-starter p { margin-bottom: 10px; }
+}
+
+/* Optional drafting aids share the desk's paper, ink and focus treatment. */
+.assist-tools { display:flex; gap:6px; padding:4px 16px; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; flex-wrap:wrap; }
+.assist-tools .button { min-height:36px; padding:5px 10px; font-size:11px; background:transparent; border-color:transparent; color:var(--muted); }
+.assist-tools .button:hover { color:var(--primary); border-color:var(--border); }
+.assist-brief { flex-shrink:0; padding:0 16px; background:var(--soft); border-bottom:1px solid var(--border); max-height:24vh; overflow:auto; }
+.assist-brief summary { cursor:pointer; padding:10px 0; font-size:12px; font-weight:600; color:var(--primary); }
+.assist-brief p { margin:0 0 10px; font-size:13px; line-height:1.6; white-space:pre-wrap; }
+.assist-flow { display:flex; flex-wrap:wrap; gap:6px; padding-bottom:10px; }
+.assist-flow [aria-pressed=true] { border-color:var(--primary); color:var(--primary); }
+.assist-dimensions { position:absolute; z-index:5; display:grid; grid-template-columns:minmax(75px,1fr) minmax(70px,1fr) 40px; gap:5px; width:min(260px,calc(100% - 16px)); background:var(--surface); border:1px solid var(--primary); padding:8px; box-shadow:0 6px 18px #0002; }
+.assist-dimensions label { min-width:0; font-size:10px; color:var(--muted); }
+.assist-dimensions input { display:block; width:100%; min-width:0; min-height:36px; padding:5px; margin-top:4px; border:1px solid var(--border); background:var(--bg); color:var(--text); font:13px ui-monospace,monospace; }
+.assist-dimensions:has([data-angle-field][hidden]) { grid-template-columns:minmax(90px,1fr) 40px; width:190px; }
+.assist-dimensions > button { align-self:end; min-width:0; padding:6px; height:36px; }
+.assist-dimension-hint,.assist-input-error { grid-column:1/-1; font-size:9px; color:var(--muted); }
+.assist-input-error:empty { display:none; }
+.assist-input-error { color:#b53e32; }
+.assist-selection { position:absolute; bottom:34px; left:12px; right:12px; margin:auto; width:fit-content; max-width:calc(100% - 24px); display:flex; align-items:center; gap:6px; padding:6px; border:1px solid var(--border); background:var(--surface); box-shadow:0 4px 16px #0001; }
+.assist-selection > span { max-width:120px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; padding:0 8px; font:12px ui-monospace,monospace; }
+.assist-selection .button { min-height:40px; font-size:11px; }
+.assist-dialog { width:min(570px,calc(100vw - 24px)); max-height:calc(100svh - 32px); overflow:auto; }
+.assist-dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.assist-dialog-heading h2 { margin:0; }
+.assist-dialog > input { width:100%; min-height:44px; padding:10px; background:var(--bg); color:var(--text); border:1px solid var(--border); }
+.assist-search-results { display:grid; gap:4px; margin:12px 0; max-height:45vh; overflow:auto; }
+.assist-search-results .button { justify-content:space-between; min-height:44px; text-align:left; }
+.assist-search-results small { font-size:10px; color:var(--muted); }
+.assist-layer-list section,.assist-checkpoint-list section { display:flex; align-items:center; gap:12px; border-top:1px solid var(--border); padding:12px 0; }
+.assist-layer-list strong,.assist-checkpoint-list section > div { flex:1; font-size:12px; min-width:0; overflow-wrap:anywhere; }
+.assist-layer-list label { display:flex; align-items:center; gap:5px; min-height:44px; font-size:12px; }
+.assist-checkpoint-list small { display:block; margin-top:5px; font-size:10px; color:var(--muted); }
+.assist-checkpoint-form { margin:16px 0; }
+.assist-review-list { display:grid; gap:8px; margin:18px 0; }
+.assist-review-list .button { text-align:left; justify-content:space-between; white-space:normal; line-height:1.5; font-size:12px; }
+.assist-review-list .button:disabled { opacity:1; color:var(--muted); }
+.assist-review-list span { white-space:nowrap; font-size:10px; }
+.assist-tools[hidden],.assist-brief[hidden],.assist-dimensions[hidden],.assist-selection[hidden],.assist-dimensions [hidden] { display:none; }
+@media(max-width:760px) {
+  .assist-tools { padding:2px 12px; gap:2px; }
+  .assist-tools .button { min-height:44px; font-size:10px; padding-inline:6px; }
+  .assist-layer-list section { flex-wrap:wrap; gap:8px; }
+  .assist-layer-list strong { flex-basis:100%; }
+}

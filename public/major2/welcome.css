@@ -1,0 +1,143 @@
+/* A visual drafting sheet; all geometry follows the shared Appearance tokens. */
+body:has(.studio-shell) { min-width: 0; }
+.studio-shell {
+  --studio-rule: color-mix(in srgb, var(--text) 18%, transparent);
+  --studio-grid: color-mix(in srgb, var(--text) 5%, transparent);
+  --studio-ink: color-mix(in srgb, var(--text) 73%, var(--bg));
+  --studio-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  color: var(--text);
+  background: var(--bg);
+}
+.studio-paper {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(var(--studio-grid) 1px, transparent 1px), linear-gradient(90deg, var(--studio-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(100deg, #0003, #000);
+}
+.studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 74px;
+  padding: 14px clamp(20px, 4.5vw, 80px);
+  border-bottom: 1px solid var(--studio-rule);
+}
+.studio-brand { display: inline-flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; }
+.studio-brand strong { font-size: 24px; font-weight: 730; letter-spacing: -.8px; }
+.studio-brand-mark { color: var(--primary); }
+.studio-brand-mark svg { width: 32px; height: 35px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.studio-appearance { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--studio-rule); color: var(--muted); background: transparent; }
+.studio-appearance:hover { color: var(--primary); border-color: var(--primary); }
+.studio-appearance .icon { width: 20px; height: 20px; }
+.studio-main { display: flex; flex-direction: column; flex: 1; width: min(1600px, 100%); padding: 0 clamp(20px, 4.5vw, 80px); margin: 0 auto; }
+.studio-main:focus { outline: none; }
+.studio-hero { display: grid; grid-template-columns: minmax(195px, .28fr) minmax(0, 1fr); gap: 24px; align-items: center; flex: 1; padding: 24px 0 18px; }
+.studio-intro h1 { font: 400 clamp(44px, 4.1vw, 64px)/1.08 Georgia, "Times New Roman", serif; letter-spacing: -2.2px; margin: 0 0 25px; }
+.studio-intro h1 em { font-weight: 400; color: var(--primary); }
+.studio-start { display: inline-flex; align-items: center; gap: 24px; min-height: 44px; border-bottom: 1px solid var(--studio-ink); text-decoration: none; color: var(--text); font-size: 12px; }
+.studio-start:hover { color: var(--primary); border-color: var(--primary); }
+.studio-down { font-size: 20px; color: var(--primary); }
+.studio-explorer { min-width: 0; }
+.studio-view-controls { display: grid; grid-template-columns: repeat(4, 1fr); width: min(460px, 100%); margin-inline: auto; border-bottom: 1px solid var(--studio-rule); }
+.studio-view-controls button { position: relative; display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 56px; padding: 5px 8px; border: 0; background: transparent; color: var(--muted); font-size: 12px; }
+.studio-view-controls svg { width: 36px; height: 34px; }
+.studio-view-controls button[aria-pressed="true"] { color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.studio-view-controls button[aria-pressed="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--primary); }
+.studio-view-controls button:hover { color: var(--primary); }
+.studio-figure { margin: 10px 0 0; }
+.studio-drawing { width: 100%; height: min(52svh, 46vw); min-height: 300px; overflow: visible; }
+.studio-drawing path, .studio-drawing polygon, .studio-drawing circle { vector-effect: non-scaling-stroke; }
+.studio-construction, .studio-main-guides { fill: none; stroke: var(--text); stroke-width: .65; opacity: .17; }
+.studio-main-guides { stroke-dasharray: 4 6; }
+.studio-registration { fill: none; stroke: var(--primary); stroke-width: .8; }
+.studio-svg-note { font: 10px var(--studio-mono); letter-spacing: .8px; fill: var(--muted); }
+.studio-face { stroke: none; }
+.studio-face-front { fill: color-mix(in srgb, var(--primary) 34%, var(--bg)); }
+.studio-face-top { fill: color-mix(in srgb, var(--primary) 14%, var(--bg)); }
+.studio-face-side { fill: color-mix(in srgb, var(--primary) 55%, var(--bg)); }
+.studio-edge { fill: none; stroke: var(--primary); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.studio-hidden { fill: none; stroke: var(--primary); stroke-width: .8; stroke-dasharray: 4 5; opacity: .5; }
+.studio-main-object { animation: studio-view-in .3s ease-out; transform-box: fill-box; transform-origin: center; }
+.studio-study .studio-face { fill: color-mix(in srgb, var(--text) 4%, var(--bg)); }
+.studio-study .studio-edge { stroke: var(--studio-ink); stroke-width: 1.2; }
+.studio-study .studio-hidden { stroke: var(--studio-ink); stroke-width: .6; }
+.studio-study.is-selected .studio-edge { stroke: var(--primary); stroke-width: 1.6; }
+.studio-study.is-selected .studio-svg-note { fill: var(--primary); }
+.studio-study.is-selected .studio-face { fill: color-mix(in srgb, var(--primary) 10%, var(--bg)); }
+.studio-datum { stroke: var(--studio-ink); stroke-width: 1; }
+.studio-dimension, .studio-projection-symbol { fill: none; stroke: var(--studio-ink); stroke-width: .65; }
+.studio-dimension text { stroke: none; }
+.studio-axis { fill: none; stroke: var(--primary); stroke-width: .8; }
+.studio-axis text { fill: var(--muted); stroke: none; font: italic 11px Georgia, serif; }
+.studio-figure figcaption { margin-top: -8px; color: var(--muted); text-align: right; font: 8px/1.5 var(--studio-mono); }
+.studio-model-controls { display: flex; justify-content: center; gap: 12px; margin-top: 9px; }
+.studio-model-controls button { display: grid; place-items: center; width: 70px; height: 64px; padding: 3px; border: 1px solid transparent; background: transparent; }
+.studio-model-controls button[aria-pressed="true"] { border-color: var(--studio-rule); background: color-mix(in srgb, var(--surface) 45%, transparent); }
+.studio-model-controls button:hover { border-color: var(--primary); }
+.studio-model-controls button svg { width: 58px; height: 54px; }
+.studio-sr-only, .studio-live-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.studio-entry { border-top: 1px solid var(--studio-ink); padding: 13px 0; scroll-margin: 20px; }
+.studio-entry:focus-visible { outline-offset: 6px; }
+.studio-workspaces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.studio-workspace { display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 12px 28px; border: 0; background: transparent; color: var(--text); text-decoration: none; text-align: left; font-size: 17px; }
+.studio-workspace + .studio-workspace { border-left: 1px solid var(--studio-rule); }
+.studio-workspace > .icon { width: 29px; height: 29px; color: var(--primary); stroke-width: 1.4; }
+.studio-workspace > svg:last-child { margin-left: auto; width: 20px; height: 20px; fill: none; stroke: var(--primary); stroke-width: 1.4; transition: transform .2s; }
+.studio-workspace:hover { background: color-mix(in srgb, var(--primary) 5%, transparent); color: var(--primary); }
+.studio-workspace:hover > svg:last-child { transform: translateX(4px); }
+.studio-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 10px clamp(20px, 4.5vw, 80px); min-height: 52px; border-top: 1px solid var(--studio-rule); color: var(--muted); font-size: 10px; }
+.studio-footer > div { display: flex; align-items: center; gap: 22px; }
+.studio-footer a { display: flex; align-items: center; gap: 7px; min-height: 36px; color: var(--muted); text-decoration: none; }
+.studio-footer a:hover { color: var(--primary); }
+.studio-footer svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+@keyframes studio-view-in { from { opacity: .2; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media(max-width:1100px) {
+  .studio-hero { grid-template-columns: minmax(180px, .25fr) minmax(0, 1fr); gap: 15px; }
+  .studio-intro h1 { font-size: 43px; letter-spacing: -1.8px; }
+  .studio-workspace { padding-inline: 20px; }
+}
+@media(max-width:820px) {
+  .studio-hero { grid-template-columns: 1fr; gap: 20px; padding-top: 24px; }
+  .studio-intro { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  .studio-intro h1 { font-size: 38px; margin: 0; }
+  .studio-intro h1 br { display: none; }
+  .studio-start { flex-shrink: 0; }
+  .studio-drawing { height: auto; min-height: 0; }
+  .studio-model-controls { margin-top: 12px; }
+  .studio-footer { font-size: 9px; }
+}
+@media(max-width:560px) {
+  .studio-header { min-height: 68px; padding-block: 12px; }
+  .studio-brand strong { font-size: 22px; }
+  .studio-brand-mark svg { width: 28px; height: 31px; }
+  .studio-hero { gap: 22px; padding: 22px 0 18px; }
+  .studio-intro { gap: 14px; }
+  .studio-intro h1 { font-size: clamp(30px, 8.5vw, 42px); letter-spacing: -1.3px; }
+  .studio-intro h1 br { display: inline; }
+  .studio-start { font-size: 10px; gap: 16px; }
+  .studio-view-controls button { flex-direction: column; gap: 3px; min-height: 65px; padding: 5px; font-size: 10px; }
+  .studio-view-controls svg { width: 33px; height: 30px; }
+  .studio-figure { margin-top: 20px; }
+  .studio-figure figcaption { font-size: 7px; margin-top: 0; }
+  .studio-model-controls { gap: 10px; margin-top: 15px; }
+  .studio-model-controls button { width: 66px; height: 59px; }
+  .studio-model-controls button svg { width: 54px; height: 50px; }
+  .studio-entry { padding-block: 12px; }
+  .studio-workspace { flex-direction: column; justify-content: center; gap: 9px; min-height: 82px; padding: 10px 5px; font-size: 13px; }
+  .studio-workspace > .icon { width: 27px; height: 27px; }
+  .studio-workspace > svg:last-child { display: none; }
+  .studio-footer { flex-wrap: wrap; gap: 0 18px; font-size: 9px; padding-block: 8px; }
+  .studio-footer > div { gap: 18px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .studio-main-object { animation: none; }
+  .studio-workspace > svg:last-child { transition: none; }
+}

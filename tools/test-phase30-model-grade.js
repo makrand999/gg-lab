@@ -96,7 +96,7 @@ async function main() {
 
   var port = await freePort();
   var srv = child.spawn(SERVER, [String(port)], {
-    env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+    env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
     stdio: ['ignore', 'ignore', 'pipe']
   });
   try {
@@ -307,7 +307,7 @@ async function main() {
     srv.kill('SIGTERM');
     await new Promise(function (resolve) { srv.on('exit', resolve); });
     srv = child.spawn(SERVER, [String(port)], {
-      env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+      env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
       stdio: ['ignore', 'ignore', 'pipe']
     });
     await waitReady(port, srv, 10000);

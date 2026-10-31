@@ -1,0 +1,209 @@
+/* The rest of the teacher workspace follows the same drawing-sheet language. */
+body[data-teacher-studio] {
+  --studio-rule: color-mix(in srgb, var(--text) 18%, transparent);
+  --studio-grid: color-mix(in srgb, var(--text) 5%, transparent);
+  --studio-ink: color-mix(in srgb, var(--text) 73%, var(--bg));
+  --studio-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+.teacher-main .button { border-radius: 0; min-height: 44px; }
+.teacher-main .card, .teacher-main .notice, .teacher-main .badge { border-radius: 0; box-shadow: none; }
+.teacher-main .field input, .teacher-main .field select, .teacher-main .field textarea { border-radius: 0; }
+.teacher-studio-study { min-width: 0; margin: 0; }
+.teacher-studio-study .studio-drawing { display: block; width: 100%; height: auto; min-height: 0; }
+.teacher-studio-study figcaption { margin: 7px 0 0; text-align: right; font: 8px var(--studio-mono); color: var(--muted); }
+.teacher-studio-study .teacher-view-controls { margin-top: -7px; }
+@media(min-width:821px) {
+  .teacher-drawings-hero .studio-drawing, .teacher-practice-hero .studio-drawing { height: 285px; }
+}
+.teacher-studio-etching { display: flex; align-items: center; gap: 25px; min-height: 136px; margin-top: 30px; padding: 15px 0; border-top: 1px solid var(--studio-rule); color: var(--muted); }
+.teacher-studio-etching > span { flex: 0 0 auto; font: 8px var(--studio-mono); letter-spacing: .7px; }
+.teacher-studio-etching > div { display: flex; align-items: center; justify-content: space-around; flex: 1; min-width: 0; gap: 20px; }
+.teacher-studio-etching svg { width: min(140px, 30%); height: 99px; color: var(--primary); opacity: .55; }
+.teacher-empty-study { width: min(195px,70%); color: var(--primary); }
+.teacher-empty-study > svg { width: 100%; height: 125px; }
+.teacher-drawing-gallery { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; }
+.teacher-drawing-sheet.card { min-width: 0; padding: 0; border-color: var(--studio-rule); background: color-mix(in srgb, var(--surface) 40%, var(--bg)); }
+.teacher-drawing-sheet:hover { border-color: var(--primary); }
+.teacher-drawing-open { display: block; padding: 11px 11px 0; color: var(--text); text-decoration: none; }
+.teacher-drawing-preview-wrap { position: relative; border: 1px solid #D8DDD7; background: #FAFCF8; }
+.teacher-drawing-sheet-index { position: absolute; z-index: 1; left: 10px; top: 10px; color: #657363; font: 8px var(--studio-mono); }
+.teacher-drawing-sheet .drawing-thumb { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 184px; margin: 0; padding: 17px 10px 10px; border: 0; border-radius: 0; background-color: transparent; background-image: linear-gradient(#D8E0D43B 1px, transparent 1px), linear-gradient(90deg,#D8E0D43B 1px, transparent 1px); background-size: 15px 15px; color: #657363; }
+.teacher-drawing-sheet .drawing-thumb svg:not(.icon) { width: 100%; height: 100%; }
+.teacher-drawing-sheet .drawing-thumb > .icon { width: 30px; height: 30px; }
+.teacher-drawing-sheet .drawing-thumb > span { font-size: 10px; }
+.teacher-drawing-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 5px 0; }
+.teacher-drawing-title h3 { min-width: 0; margin: 0; font-size: 15px; font-weight: 550; overflow-wrap: anywhere; }
+.teacher-drawing-title > .icon { flex-shrink: 0; width: 17px; height: 17px; color: var(--primary); }
+.teacher-drawing-date { margin: 8px 5px 15px; color: var(--muted); font: 9px var(--studio-mono); }
+.teacher-drawing-actions { display: flex; flex-wrap: wrap; gap: 5px 20px; padding: 0 16px; border-top: 1px solid var(--studio-rule); }
+.teacher-drawing-actions .teacher-link { padding: 0; border: 0; background: transparent; font-size: 10px; }
+.teacher-drawing-actions .teacher-drawing-delete { color: var(--danger); }
+.teacher-drawing-actions .icon { width: 14px; height: 14px; }
+.teacher-studio-empty { display: grid; grid-template-columns: 1fr minmax(100px,.6fr); align-items: center; gap: 20px; min-height: 235px; padding: 24px 32px; border: 1px dashed var(--studio-rule); background: color-mix(in srgb,var(--surface) 30%,transparent); }
+.teacher-studio-empty h2 { margin: 0 0 19px; font: 400 35px/1.15 Georgia,serif; letter-spacing: -1px; }
+.teacher-studio-empty h2 em { color: var(--primary); font-weight: 400; }
+.teacher-studio-empty > div:last-child { justify-self: center; width: min(225px,100%); color: var(--primary); }
+.teacher-studio-empty > div:last-child svg { display: block; width: 100%; height: 168px; }
+.teacher-studio-empty-small { min-height: 170px; }
+.teacher-studio-empty-small h2 { font-size: 28px; }
+.teacher-studio-empty-small > div:last-child svg { height: 115px; }
+.teacher-studio-empty code { color: var(--primary); font: 11px var(--studio-mono); }
+.teacher-practice-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 26px; color: var(--muted); }
+.teacher-practice-progress > span { display: grid; place-items: center; width: 35px; height: 35px; border: 1px solid var(--studio-rule); font: 9px var(--studio-mono); }
+.teacher-practice-progress > span.done { color: var(--primary); border-color: var(--primary); background: var(--soft); }
+.teacher-practice-progress > span:last-child { width: auto; padding-left: 9px; border: 0; }
+.teacher-practice-progress .icon { width: 15px; height: 15px; }
+.teacher-practice-gallery { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; }
+.teacher-practice-sheet { min-width: 0; border: 1px solid var(--studio-rule); background: color-mix(in srgb,var(--surface) 40%,var(--bg)); color: var(--text); text-decoration: none; }
+.teacher-practice-sheet:hover { border-color: var(--primary); }
+.teacher-practice-sheet-art { position: relative; padding: 15px 10px 2px; border-bottom: 1px solid var(--studio-rule); color: var(--primary); background-image: linear-gradient(var(--studio-grid) 1px,transparent 1px),linear-gradient(90deg,var(--studio-grid) 1px,transparent 1px); background-size: 18px 18px; }
+.teacher-practice-sheet-art .teacher-overline { display: block; margin: 0 8px 7px; font-size: 8px; }
+.teacher-practice-sheet-art > svg { width: 100%; height: 173px; }
+.teacher-practice-sheet-art text { fill: currentColor; stroke: none; font: 10px var(--studio-mono); }
+.teacher-practice-sheet-art circle { fill: var(--bg); }
+.study-projector { stroke-dasharray: 3 4; opacity: .35; }
+.study-axis { stroke-width: .7; opacity: .6; }
+.teacher-practice-sheet-body { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 17px; }
+.teacher-practice-sheet-body h2 { margin: 0 0 7px; font: 400 27px Georgia,serif; }
+.teacher-practice-sheet-body p { margin: 0; color: var(--muted); font-size: 10px; }
+.teacher-practice-sheet-body > .icon { flex-shrink: 0; width: 20px; height: 20px; color: var(--primary); }
+.teacher-practice-sheet-action { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 7px; min-height: 55px; padding: 12px 17px; border-top: 1px solid var(--studio-rule); color: var(--primary); font-size: 10px; }
+.teacher-practice-sheet-action > .icon { width: 17px; height: 17px; }
+.teacher-practice-done { display: inline-flex; align-items: center; gap: 4px; font: 8px var(--studio-mono); }
+.teacher-practice-done .icon { width: 12px; height: 12px; }
+.teacher-studio-page-heading { margin: 12px 0 29px; }
+.teacher-studio-page-heading h1 { margin: 0; font: 400 clamp(38px,4.5vw,56px)/1.1 Georgia,serif; letter-spacing: -1.8px; }
+.teacher-studio-page-heading em { color: var(--primary); font-weight: 400; }
+.teacher-form-spread, .teacher-publishing-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.9fr); gap: 28px; align-items: start; }
+.teacher-form-spread > .form-card { max-width: none; margin: 0; padding: 28px; }
+.teacher-form-spread .field small { font-size: 11px; }
+.teacher-form-art { min-width: 0; min-height: 355px; padding: 17px 18px; border: 1px solid var(--studio-rule); background-image: linear-gradient(var(--studio-grid) 1px,transparent 1px),linear-gradient(90deg,var(--studio-grid) 1px,transparent 1px); background-size: 24px 24px; }
+.teacher-form-art-index { display: flex; justify-content: space-between; gap: 15px; color: var(--muted); font: 8px var(--studio-mono); letter-spacing: .8px; }
+.teacher-form-art .teacher-studio-study { margin: 14px -9px 8px; }
+.teacher-form-art .teacher-studio-study figcaption { margin: 0 10px; font-size: 7px; }
+.teacher-form-art-caption { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: baseline; gap: 12px; padding-top: 17px; border-top: 1px solid var(--studio-rule); }
+.teacher-form-art-caption h2 { margin: 0; font: 400 23px/1.2 Georgia,serif; overflow-wrap: anywhere; }
+.teacher-form-art-caption code { max-width: 130px; color: var(--primary); font: 10px var(--studio-mono); overflow-wrap: anywhere; }
+.teacher-form-art-questions { display: flex; flex-wrap: wrap; gap: 5px; grid-column: 1/-1; }
+.teacher-form-art-questions > span { display: grid; place-items: center; min-width: 24px; height: 24px; padding-inline: 4px; border: 1px solid var(--studio-rule); color: var(--primary); font: 8px var(--studio-mono); background: var(--bg); }
+.teacher-publishing-grid.wizard-layout { max-width: none; }
+.teacher-publishing-grid .wizard-steps { grid-column: 1/-1; margin-bottom: 0; padding-bottom: 16px; border-bottom: 1px solid var(--studio-rule); }
+.teacher-publishing-grid > .card { min-width: 0; padding: 26px; }
+.teacher-publishing-grid .wizard-step { flex: 1; }
+.teacher-publishing-grid .wizard-step.active { font-weight: 550; }
+.teacher-publishing-grid .question-draft p { font-size: 14px; }
+.teacher-publishing-grid .question-draft strong { font: 9px var(--studio-mono); color: var(--primary); }
+.teacher-publishing-grid h2 { font: 400 25px Georgia,serif; }
+.teacher-publishing-grid .notice { font-size: 12px; }
+.teacher-publishing-grid #draft-status { font: 9px/1.6 var(--studio-mono); }
+.teacher-studio-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin: 12px 0 28px; }
+.teacher-studio-detail-heading > div { min-width: 0; }
+.teacher-studio-detail-heading h1 { margin: 0 0 17px; font: 400 clamp(34px,3.8vw,50px)/1.1 Georgia,serif; letter-spacing: -1.6px; overflow-wrap: anywhere; }
+.teacher-studio-detail-heading .teacher-overline { overflow-wrap: anywhere; }
+.teacher-studio-detail-heading .teacher-library-total { margin: 0; }
+.teacher-studio-detail-heading > .button { flex-shrink: 0; }
+.teacher-question-sheet.question-card { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,.8fr); gap: 26px; }
+.teacher-question-content { min-width: 0; }
+.teacher-question-content > .actions { margin-top: 20px; }
+.teacher-question-art { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding-left: 25px; border-left: 1px solid var(--studio-rule); }
+.teacher-question-art > svg { width: 100%; height: 195px; color: var(--primary); }
+.teacher-question-art-note { color: var(--muted); font: 8px var(--studio-mono); text-align: right; }
+.teacher-question-art .reference-host { width: 100%; height: 240px; max-width: none; margin: 0 0 12px; }
+.teacher-question-art .actions { gap: 8px; }
+.teacher-question-art .button { padding: 9px; font-size: 10px; }
+.teacher-question-model { height: 205px; padding: 15px; border: 1px solid #D8DDD7; background: #FAFCF8; }
+.teacher-question-model svg { width: 100%; height: 100%; }
+.teacher-drawing-desk { --teacher-mono: var(--studio-mono); min-height: 0; background-image: linear-gradient(var(--studio-grid) 1px,transparent 1px),linear-gradient(90deg,var(--studio-grid) 1px,transparent 1px); background-size: 28px 28px; }
+.teacher-drawing-desk .desk-header, .teacher-drawing-desk .desk-toolbar, .teacher-drawing-desk .desk-footer { background: var(--bg); border-color: var(--studio-rule); }
+.teacher-drawing-desk .desk-title strong { font: 400 23px Georgia,serif; letter-spacing: -.5px; }
+.teacher-drawing-desk .desk-title span { margin-top: 4px; font: 9px var(--studio-mono); }
+.teacher-drawing-desk .button { border-radius: 0; font-size: 11px; }
+.teacher-drawing-desk .desk-toolbar .button { font-size: 11px; padding: 8px 10px; }
+.teacher-drawing-desk .paper-area { border-radius: 0; margin: 17px; }
+.teacher-drawing-desk .paper-caption { border-radius: 0; text-transform: uppercase; font: 8px var(--studio-mono); letter-spacing: .5px; }
+.teacher-drawing-desk .coords { font-size: 10px; }
+.teacher-drawing-desk .desk-guide { border-color: var(--studio-rule); background: color-mix(in srgb,var(--surface) 35%,var(--bg)); }
+.teacher-drawing-desk .desk-guide h2, .teacher-drawing-desk .desk-guide h3 { font-family: Georgia,serif; font-weight: 400; }
+.teacher-drawing-desk .desk-guide p { font-size: 12px; }
+.teacher-drawing-desk .step-box, .teacher-drawing-desk .reference-host, .teacher-drawing-desk .notice { border-radius: 0; }
+.teacher-drawing-desk .step-box { background: var(--bg); border-color: var(--studio-rule); padding: 13px; }
+.teacher-drawing-desk .step-box > strong { font: 9px var(--studio-mono); text-transform: uppercase; letter-spacing: .6px; color: var(--primary); }
+.teacher-drawing-desk .step-box > p { font-size: 14px; }
+.teacher-drawing-desk input, .teacher-drawing-desk select, .teacher-drawing-desk textarea { border-radius: 0; }
+.teacher-drawing-desk .field > span { font-size: 12px; }
+.teacher-drawing-desk .check-field, .teacher-drawing-desk summary { font-size: 12px; }
+.teacher-drawing-desk .desk-footer .button { font-size: 11px; }
+.teacher-drawing-desk .save-indicator { font: 9px var(--studio-mono); }
+.teacher-desk-study { margin-top: 27px; padding-top: 20px; border-top: 1px solid var(--studio-rule); }
+.teacher-desk-study .teacher-view-controls { width: 100%; }
+.teacher-desk-study .teacher-view-controls button { gap: 2px; font-size: 8px; }
+.teacher-desk-study .teacher-view-controls svg { width: 21px; height: 23px; }
+body[data-teacher-studio] .dialog { border-radius: 0; border-color: var(--studio-rule); background-color: var(--bg); background-image: linear-gradient(var(--studio-grid) 1px,transparent 1px),linear-gradient(90deg,var(--studio-grid) 1px,transparent 1px); background-size: 24px 24px; }
+body[data-teacher-studio] .dialog::before { content: ''; display: block; width: 31px; height: 29px; margin-bottom: 17px; background: var(--primary); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath fill='none' stroke='black' stroke-width='1.5' d='m20 3 15 9v17L20 38 5 29V12ZM5 12l15 9 15-9M20 21v17'/%3E%3C/svg%3E") center/contain no-repeat; }
+body[data-teacher-studio] .dialog h2 { font: 400 30px/1.15 Georgia,serif; letter-spacing: -.7px; }
+body[data-teacher-studio] .dialog p { font-size: 13px; }
+body[data-teacher-studio] .dialog .button, body[data-teacher-studio] .dialog input, body[data-teacher-studio] .dialog select, body[data-teacher-studio] .dialog textarea, body[data-teacher-studio] .dialog .notice { border-radius: 0; }
+body[data-teacher-studio] .dialog .button { font-size: 12px; }
+body[data-teacher-studio] .theme-option-app { min-height: 96px; border-radius: 0; padding: 14px 12px; }
+body[data-teacher-studio] .theme-option-app:has(input:checked) { border-color: var(--primary); }
+body[data-teacher-studio] .theme-option-app strong { font-size: 12px; }
+body[data-teacher-studio] .theme-option-app small { font-size: 10px; }
+body[data-teacher-studio] .theme-dot { width: 33px; height: 38px; border-radius: 0; clip-path: polygon(50% 0,100% 24%,100% 77%,50% 100%,0 77%,0 24%); }
+body[data-teacher-studio] .toast { border-radius: 0; font-size: 12px; }
+@media(max-width:1100px) {
+  .teacher-drawing-gallery { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .teacher-practice-gallery { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .teacher-form-spread, .teacher-publishing-grid { grid-template-columns: minmax(0,1fr) minmax(0,.85fr); gap: 19px; }
+  .teacher-form-art-caption { grid-template-columns: 1fr; }
+  .teacher-form-art-caption code { max-width: none; }
+}
+@media(max-width:820px) {
+  .teacher-form-spread, .teacher-publishing-grid { grid-template-columns: minmax(0,1fr); }
+  .teacher-form-art { min-height: 0; }
+  .teacher-form-art .teacher-studio-study { width: min(470px,100%); margin: 0 auto; }
+  .teacher-form-art-caption { grid-template-columns: minmax(0,1fr) auto; }
+  .teacher-form-art-caption code { max-width: 125px; }
+  .teacher-nav a[href="#/drawings"], .teacher-nav a[href="#/learn"] { display: flex; }
+  .teacher-nav { gap: 1px; }
+  .teacher-nav a { font-size: 8px; }
+  .teacher-nav a .icon { width: 20px; height: 20px; }
+}
+@media(max-width:680px) {
+  .teacher-question-sheet.question-card { grid-template-columns: minmax(0,1fr); gap: 18px; }
+  .teacher-question-art { border-left: 0; border-top: 1px solid var(--studio-rule); padding: 18px 0 0; }
+  .teacher-question-art > svg { height: 160px; }
+  .teacher-question-art .reference-host { max-width: 380px; }
+  .teacher-studio-detail-heading { align-items: flex-start; flex-direction: column; gap: 17px; }
+  .teacher-studio-etching { min-height: 108px; gap: 10px; }
+  .teacher-studio-etching > span { font-size: 6px; }
+  .teacher-studio-etching > div { gap: 5px; }
+  .teacher-studio-etching svg { height: 74px; }
+  .teacher-form-spread > .form-card, .teacher-publishing-grid > .card { padding: 20px; }
+  .teacher-publishing-grid .wizard-steps { gap: 10px; }
+  .teacher-publishing-grid .wizard-step { align-items: flex-start; flex-direction: column; gap: 7px; font-size: 10px; }
+  .teacher-studio-empty { padding: 20px; }
+  .teacher-studio-empty h2 { font-size: 29px; }
+  .teacher-drawing-desk .paper-area { margin: 10px; }
+}
+@media(max-width:440px) {
+  .teacher-drawing-gallery { grid-template-columns: minmax(0,1fr); }
+  .teacher-practice-gallery { gap: 11px; }
+  .teacher-practice-sheet-art { padding-inline: 5px; }
+  .teacher-practice-sheet-art > svg { height: 127px; }
+  .teacher-practice-sheet-art .teacher-overline { font-size: 7px; margin-inline: 4px; }
+  .teacher-practice-sheet-body { padding: 14px 11px; gap: 6px; }
+  .teacher-practice-sheet-body h2 { font-size: 24px; }
+  .teacher-practice-sheet-body > .icon { width: 16px; height: 16px; }
+  .teacher-practice-sheet-body p { font-size: 9px; }
+  .teacher-practice-sheet-action { padding-inline: 11px; min-height: 54px; font-size: 9px; }
+  .teacher-practice-sheet-action > .icon { width: 14px; height: 14px; }
+  .teacher-form-art-caption { grid-template-columns: 1fr; }
+  .teacher-form-art-caption code { max-width: none; }
+  .teacher-studio-etching > span:last-child { display: none; }
+  .teacher-studio-empty { grid-template-columns: minmax(0,1fr) 90px; gap: 5px; }
+  .teacher-studio-empty > div:last-child svg { height: 105px; }
+  .teacher-studio-empty h2 { font-size: 26px; }
+  body[data-teacher-studio] .theme-options { gap: 9px; }
+  body[data-teacher-studio] .theme-option-app { flex-wrap: wrap; gap: 9px; }
+  body[data-teacher-studio] .theme-option-app > span:last-child { flex-basis: 100%; }
+}

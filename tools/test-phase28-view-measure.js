@@ -185,7 +185,9 @@ ok(dblSlice.indexOf('if (EduCADMeasure.isView(handle.measure)) return;') !== -1,
   'no rename in view');
 var keyIdx = index.indexOf("window.addEventListener('keydown', function (e) {");
 ok(keyIdx !== -1, 'keydown found');
-var keySlice = index.slice(keyIdx, keyIdx + 700);
+// Read through the authoring branch instead of an arbitrary byte budget;
+// input-focus guards may precede the View-mode keyboard branch.
+var keySlice = index.slice(keyIdx, index.indexOf('// Tab steps into pose mode from edit', keyIdx));
 ok(keySlice.indexOf('if (EduCADMeasure.isView(handle.measure)) {') !== -1,
   'keyboard owned');
 ok(keySlice.indexOf('clearInspect') !== -1, 'escape clears');
@@ -243,7 +245,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase28`') !== -1, 'phase28 row');
 ok(readme.indexOf('View mode: Edit/View toggle, select-and-measure inspect') !== -1,
   'phase28 label');
-ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–47 (1060 checks)') !== -1,
   'grand total 850');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase28'], 'node tools/test-phase28-view-measure.js',

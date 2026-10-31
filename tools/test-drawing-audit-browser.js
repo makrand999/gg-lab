@@ -259,6 +259,54 @@
       window.educadSetSheetMode('view'); sheetClick(guide);
       assert(h.measure.inspectId !== guide.id, 'Hidden guide remained pickable');
     });
+    await test('F11 datum occlusion tracks the 3D model across orbit, pan, and zoom', async () => {
+      await reset(); window.educadRunCommand('/demo 3view'); await frame(); await frame();
+      window.educadSetSheetMode('view'); await frame(); await frame(); await frame();
+      const c1 = h.mount.layer1, ctx = c1.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const xyY = Math.floor(EduCADViewport.forward(h.view, { x: 0, y: 0 }).y) + 0.5;
+      const rowY = Math.floor(xyY);
+      // Same text measure renderLayer1 uses: label backings count as coverage.
+      const measure = text => {
+        ctx.save(); ctx.font = '11px system-ui, sans-serif';
+        const w = ctx.measureText(text).width; ctx.restore(); return w;
+      };
+      const liveGaps = () => h.spatialView.datumGaps(xyY, measure);
+      // Layer 1 is transparent outside its ink: a datum pixel needs alpha.
+      const inkRow = () => {
+        const y0 = Math.round(rowY * dpr), hh = Math.max(1, Math.round(dpr));
+        const data = ctx.getImageData(0, y0, c1.width, hh).data;
+        const ink = new Array(c1.width).fill(false);
+        for (let x = 0; x < c1.width; x++) for (let r = 0; r < hh; r++) {
+          const i = (r * c1.width + x) * 4;
+          if (data[i + 3] > 100 && data[i] < 100 && data[i + 1] < 115 && data[i + 2] < 135) { ink[x] = true; break; }
+        }
+        return ink;
+      };
+      const inkKey = ink => ink.map(v => v ? '#' : '.').join('');
+      const inkAt = (ink, cssX) => ink[Math.min(c1.width - 1, Math.max(0, Math.floor(cssX * dpr)))];
+      const gapsKey = () => JSON.stringify(liveGaps().map(g => g.map(n => Math.round(n))));
+      for (const [name, move] of [['orbit', () => h.solid.orbitBy(90, 40)], ['pan', () => h.solid.panBy(60, -25)], ['zoom', () => h.solid.zoomAt(900, 300, 1.35)], ['panOff', () => h.solid.panBy(0, -250)]]) {
+        const inkBefore = inkKey(inkRow()), gapsBefore = gapsKey();
+        move(); await frame(); await frame();
+        const fresh = liveGaps();
+        assert(gapsKey() !== gapsBefore, name + ' moved no model coverage; the test is vacuous');
+        const ink = inkRow();
+        assert(inkKey(ink) !== inkBefore, name + ' left stale datum paint');
+        for (const [a, b] of fresh) {
+          if (b - a < 24) continue;
+          const mid = (a + b) / 2;
+          if (mid < 850) continue; // Sheet ink may legitimately cross left-side gaps.
+          assert(!inkAt(ink, mid), { name, gap: [Math.round(a), Math.round(b)], detail: 'fresh gap still shows datum ink' });
+        }
+        for (const [a, b] of JSON.parse(gapsBefore)) {
+          const mid = (a + b) / 2;
+          if (mid < 850 || fresh.some(([c, d]) => mid > c - 10 && mid < d + 10)) continue;
+          assert(inkAt(ink, mid), { name, at: Math.round(mid), detail: 'vacated span was not repainted' });
+        }
+      }
+      return { tracked: ['orbit', 'pan', 'zoom', 'panOff'] };
+    });
   } finally { window.removeEventListener('error', onError); }
   window.educadDrawingAuditResults = results;
   return { passed: results.filter(r => r.status === 'PASS').length, failed: results.filter(r => r.status === 'FAIL').length, results };

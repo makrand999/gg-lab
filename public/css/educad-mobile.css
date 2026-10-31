@@ -1,0 +1,602 @@
+/* EduCAD mobile inspection: split 2D/3D panes, compact header, pose
+   dock, bottom sheet, and overflow menu. Everything here is scoped
+   under body.mobile-layout (split panes by space) or
+   body.mobile-inspect (inspection-only by input), so desktop keeps its
+   exact current look. Plain actions sit over canvas edges; the thin
+   divider has a larger invisible touch area. */
+
+body.mobile-layout {
+  overscroll-behavior: none;
+}
+
+body.mobile-layout #app-container {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Desktop chrome replaced by the mobile header/overflow while split. */
+body.mobile-layout .demo-bar,
+body.mobile-layout #session-bar,
+body.mobile-layout .drafting-controls,
+body.mobile-layout .drafting-status,
+body.mobile-layout #pose-panel,
+body.mobile-layout .edugraphics-hud {
+  display: none !important;
+}
+
+body.mobile-layout .coords-hud { display: none !important; }
+
+/* ---- Header ---- */
+#mobile-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px;
+  background: #f8fafc;
+  border-bottom: 1px solid #cbd5e1;
+  z-index: 40;
+}
+#mobile-header[hidden] { display: none; }
+#mobile-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.mobile-seg {
+  flex: none;
+  display: inline-flex;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.mobile-seg-btn {
+  min-height: 44px;
+  min-width: 52px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+}
+.mobile-seg-btn + .mobile-seg-btn { border-left: none; }
+.mobile-seg-btn.active {
+  background: transparent;
+  color: #0284c7;
+  font-weight: 600;
+  box-shadow: inset 0 -2px #0284c7;
+}
+.mobile-seg-btn:disabled { opacity: 0.4; cursor: default; }
+.mobile-btn {
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 14px;
+  color: #0f172a;
+  cursor: pointer;
+}
+.mobile-btn:active { background: #e2e8f0; }
+.mobile-icon-btn {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: #0f172a;
+  cursor: pointer;
+}
+#mobile-header .mobile-icon-btn { border: none; font-size: 22px; }
+
+/* ---- Panes ---- */
+#mobile-panes {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  background: #f8fafc;
+  position: relative;
+}
+#mobile-panes[hidden] { display: none; }
+body.mobile-portrait #mobile-panes { flex-direction: column; }
+body.mobile-landscape #mobile-panes { flex-direction: row; }
+#mobile-pane-3d, #mobile-pane-2d {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+#mobile-pane-3d { flex: none; }
+body.mobile-portrait #mobile-pane-2d { flex: 1 1 auto; }
+body.mobile-landscape #mobile-pane-2d { flex: 1 1 auto; }
+body.mobile-expand-2d #mobile-pane-3d,
+body.mobile-expand-3d #mobile-pane-2d,
+body.mobile-expand-2d #mobile-divider,
+body.mobile-expand-3d #mobile-divider {
+  display: none !important;
+}
+body.mobile-expand-2d #mobile-pane-2d,
+body.mobile-expand-3d #mobile-pane-3d {
+  flex: 1 1 auto;
+}
+.mobile-pane-bar {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 8px;
+  background: transparent;
+  pointer-events: none;
+}
+.mobile-pane-bar button { pointer-events: auto; }
+.mobile-pane-bar .mobile-btn,
+.mobile-pane-bar .mobile-icon-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #475569;
+}
+.mobile-pane-bar .mobile-icon-btn { min-width: 44px; font-size: 15px; }
+.mobile-pane-label {
+  flex: 1 1 auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+}
+#mobile-glass-slot, #mobile-sheet-slot {
+  flex: 1 1 auto;
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: #f8fafc;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+#mobile-sheet-slot canvas[data-layer],
+#mobile-glass-slot canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  touch-action: none;
+}
+#mobile-glass-slot .educad-solid-glass {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.mobile-pane-empty {
+  margin: 0;
+  padding: 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+.mobile-divider {
+  position: relative;
+  z-index: 25;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  touch-action: none;
+  cursor: row-resize;
+}
+body.mobile-portrait .mobile-divider {
+  width: 100%;
+  height: 8px;
+  cursor: row-resize;
+}
+body.mobile-landscape .mobile-divider {
+  width: 8px;
+  height: auto;
+  cursor: col-resize;
+}
+.mobile-divider-grip {
+  display: block;
+  border-radius: 3px;
+  background: #cbd5e1;
+}
+body.mobile-portrait .mobile-divider-grip { width: 28px; height: 2px; }
+body.mobile-landscape .mobile-divider-grip { width: 2px; height: 28px; }
+.mobile-divider::before { content: ''; position: absolute; }
+body.mobile-portrait .mobile-divider::before { inset: -18px 0; }
+body.mobile-landscape .mobile-divider::before { inset: 0 -18px; }
+.mobile-divider:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: -2px;
+}
+
+/* Menus moved into the sheet slot keep pane-relative offsets. */
+#mobile-sheet-slot .edugraphics-menu {
+  max-width: calc(100% - 16px);
+  touch-action: pan-y;
+}
+#mobile-sheet-slot .edugraphics-menu-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+/* ---- Expand bar ---- */
+#mobile-expandbar {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+  background: #f8fafc;
+  border-top: 1px solid #cbd5e1;
+  z-index: 40;
+}
+#mobile-expandbar[hidden] { display: none; }
+
+/* ---- Pose dock ---- */
+#mobile-pose {
+  flex: none;
+  padding: 0 8px;
+  background: #f8fafc;
+  border-top: 1px solid #cbd5e1;
+  z-index: 40;
+  max-height: 36dvh;
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+#mobile-pose[hidden] { display: none; }
+#mobile-pose-readout {
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: #1e293b;
+}
+.mobile-pose-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0;
+}
+.mobile-pose-row:last-child { margin-bottom: 0; }
+#mobile-pose .mobile-seg-btn { min-width: 44px; padding: 0 8px; }
+#mobile-pose .mobile-pose-row:first-of-type { flex-wrap: wrap; }
+#mobile-pose-slider, :is(#mobile-pose, #mobile-pose-options) .mobile-pose-row input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+}
+#mobile-pose-number, :is(#mobile-pose, #mobile-pose-options) .mobile-pose-row input[type="number"] {
+  flex: none;
+  width: 84px;
+  min-height: 44px;
+  font-size: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 6px;
+  background: #fff;
+  color: #0f172a;
+}
+.mobile-pose-unit {
+  flex: none;
+  min-width: 28px;
+  font-size: 14px;
+  color: #475569;
+}
+.mobile-snap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 80px;
+  font-size: 14px;
+  color: #0f172a;
+}
+.mobile-snap input {
+  width: 22px;
+  height: 22px;
+}
+.mobile-advanced summary {
+  min-width: 60px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #0284c7;
+  cursor: pointer;
+}
+#mobile-pose .mobile-pose-row:nth-of-type(3) { flex-wrap: wrap; }
+#mobile-pose .mobile-advanced { flex: none; }
+#mobile-pose .mobile-advanced[open] { flex: 1 1 100%; }
+#mobile-pose-options .mobile-pose-row { flex-wrap: wrap; }
+#mobile-pose-options .mobile-advanced { flex: 1 1 100%; }
+.mobile-pose-empty {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+/* ---- Bottom sheet ---- */
+#mobile-sheet {
+  flex: none;
+  background: #fff;
+  border-top: 1px solid #cbd5e1;
+  z-index: 40;
+  max-height: 46dvh;
+  display: flex;
+  flex-direction: column;
+}
+#mobile-sheet[hidden] { display: none; }
+#mobile-sheet-handle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+}
+#mobile-peek {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mobile-chev { flex: none; color: #64748b; }
+#mobile-sheet-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: 4px 12px 12px;
+  overscroll-behavior: contain;
+}
+#mobile-sheet-body[hidden] { display: none; }
+#mobile-inspect-card h2, #mobile-spatial-slot .spatial-head > span {
+  font-size: 13px;
+}
+#mobile-inspect-card {
+  font-size: 13px;
+  color: #334155;
+  white-space: pre-wrap;
+  margin-bottom: 8px;
+}
+#mobile-inspect-card[hidden] { display: none; }
+/* The spatial panel docks into the sheet instead of floating. */
+#mobile-spatial-slot .spatial-panel {
+  position: static;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  border-top: none;
+  padding: 0;
+  background: transparent;
+}
+#mobile-spatial-slot .spatial-panel button {
+  min-height: 44px;
+  min-width: 44px;
+}
+#mobile-spatial-slot .spatial-panel summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+/* ---- Overflow menu + account panels ---- */
+#mobile-menu-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(15, 23, 42, 0.25);
+}
+#mobile-menu-root[hidden] { display: none; }
+#mobile-menu {
+  position: absolute;
+  top: calc(52px + env(safe-area-inset-top, 0px));
+  right: 8px;
+  width: min(320px, calc(100vw - 16px));
+  max-height: calc(100dvh - 140px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 6px 8px 12px;
+}
+#mobile-menu[hidden] { display: none; }
+.mobile-menu-section h2 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin: 8px 4px 4px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.mobile-menu-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+}
+.mobile-menu-btn:active { background: #f1f5f9; }
+.mobile-menu-btn:disabled { opacity: 0.4; cursor: default; }
+.mobile-menu-btn[aria-pressed="true"] { color: #0284c7; font-weight: 600; }
+.mobile-menu-link { display: flex; }
+/* Saved drawings / sets panels dock as overlays while split. */
+body.mobile-layout #drawings-panel,
+body.mobile-layout #sets-panel {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  top: auto;
+  min-width: 0;
+  max-width: none;
+  max-height: 62dvh;
+  z-index: 70;
+}
+body.mobile-layout #drawings-panel .demo-btn,
+body.mobile-layout #drawings-panel .cf-link,
+body.mobile-layout #sets-panel .demo-btn,
+body.mobile-layout #sets-panel .cf-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---- Toast ---- */
+#mobile-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 10px 16px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 13px;
+  line-height: 1.4;
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 90;
+  pointer-events: none;
+  text-align: center;
+}
+#mobile-toast[hidden] { display: none; }
+
+/* ---- Candidate chooser ---- */
+#mobile-chooser {
+  position: fixed;
+  z-index: 80;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
+  background: #fff;
+  border: 1px solid #94a3b8;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  padding: 6px;
+}
+#mobile-chooser[hidden] { display: none; }
+.mobile-chooser-head {
+  margin: 2px 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+.mobile-chooser-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+}
+.mobile-chooser-btn:active { background: #f1f5f9; }
+.mobile-chooser-close { color: #64748b; }
+
+/* ---- Small-height + verify/tutorial overlays ---- */
+body.mobile-layout #verify-panel {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  top: auto;
+  bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  max-width: none;
+  max-height: 40dvh;
+  z-index: 55;
+}
+body.mobile-layout #tutorial-panel {
+  left: 8px;
+  right: 8px;
+  max-width: none;
+}
+body.mobile-layout #settings-panel {
+  top: calc(56px + env(safe-area-inset-top, 0px));
+  right: 8px;
+  left: 8px;
+  min-width: 0;
+  max-width: none;
+  max-height: calc(100dvh - 140px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+body.mobile-layout #cmd-bar {
+  width: calc(100vw - 16px);
+  bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+}
+body.mobile-layout #cmd-status,
+body.mobile-layout #cmd-suggest {
+  touch-action: pan-y;
+}
+@media (max-height: 500px) {
+  body.mobile-layout #mobile-sheet { max-height: 38dvh; }
+  body.mobile-layout .mobile-pane-bar { min-height: 40px; }
+}
+
+/* Focus visibility on touch + keyboard. */
+#mobile-header button:focus-visible,
+#mobile-pose button:focus-visible,
+#mobile-pose input:focus-visible,
+#mobile-sheet-handle:focus-visible,
+#mobile-menu button:focus-visible,
+#mobile-menu a:focus-visible,
+#mobile-chooser button:focus-visible,
+#mobile-expandbar button:focus-visible,
+.mobile-pane-bar button:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #mobile-sheet-body, #mobile-menu { scroll-behavior: auto; }
+}

@@ -4,6 +4,7 @@
    original contrast. */
 .spatial-inspection .edugraphics-layer1 { opacity: 0.55; }
 .spatial-panel {
+  box-sizing: border-box;
   position: absolute;
   top: 44px;
   left: 12px;
@@ -48,3 +49,54 @@
 .spatial-panel thead { border-bottom: 1px solid #e5e9ee; }
 .spatial-panel td:first-child button { text-align: left; color: #526f89; }
 .spatial-panel .spatial-note { margin: 6px 0 12px; }
+.spatial-tools { display: flex; align-items: center; gap: 4px; margin: 10px 0 6px; flex-wrap: wrap; }
+.spatial-tools > button { padding: 3px 7px; }
+.spatial-tools > button[aria-pressed="true"] { background: #edf1f5; box-shadow: none; }
+.spatial-panel .spatial-filter { margin: 0 0 0 auto; }
+.spatial-filter summary { font-size: 11px; }
+.spatial-filter[open] { flex-basis: 100%; }
+.spatial-filter-fields { display: grid; gap: 5px; padding: 6px 4px 8px; }
+.spatial-filter-fields label { display: flex; align-items: center; gap: 7px; font-size: 11px; }
+.spatial-filter-fields input { margin: 0; accent-color: #6e8599; }
+.spatial-selection-head > div { display: flex; gap: 6px; }
+.spatial-pins { margin: 10px 0; padding-top: 8px; border-top: 1px solid #e5e9ee; }
+.spatial-pins .spatial-selection-head { color: #7d8997; font-size: 11px; margin-bottom: 4px; }
+.spatial-pin-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 6px; margin: 5px 0; font-size: 11px; }
+.spatial-pin-row > span { color: #7d8997; overflow-wrap: anywhere; padding-top: 2px; }
+.spatial-search { box-sizing: border-box; width: 100%; margin: 6px 0; padding: 5px 7px; border: 1px solid #e0e5eb; border-radius: 3px; background: transparent; color: #536274; font: inherit; }
+.spatial-search:focus-visible { outline: 2px solid #7d95ab; outline-offset: 1px; }
+.spatial-table-scroll { overflow-x: auto; }
+.spatial-active-row { background: #eaf0f5; }
+.spatial-pinned-row td:first-child { box-shadow: inset 2px 0 #a8b8c7; }
+.spatial-label-note { max-width: 32ch; }
+#settings-panel .cmd-inspection-settings { margin-top: 10px; border-top: 1px solid #e5e9ee; padding-top: 8px; }
+#settings-panel .cmd-inspection-settings summary { cursor: pointer; padding: 3px 0; color: #617285; }
+#settings-panel .cmd-inspection-settings select { margin-left: auto; max-width: 110px; border: 1px solid #dce2e8; background: #f8fafc; color: #536274; font: inherit; padding: 3px; }
+#settings-panel .cmd-inspection-settings input { accent-color: #6e8599; }
+#settings-panel { max-height: calc(100dvh - 80px); overflow-y: auto; }
+.inspection-switch { display: flex; gap: 4px; padding-top: 7px; }
+.inspection-switch button { padding: 2px 10px; font-size: 11px; }
+.inspection-switch button[aria-pressed="true"] { background: #edf1f5; box-shadow: none; }
+.sheet-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.sheet-tools > div { display: flex; gap: 3px; }
+.sheet-tools [aria-pressed="true"] { background: #edf1f5; box-shadow: none; }
+.sheet-view-filter { max-width: 110px; border: 0; background: transparent; color: #64748b; font: inherit; font-size: 11px; padding: 3px; }
+.sheet-view-filter:focus-visible { outline: 2px solid #7d95ab; }
+.sheet-filter-fields { display: grid; gap: 5px; padding: 6px 4px; }
+.sheet-filter-fields label { display: flex; align-items: center; gap: 7px; color: #7d8997; font-size: 11px; }
+.sheet-filter-fields input { accent-color: #6e8599; margin: 0; }
+.sheet-selection td:first-child { white-space: normal; max-width: 145px; }
+.sheet-selection .spatial-selection-head strong { overflow-wrap: anywhere; }
+.sheet-selection .spatial-selection-head > div { flex-shrink: 0; }
+.sheet-record { padding: 5px 4px 5px 7px; border-left: 2px solid transparent; border-bottom: 1px solid #edf1f5; }
+.sheet-record > button { color: #526f89; text-align: left; max-width: 100%; overflow-wrap: anywhere; }
+.sheet-record > span { display: block; padding-left: 4px; font-size: 11px; color: #7d8997; overflow-wrap: anywhere; }
+.sheet-record.spatial-pinned-row { border-left-color: #a8b8c7; }
+.spatial-panel .sheet-full-specs { margin-top: 2px; }
+.sheet-full-specs summary { font-size: 11px; color: #84909d; }
+.sheet-full-specs td:first-child { white-space: normal; }
+.sheet-comparison { border-top: 1px solid #e5e9ee; padding-top: 7px; margin: 10px 0; }
+.sheet-compare-title { color: #617285; font-size: 11px; overflow-wrap: anywhere; }
+.sheet-comparison .spatial-note { margin: 3px 0; }
+.sheet-label-note { max-width: 32ch; }
+.sheet-inventory-tools { display: flex; justify-content: flex-end; margin: 0 0 4px; font-size: 11px; }

@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-07T03:12:57.951Z",
+  "failed": 0,
+  "passed": 8,
+  "results": [
+    {
+      "name": "mounted bridge applies whole plan with one undo/redo",
+      "status": "PASS"
+    },
+    {
+      "name": "failed replacement keeps current drawing and undo history",
+      "status": "PASS"
+    },
+    {
+      "name": "mounted repair sends validation feedback and commits once",
+      "status": "PASS"
+    },
+    {
+      "name": "stale view-mode response cannot edit drawing",
+      "status": "PASS"
+    },
+    {
+      "name": "edit-view-edit roundtrip invalidates pending response",
+      "status": "PASS"
+    },
+    {
+      "name": "stale response cannot overwrite manual edits",
+      "status": "PASS"
+    },
+    {
+      "name": "overlapping calls and student bridge rejected before fetch",
+      "status": "PASS"
+    },
+    {
+      "name": "teacher deep-link refusal preserves sheet and reports failure",
+      "status": "PASS"
+    }
+  ]
+}

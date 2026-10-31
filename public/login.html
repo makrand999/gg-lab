@@ -25,19 +25,19 @@
     <main id="login-view" class="cf-content">
       <h1>Login to EduCAD</h1>
       <div class="cf-tabs">
-        <button type="button" data-role="academics" class="active">Academics</button>
+        <button type="button" data-role="academics">Academics</button>
         <button type="button" data-role="teacher">Teacher</button>
-        <button type="button" data-role="student">Student</button>
+        <button type="button" data-role="student" class="active">Student</button>
       </div>
       <form id="login-form" action="api/login" method="post" autocomplete="off">
         <table class="cf-form">
           <tr>
-            <td class="lbl"><label for="username">Username:</label></td>
-            <td><input id="username" name="username" type="text" maxlength="64"></td>
+            <td class="lbl"><label for="username">College ERP email:</label></td>
+            <td><input id="username" name="username" type="email" maxlength="254" autocomplete="username" required></td>
           </tr>
           <tr>
             <td class="lbl"><label for="password">Password:</label></td>
-            <td><input id="password" name="password" type="password" maxlength="64"></td>
+            <td><input id="password" name="password" type="password" maxlength="1024" autocomplete="current-password" required></td>
           </tr>
           <tr>
             <td></td>
@@ -57,7 +57,7 @@
         <p class="cf-hint">Loading manual...</p>
       </div>
     </main>
-    <footer class="cf-footer">EduCAD &middot; zero-dependency teaching CAD &middot; demo login, no real security</footer>
+    <footer class="cf-footer">EduCAD &middot; zero-dependency teaching CAD &middot; College digital lab</footer>
   </div>
   <script src="menu-lava.js"></script>
   <script src="login.js"></script>

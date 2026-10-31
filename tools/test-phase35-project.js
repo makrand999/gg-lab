@@ -241,7 +241,7 @@ var readme = fs.readFileSync(README_PATH, 'utf8');
 ok(readme.indexOf('`npm run test:phase35`') !== -1, 'phase35 row');
 ok(readme.indexOf('Pose live views: exact 2D projections of the posed solid') !== -1,
   'phase35 label');
-ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–47 (1060 checks)') !== -1,
   'grand total 960');
 var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
 eq(pkg.scripts['test:phase35'], 'node tools/test-phase35-project.js',

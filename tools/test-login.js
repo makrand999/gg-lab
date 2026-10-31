@@ -120,7 +120,7 @@ async function main() {
 
   var port = await freePort();
   var srv = child.spawn(SERVER, [String(port)], {
-    env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
+    env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR }),
     stdio: ['ignore', 'ignore', 'ignore']
   });
   try {
@@ -212,7 +212,7 @@ async function main() {
     pass('login page ships');
 
     // 12 login css rules ship
-    var r12 = await get(port, '/login.css');
+    var r12 = await get(port, '/css/login.css');
     eq(r12.status, 200);
     ok(r12.body.indexOf('backLava') !== -1, 'blob rule');
     ok(r12.body.indexOf('leftLava') !== -1, 'slice rule');

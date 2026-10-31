@@ -22,7 +22,7 @@
   if (s0.role !== 'student') { window.location.replace('login.html'); return; }
 
   var who = $('lab-who');
-  if (who) who.textContent = s0.name + ' (' + s0.role + ')';
+  if (who) who.textContent = s0.name + (s0.profile ? ' · ' + ['class','division','year'].map(function(key){return s0.profile[key];}).filter(Boolean).join(' · ') : ' (' + s0.role + ')');
   var out = $('lab-logout');
   if (out) out.addEventListener('click', function (e) {
     e.preventDefault();
@@ -424,6 +424,11 @@
         } else if (q.has_model) {
           row.appendChild(el('div', 'Auto-check is off for this question.', 'lab-meta'));
         }
+        if (q.model3d) {
+          row.appendChild(el('div',
+            'A 3D reference for this question appears beside the sheet ' +
+            'while solving.', 'lab-meta'));
+        }
         var mine = el('div', null, 'lab-meta');
         row.appendChild(mine);
         rows.push(mine);
@@ -447,7 +452,9 @@
       root.appendChild(el('p', 'Solving opens the sheet with the starter ' +
         'loaded (when the teacher attached one). Verify checks your drawing ' +
         'against the model answer (pass/fail only, the model stays hidden); ' +
-        'Submit sends it to your teacher from the sheet\'s Sets panel.', 'lab-hint'));
+        'Submit sends it to your teacher from the sheet\'s Sets panel. ' +
+        'When the teacher shares a 3D reference it appears beside the ' +
+        'sheet while solving — draw the views from it.', 'lab-hint'));
       // Overlay my latest status per question.
       Saves.listMySubmissions(fi(), session()).then(function (md) {
         var latest = {};

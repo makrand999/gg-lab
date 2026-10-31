@@ -157,7 +157,7 @@ var readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 ok(readme.indexOf('`npm run test:phase45`') !== -1, 'phase45 row');
 ok(readme.indexOf('Pose stack labels split across parted corners') !== -1,
   'phase45 label');
-ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
+ok(readme.indexOf('baseline + phases 1–47 (1060 checks)') !== -1,
   'grand total 1039');
 var pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 eq(pkg.scripts['test:phase45'], 'node tools/test-phase45-pose-labels.js',

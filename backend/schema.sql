@@ -16,6 +16,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
+-- Only normalized lab identity is retained; ERP credentials/cookies are ephemeral.
+CREATE TABLE IF NOT EXISTS student_profiles (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  profile_json TEXT NOT NULL,
+  synced_at INTEGER NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE TABLE IF NOT EXISTS drawings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

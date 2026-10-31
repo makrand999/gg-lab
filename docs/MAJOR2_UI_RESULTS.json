@@ -1,0 +1,103 @@
+{
+  "results": [
+    {
+      "name": "New welcome and six themes persist",
+      "status": "PASS"
+    },
+    {
+      "name": "Guest drawing uses native paper, pointer tools, undo and redo",
+      "status": "PASS"
+    },
+    {
+      "name": "Draft restore survives navigation",
+      "status": "PASS"
+    },
+    {
+      "name": "Teacher creates a class and publishes a wizard assignment",
+      "status": "PASS"
+    },
+    {
+      "name": "Teacher saves a private model and a real 3D reference",
+      "status": "PASS"
+    },
+    {
+      "name": "Student joins class; models stay private and 3D respects visibility",
+      "status": "PASS"
+    },
+    {
+      "name": "Student checks, saves, and submits a drawing",
+      "status": "PASS"
+    },
+    {
+      "name": "Teacher reviews immutable submission; student receives feedback",
+      "status": "PASS"
+    },
+    {
+      "name": "Saved drawing reopens; rename and search use actual data",
+      "status": "PASS"
+    },
+    {
+      "name": "Point practice requires actions and records completion",
+      "status": "PASS"
+    },
+    {
+      "name": "Line, square, and solid lessons require actual practice",
+      "status": "PASS"
+    },
+    {
+      "name": "Editing dependencies, circle radius, cancellation, and invalid commands are safe",
+      "status": "PASS"
+    },
+    {
+      "name": "A failed save preserves drawing and offers an explicit retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Malformed JSON import is rejected without changing the paper",
+      "status": "PASS"
+    },
+    {
+      "name": "Six themes and responsive layouts have no horizontal overflow",
+      "status": "PASS"
+    },
+    {
+      "name": "Touch-only devices keep authoring disabled and inspection available",
+      "status": "PASS"
+    },
+    {
+      "name": "No uncaught browser errors",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "checkedAt": "2026-10-07T10:56:51.305256+00:00",
+  "browser": "Chromium headless, native CDP",
+  "database": "Disposable SQLite database; live data untouched",
+  "passed": 17,
+  "responsiveLayouts": 96,
+  "themes": 6,
+  "widths": [
+    1366,
+    800,
+    390,
+    320
+  ],
+  "screens": [
+    "home",
+    "drawings",
+    "learn",
+    "drawing"
+  ],
+  "engineModulesVerified": 28,
+  "liveRoutes": {
+    "https://mitasia.in/major2/": 200,
+    "https://mitasia.in/major2": 301,
+    "https://mitasia.in/major2/drawing.js": 200,
+    "https://mitasia.in/major2/api/me": 401,
+    "https://mitasia.in/major/": 200
+  },
+  "limitations": [
+    "Automated checks do not establish novice usability.",
+    "Live AI generation was not exercised; it depends on the existing service."
+  ]
+}

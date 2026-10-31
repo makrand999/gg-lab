@@ -1,0 +1,168 @@
+{
+  "date": "2026-10-07",
+  "browser": "T3 collaborative preview",
+  "isolation": "Studio uses in-memory fixture accounts/data; sheet tests override APIs on a disposable guest canvas.",
+  "studio": {
+    "failed": 0,
+    "passed": 22,
+    "results": [
+      {
+        "name": "Labels associate with inputs and model-only controls explain availability",
+        "status": "PASS"
+      },
+      {
+        "name": "Code and UTF-8 title validation prevents silent truncation",
+        "status": "PASS"
+      },
+      {
+        "name": "Draft metadata, questions, pending text and class survive navigation",
+        "status": "PASS"
+      },
+      {
+        "name": "Editing and ordering questions preserves models and pending edit across navigation",
+        "status": "PASS"
+      },
+      {
+        "name": "Bulk import is atomic, enforces limits, and never silently reuses selected model",
+        "status": "PASS"
+      },
+      {
+        "name": "Unavailable class list and deleted class fail closed instead of posting an open set",
+        "status": "PASS"
+      },
+      {
+        "name": "Pending prompt and oversized Unicode hints are not silently dropped",
+        "status": "PASS"
+      },
+      {
+        "name": "Posting freezes draft, sends once and opens the created set",
+        "status": "PASS"
+      },
+      {
+        "name": "Failed posting retains recoverable draft and unlocks controls",
+        "status": "PASS"
+      },
+      {
+        "name": "Late set success and errors cannot overwrite another route",
+        "status": "PASS"
+      },
+      {
+        "name": "Grades save once in place and retain other teacher remarks",
+        "status": "PASS"
+      },
+      {
+        "name": "Needs-grading filter updates live after grading",
+        "status": "PASS"
+      },
+      {
+        "name": "Model toggles preserve grading forms and duplicate clicks send once",
+        "status": "PASS"
+      },
+      {
+        "name": "Empty saved model refused and valid attachment preserves grading context",
+        "status": "PASS"
+      },
+      {
+        "name": "Upload rejects malformed rows atomically and supports retrying the same file",
+        "status": "PASS"
+      },
+      {
+        "name": "Oversized grading remarks retain text and never reach the API",
+        "status": "PASS"
+      },
+      {
+        "name": "Replacing a model keeps the latest 3D-sharing choice",
+        "status": "PASS"
+      },
+      {
+        "name": "Navigating away during model lookup cancels attachment before mutation",
+        "status": "PASS"
+      },
+      {
+        "name": "Slow class lookup cannot expose a set as open",
+        "status": "PASS"
+      },
+      {
+        "name": "Repeated model references resolve once per posted set",
+        "status": "PASS"
+      },
+      {
+        "name": "A drawing list that resolves during failed posting remains usable",
+        "status": "PASS"
+      },
+      {
+        "name": "Malformed route recovers to studio without exception",
+        "status": "PASS"
+      }
+    ]
+  },
+  "modelReview": {
+    "failed": 0,
+    "passed": 9,
+    "results": [
+      {
+        "name": "Auto-draw produces a reviewed draft without automatically attaching it",
+        "status": "PASS"
+      },
+      {
+        "name": "Reviewed model attaches to the exact set and question once",
+        "status": "PASS"
+      },
+      {
+        "name": "Empty drawing cannot replace a model",
+        "status": "PASS"
+      },
+      {
+        "name": "Replacement cancellation preserves the previous model",
+        "status": "PASS"
+      },
+      {
+        "name": "Failed attachment preserves the drawing and allows retry",
+        "status": "PASS"
+      },
+      {
+        "name": "Session changes during attachment preflight cancel the mutation",
+        "status": "PASS"
+      },
+      {
+        "name": "Mobile inspection cannot attach models",
+        "status": "PASS"
+      },
+      {
+        "name": "Reviewing an existing model offers explicit attachment and preserves sharing settings",
+        "status": "PASS"
+      },
+      {
+        "name": "Viewing a different question updates the attachment destination",
+        "status": "PASS"
+      }
+    ]
+  },
+  "additionalChecks": [
+    {
+      "name": "Actual page reload restores set metadata, selected class and pending question/hint",
+      "status": "PASS"
+    },
+    {
+      "name": "Desktop 1280px layout has no horizontal overflow",
+      "status": "PASS"
+    },
+    {
+      "name": "390px layout has no horizontal or field overflow",
+      "status": "PASS"
+    },
+    {
+      "name": "320px layout has no horizontal or field overflow",
+      "status": "PASS"
+    }
+  ],
+  "regressions": {
+    "npmTest": "PASS",
+    "lab": "18/18 PASS",
+    "login": "15/15 PASS",
+    "saves": "20/20 PASS",
+    "modelGrade": "18/18 PASS",
+    "naturalLanguage": "16/16 PASS",
+    "reference3d": "13/13 PASS"
+  }
+}

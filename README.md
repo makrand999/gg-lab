@@ -4,9 +4,12 @@ EduCAD is a zero-dependency teaching CAD for first-angle Monge projection
 (engineering drawing): a millimetre-precise 2D sheet with elevation above
 and plan below the XY ground line, plus a live pen-sketch 3D widget that
 reconstructs the drawn views. A small Draw menu keeps the canvas clear; Settings
-holds drawing preferences. Contextual tools provide linked editing,
+holds drawing preferences, including a switch to the earlier shortcut gestures.
+Both drawing methods share the same sheet and history. Contextual tools provide linked editing,
 gesture Undo/Redo, guided front/top/side projection, and three-view consistency
-feedback. Pose previews update all enabled views.
+feedback. Pose previews update all enabled views. Touch-only phones and tablets
+open in View/Pose with split 2D/3D panes, pan/pinch/orbit gestures, and explicit
+Pose controls; authoring remains available on fine-pointer devices.
 
 - **User manual:** [`docs/MANUAL.md`](docs/MANUAL.md) — the complete guide
   for students and teachers (drawing, editing, precision, 3D view, demos,
@@ -24,7 +27,7 @@ npm start      # build + seed + serve on http://127.0.0.1:8124/ (localhost only)
 ```
 
 `npm start` compiles the C++ backend on first run (needs CMake, a C++17
-compiler and libsodium headers — see Development below), seeds the demo
+compiler, libsodium and libcurl headers — see Development below), seeds the demo
 accounts into `backend/data/educad.db`, and serves `public/` plus the
 JSON API. Open the printed URL in a browser. If port 8124 is busy the
 server picks the next free port and prints it; `npm start -- <port>` or
@@ -43,19 +46,30 @@ sheet stays local). Each role lands on its own home: teachers and
 academics on the **Teacher studio** ([`public/teacher.html`](public/teacher.html):
 create classes, post question sets (single, bulk text, or file upload)
 to a class or as open sets, attach model-answer drawings per question
-with a strict auto-check toggle, review submissions grouped by question
+with a strict auto-check toggle and a per-question 3D-preview toggle,
+review submissions grouped by question
 in read-only View mode, and grade with remarks and pass/fail), students
 on the **Student workspace** ([`public/student.html`](public/student.html):
 join classes, solve sets, verify drawings against the hidden model
-answer (pass/fail only, the model is never shown), manage drawings,
+answer (pass/fail only, the model is never shown), draw the views from
+the shared 3D reference, manage drawings,
 track submissions, grades and tutorial progress),
-guests on the bare sheet. Demo credentials:
+guests on the bare sheet.
+
+Students sign in with their **@mit.asia college ERP email and password**.
+The backend verifies them against `erp.mit.asia`, loads their name, class,
+division and year, and creates or updates their lab account. ERP passwords
+and cookies are never persisted. Student demo credentials work only with
+`EDUCAD_STUDENT_AUTH=demo`; there is no fallback when ERP is unavailable.
+See [ERP login and deployment](docs/ERP_LOGIN.md) for configuration and mapping.
+
+Local staff/development credentials:
 
 | Role | Username | Password |
 |------|----------|----------|
 | Academics | `academics` | `admin123` |
 | Teacher | `teacher` | `teach123` |
-| Student | `student` | `learn123` |
+| Student (explicit demo mode only) | `student` | `learn123` |
 
 The server is the C++ backend (`backend/`, vendored httplib/JSON/SQLite
 + libsodium): `educad-seed` hashes the demo passwords from
@@ -75,7 +89,7 @@ a ✓ next visit.
 ## Test
 
 ```sh
-npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatial inspection, drafting, and drawing regressions
+npm test       # full suite: baseline + phases 1–47 (1060 checks), plus spatial inspection, drafting, and drawing regressions
 ```
 
 | Command | Suite |
@@ -94,7 +108,13 @@ npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatia
 | `npm run test:drafting` | Linked editing, profile consistency, left/right projection, curved silhouettes and saved layouts (37) |
 | `npm run test:drawing-audit` | Generalized drawing/Edit/View/Pose regressions: atomic edits, dependencies, cancellation, degree arcs, picking, coverage and connected profile projections (48) |
 | `npm run test:drawing-browser` | Mounted guest-sheet interactions and mode transitions (27); requires a running app and optional Playwright with Chromium |
+| `npm run test:mobile` | Mobile layout, gesture, fit, and pose helpers (18) |
+| `npm run test:mobile-browser` | Optional Chromium runner: desktop, narrow windows, phone portrait/landscape, short phone and tablet inspection |
 | `npm run test:spatial` | View-mode HP/VP coordinates, projections, picking, distances, angles, wireframe rendering, datum gaps, and face fills (18) |
+| `npm run test:inspection` | Multiple inspection pins, filtered overlays, signed readouts, saved preferences, and label placement (10) |
+| `npm run test:inspection-browser` | Inspection controls, mode transitions, read-only safety, persistence, and desktop/mobile layouts (optional Playwright) |
+| `npm run test:orthographic` | Front/top/side specs, projected comparisons, curves, filters, pins, reference mapping, and independent preferences (12) |
+| `npm run test:orthographic-browser` | Shared 2D/3D inspector, complete specs, overview, comparisons, layout, persistence, and read-only safety (optional Playwright) |
 | `npm run test:phase11` | Manual: Markdown→HTML build, in-app link, freshness guard (22) |
 | `npm run test:phase12` | Reconstruction 3-view: PROFILE role, result shapes, ignored views (30) |
 | `npm run test:phase13` | Curves: revolved cylinders/cones, K=24 tessellation (30) |
@@ -131,6 +151,8 @@ npm test       # full suite: baseline + phases 1–46 (1047 checks), plus spatia
 | `npm run test:phase44` | Cmd-only problem-bank drawing: /polyline /ellipse /hatch /style /undo, render fixes, EduCAD Script (18) |
 | `npm run test:phase45` | Pose stack labels split across parted corners (8) |
 | `npm run test:phase46` | Pose reference ink: pinned axes, datum seats, stack parts seat (8) |
+| `npm run test:phase47` | Reference 3D: model previews students can draw from (13) |
+| `npm run test:auto-draw` | Generated plan validation, atomic application, concurrency, roles, hatching bounds, and undo (17 groups; 2,000 malformed inputs) |
 | `npm run test:login` | Login: 3 roles + guest, `/api/login`, gate ships (15) |
 | `npm run test:lab` | Lab: studio + workspace pages, role routing, deep links, class client, inline manual (18) |
 | `npm run test:cpp` | C++ backend: static serving, auth, drawings/progress, question sets, classes (43) |
@@ -145,12 +167,12 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contributor guide.
 Short version:
 
 - Prerequisites: Node.js 22 (`.nvmrc`), CMake ≥ 3.16, a C++17 compiler,
-  and libsodium headers (`sudo apt-get install -y cmake g++ libsodium-dev`
+  and libsodium/libcurl headers (`sudo apt-get install -y cmake g++ libsodium-dev libcurl4-openssl-dev`
   on Ubuntu). No `npm install` needed — zero npm dependencies.
 - Layout: `public/` app, `tools/` tests, `backend/` C++ server, `docs/`
   manual source.
-- `npm test` builds the backend, then runs baseline + phases 1–46
-  (1047 checks); CI additionally runs the login/lab/saves/cpp suites on
+- `npm test` builds the backend, then runs baseline + phases 1–47
+  (1060 checks); CI additionally runs the login/lab/saves/cpp suites on
   every PR.
 - `public/manual.html` is generated — edit `docs/MANUAL.md` and run
   `npm run build:manual`.

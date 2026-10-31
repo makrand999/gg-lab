@@ -45,7 +45,7 @@ then the [Appendix](#13-appendix-developer-reference).
 | Draw at an angle and distance | [§4.5 polar point](#45-polar-point-angle--distance-from-an-anchor) |
 | Place a point measured off a line | [§4.6 plotting](#46-line-referenced-plotting-perpendicular-offset-point) |
 | Load a demo lesson | [§9.1 demos](#91-demo-buttons-guided-walkthroughs) |
-| Log in or continue as guest | [§3.8 login](#38-login-session-chip-and-desktop-gate) |
+| Log in or continue as guest | [§3.8 login](#38-login-session-chip-and-mobile-support) |
 | Create a class (teacher) | [§3.10 classes](#310-classes-and-question-sets-teachers-post-students-submit) |
 | Join a class (student) | [§3.10 classes](#310-classes-and-question-sets-teachers-post-students-submit) |
 | Review a submitted sheet | [§3.10 inspect](#310-classes-and-question-sets-teachers-post-students-submit) |
@@ -70,7 +70,7 @@ to the topic — every subsection is one click away:
   [sheet](#34-the-sheet-itself) · [popups](#35-popups) · [3D
   overview](#36-the-3d-view-floating-ink-on-glass) · [layout
   diagram](#37-layout-diagram-from-the-real-domcss) · [login &
-  desktop gate](#38-login-session-chip-and-desktop-gate) ·
+  mobile support](#38-login-session-chip-and-mobile-support) ·
   [modes](#39-edit-and-view-modes) ·
   [command line](#311-command-line--and-settings) ·
   [plain words](#312-plain-words---and-teacher-auto-draw) ·
@@ -186,8 +186,9 @@ What to expect:
   the JSON API. Stop it with `Ctrl+C` when you are done.
 - The **Manual** button in the demo bar (top-right) opens this guide in a
   new tab at `manual.html`.
-- Touch-only phones and small tablets get a **Desktop required** overlay
-  instead of the canvas, with a link to the tutorials sheet (§3.8).
+- Touch-only phones and tablets open the sheet in **View**. **Pose** is
+  available for exploring a reconstructed model; drawing needs a fine pointer
+  (§3.8). Narrow desktop windows also use the split layout and keep Edit.
 
 Demo accounts (also printed on the login page itself):
 
@@ -201,11 +202,11 @@ Demo accounts (also printed on the login page itself):
 
 The page needs JavaScript, Canvas 2D, Pointer Events, `requestAnimationFrame`,
 and `localStorage` (for the login session); any recent desktop browser
-provides these, and the sheet was smoke-tested in one via the project's
-obscura harness. Touch/pen input on desktop, specific browser versions, and
-the exact phone overlay behavior are `[unverified]` — the desktop gate
-traced to source blocks touch-only small screens, but no phone was tested,
-so teach from a desktop or laptop.
+provides these. Mobile View/Pose is checked in the collaborative Chromium
+browser using phone/tablet viewport sizes, simulated touch-only capabilities,
+and pointer gestures. Physical phones, Safari, browser-specific safe areas,
+and real stylus input still need device testing. Keep browser page zoom enabled;
+canvas gestures handle the drawing viewport only.
 
 ---
 
@@ -248,10 +249,20 @@ Select geometry for projection actions; click **Edit** to reveal coordinates.
    projections, leaving room for 3D; **Settings → Show 3D preview** hides the model when more drawing
    space is useful. Shift-drag pans; the wheel zooms at the cursor.
 
-Existing Ctrl-click banking, plotting, renaming, tutorials, and slash commands
-remain available. Tab navigates the controls normally; the **Pose** button
-enters the read-only 3D → 2D preview. Pose updates front, top, and enabled side
-projections without changing saved geometry.
+Choose **Settings → Drawing → Drawing method** to switch between **Draw menu**
+and **Shortcuts**. Draw menu is the default and uses the tools above. Shortcuts
+restores the earlier canvas gestures: click empty paper to place points,
+Ctrl/Cmd-click a point then click another for a line, bank two points then click
+a third for a circle, double-click a point to rename, or aim and type a distance.
+The tool chooser stays hidden; a small **Sheet** menu provides Fit, Undo and Redo.
+Both methods use the same drawing and history. Switching cancels unfinished
+gestures and remembers the method after reload.
+
+Tutorials and slash commands remain available in both methods. In Draw menu,
+Tab navigates controls; in Shortcuts, Tab on the canvas enters Pose. Settings
+always uses normal Tab navigation. The **Pose** button is available in either
+method. Pose updates front, top, and enabled side projections without changing
+saved geometry.
 
 ---
 
@@ -261,7 +272,7 @@ The default sheet shows a small **Draw** menu and the Edit/View/Pose, Settings,
 and Manual controls. Tools appear when Draw is opened and close after a choice.
 A selected point reveals projection actions; its coordinate fields appear only
 after **Edit**. Drawing view, line style, side layout, guides, 3D visibility,
-demos and tutorials live in **Settings**. Guide and 3D preferences survive reload
+demos and tutorials live in **Settings**. The drawing method, guide and 3D preferences survive reload
 and reset with the other preferences. Contextual instructions follow an active
 construction; warnings remain visible when a projection needs attention.
 
@@ -401,11 +412,10 @@ Positions: status HUD `top:12px left:12px`; demo bar `top:12px right:12px`;
 session chip `left:12px bottom:12px`; zoom HUD `right:8px bottom:8px`;
 3D glass covers the window (z-index 2, above the sheet layers, below HUD
 chrome; `pointer-events:none` except the wireframe aura); the cursor popups
-open near the pointer and are clamped inside the window; the mobile
-`Desktop required` overlay (§3.8), when active, covers everything and
-freezes the app behind it.
+open near the pointer and are clamped inside the window. On mobile,
+separate panes replace this desktop arrangement (§3.8).
 
-### 3.8 Login, session chip, and desktop gate
+### 3.8 Login, session chip, and mobile support
 
 Three things stand around the sheet itself:
 
@@ -429,18 +439,52 @@ Three things stand around the sheet itself:
   Clicks here never draw (the chip swallows all pointer gestures).
   **Logout** clears the session and returns to the login page. It sits
   outside the demo bar, so `Manual` stays the bar's last child.
-- **Desktop gate.** Touch-only devices with no fine pointer (phones, small
-  tablets) get an opaque **Desktop required** overlay: the canvas needs a
-  keyboard, mouse, and wide screen. The overlay offers one way out — a
-  link to the tutorials sheet. There is no dismiss and no bypass;
-  touchscreen laptops (fine pointer present) are let through, and if the
-  input setup changes mid-session the page reloads itself cleanly.
+- **Mobile support.** Touch-only devices open in **View**, with **Pose**
+  available when the drawing resolves to a 3D model. Edit, drawing commands,
+  rename, Clear, authoring tutorials, saves, deletions, and submissions are
+  unavailable in this inspection session. Demos and saved drawings load into
+  View. Fine-pointer desktops and touchscreen laptops keep Edit, including
+  in narrow windows. The input restriction is chosen at page load: attaching
+  a mouse does not enable editing in the middle of an inspection session;
+  reload after changing input devices to select the new capability.
+
+#### Mobile layout and gestures
+
+Portrait places 3D above the sheet; landscape places them side by side. Drag
+(or focus and use arrow keys on) the thin divider to change the split. Its
+invisible touch area is wider than the visible grip. Plain text Fit/Expand
+actions sit at the canvas edges without taking up separate toolbar rows. **Expand**
+opens either pane; **Show both** returns to the split and **Switch** opens the
+other pane. Resizing and rotation keep the current drawing and view. Switching modes
+frames the drawing again to account for the Pose dock. Front and
+top stay together around the XY datum in the sheet pane.
+
+- **Sheet:** drag with one finger to pan, pinch with two to zoom, tap to inspect.
+  Close points offer a chooser. **Fit** frames the ink and XY datum.
+- **3D:** drag with one finger to orbit the camera, pinch with two to zoom,
+  and move two fingers together to pan. Tap a point or edge to inspect it.
+  **Fit** frames the model and reference planes; **Reset 3D camera** in More
+  restores the camera.
+- **Details:** tap the bottom strip to expand measurements and spatial details.
+  It scrolls separately from the canvases. **More (⋯)** contains demos, drawings,
+  question sets, display preferences, account navigation, and the manual.
+- **Pose:** choose **Move** or **Rotate**, select X/Y/Z, then use the slider or
+  numeric entry. Move values are millimetres; rotations are degrees. **More → Pose options**
+  contains **Snap** (5 mm / 5° steps), **Reset pose**, and **Scale** (0.1 steps
+  with Snap). Camera gestures still only move the camera. Both projections
+  update live using the same datum limits as desktop Pose. **Reset pose** clears
+  transforms; leaving Pose restores the original ink exactly. If no model is
+  available, open a demo or a drawing with paired front/top geometry first.
+
+Controls have touch-sized targets. Browser safe areas and changing visible
+viewport heights leave space for the canvases; short screens scroll the Pose
+controls rather than expanding the page. No orientation lock is required.
 
 ### 3.9 Edit and View modes
 
 The `Edit`/`View` pair switches what the sheet does with your clicks:
 
-- **Edit** (default, blue on load) is the drawing mode: clicks place,
+- **Edit** (desktop default, blue on load) is the drawing mode: clicks place,
   select, bank, plot, and rename, exactly as §4–§6 describe.
 - **View** is the read-only measure mode. View measures, never edits:
   click the entity to inspect — a point, segment, circle, or arc — and
@@ -467,6 +511,75 @@ frames the model together with both planes. Where the Spatial card or
 ghosts through text, wires, or the translucent planes. These references
 and details appear only in View mode, and never become drawing entities
 or saved ink.
+
+The compact **Selected / Pinned / All** controls choose which measurements
+appear beside the 3D model. Selected is the quiet default. Inspect a point
+or edge and choose **Pin** to keep its measurements while inspecting another;
+the first pin activates Pinned. Clear selection (including Escape or an
+empty click) leaves pins in place. Each pin has an **×** to remove it, and
+**Clear pins** removes the full set. Pins survive mode switches while the
+source drawing is unchanged; changing the drawing or reloading clears them.
+
+**All** expands Geometry details with every point and edge. **Filter** chooses
+coordinates, distances to HP/VP, true lengths, and inclinations; the same
+choices apply to readouts and the tables. Search accepts point IDs or edge
+pairs such as `P1–P2` (a regular hyphen works too). A selected table row
+highlights the model and follows selections made directly in 3D. Measurement
+labels stay outside the object's outline and avoid one another. Dense views
+hide labels that cannot fit; their values remain available in the tables.
+Projection guides stay focused on selected and pinned points.
+
+**Settings → Preferences → 3D spatial inspection** remembers the overlay scope,
+measurement categories, reference planes, projection guides, label visibility,
+decimal precision, and label size. Changes apply immediately, including those
+made with the quick controls. Reset to defaults restores Selected and the
+original small labels. These preferences are separate from drawing ink;
+inspection remains read-only.
+
+The same inspector has compact **2D / 3D** workspace buttons. A sheet pick
+opens **Orthographic view**; a model pick opens Spatial view. Both use the
+original card position, and mobile docks the card into Inspection details.
+The 2D inspector remains available when the 3D preview is hidden or a
+drawing cannot be reconstructed. **Fit sheet** frames ink beside the card
+on desktop and within the sheet pane on mobile.
+
+In **2D**, Selected is the default. **Pin** keeps a sheet measurement in
+place, and the first pin activates Pinned. Empty clicks, right-click and
+Escape clear the active pick while retaining pins. Pins survive mode
+switches with an unchanged drawing; source edits and reloads clear them.
+**All** opens a searchable inventory grouped into **Front · VP**, **Top · HP**,
+and **Side**. Choose a view with the small view filter or enable construction
+geometry in **Filter measurements**. Each record has **Specs**; **Expand specs**
+opens all records together. Selecting a record highlights its source geometry.
+
+| Geometry | Orthographic specs |
+|---|---|
+| Point | Sheet X/Y, front-view height from HP, top-view depth from VP; side-view height, mapped depth, and offset from X₁Y₁ |
+| Segment / dimension | Endpoints, projected length, ΔX/ΔY, and orientation from +X |
+| Infinite line / ray | Defining endpoints and span, orientation, and an explicit infinite-extent note |
+| Circle | Center, radius, diameter, circumference, and circle area |
+| Arc | Center, radius, diameter, start/end coordinates and angles, sweep, arc length, and chord length |
+
+All sheet lengths and areas use mm and mm². A **projected length** belongs
+to that orthographic view; the 3D inspector reports true spatial length.
+Signed plane distances preserve above/below HP and in front of/behind VP.
+Side depth uses the drawing's side-reference mapping, including its left
+or right direction and datum offset.
+
+Pin **two points** in one view to compare their projected distance and
+ΔX/ΔY. Pin **two straight edges** to compare their defined spans and smaller
+angle. Pins in different views show an explanatory note rather than a
+misleading numerical distance. Comparisons are inspection readouts and
+never add dimensions or other entities to the drawing.
+
+Sheet labels stay outside the projection outlines and avoid each other;
+values that cannot fit remain in Sheet details. Dimension guides apply
+to selected and pinned items, and crowded guides are omitted when they
+would pass through a projection. Label positions follow the geometry
+through pan and zoom. **Settings → Preferences → 2D orthographic inspection**
+remembers view and category filters, scope, coordinate/length/angle/curve
+specs, guides, corresponding-projection highlights, label visibility,
+precision, and size. The 2D and 3D preferences are independent.
 
 Drafting style: a segment gets a true dimension — extension lines
 off both ends, a parallel dimension line with arrow tips, and the bare
@@ -505,6 +618,11 @@ each submitted sheet in read-only View mode:
   is solvable by any logged-in student with the code. Starters still
   attach from the sheet: open the **Sheet**, draw, then post via the
   session bar's **Sets** panel (**Attach current sheet as starter**).
+  Attach a model answer per question from a saved drawing (or the
+  current sheet): students never see the 2D ink, but its 3D preview
+  appears beside their sheet while solving unless the per-question
+  **3D preview** toggle is off. Re-attaching a model rebuilds its
+  preview; clearing it removes the preview too.
 - **Join (student, in the workspace).** Enter the class code the
   teacher shared. Joining lists the class and its sets; leaving drops
   them from your feed (your submissions stay).
@@ -512,7 +630,10 @@ each submitted sheet in read-only View mode:
   open sets, or open any set by code. Each question shows its prompt
   with a **Hint** toggle where the teacher left one; **Solve on sheet**
   opens the sheet with the starter loaded (when the teacher attached
-  one). Draw the answer, then **Submit my sheet** from the sheet's
+  one). When the teacher shares a 3D reference it appears in a
+  **Reference 3D** card beside the sheet — draw the views from it
+  (drag orbits, wheel zooms, double-click resets). Draw the answer,
+  then **Submit my sheet** from the sheet's
   **Sets** panel with an optional note. **My submissions** lists what
   you sent, with **Reload in sheet** to load one back as an editable
   copy. **My drawings** reopens anything you **Save**d, and **Tutorial
@@ -645,10 +766,19 @@ which forwards one prompt to the local model gateway and returns
 from server environment, else straight from the manager's own
 `~/.hermes/.env` — plain `npm start` just works wherever the manager
 installed the key (see `antigravity-manager.md` on the host); browsers
-never see it. Every
-returned line still passes through the normal command runner, so a
-wayward model line fails loudly per line instead of corrupting the
-sheet, and View mode stays read-only for interpreted drawing too.
+never see it. The complete plan is validated on a detached sheet using
+the same command engine as the `.edc` CLI. A failed step applies nothing;
+a successful plan is one undoable change. Invalid plans get one automatic
+repair attempt using the validation reason and the original request. A
+refusal does not retry, and the complete request has a 120-second limit. Generated plans cannot clear
+the sheet, undo, change modes, run demos/tutorials, or trigger checking.
+Teacher access is enforced by the API and the drawing bridge. Responses
+are discarded if the sheet, current mode, or login changes while waiting.
+Auto-draw replacement keeps the current sheet until the new plan passes.
+Plans may contain up to 128 commands; projector pairs must share x in
+auto mode. These checks validate executable geometry, not whether every
+dimension or construction correctly answers the question: review remains
+necessary before attaching a model.
 
 ### 3.13 Pose mode (Blender moves, live 2D views)
 
@@ -1821,7 +1951,7 @@ lands (step 77), before a single verdict is judged. The finale grades
 | Tab | Command line, suggestions open | Accept the highlighted suggestion |
 | Up / Down | Command line | Walk suggestions, else recall history |
 | Escape | Command line focused | Close the bar without running |
-| `Tab` | Sheet / controls | Navigate controls; in Pose, exit it (§3.13) |
+| `Tab` | Sheet / controls | Draw menu: navigate controls; Shortcuts: enter Pose from the canvas; in Pose, exit it (§3.13). Settings always navigates normally. |
 | `G` / `R` / `S` | Pose mode, no gesture | Start move / rotate / scale |
 | `X` / `Y` / `Z` | Pose gesture running | Lock the gesture to one world axis |
 | `Ctrl` | Pose gesture running | Snap to 5 mm / 5° / 0.1 |
@@ -1951,8 +2081,8 @@ priority order within 14 px wins):
 | Check hidden fails on a fresh demo | Demos ship pairs without verdicts — that is the exercise, not a bug | Add parens (§5.3, §9.3b), then Check again |
 | App opens on a login page, not the sheet | No session yet: the gate redirects before any canvas loads | Pick a role tab + its demo account, or Continue as guest (§3.8) |
 | Login says `Invalid username or password` | Wrong pair for the active role tab | Match the tab to the account; the demo pairs print under the form |
-| `Desktop required` overlay, no canvas | Touch-only small screen blocked by the desktop gate | Open on a desktop/laptop; the overlay links the tutorials sheet (§3.8) |
-| Clicks won't draw anything | View mode is on: it measures, never edits | Switch back to Edit (§3.9) |
+| Phone shows View/Pose but no Edit | Touch-only inspection session | Inspect or pose a demo/saved drawing; use a fine pointer and reload for authoring (§3.8) |
+| Clicks won't draw anything | View mode measures; touch-only sessions are inspection-only | On desktop switch to Edit; on a phone use View/Pose (§3.8, §3.9) |
 | Server prints `port 8124 busy, using N` | Port occupied (another server or runaway process) | Open the printed port; stop the other server if it is yours |
 | `npm start` fails immediately | Build tools/libsodium missing, or port range exhausted | Install Node, CMake, a C++ compiler and libsodium-dev; free ports 8124–8133 |
 
@@ -1979,8 +2109,9 @@ Remaining limits:
   rims. Print-accurate export, sections, shading, and 3D export are not implemented.
 - Guest sheets are local to the open page; logged-in sheets use Save/Drawings.
   There is no automatic recovery or autosave. History does not survive reload.
-- Touch-only small devices remain blocked; desktop browser interactions have been
-  exercised, but this is not a claim of complete touch or accessibility coverage.
+- Touch-only devices support inspection and Pose, not authoring. Physical-device
+  and Safari testing remain outstanding; Chromium checks do not establish complete
+  touch or accessibility coverage.
 - `npm test` uses Node and local C++ server checks. Browser workflow checks are
   separate from that command.
 
@@ -2049,7 +2180,7 @@ drifted — the demo-bar, gate, and session rows were re-verified for this
 revision).
 
 - Status HUD + demo bar (10 buttons, Manual last): `public/index.html:200-215`
-- Login gate + mobile gate + session chip: `index.html:142-152`, `:160-199`,
+- Login gate + mobile classification + session chip: `index.html:142-152`, `:160-199`,
   `:218-244`
 - Boot + module wiring: `index.html:97-101`, `educad-boot.js:80-136`
 - XY ground line + watermarks + X/Y marks: `index.html:351-378`

@@ -7,7 +7,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
   // EduCAD preferences: a tiny boolean store behind the sheet's Settings
-  // panel. Every key is on/off, every default is true (full assistance).
+  // panel. Sheet keys are boolean; inspection has its own typed defaults.
   // Zero dependencies. Dual-env: browser via window.EduCADSettings, plain
   // Node via module.exports. Node-safe: storage is injected, never global.
   //
@@ -23,6 +23,17 @@
   //   solidPreview       show the linked 3D preview
   var VERSION = '1.0.0-educad';
   var STORAGE_KEY = 'educad_settings_v1';
+  var DRAWING_MODES = ['menu', 'shortcuts'];
+  function getDrawingMode(store) {
+    checkStore(store);
+    return DRAWING_MODES.indexOf(store.drawingMode) !== -1 ? store.drawingMode : 'menu';
+  }
+  function setDrawingMode(store, value) {
+    checkStore(store);
+    if (DRAWING_MODES.indexOf(value) === -1) throw new Error('educad-settings: invalid drawing method');
+    store.drawingMode = value;
+    return value;
+  }
 
   var DEFAULTS = {
     commandPreview: true,
@@ -51,6 +62,80 @@
     projectionGuides: 'Show projection guides',
     solidPreview: 'Show 3D preview'
   };
+
+  var INSPECTION_FIELDS = {
+    overlay: { label: 'Measurements on model', default: 'selected', options: ['selected', 'pinned', 'all'] },
+    coordinates: { label: 'Point coordinates', default: true },
+    planeDistances: { label: 'Distances to HP / VP', default: true },
+    lengths: { label: 'True edge lengths', default: true },
+    inclinations: { label: 'Edge inclinations to HP / VP', default: true },
+    planes: { label: 'Reference planes (HP / VP)', default: true },
+    guides: { label: 'Projection guides for selected / pinned points', default: true },
+    labels: { label: 'Measurement labels on model', default: true },
+    precision: { label: 'Decimal places', default: 2, options: [0, 1, 2, 3] },
+    textSize: { label: 'Label size', default: 11, options: [11, 13, 15] }
+  };
+  var SHEET_INSPECTION_FIELDS = {
+    overlay: { label: 'Measurements on sheet', default: 'selected', options: ['selected', 'pinned', 'all'] },
+    view: { label: 'Views to inspect', default: 'all', options: ['all', 'elevation', 'plan', 'profile'] },
+    points: { label: 'Points', default: true },
+    lines: { label: 'Lines and dimensions', default: true },
+    curves: { label: 'Circles and arcs', default: true },
+    construction: { label: 'Include construction geometry', default: false },
+    coordinates: { label: 'Coordinates and endpoints', default: true },
+    offsets: { label: 'Distances from XY / side reference', default: true },
+    lengths: { label: 'Projected lengths and component distances', default: true },
+    angles: { label: 'Orientation and arc sweep', default: true },
+    radii: { label: 'Radius and diameter', default: true },
+    curveProperties: { label: 'Circumference, circle area and arc length', default: true },
+    dimensions: { label: 'Dimension guides for selected / pinned items', default: true },
+    links: { label: 'Highlight corresponding projections', default: true },
+    labels: { label: 'Measurement labels on sheet', default: true },
+    precision: { label: 'Decimal precision', default: 2, options: [0, 1, 2, 3] },
+    textSize: { label: 'Label size', default: 11, options: [11, 13, 15] }
+  };
+  function validSheetInspectionValue(key, value) {
+    if (!Object.prototype.hasOwnProperty.call(SHEET_INSPECTION_FIELDS, key)) return false;
+    var field = SHEET_INSPECTION_FIELDS[key];
+    return field.options ? field.options.indexOf(value) !== -1 : typeof value === 'boolean';
+  }
+  function normalizeSheetInspection(initial) {
+    var out = {};
+    Object.keys(SHEET_INSPECTION_FIELDS).forEach(function (key) {
+      out[key] = initial && validSheetInspectionValue(key, initial[key]) ? initial[key] : SHEET_INSPECTION_FIELDS[key].default;
+    });
+    return out;
+  }
+  function getSheetInspection(store) { checkStore(store); return normalizeSheetInspection(store.sheetInspection); }
+  function setSheetInspection(store, key, value) {
+    checkStore(store);
+    if (!validSheetInspectionValue(key, value)) throw new Error('educad-settings: invalid sheet inspection preference ' + key);
+    store.sheetInspection = getSheetInspection(store); store.sheetInspection[key] = value;
+    return value;
+  }
+  function validInspectionValue(key, value) {
+    if (!Object.prototype.hasOwnProperty.call(INSPECTION_FIELDS, key)) return false;
+    var field = INSPECTION_FIELDS[key];
+    return !!field && (field.options ? field.options.indexOf(value) !== -1 : typeof value === 'boolean');
+  }
+  function normalizeInspection(initial) {
+    var out = {};
+    Object.keys(INSPECTION_FIELDS).forEach(function (key) {
+      out[key] = initial && validInspectionValue(key, initial[key]) ? initial[key] : INSPECTION_FIELDS[key].default;
+    });
+    return out;
+  }
+  function getInspection(store) {
+    checkStore(store);
+    return normalizeInspection(store.inspection);
+  }
+  function setInspection(store, key, value) {
+    checkStore(store);
+    if (!validInspectionValue(key, value)) throw new Error('educad-settings: invalid inspection preference ' + key);
+    store.inspection = getInspection(store);
+    store.inspection[key] = value;
+    return value;
+  }
 
   function isValidKey(key) { return KEYS.indexOf(key) !== -1; }
 
@@ -85,7 +170,7 @@
         values[names[j]] = initial[names[j]];
       }
     }
-    return { values: values };
+    return { values: values, drawingMode: 'menu', inspection: normalizeInspection(), sheetInspection: normalizeSheetInspection() };
   }
 
   function get(store, key) {
@@ -116,6 +201,9 @@
     for (var i = 0; i < KEYS.length; i++) {
       store.values[KEYS[i]] = DEFAULTS[KEYS[i]];
     }
+    store.inspection = normalizeInspection();
+    store.sheetInspection = normalizeSheetInspection();
+    store.drawingMode = 'menu';
     return store;
   }
 
@@ -123,6 +211,9 @@
     checkStore(store);
     var out = {};
     for (var i = 0; i < KEYS.length; i++) out[KEYS[i]] = !!store.values[KEYS[i]];
+    out.inspection = getInspection(store);
+    out.sheetInspection = getSheetInspection(store);
+    out.drawingMode = getDrawingMode(store);
     return JSON.stringify(out);
   }
 
@@ -141,6 +232,9 @@
     for (var i = 0; i < KEYS.length; i++) {
       if (typeof obj[KEYS[i]] === 'boolean') store.values[KEYS[i]] = obj[KEYS[i]];
     }
+    store.inspection = normalizeInspection(obj.inspection);
+    store.sheetInspection = normalizeSheetInspection(obj.sheetInspection);
+    if (DRAWING_MODES.indexOf(obj.drawingMode) !== -1) store.drawingMode = obj.drawingMode;
     return store;
   }
 
@@ -179,6 +273,17 @@
     DEFAULTS: DEFAULTS,
     KEYS: KEYS,
     LABELS: LABELS,
+    DRAWING_MODES: DRAWING_MODES,
+    getDrawingMode: getDrawingMode,
+    setDrawingMode: setDrawingMode,
+    INSPECTION_FIELDS: INSPECTION_FIELDS,
+    normalizeInspection: normalizeInspection,
+    getInspection: getInspection,
+    setInspection: setInspection,
+    SHEET_INSPECTION_FIELDS: SHEET_INSPECTION_FIELDS,
+    normalizeSheetInspection: normalizeSheetInspection,
+    getSheetInspection: getSheetInspection,
+    setSheetInspection: setSheetInspection,
     isValidKey: isValidKey,
     createStore: createStore,
     get: get,

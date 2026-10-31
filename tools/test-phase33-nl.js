@@ -155,6 +155,7 @@ async function main() {
   var seedBare = child.spawnSync(SEED, [USERS, dbBare], { encoding: 'utf8' });
   eq(seedBare.status, 0, 'bare seed exit 0');
   var stubMode = 'ok';
+  var customContent = '', finishReason = 'stop';
   var lastChat = null;
   var lastAuth = null;
   var stub = http.createServer(function (q, s) {
@@ -173,24 +174,24 @@ async function main() {
         s.end('{"error":"boom"}');
         return;
       }
-      var content = stubMode === 'garbage' ? 'definitely not json {{{' :
-        JSON.stringify({ commands: ['/point a 0 0', 'draw stuff',
-          '/line a b', 'x'.repeat(400)], reply: 'stub drew it' });
+      var content = stubMode === 'custom' ? customContent : stubMode === 'garbage' ? 'definitely not json {{{' :
+        JSON.stringify({ commands: ['/point a 0 0', '/point b 20 10',
+          '/line a b'], reply: 'stub drew it' });
       s.writeHead(200, { 'Content-Type': 'application/json' });
-      s.end(JSON.stringify({ choices: [{ message: { content: content } }] }));
+      s.end(JSON.stringify({ choices: [{ message: { content: content }, finish_reason: finishReason }] }));
     });
   });
   var stubPort = await freePort();
   await new Promise(function (resolve) { stub.listen(stubPort, '127.0.0.1', resolve); });
   var port = await freePort();
   var srv = child.spawn(SERVER, [String(port)], {
-    env: Object.assign({}, process.env, { EDUCAD_DB: db, EDUCAD_ROOT: MIRROR,
+    env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: db, EDUCAD_ROOT: MIRROR,
       OPENAI_API_KEY: 'dummy-key', ANTIGRAVITY_URL: 'http://127.0.0.1:' + stubPort }),
     stdio: ['ignore', 'ignore', 'ignore']
   });
   var portBare = await freePort();
   var srvBare = child.spawn(SERVER, [String(portBare)], {
-    env: Object.assign({}, process.env, { EDUCAD_DB: dbBare, EDUCAD_ROOT: MIRROR,
+    env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: dbBare, EDUCAD_ROOT: MIRROR,
       HOME: path.join(tmp, 'nohome'),
       OPENAI_API_KEY: '', ANTIGRAVITY_URL: 'http://127.0.0.1:' + stubPort }),
     stdio: ['ignore', 'ignore', 'ignore']
@@ -205,7 +206,7 @@ async function main() {
   eq(seedFile.status, 0, 'file seed exit 0');
   var portFile = await freePort();
   var srvFile = child.spawn(SERVER, [String(portFile)], {
-    env: Object.assign({}, process.env, { EDUCAD_DB: dbFile, EDUCAD_ROOT: MIRROR,
+    env: Object.assign({}, process.env, { EDUCAD_STUDENT_AUTH: 'demo', EDUCAD_DB: dbFile, EDUCAD_ROOT: MIRROR,
       HOME: fakeHome,
       OPENAI_API_KEY: '', ANTIGRAVITY_URL: 'http://127.0.0.1:' + stubPort }),
     stdio: ['ignore', 'ignore', 'ignore']
@@ -233,7 +234,7 @@ async function main() {
     var cases = [
       [{}, 'bad text'],
       [{ text: '' }, 'bad text'],
-      [{ text: 'x'.repeat(2001) }, 'bad text'],
+      [{ text: 'x'.repeat(3001) }, 'bad text'],
       [{ text: 'hi', mode: 'party' }, 'bad mode'],
       [{ text: 'hi', points: 'ab' }, 'bad points'],
       [{ text: 'hi', points: [7] }, 'bad points']
@@ -258,7 +259,7 @@ async function main() {
     var via = await req(portFile, 'POST', '/api/interpret', { text: 'hi' },
       auth(loginFile.json.token));
     eq(via.status, 200, 'key file works');
-    eq(JSON.stringify(via.json.commands), '["/point a 0 0","/line a b"]',
+    eq(JSON.stringify(via.json.commands), '["/point a 0 0","/point b 20 10","/line a b"]',
       'key file draws');
     eq(lastAuth, 'Bearer dummy-file-key', 'file key sent, quotes stripped');
     pass('phase33 missing key honest');
@@ -269,13 +270,13 @@ async function main() {
       { text: 'a dot and a span', points: ['a'], mode: 'draw' }, H);
     eq(good.status, 200);
     eq(good.json.ok, true);
-    eq(JSON.stringify(good.json.commands), '["/point a 0 0","/line a b"]',
-      'only slash lines survive');
+    eq(JSON.stringify(good.json.commands), '["/point a 0 0","/point b 20 10","/line a b"]',
+      'complete command plan survives');
     eq(good.json.reply, 'stub drew it', 'reply passes');
     ok(lastChat && lastChat.model === 'gemini-3.8-flash-medium', 'default model');
     ok(lastChat.messages.length === 2, 'system plus user');
     ok(lastChat.messages[1].content === 'a dot and a span', 'user text raw');
-    pass('phase33 stub success filtered');
+    pass('phase33 stub success validated');
 
     // 8 model garbage becomes an empty plan with a human reason
     stubMode = 'garbage';
@@ -303,14 +304,67 @@ async function main() {
     // 10 auto mode and sheet points reach the model prompt
     await new Promise(function (resolve) { stub.listen(stubPort, '127.0.0.1', resolve); });
     stubMode = 'ok';
+    var teacherLogin = await req(port, 'POST', '/api/login',
+      { role: 'teacher', username: 'teacher', password: 'teach123' });
     var auto = await req(port, 'POST', '/api/interpret',
-      { text: 'square lamina', points: ['a', 'b'], mode: 'auto' }, H);
+      { text: 'square lamina', points: ['a', 'b'], mode: 'auto' }, auth(teacherLogin.json.token));
     eq(auto.status, 200);
     ok(lastChat.messages[0].content.indexOf('model answer') !== -1,
       'auto goal in system');
-    ok(lastChat.messages[0].content.indexOf('a, b') !== -1, 'points in system');
+    ok(lastChat.messages[0].content.indexOf('[\"a\",\"b\"]') !== -1, 'points in system');
     ok(lastChat.messages[0].content.indexOf('/polygon <p1>') !== -1,
       'command catalog in system');
+    // Model output is indivisible: no dropping bad entries or truncating plans.
+    const invalidPlans = [
+      {commands: ['/point a 0 0', 'draw stuff'], reply: 'bad'},
+      {commands: ['/point a 0 0', '/clear'], reply: 'bad'},
+      {commands: ['/mode edit'], reply: 'bad'},
+      {commands: ['/help'], reply: 'bad'},
+      {commands: ['/unknown'], reply: 'bad'},
+      {commands: ['/point a 0 0\n/clear'], reply: 'bad'},
+      {commands: ['/text 0 0 ' + 'x'.repeat(512)], reply: 'bad'},
+      {commands: Array(129).fill('/datum'), reply: 'bad'},
+      {commands: ['/datum', null], reply: 'bad'},
+      {commands: 'not an array', reply: 'bad'},
+      {commands: ['/datum'], reply: 7}, {reply: 'missing commands'}
+    ];
+    stubMode = 'custom';
+    for (const plan of invalidPlans) {
+      customContent = JSON.stringify(plan);
+      const response = await req(port, 'POST', '/api/interpret', {text: 'triangle'}, H);
+      eq(response.status, 200); eq(response.json.commands.length, 0);
+      ok(/unusable drawing plan/.test(response.json.reply));
+    }
+    customContent = '```json\n' + JSON.stringify({commands: [' /datum -40 40 '], reply: 'ok'}) + '\n```';
+    var fenced = await req(port, 'POST', '/api/interpret', {text: 'datum'}, H);
+    eq(fenced.json.commands[0], '/datum -40 40');
+    customContent = JSON.stringify({commands: ['/datum'], reply: 'x'.repeat(599) + 'é'.repeat(300)});
+    var unicodeReply = await req(port, 'POST', '/api/interpret', {text: 'datum'}, H);
+    eq(unicodeReply.status, 200); ok(unicodeReply.json, 'truncation preserves UTF-8 JSON');
+    ok(Buffer.byteLength(unicodeReply.json.reply) <= 600);
+    finishReason = 'length';
+    var truncated = await req(port, 'POST', '/api/interpret', {text: 'datum'}, H);
+    eq(truncated.status, 502, 'truncated completion rejected');
+    finishReason = 'stop'; stubMode = 'ok';
+    var forbidden = await req(port, 'POST', '/api/interpret', {text: 'hi', mode: 'auto'}, H);
+    eq(forbidden.status, 403, 'server enforces teacher-only auto');
+    for (const payload of [
+      {text: '   '}, {text: 'hi', points: Array(65).fill('a')},
+      {text: 'hi', points: ['']}, {text: 'hi', pointData: []},
+      {text: 'hi', points: ['a'], pointData: {a: {x: 'bad', y: 0}}},
+      {text: 'hi', points: ['a'], pointData: {z: {x: 0, y: 0}}},
+      {text: 'hi', points: ['a'], pointData: {a: {x: 1e100, y: 0}}},
+      {text:'hi',feedback:42}, {text:'hi',feedback:'x'.repeat(2001)}
+    ]) eq((await req(port, 'POST', '/api/interpret', payload, H)).status, 400);
+    var contextual = await req(port, 'POST', '/api/interpret',
+      {text: 'join a to b', points: ['a', 'b'], pointData: {a: {x: 0, y: 10}, b: {x: 20, y: 10}}}, H);
+    eq(contextual.status, 200);
+    ok(lastChat.messages[0].content.indexOf('"x":20') !== -1, 'coordinates reach model');
+    var repair = await req(port, 'POST', '/api/interpret',
+      {text: 'original triangle question', feedback:'Step 2 references an unknown point.'}, H);
+    eq(repair.status,200); eq(lastChat.messages[1].content,'original triangle question');
+    ok(lastChat.messages[0].content.indexOf('complete corrected plan') !== -1);
+    ok(lastChat.messages[0].content.indexOf('Step 2 references an unknown point.') !== -1);
     pass('phase33 auto prompt shaped');
   } finally {
     srv.kill('SIGTERM');
@@ -335,7 +389,7 @@ async function main() {
     "'/auto '", 'Draw from words (teachers)',
     'Describe the drawing in words — Enter interprets it.',
     'Describe the model — Enter draws it (teachers).',
-    "'Drew ' + drawn", 'these failed:'].forEach(function (s) {
+    'EduCADAuto.createRunner', 'interpretRunner(text, mode, replace)'].forEach(function (s) {
     ok(index.indexOf(s) !== -1, 'bar ships ' + s);
   });
   pass('phase33 bar intercepts words');
@@ -355,9 +409,10 @@ async function main() {
   ok(teacher.indexOf('Auto-draw replacement') !== -1, 'replace label');
   ok(teacher.indexOf('&autodraw=1') !== -1, 'deep link flag');
   ok(index.indexOf('p.autodraw') !== -1, 'branch reads flag');
-  ok(index.indexOf('window.educadAutoDraw(words)') !== -1, 'branch draws');
+  ok(index.indexOf('window.educadAutoDraw(words, true)') !== -1, 'branch draws');
   ok(index.indexOf('Model drafted for') !== -1, 'branch reports');
-  ok(index.indexOf('re-attach via the Sets panel') !== -1, 're-attach hint');
+  ok(index.indexOf('then use Attach model to Q') !== -1, 'review and attach hint');
+  ok(index.indexOf('btn-attach-reviewed-model') !== -1, 'question-specific attach action');
   pass('phase33 teacher autodraw flow');
 
   // 14 the manual documents words, auto-draw, and the key requirement
@@ -385,7 +440,7 @@ async function main() {
   ok(readme.indexOf('`npm run test:phase33`') !== -1, 'phase33 row');
   ok(readme.indexOf('Words to drawing: student `/ words` NL, teacher auto-draw via local gateway') !== -1,
     'phase33 label');
-  ok(readme.indexOf('baseline + phases 1–46 (1047 checks)') !== -1,
+  ok(readme.indexOf('baseline + phases 1–47 (1060 checks)') !== -1,
     'grand total 960');
   var pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
   eq(pkg.scripts['test:phase33'], 'npm run build:cpp && node tools/test-phase33-nl.js',

@@ -12,15 +12,15 @@ var E = require('../public/lib/educad-entities.js');
 var R = require('../public/lib/educad-reconstruct.js');
 
 function baseName(caption) {
-  return String(caption).replace(/'+$/, '');
+  return String(caption).replace(/['’′]+$/, '').toLowerCase();
 }
 
 // checkProjectors(table): points sharing a base name (a/a', b/b') are
 // one 3D point, so their x must match across views (Monge invariant).
 function checkProjectors(table) {
-  var groups = {};
+  var groups = Object.create(null);
   table.list().forEach(function (e) {
-    if (e.type !== 'POINT') return;
+    if (e.type !== 'POINT' || e.viewRole === 'PROFILE') return;
     var b = baseName(e.caption || e.name);
     if (!groups[b]) groups[b] = [];
     groups[b].push(e);

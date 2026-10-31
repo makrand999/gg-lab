@@ -340,7 +340,15 @@
         });
       });
     }
-    var guides = true, solidVisible = true, projectTarget = null;
+    var guides = true, solidVisible = true, projectTarget = null, drawingMode = 'menu';
+    function menuDrawing() { return drawingMode === 'menu'; }
+    function setDrawingMode(value) {
+      if (value !== 'menu' && value !== 'shortcuts') throw new Error('Choose Draw menu or Shortcuts.');
+      if (drawingMode === value) return;
+      cancel(); options.cancelLegacy(); closeMenu(); editorOpen = false;
+      selected = null; solidSelection = null; editorId = null; tool = 'select';
+      drawingMode = value; sync();
+    }
     var labels = { select: 'Select', point: 'Point', line: 'Line', polyline: 'Polyline', circle: 'Circle', projector: 'Projector', dimension: 'Dimension' };
     Object.keys(labels).forEach(function (key) {
       var button = document.createElement('button'); button.type = 'button'; button.dataset.tool = key; button.textContent = labels[key]; button.setAttribute('aria-pressed', String(key === tool)); nav.appendChild(button);
@@ -364,6 +372,7 @@
       surface.style.cursor = '';
     }
     function setTool(value) {
+      if (!menuDrawing()) return;
       closeMenu(); editorOpen = false; cancel(); options.cancelLegacy(); tool = value; if (tool !== 'select') solidSelection = null;
       if (tool === 'projector' && entity() && entity().type === 'POINT') { anchor = clone(entity()); projectTarget = role(anchor) === 'PLAN' ? 'ELEVATION' : 'PLAN'; }
       if (tool !== 'select' && tool !== 'projector') selected = null;
@@ -532,9 +541,12 @@
       b.y0 = Math.min(0, b.y0); b.y1 = Math.max(0, b.y1);
       if (map().three) { b.x0 = Math.min(b.x0, map().xRef); b.x1 = Math.max(b.x1, map().xRef); b.y1 += 20; }
       var solidRoom = solidVisible && h.solidMm ? Math.min(330, h.view.w * 0.28) : 0;
-      var usableW = h.view.w - solidRoom - 120, usableH = h.view.h - 230;
+      var inspectorRoom = h.orthographicView && h.measure.mode === 'view' &&
+        !(typeof EduCADMobile !== 'undefined' && EduCADMobile.splitActive()) ?
+        Math.min(h.view.w * 0.32, h.orthographicView.panel.getBoundingClientRect().width + 24) : 0;
+      var usableW = Math.max(80, h.view.w - solidRoom - 120 - inspectorRoom), usableH = Math.max(80, h.view.h - 230);
       h.view.s = V.clampScale(Math.min(usableW / Math.max(b.x1 - b.x0, 40), usableH / Math.max(b.y1 - b.y0, 40)));
-      h.view.tx = 60 + usableW / 2 - (b.x0 + b.x1) / 2 * h.view.s;
+      h.view.tx = 60 + inspectorRoom + usableW / 2 - (b.x0 + b.x1) / 2 * h.view.s;
       h.view.ty = 150 + usableH / 2 + (b.y0 + b.y1) / 2 * h.view.s;
       if (h.spatialView && h.measure.mode === 'view') h.spatialView.fit();
       redraw();
@@ -564,12 +576,12 @@
       status.textContent = text; status.dataset.state = validation.status || '';
     }
     function sync() {
-      var e = entity(), editing = editMode(), m = map();
-      root.querySelectorAll('[data-tool]').forEach(function (button) { button.setAttribute('aria-pressed', String(button.dataset.tool === tool)); button.disabled = !editing; });
-      nav.hidden = !editing;
-      launch.textContent = !editing ? 'Views' : tool === 'select' ? 'Draw' : labels[tool];
+      var e = entity(), editing = editMode(), authoring = editing && menuDrawing(), m = map();
+      root.querySelectorAll('[data-tool]').forEach(function (button) { button.setAttribute('aria-pressed', String(button.dataset.tool === tool)); button.disabled = !authoring; });
+      nav.hidden = !authoring;
+      launch.textContent = !editing ? 'Views' : !menuDrawing() ? 'Sheet' : tool === 'select' ? 'Draw' : labels[tool];
       if (!editing) closeMenu();
-      roleSelect.value = activeRole; roleSelect.disabled = !editing;
+      roleSelect.value = activeRole; roleSelect.disabled = !authoring;
       styleSelect.value = style; styleSelect.disabled = !editing;
       control('[data-action="layout"]').setAttribute('aria-pressed', String(m.three));
       control('[data-action="layout"]').disabled = !editing;
@@ -581,10 +593,10 @@
       root.querySelector('[data-action="undo"]').hidden = !editing;
       root.querySelector('[data-action="redo"]').hidden = !editing;
       if (!e || editorId !== e.id) { editorOpen = false; editorId = e && e.id; }
-      selectionRow.hidden = !editing || !e;
+      selectionRow.hidden = !authoring || !e;
       root.querySelector('.drafting-selection-name').textContent = e ? (e.caption || (e.type === 'POINT' ? 'Point' : e.type === 'CIRCLE' ? 'Circle' : 'Edge')) : '';
       root.querySelector('[data-action="edit-selection"]').setAttribute('aria-expanded', String(editorOpen));
-      editor.hidden = !editing || !e || !editorOpen;
+      editor.hidden = !authoring || !e || !editorOpen;
       if (e && !editor.contains(document.activeElement)) {
         root.querySelector('.drafting-kind').textContent = e.type === 'POINT' ? 'Point' : e.type === 'CIRCLE' ? 'Circle' : e.type === 'DIMENSION' ? 'Dimension' : 'Edge';
         ['caption', 'x', 'y', 'x2', 'y2', 'radius'].forEach(function (key) {
@@ -597,7 +609,7 @@
         root.querySelectorAll('[data-target]').forEach(function (button) { button.disabled = e.type !== 'POINT' || button.dataset.target === role(e); });
       }
       document.body.classList.toggle('drafting-readonly', !editing);
-      surface.style.cursor = tool === 'select' ? '' : 'crosshair';
+      surface.style.cursor = !authoring || tool === 'select' ? '' : 'crosshair';
       updateStatus();
     }
     function refresh() {
@@ -606,7 +618,7 @@
       sync();
     }
     editor.addEventListener('submit', function (event) {
-      event.preventDefault(); var e = entity(); if (!editMode() || !e || e.locked) return;
+      event.preventDefault(); var e = entity(); if (!menuDrawing() || !editMode() || !e || e.locked) return;
       try {
         transaction(function () {
           var x = Number(editor.elements.x.value), y = Number(editor.elements.y.value);
@@ -625,10 +637,11 @@
     });
     function onControlClick(event) {
       var button = event.target.closest('button'); if (!button) return;
-      if (button === launch) { menuOpen = !menuOpen; menu.hidden = !menuOpen; launch.setAttribute('aria-expanded', String(menuOpen)); if (menuOpen) (editMode() ? nav.querySelector('[data-tool="' + tool + '"]') : root.querySelector('[data-action="fit"]')).focus(); return; }
+      if (button === launch) { menuOpen = !menuOpen; menu.hidden = !menuOpen; launch.setAttribute('aria-expanded', String(menuOpen)); if (menuOpen) (editMode() && menuDrawing() ? nav.querySelector('[data-tool="' + tool + '"]') : root.querySelector('[data-action="fit"]')).focus(); return; }
       if (button.dataset.action === 'edit-selection') { editorOpen = !editorOpen; sync(); if (editorOpen) editor.elements.x.focus(); return; }
       if (button.dataset.tool) { setTool(button.dataset.tool); return; }
       if (button.dataset.target) {
+        if (!menuDrawing() || !editMode()) return;
         var e = entity(); if (!e || e.type !== 'POINT') return;
         setTool('projector'); anchor = clone(e); projectTarget = button.dataset.target; hint('Place the ' + (projectTarget === 'PROFILE' ? 'side' : projectTarget === 'PLAN' ? 'top' : 'front') + ' projection.'); redraw(); return;
       }
@@ -648,19 +661,43 @@
       redraw();
     });
     sideSelect.addEventListener('change', function () { setLayout(true, sideSelect.value); });
+    // Pane-relative pointer math: the sheet canvas fills the window on
+    // desktop (identical values) and one split pane on mobile.
+    function surfacePx(event) {
+      try {
+        var r = surface.getBoundingClientRect();
+        return { x: event.clientX - r.left, y: event.clientY - r.top };
+      } catch (err) {
+        return { x: event.clientX, y: event.clientY };
+      }
+    }
+    // Touch on a split layout belongs to the pane gesture controllers.
+    function mobileTouchOwned(event) {
+      var t = event && event.pointerType;
+      if (t === undefined || t === null || t === '' || t === 'mouse') return false;
+      try {
+        return !!(window.EduCADMobile && window.EduCADMobile.splitActive &&
+          window.EduCADMobile.splitActive());
+      } catch (err) {
+        return false;
+      }
+    }
     ['pointerdown', 'pointerup', 'pointermove', 'click', 'dblclick', 'wheel', 'contextmenu', 'keydown'].forEach(function (name) { root.addEventListener(name, function (event) { event.stopPropagation(); }); });
     window.addEventListener('pointerdown', function (event) {
+      if (!menuDrawing()) return;
       if (event.target === surface && event.button === 0) suppressClick = false;
       if (event.target !== surface || !editMode() || event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || tool !== 'select') return;
-      var px = { x: event.clientX, y: event.clientY };
-      if (!event.altKey && solidVisible && options.solidAt(px)) return;
+      if (mobileTouchOwned(event)) return;
+      var px = surfacePx(event);
+      if (!event.altKey && solidVisible && options.solidAt({ x: event.clientX, y: event.clientY })) return;
       var id = hit(px), e = id && h.table.get(id);
       choose(id);
       if (e && e.type === 'POINT' && !e.locked) drag = { id: e.id, start: px, moved: false, offset: { x: e.x - V.inverse(h.view, px).x, y: e.y - V.inverse(h.view, px).y } };
       event.stopImmediatePropagation(); redraw();
     }, true);
     window.addEventListener('pointermove', function (event) {
-      cursor = { x: event.clientX, y: event.clientY };
+      if (mobileTouchOwned(event)) return;
+      cursor = surfacePx(event);
       if (!drag) return;
       if (!drag.moved && Math.hypot(cursor.x - drag.start.x, cursor.y - drag.start.y) <= 4) return;
       if (!drag.moved) { options.history.begin(); drag.moved = true; }
@@ -677,32 +714,44 @@
     }, true);
     window.addEventListener('pointercancel', function () { if (drag) { cancel(); sync(); redraw(); } }, true);
     surface.addEventListener('click', function (event) {
-      if (event.shiftKey || event.ctrlKey || event.metaKey || !editMode() || options.legacyActive()) return;
+      if (!menuDrawing() || event.shiftKey || event.ctrlKey || event.metaKey || !editMode() || options.legacyActive()) return;
       if (options.solidSuppressed()) return;
       event.stopImmediatePropagation();
       if (suppressClick) { suppressClick = false; return; }
-      try { click({ x: event.clientX, y: event.clientY }); }
+      try { click(surfacePx(event)); }
       catch (error) { hint(error.message); }
     }, true);
     surface.addEventListener('dblclick', function (event) {
+      if (!menuDrawing()) return;
       if (tool !== 'select') { event.stopImmediatePropagation(); anchor = null; dimensionEnd = null; sync(); redraw(); }
     }, true);
     surface.addEventListener('contextmenu', function (event) {
-      if (!editMode() || (!anchor && !selected && !drag)) return;
+      if (!menuDrawing() || !editMode() || (!anchor && !selected && !drag)) return;
       event.preventDefault(); event.stopImmediatePropagation(); cancel(); selected = null; options.cancelLegacy(); sync(); redraw();
     }, true);
     var typed = '';
     window.addEventListener('keydown', function (event) {
+      // The mobile shell owns its controls and transient menus. Do not
+      // cancel a drawing gesture or consume Escape/Tab under that UI.
+      if (window.EduCADMobile && window.EduCADMobile.splitActive()) {
+        var mobileMenu = document.getElementById('mobile-menu');
+        var mobileChooser = document.getElementById('mobile-chooser');
+        if ((mobileMenu && !mobileMenu.hidden) || (mobileChooser && !mobileChooser.hidden) ||
+            (event.target && event.target.closest && event.target.closest(
+              '#mobile-header, #mobile-pose, #mobile-sheet, #mobile-expandbar, .mobile-pane-bar'))) return;
+      }
       if (event.key === 'Escape' && (menuOpen || editorOpen)) {
         closeMenu(); editorOpen = false; document.activeElement.blur(); sync();
         event.preventDefault(); event.stopImmediatePropagation(); return;
       }
+      // Menu mode uses native Tab navigation; shortcuts keep the earlier
+      // canvas Tab-to-Pose gesture. Settings fields always navigate normally.
+      var settingsKey = event.target && event.target.closest && event.target.closest('#settings-panel, .drafting-controls');
+      if (event.key === 'Tab' && ((menuDrawing() && h.measure.mode !== 'pose') || settingsKey)) { event.stopImmediatePropagation(); return; }
       var field = event.target && (['INPUT', 'TEXTAREA', 'SELECT'].indexOf(event.target.tagName) !== -1 || event.target.isContentEditable);
       if (field) return;
-      // Preserve normal keyboard navigation; mode changes have explicit controls.
-      if (event.key === 'Tab' && h.measure.mode !== 'pose') { event.stopImmediatePropagation(); return; }
       if (!editMode() || h.sel.editing) return;
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && menuDrawing()) {
         closeMenu(); editorOpen = false; cancel(); typed = ''; selected = null; solidSelection = null; tool = 'select'; options.cancelLegacy();
         event.preventDefault(); event.stopImmediatePropagation(); sync(); redraw(); return;
       }
@@ -711,6 +760,7 @@
         if (event.shiftKey || event.key.toLowerCase() === 'y') options.redo(); else options.undo();
         refresh(); redraw(); return;
       }
+      if (!menuDrawing()) return;
       if ((event.key === 'Delete' || event.key === 'Backspace') && selected && !anchor) { event.preventDefault(); event.stopImmediatePropagation(); deleteSelection(); return; }
       if (anchor && ['line', 'polyline', 'circle', 'projector', 'dimension'].indexOf(tool) !== -1) {
         if (/^[0-9.]$/.test(event.key) || event.key === 'Backspace') {
@@ -742,6 +792,7 @@
     function linked() {
       var g = h.solidMm, m = map(), e = entity(), result = { vertices: [], edges: [] };
       if (!g) return result;
+      if (!solidSelection && h.orthographicView && !h.orthographicView.linksEnabled()) return result;
       if (solidSelection) {
         if (solidSelection.kind === 'point') result.vertices = [solidSelection.index];
         else { result.edges = [solidSelection.index]; result.vertices = g.edges[solidSelection.index] || []; }
@@ -844,19 +895,22 @@
     sync();
     return {
       preferences: function (values) {
+        if (values.drawingMode !== undefined) setDrawingMode(values.drawingMode);
         guides = !!values.guides; solidVisible = !!values.solid;
         if (h.solid && h.solid.canvas) { h.solid.canvas.hidden = !solidVisible; h.solid.canvas.style.display = solidVisible ? '' : 'none'; }
-        if (h.spatialView) h.spatialView.panel.hidden = !solidVisible || h.measure.mode !== 'view';
+        if (h.orthographicView) h.orthographicView.sync();
+        else if (h.spatialView) h.spatialView.panel.hidden = !solidVisible || h.measure.mode !== 'view';
         redraw();
       },
       root: root, refresh: refresh, cancel: function () { cancel(); selected = null; solidSelection = null; typed = ''; sync(); },
       layout: map, isVisible: isVisible, fit: fit, notify: hint, drawSheet: drawSheet, drawDynamic: drawDynamic, drawSolid: drawSolid, drawDimension: drawDimension,
-      active: function () { return editMode() && (tool !== 'select' || !!drag); }, solidVisible: function () { return solidVisible; },
+      active: function () { return menuDrawing() && editMode() && (tool !== 'select' || !!drag); }, solidVisible: function () { return solidVisible; },
+      drawingMode: function () { return drawingMode; },
       setStyle: function (value) { style = value; styleSelect.value = value; },
       select: function (id) { selected = id; solidSelection = null; sync(); redraw(); },
       selectSolid: function (value) { selected = null; solidSelection = value; sync(); options.redrawDynamic(cursor); if (h.solid) h.solid.scheduleDraw(); },
       validation: function () { return validation; },
-      modeChanged: function () { cancel(); selected = null; solidSelection = null; sync(); if (!solidVisible && h.spatialView) h.spatialView.panel.hidden = true; },
+      modeChanged: function () { cancel(); selected = null; solidSelection = null; sync(); if (h.orthographicView) h.orthographicView.sync(); else if (!solidVisible && h.spatialView) h.spatialView.panel.hidden = true; },
       projectCopies: function (ent, posed) { return profileCopies(ent, h.solidMm, posed, map()); }
     };
   }

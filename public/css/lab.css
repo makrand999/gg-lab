@@ -23,6 +23,8 @@
 .lab-error { color: #b00000; font-size: 12px; }
 .lab-ok { color: #006400; font-size: 12px; }
 .lab-flash { margin: 6px 0 0; min-height: 18px; }
+.lab-flash { position: sticky; top: 0; z-index: 2; background: #fff; }
+.lab-flash:empty { visibility: hidden; }
 
 /* Rows: title link + muted meta + trailing text actions, hairline split. */
 .lab-list { margin: 4px 0 0; }
@@ -98,6 +100,32 @@ button.lab-act:disabled { color: #999; cursor: default; text-decoration: none; }
 }
 
 .lab-back { font-size: 12px; }
+
+/* Keep the studio's compact links, with readable wrapping and keyboard focus. */
+.lab-acts { line-height: 1.9; }
+.lab-jumps { margin-top: 4px; }
+.lab-row, .lab-title { overflow-wrap: anywhere; }
+.lab-form input, .lab-form textarea, .lab-form select { box-sizing: border-box; }
+.lab-acts select, .lab-list > .lab-field select {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 5px;
+  border: 1px solid #b9b9b9;
+  background: #fff;
+  color: #222;
+  max-width: 100%;
+  margin-right: 8px;
+}
+.lab-list > .lab-field label { margin-right: 8px; }
+.lab-gradeform { margin: 8px 0; }
+a.lab-act:focus-visible, button.lab-act:focus-visible,
+.lab-form input:focus-visible, .lab-form textarea:focus-visible,
+.lab-form select:focus-visible, .lab-acts select:focus-visible {
+  outline: 2px solid #0645ad;
+  outline-offset: 3px;
+}
+.lab-form [disabled] { color: #777; }
+[hidden] { display: none !important; }
 
 /* Inline manual: cloned manual.html sections in lab clothing. Scoped so
    the document styles never leak onto the studio/workspace chrome. */

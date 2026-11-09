@@ -20,6 +20,27 @@ Pose controls; authoring remains available on fine-pointer devices.
 - **Design note:** [`docs/2d3d-problem-statement.md`](docs/2d3d-problem-statement.md)
   — the locked 2D⇄3D reconstruction contract.
 
+## Explicit reconstruction in Major
+
+Major's live 3D view now uses the [explicit reconstruction contract](docs/RECONSTRUCTION_CONTRACT.md).
+Stable member identities determine correspondence; exact stored-decimal constraints
+must agree. Lines retain both endpoint identities, and surfaces require declared
+triangles. Every valid closed surface automatically defines a solid, with exact
+closure/intersection checks and an exact volume certificate. Missing information,
+contradictions and unsupported primitives produce
+diagnostics instead of a guessed model. Old drawings without these declarations
+may remain unresolved; they are not silently migrated by geometric inference.
+
+The contract includes the existence/uniqueness proof and its limits. V1 covers
+vertices, straight edges, embedded triangular surfaces and the solids enclosed
+by their closed shells. Arbitrary curved surfaces and cavity/Boolean grouping
+remain outside the contract. Geometry is rendered approximately; the reconstruction result
+also carries an exact rational certificate. The legacy recognition API remains
+available for compatibility, separately from Major's strict live bridge.
+
+Run `node tools/edc.js --solid <file.edc>` to inspect the reconstructed
+wireframe from a drawn sheet. Sample sheets live in `tools/scripts/`.
+
 ## Run
 
 ```sh
@@ -86,77 +107,19 @@ clears the session and returns to the login page.
 Finishing a tutorial records progress and earns its lesson button
 a ✓ next visit.
 
-## Test
+## Verification
+
+EduCAD Script (`.edc`) is the drawing check: one slash command per line,
+validated headlessly against the live reconstruction.
 
 ```sh
-npm test       # full suite: baseline + phases 1–47 (1060 checks), plus spatial inspection, drafting, and drawing regressions
+node tools/edc.js tools/scripts/ln1.edc
+node tools/edc.js --solid tools/scripts/quad3d.edc
 ```
 
-| Command | Suite |
-|---------|-------|
-| `npm run test:baseline` | Baseline: affine/scale/zoom guards + golden fixtures (35) |
-| `npm run test:phase1` | Canvas + viewport: menus, selection, rename, line/polar/plot tools (71) |
-| `npm run test:phase2` | Entities: types, BIS SP 46 styles, table, cosmetic weights (51) |
-| `npm run test:phase3` | GeoGebra shim API: 39 methods, 14 commands (56) |
-| `npm run test:phase4` | Solver: line rotation, loci, traces, LM fallback (64) |
-| `npm run test:phase5` | Instruments + snapping: ruler/compass, 6-tier snap (32) |
-| `npm run test:phase6` | Curriculum: quadrant/line/plane/solid lessons (23) |
-| `npm run test:phase7` | Production audit: boot, budgets, mount (27) |
-| `npm run test:phase8` | Labels: 3-tier layout + leader fallback (28) |
-| `npm run test:phase9` | Solid widget: iso render, orbit/zoom, hidden edges (55) |
-| `npm run test:phase10` | Reconstruction: live wireframe, readers, failures, live sync (54) |
-| `npm run test:drafting` | Linked editing, profile consistency, left/right projection, curved silhouettes and saved layouts (37) |
-| `npm run test:drawing-audit` | Generalized drawing/Edit/View/Pose regressions: atomic edits, dependencies, cancellation, degree arcs, picking, coverage and connected profile projections (48) |
-| `npm run test:drawing-browser` | Mounted guest-sheet interactions and mode transitions (27); requires a running app and optional Playwright with Chromium |
-| `npm run test:mobile` | Mobile layout, gesture, fit, and pose helpers (18) |
-| `npm run test:mobile-browser` | Optional Chromium runner: desktop, narrow windows, phone portrait/landscape, short phone and tablet inspection |
-| `npm run test:spatial` | View-mode HP/VP coordinates, projections, picking, distances, angles, wireframe rendering, datum gaps, and face fills (18) |
-| `npm run test:inspection` | Multiple inspection pins, filtered overlays, signed readouts, saved preferences, and label placement (10) |
-| `npm run test:inspection-browser` | Inspection controls, mode transitions, read-only safety, persistence, and desktop/mobile layouts (optional Playwright) |
-| `npm run test:orthographic` | Front/top/side specs, projected comparisons, curves, filters, pins, reference mapping, and independent preferences (12) |
-| `npm run test:orthographic-browser` | Shared 2D/3D inspector, complete specs, overview, comparisons, layout, persistence, and read-only safety (optional Playwright) |
-| `npm run test:phase11` | Manual: Markdown→HTML build, in-app link, freshness guard (22) |
-| `npm run test:phase12` | Reconstruction 3-view: PROFILE role, result shapes, ignored views (30) |
-| `npm run test:phase13` | Curves: revolved cylinders/cones, K=24 tessellation (30) |
-| `npm run test:phase14` | Glass overlay: fullscreen sheet, aura hit-test, orbit/zoom/pan (42) |
-| `npm run test:phase15` | Demo 3-view: button wiring, `#3view` hash, prism wire proof (14) |
-| `npm run test:phase16` | Line vs circle: shared Ctrl+click anchor, plain-click draws line (12) |
-| `npm run test:phase17` | Point cascade: deleting a point deletes its lines, refs + coincident (12) |
-| `npm run test:phase18` | Two-point line: core rejects one-point lines everywhere (12) |
-| `npm run test:phase19` | Multi-caption: coincident pairs, parens verdicts, corner truth (24) |
-| `npm run test:phase20` | Claims + verify: member chooser, checker, Check button (26) |
-| `npm run test:phase21` | Tutorial: scripted user, square stepper, action funnel (24) |
-| `npm run test:phase22` | Claims reader: corner-lift lamina, hint failures (20) |
-| `npm run test:phase23` | Tutorial: hex-prism lesson, 88 steps, honest solid (20) |
-| `npm run test:phase24` | Typed distance: select point, type mm, Enter stakes (12) |
-| `npm run test:phase25` | Typed plot offset: focus line, type mm, Enter stakes (12) |
-| `npm run test:phase26` | Ground-line plotting: Alt+click fold, type mm, Enter stakes (13) |
-| `npm run test:phase27` | Pick bank: Ctrl banks, plain click finalizes (12) |
-| `npm run test:phase28` | View mode: Edit/View toggle, select-and-measure inspect (12) |
-| `npm run test:phase29` | View dimensions: drafting-style overlay (extension lines, leaders) (12) |
-| `npm run test:phase30` | Model + grade: model answers, strict verify, remarks, pass/fail (18) |
-| `npm run test:phase31` | Undo/Redo: grouped gestures, cancelled previews, exact restores (12) |
-| `npm run test:phase32` | Slash commands: Minecraft-style `/cmd` draw, autocomplete, Settings prefs (16) |
-| `npm run test:phase33` | Words to drawing: student `/ words` NL, teacher auto-draw via local gateway (16) |
-| `npm run test:phase34` | Pose mode: Blender-style 3D moves drag the drawn 2D views (19) |
-| `npm run test:phase35` | Pose live views: exact 2D projections of the posed solid (10) |
-| `npm run test:phase36` | Live wireframe: 2D entities with both views resolve to 3D (12) |
-| `npm run test:phase37` | Claim-decided pairing: corner choices pair 3D, dot picker covers stacks (9) |
-| `npm run test:phase38` | Logical faces: closed wire infers faces for hidden dashes (9) |
-| `npm run test:phase39` | Projector-read claims: drawn Type G pairs stacks, menu retired (12) |
-| `npm run test:phase40` | Split pieces need both-views proof; whole lines keep trust (4) |
-| `npm run test:phase41` | Pose accuracy: Y-move/Z-rotate projection invariants on the hex prism (7) |
-| `npm run test:phase42` | Pose ink rides exact: vertex dots, labels, projector feet track split views (7) |
-| `npm run test:phase43` | True projector corners: spanning lines head every touched corner once (5) |
-| `npm run test:phase44` | Cmd-only problem-bank drawing: /polyline /ellipse /hatch /style /undo, render fixes, EduCAD Script (18) |
-| `npm run test:phase45` | Pose stack labels split across parted corners (8) |
-| `npm run test:phase46` | Pose reference ink: pinned axes, datum seats, stack parts seat (8) |
-| `npm run test:phase47` | Reference 3D: model previews students can draw from (13) |
-| `npm run test:auto-draw` | Generated plan validation, atomic application, concurrency, roles, hatching bounds, and undo (17 groups; 2,000 malformed inputs) |
-| `npm run test:login` | Login: 3 roles + guest, `/api/login`, gate ships (15) |
-| `npm run test:lab` | Lab: studio + workspace pages, role routing, deep links, class client, inline manual (18) |
-| `npm run test:cpp` | C++ backend: static serving, auth, drawings/progress, question sets, classes (43) |
-| `npm run test:saves` | Saves module: snapshot/restore, API client incl. sets, guest gate, UI ships (20) |
+The runner reports per-line errors, entity counts, projector alignment and
+the reconstructed `solid:` summary. Exit code is 0 clean / 1 with problems.
+Sample sheets live in `tools/scripts/`.
 
 App entry point: [`public/index.html`](public/index.html).
 Library modules: [`public/files/www.geogebra.org/`](public/files/www.geogebra.org/).
@@ -169,11 +132,9 @@ Short version:
 - Prerequisites: Node.js 22 (`.nvmrc`), CMake ≥ 3.16, a C++17 compiler,
   and libsodium/libcurl headers (`sudo apt-get install -y cmake g++ libsodium-dev libcurl4-openssl-dev`
   on Ubuntu). No `npm install` needed — zero npm dependencies.
-- Layout: `public/` app, `tools/` tests, `backend/` C++ server, `docs/`
-  manual source.
-- `npm test` builds the backend, then runs baseline + phases 1–47
-  (1060 checks); CI additionally runs the login/lab/saves/cpp suites on
-  every PR.
+- Layout: `public/` app, `tools/` scripts and the C++ backend under
+  `backend/`, `docs/` manual source.
+- Drawing checks run through EduCAD Script with `node tools/edc.js <file.edc>`.
 - `public/manual.html` is generated — edit `docs/MANUAL.md` and run
   `npm run build:manual`.
 - License: MIT — see [`LICENSE`](LICENSE).

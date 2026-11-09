@@ -13,7 +13,7 @@
   // browser via window.EduCADRef3d, plain Node via module.exports.
   //
   // A preview is {status:'ok', geometry:{name, vertices, edges, faces}} or
-  // {status:'unavailable', reason, label}, mirroring reconstructLive but
+  // {status:'unavailable', reason, label}, mirroring the shared pipeline but
   // detached to plain JSON the server stores opaquely.
   var VERSION = '1.0.0-educad';
 
@@ -58,12 +58,12 @@
   // {status:'unavailable'} preview instead of nothing.
   function buildPreview(entities, R) {
     if (!Array.isArray(entities) || !R ||
-        typeof R.reconstructLive !== 'function') {
+        typeof R.reconstruct !== 'function') {
       return null;
     }
     var res;
     try {
-      res = R.reconstructLive(entities);
+      res = R.reconstruct(entities);
     } catch (err) {
       return { status: 'unavailable', reason: 'preview-failed',
         label: 'could not build 3D preview' };
@@ -87,9 +87,13 @@
       });
       var preview = {
         status: 'ok',
+        pipeline: res.pipeline,
         geometry: {
           name: String(g.name === undefined ? 'wireframe' : g.name),
-          vertices: verts, edges: edges, faces: faces
+          vertices: verts, edges: edges, faces: faces,
+          curves: g.curves || [], surfacePatches: g.surfacePatches || [],
+          smoothSideFaces: g.smoothSideFaces, topologyStatus: g.topologyStatus,
+          faceHoles: (g.faceHoles || faces.map(function() { return []; })).map(function(holes) { return holes.map(function(hole) { return copyFace(hole, verts.length); }); })
         }
       };
       // Detach from live objects; the payload must survive JSON storage.
@@ -122,6 +126,27 @@
       if (!Array.isArray(g.edges) || !Array.isArray(g.faces)) return false;
       for (i = 0; i < g.edges.length; i++) copyEdge(g.edges[i], g.vertices.length);
       for (i = 0; i < g.faces.length; i++) copyFace(g.faces[i], g.vertices.length);
+      if (g.faceHoles !== undefined) {
+        if (!Array.isArray(g.faceHoles) || g.faceHoles.length !== g.faces.length) return false;
+        g.faceHoles.forEach(function(holes) {
+          if (!Array.isArray(holes)) throw new Error('invalid face holes');
+          holes.forEach(function(hole) { copyFace(hole, g.vertices.length); });
+        });
+      }
+      function indices(values, count) {
+        return Array.isArray(values) && values.every(function(v) {return Number.isInteger(v) && v>=0 && v<count;});
+      }
+      if (g.smoothSideFaces !== undefined && !indices(g.smoothSideFaces,g.faces.length)) return false;
+      if (g.curves !== undefined) {
+        if (!Array.isArray(g.curves)) return false;
+        for (var ci=0;ci<g.curves.length;ci++) {
+          var c=g.curves[ci];
+          if (!c || ['circle','circular-arc'].indexOf(c.kind)===-1 || !isFiniteNumber(c.radius) || c.radius<=0 ||
+              !isFiniteNumber(c.startAngle) || !isFiniteNumber(c.sweepAngle) || c.sweepAngle<=0) return false;
+          copyVertex(c.center); copyVertex(c.u); copyVertex(c.v);
+          if (!indices(c.displayVertices,g.vertices.length) || !indices(c.displayEdges,g.edges.length)) return false;
+        }
+      }
       return true;
     } catch (err) {
       return false;

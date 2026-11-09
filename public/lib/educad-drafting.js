@@ -13,7 +13,13 @@
       return s.trim().replace(/^\((.*)\)$/, '$1').trim().replace(/['′’]+$/, '');
     }).filter(Boolean);
   }
-  function common(a, b) { return bases(a).some(function (n) { return bases(b).indexOf(n) !== -1; }); }
+  function common(a, b) {
+    if (a.meta && Array.isArray(a.meta.members) || b.meta && Array.isArray(b.meta.members)) {
+      var am = a.meta && a.meta.members || [], bm = b.meta && b.meta.members || [];
+      return am.some(function (m) { return bm.some(function (n) { return m.id === n.id; }); });
+    }
+    return bases(a).some(function (n) { return bases(b).indexOf(n) !== -1; });
+  }
   function role(e) {
     return e.viewRole && e.viewRole !== 'BOTH' ? e.viewRole : (e.y < 0 ? 'PLAN' : 'ELEVATION');
   }
@@ -22,29 +28,132 @@
     if (r === 'PROFILE') return { x: map.xRef + map.s * (v.z - map.dRef), y: v.y };
     return { x: v.x, y: v.y };
   }
-  function renamePoint(table, id, caption) {
-    var point = table.get(id);
-    if (!point || point.locked) throw new Error('Select an unlocked point to rename.');
-    var before = bases(point), after = bases({ caption: caption });
-    var patches = {}, list = table.list();
+  var EDIT_RULES = Object.freeze({ renameScope: 'local', moveScope: 'linked', labelPolicy: 'allow' });
+  function editRules(options) {
+    var rules = Object.assign({}, EDIT_RULES, options || {});
+    if (['local', 'linked'].indexOf(rules.renameScope) < 0 || ['linked', 'detach'].indexOf(rules.moveScope) < 0 || ['allow', 'unique-view'].indexOf(rules.labelPolicy) < 0 || rules.labelAction !== undefined && ['local', 'linked', 'members'].indexOf(rules.labelAction) < 0) throw new Error('Unknown edit rule.');
+    return rules;
+  }
+  function commitIdentitySnapshot(table, list) {
+    var patches = {};
     list.forEach(function (e) {
-      var meta = Entities.normalizeMeta(list, e);
-      if (JSON.stringify(meta) !== JSON.stringify(e.meta)) patches[e.id] = { meta: meta };
+      var old = table.get(e.id), patch = {};
+      ['meta', 'caption', 'name'].forEach(function (key) {
+        if (JSON.stringify(old[key]) !== JSON.stringify(e[key])) patch[key] = e[key];
+      });
+      if (Object.keys(patch).length) patches[e.id] = patch;
     });
-    table.list().filter(function (e) { return e.type === 'POINT' && e.id !== id && common(point, e); }).forEach(function (e) {
-      var renamed = String(e.caption).split(',').map(function (part) {
-        var token = part.trim(), hidden = /^\(.*\)$/.test(token);
-        if (hidden) token = token.slice(1, -1);
-        var name = token.replace(/['′’]+$/, ''), index = before.indexOf(name);
-        if (index < 0 || !after[index]) return part;
-        var next = after[index] + (role(e) === 'ELEVATION' ? "'" : role(e) === 'PROFILE' ? "''" : '');
-        return hidden ? '(' + next + ')' : next;
-      }).join(',');
-      if (e.locked && renamed !== e.caption) throw new Error('A linked point is locked.');
-      patches[e.id] = Object.assign(patches[e.id] || {}, { caption: renamed, name: renamed });
-    });
-    patches[id] = Object.assign(patches[id] || {}, { caption: caption, name: caption });
     table.updateMany(patches);
+  }
+  function editablePoint(list, id) {
+    var p = list.find(function (e) { return e.id === id; });
+    if (!p || p.type !== 'POINT' || p.locked) throw new Error('Select an unlocked point.');
+    return p;
+  }
+  function setMemberLabel(p) {
+    p.caption = Entities.memberCaption(p, false); p.name = p.caption;
+    p.meta.labelOverride = false;
+  }
+  function validateProjectionMembers(list, map) {
+    var values = Object.create(null);
+    list.forEach(function (p) {
+      if (p.type !== 'POINT') return;
+      var r = role(p), axes = r === 'PLAN' ? {x: p.x, depth: -p.y} : r === 'ELEVATION' ? {x: p.x, height: p.y} : {height: p.y, sideX: p.x};
+      if (r === 'PROFILE' && map) axes.depth = map.dRef + map.s * (p.x - map.xRef);
+      (p.meta.members || []).forEach(function (m) {
+        var known = values[m.id] || (values[m.id] = {});
+        Object.keys(axes).forEach(function (axis) {
+          if (known[axis] !== undefined && Math.abs(known[axis] - axes[axis]) > EPS) throw new Error('Linked stations disagree on ' + axis + '. Detach or correct the projections.');
+          known[axis] = axes[axis];
+        });
+      });
+    });
+  }
+  function renamePoint(table, id, caption, options) {
+    var rules = editRules(options), list = Entities.identitySnapshot(table.list());
+    var point = editablePoint(list, id);
+    caption = String(caption).trim();
+    if (rules.labelPolicy === 'unique-view' && list.some(function (e) { return e.id !== id && e.type === 'POINT' && role(e) === role(point) && e.caption === caption; })) throw new Error('That display label is already used in this view.');
+    if (rules.renameScope === 'local') {
+      point.caption = caption; point.name = caption; point.meta.labelOverride = true;
+    } else {
+      var chosen = options && options.memberId;
+      var members = point.meta.members.filter(function (m) { return chosen ? m.id === chosen : true; });
+      var names = Entities.parseMembers(caption);
+      if (members.length !== 1 || names.length !== 1) throw new Error('Choose one member and one base name for a linked rename.');
+      list.forEach(function (e) {
+        if (e.type !== 'POINT') return;
+        var member = e.meta.members.find(function (m) { return m.id === members[0].id; });
+        if (!member) return;
+        if (e.locked) throw new Error('A linked station is locked.');
+        member.name = names[0].name;
+        // A deliberate linked rename refreshes all affected station labels.
+        setMemberLabel(e);
+      });
+    }
+    if (rules.labelPolicy === 'unique-view') list.forEach(function (e) {
+      if (e.type !== 'POINT' || !e.caption || e.id !== id && e.caption === table.get(e.id).caption) return;
+      if (list.some(function (other) { return other.type === 'POINT' && other.id !== e.id && role(other) === role(e) && other.caption === e.caption; })) throw new Error('That display label is already used in this view.');
+    });
+    commitIdentitySnapshot(table, list);
+  }
+  // Membership is a separate operation. Callers may supply exact IDs, or
+  // explicitly resolve base names at this input boundary. Ambiguity rejects.
+  function assignMembers(table, id, input) {
+    var list = Entities.identitySnapshot(table.list()), point = editablePoint(list, id);
+    var requested = typeof input === 'string' ? Entities.parseMembers(input) : clone(input);
+    if (!Array.isArray(requested)) throw new Error('Members must be a caption or an array.');
+    var registry = Object.create(null), declared = Object.create(null);
+    list.forEach(function (e) { if (e.type === 'POINT') e.meta.members.forEach(function (m) {
+      registry[m.id] = m;
+      if (e.meta.membersDeclared) declared[m.id] = true;
+    }); });
+    point.meta.members = requested.map(function (m, i) {
+      if (!m.id && m.name && m.name.charAt(0) === '@') m.id = m.name.slice(1);
+      if (m.id) {
+        if (!registry[m.id]) throw new Error('Unknown member ID: ' + m.id);
+        return { id: m.id, name: registry[m.id].name, hidden: m.hidden === undefined ? false : m.hidden };
+      }
+      var matches = Object.keys(registry).filter(function (key) { return declared[key] && registry[key].name === m.name; });
+      if (matches.length > 1) throw new Error('Ambiguous member name: ' + m.name + '. Select a member by ID.');
+      var key = matches[0];
+      if (!key) {
+        var n = 0; key = 'member:' + id + ':' + i;
+        while (registry[key]) key = 'member:' + id + ':' + i + ':' + (++n);
+        registry[key] = { id: key, name: m.name, hidden: !!m.hidden };
+        declared[key] = true;
+      }
+      return { id: key, name: m.name, hidden: m.hidden === undefined ? false : m.hidden };
+    });
+    point.meta.membersDeclared = true;
+    Entities.validateMembers(point); validateProjectionMembers(list); setMemberLabel(point);
+    commitIdentitySnapshot(table, list);
+  }
+  function linkPoints(table, sourceId, targetId, map) {
+    var list = Entities.identitySnapshot(table.list());
+    var source = editablePoint(list, sourceId), target = editablePoint(list, targetId);
+    if (role(source) === role(target)) throw new Error('Choose stations in different views.');
+    var front = role(source) === 'ELEVATION' ? source : role(target) === 'ELEVATION' ? target : null;
+    var plan = role(source) === 'PLAN' ? source : role(target) === 'PLAN' ? target : null;
+    var side = role(source) === 'PROFILE' ? source : role(target) === 'PROFILE' ? target : null;
+    if (front && plan && Math.abs(front.x - plan.x) > EPS || front && side && Math.abs(front.y - side.y) > EPS || plan && side && map && Math.abs(side.x - (map.xRef + map.s * (-plan.y - map.dRef))) > EPS) throw new Error('The stations do not satisfy the projection equations.');
+    // Assignment is deliberate; coincidence and equal labels never merge IDs.
+    target.meta.members = clone(source.meta.members);
+    source.meta.membersDeclared = true; target.meta.membersDeclared = true;
+    validateProjectionMembers(list, map);
+    setMemberLabel(target);
+    commitIdentitySnapshot(table, list);
+  }
+  function detachPoint(table, id) {
+    var list = Entities.identitySnapshot(table.list()), p = editablePoint(list, id);
+    var used = Object.create(null);
+    list.forEach(function (e) { if (e.type === 'POINT') e.meta.members.forEach(function (m) { used[m.id] = true; }); });
+    p.meta.members = p.meta.members.map(function (m, i) {
+      var key = 'detached:' + id + ':' + i, n = 0;
+      while (used[key]) key = 'detached:' + id + ':' + i + ':' + (++n);
+      return Object.assign({}, m, { id: key });
+    });
+    commitIdentitySnapshot(table, list);
   }
   function distance(p, a, b) {
     var dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
@@ -122,7 +231,7 @@
   // Move the selected point, its declared counterparts, and attached endpoints.
   // Validate the complete patch before committing, including collapsed edges.
   function movePoints(table, E, targets, map, extra) {
-    var list = clone(table.list()), points = list.filter(function (e) { return e.type === 'POINT'; });
+    var list = Entities.identitySnapshot(table.list()), points = list.filter(function (e) { return e.type === 'POINT'; });
     var changes = Object.create(null), constraints = Object.create(null), queue = [];
     function put(p, key, value) {
       E.assertFinite(value);
@@ -150,24 +259,19 @@
       points.forEach(function (q) {
         if (q.id === p.id || !common(p, q)) return;
         var qr = role(q);
-        if (k === 'x' && ((r === 'PLAN' && qr === 'ELEVATION') || (r === 'ELEVATION' && qr === 'PLAN')) && Math.abs(q.x - p.x) < EPS) put(q, 'x', value);
+        if (r === qr) put(q, k, value);
+        if (k === 'x' && ((r === 'PLAN' && qr === 'ELEVATION') || (r === 'ELEVATION' && qr === 'PLAN'))) put(q, 'x', value);
         if (r === 'PLAN' && qr === 'PROFILE' && k === 'y') put(q, 'x', map.xRef + map.s * (-value - map.dRef));
         if (r === 'ELEVATION' && qr === 'PROFILE' && k === 'y') put(q, 'y', value);
         if (r === 'PROFILE' && qr === 'PLAN' && k === 'x') put(q, 'y', -(map.dRef + map.s * (value - map.xRef)));
         if (r === 'PROFILE' && qr === 'ELEVATION' && k === 'y') put(q, 'y', value);
       });
-      if (r !== 'PROFILE' && k === 'x') {
-        list.filter(function (e) { return e.meta && e.meta.kind === 'projector' && Math.abs(e.x - p.x) < EPS; }).forEach(function (line) {
-          points.forEach(function (q) {
-            if (role(q) !== 'PROFILE' && Math.abs(q.x - p.x) < EPS && q.y >= Math.min(line.y, line.y2) - EPS && q.y <= Math.max(line.y, line.y2) + EPS) put(q, 'x', value);
-          });
-        });
-      }
+
     }
     function final(p) { return Object.assign({}, p, changes[p.id]); }
     list.forEach(function (e) {
       var meta = E.normalizeMeta(list, e), patch = {};
-      if (JSON.stringify(meta) !== JSON.stringify(e.meta)) patch.meta = meta;
+      if (JSON.stringify(meta) !== JSON.stringify(table.get(e.id).meta)) patch.meta = meta;
       if (LINE_TYPES.indexOf(e.type) !== -1) {
         var refs = E.endpointReferences(list, e);
         [0, 1].forEach(function (end) {
@@ -194,6 +298,7 @@
       if (Object.keys(patch).length) changes[e.id] = Object.assign(changes[e.id] || {}, patch);
     });
     Object.keys(extra || {}).forEach(function (id) { changes[id] = Object.assign(changes[id] || {}, extra[id]); });
+    validateProjectionMembers(list.map(final), map);
     return table.updateMany(changes);
   }
   function movePoint(table, E, id, target, map) {
@@ -221,11 +326,20 @@
     extra[e.id] = Object.assign({}, patch, { meta: meta });
     return movePoints(table, E, targets, map, extra);
   }
-  function editPoint(table, E, id, target, caption, map) {
+  function editPoint(table, E, id, target, caption, map, options) {
     var temp = E.createTable(), patches = {};
     table.list().forEach(function (e) { temp.add(E.createEntity(e.type, clone(e))); });
+    var rules = editRules(options);
+    if (options && options.patch) {
+      if (Object.keys(options.patch).some(function (key) { return ['bisCode', 'viewRole'].indexOf(key) < 0; })) throw new Error('Unsupported point property.');
+      temp.update(id, options.patch);
+    }
+    if (rules.moveScope === 'detach') detachPoint(temp, id);
     movePoint(temp, E, id, target, map);
-    if (caption) renamePoint(temp, id, caption);
+    if (caption !== null && caption !== undefined) {
+      if (options && options.labelAction === 'members') assignMembers(temp, id, caption);
+      else renamePoint(temp, id, caption, rules);
+    }
     temp.list().forEach(function (e) {
       var real = table.get(e.id);
       if (JSON.stringify(real) !== JSON.stringify(e)) {
@@ -316,6 +430,9 @@
       '<span class="drafting-project-actions">Project to <button type="button" data-target="ELEVATION">Front</button><button type="button" data-target="PLAN">Top</button><button type="button" data-target="PROFILE">Side</button></span>' +
       '<button type="button" data-action="edit-selection" aria-expanded="false">Edit</button></div>' +
       '<form class="drafting-editor" hidden aria-label="Edit selection"><span class="drafting-kind"></span><label>Name <input name="caption" aria-label="Point name" autocomplete="off"></label>' +
+      '<label data-point-rule>Label action <select name="labelAction"><option value="local">Display label only</option><option value="linked">Rename linked member</option><option value="members">Assign station members</option></select></label>' +
+      '<label data-point-rule>Member <select name="memberId"><option value="">Choose for linked rename</option></select></label>' +
+      '<label data-point-rule>Movement <select name="moveScope"><option value="linked">Keep projections linked</option><option value="detach">Detach this station</option></select></label>' +
       '<label>X <input name="x" aria-label="X coordinate" type="number" step="any" required></label><label>Y <input name="y" aria-label="Y coordinate" type="number" step="any" required></label>' +
       '<label>X₂ <input name="x2" aria-label="Endpoint X coordinate" type="number" step="any"></label><label>Y₂ <input name="y2" aria-label="Endpoint Y coordinate" type="number" step="any"></label>' +
       '<label>R <input name="radius" aria-label="Radius" type="number" min="0.01" step="any"></label><span>mm</span><button type="submit">Apply</button><button type="button" data-action="delete">Delete</button></form>';
@@ -457,7 +574,7 @@
       var caption = bases(source).map(function (n) { return n + (pt.viewRole === 'ELEVATION' ? "'" : pt.viewRole === 'PROFILE' ? "''" : ''); }).join(',');
       transaction(function () {
         var dest = ensurePoint(pt, caption), sourceRole = role(source), destRole = role(dest);
-        if (!common(source, dest)) h.table.update(dest.id, { caption: [dest.caption, caption].filter(Boolean).join(',') });
+        linkPoints(h.table, source.id, dest.id, map());
         if (sourceRole !== 'PROFILE' && destRole !== 'PROFILE') {
           var extended = near(source, dest);
           h.table.create('SEGMENT', { x: source.x, y: source.y - (extended ? 5 : 0), x2: dest.x, y2: dest.y + (extended ? 5 : 0), bisCode: 'G', viewRole: 'BOTH', meta: { kind: 'projector', refs: [source.id, dest.id], extended: extended } });
@@ -496,10 +613,16 @@
           var center = ensurePoint(anchor), rim = ensurePoint(pt);
           selected = h.table.create('CIRCLE', { x: anchor.x, y: anchor.y, radius: radius, bisCode: style, viewRole: anchor.viewRole, meta: { centerRef: center.id, radiusRef: rim.id, refs: [center.id, rim.id] } }).id;
         } else {
-          var end = dimensionEnd || pt, a = ensurePoint(anchor), b = ensurePoint(end), dx = end.x - anchor.x, dy = end.y - anchor.y, length = Math.hypot(dx, dy);
+          var end = dimensionEnd || pt;
+          if (tool !== 'dimension') [anchor, end].forEach(function (candidate) {
+            var station = candidate.id && h.table.get(candidate.id);
+            var overlapping = h.table.visibleEntities().filter(function (p) { return p.type === 'POINT' && isVisible(p) && role(p) === candidate.viewRole && near(p, candidate); });
+            if (overlapping.length > 1 || station && (!station.meta.members || station.meta.members.length !== 1)) throw new Error('Choose overlapping line endpoints with Ctrl/Cmd-click, then click the destination.');
+          });
+          var a = ensurePoint(anchor), b = ensurePoint(end), dx = end.x - anchor.x, dy = end.y - anchor.y, length = Math.hypot(dx, dy);
           var offset = dimensionEnd ? ((pt.x - anchor.x) * -dy + (pt.y - anchor.y) * dx) / length : 0;
-          selected = h.table.create(tool === 'dimension' ? 'DIMENSION' : 'SEGMENT', { x: anchor.x, y: anchor.y, x2: end.x, y2: end.y, bisCode: tool === 'dimension' ? 'B' : style,
-            viewRole: anchor.viewRole, meta: { kind: tool === 'dimension' ? 'user-dimension' : 'user-line', refs: [a.id, b.id], offsetMm: offset } }).id;
+          selected = h.table.create(tool === 'dimension' ? 'DIMENSION' : 'SEGMENT', { x: a.x, y: a.y, x2: b.x, y2: b.y, bisCode: tool === 'dimension' ? 'B' : style,
+            viewRole: anchor.viewRole, meta: { kind: tool === 'dimension' ? 'user-dimension' : 'user-line', refs: [a.id, b.id], endpointMemberIds: tool === 'dimension' ? undefined : [a.meta.members[0].id, b.meta.members[0].id], offsetMm: offset } }).id;
         }
       });
       anchor = tool === 'polyline' ? pt : null; dimensionEnd = null; sync(); redraw();
@@ -564,11 +687,15 @@
     function updateStatus() {
       var text = warning;
       if (!text && options.getPose()) text = 'Pose preview · stored drawing unchanged';
+      if (!text && h.reconstruction) text = h.reconstruction.determination !== 'determined' ? h.reconstruction.label :
+        h.reconstruction.geometry.topologyStatus ? (h.reconstruction.geometry.topologyStatus === 'inferred' ? 'Projections agree · inferred surface preview' : 'Wire preview · ' + h.reconstruction.geometry.topologyStatus.replace(/-/g, ' ')) :
+        h.reconstruction.geometry.solids && h.reconstruction.geometry.solids.length ? 'Explicit projections agree · closed surface defines a solid' :
+        h.reconstruction.geometry.faces.length ? 'Explicit projections agree · open surface' : 'Explicit projections agree · wireframe; no surface declared';
       var selectedPoint = entity();
       if (!text && selectedPoint && selectedPoint.type === 'POINT' && !linked().vertices.length && role(selectedPoint) !== 'PROFILE') {
         var targetRole = role(selectedPoint) === 'PLAN' ? 'ELEVATION' : 'PLAN';
         var mate = h.table.list().find(function (p) { return p.type === 'POINT' && role(p) === targetRole && common(selectedPoint, p); });
-        text = mate ? 'Matching point needs an aligned projector · use Project to pair it' : 'Point needs a ' + (targetRole === 'PLAN' ? 'top' : 'front') + ' projection · use Project to pair it';
+        text = mate ? 'Matching projections need consistent coordinates' : 'Point needs a ' + (targetRole === 'PLAN' ? 'top' : 'front') + ' projection · use Project to pair it';
       }
       if (!text && validation.status === 'mismatch') text = 'Side view disagrees with front / top · ' + validation.issues.length + ' marked item' + (validation.issues.length === 1 ? '' : 's');
       if (!text && validation.status === 'incomplete') text = 'Side view incomplete · add the missing projections';
@@ -604,6 +731,11 @@
           input.parentNode.hidden = !visible; input.disabled = !visible || e.locked;
           input.value = key === 'caption' ? e.caption : String(Number(e[key].toFixed(8)));
         });
+        editor.querySelectorAll('[data-point-rule]').forEach(function (label) { label.hidden = e.type !== 'POINT'; label.querySelector('select').disabled = e.locked; });
+        var memberSelect = editor.elements.memberId, currentMember = memberSelect.value;
+        memberSelect.replaceChildren(new Option('Choose for linked rename', ''));
+        (e.meta.members || []).forEach(function (member) { memberSelect.add(new Option(member.name + ' (' + member.id + ')', member.id)); });
+        memberSelect.value = currentMember;
         root.querySelector('.drafting-project-actions').hidden = e.type !== 'POINT';
         root.querySelector('[data-target="PROFILE"]').hidden = !m.three;
         root.querySelectorAll('[data-target]').forEach(function (button) { button.disabled = e.type !== 'POINT' || button.dataset.target === role(e); });
@@ -624,7 +756,7 @@
           var x = Number(editor.elements.x.value), y = Number(editor.elements.y.value);
           if (e.type === 'POINT') {
             var name = editor.elements.caption.value.trim();
-            editPoint(h.table, E, e.id, { x: x, y: y }, name, map());
+            editPoint(h.table, E, e.id, { x: x, y: y }, name, map(), {labelAction: editor.elements.labelAction.value, renameScope: editor.elements.labelAction.value === 'linked' ? 'linked' : 'local', memberId: editor.elements.memberId.value, moveScope: editor.elements.moveScope.value});
           } else {
             var patch = { x: x, y: y };
             if (LINE_TYPES.indexOf(e.type) !== -1) { patch.x2 = Number(editor.elements.x2.value); patch.y2 = Number(editor.elements.y2.value); }
@@ -684,7 +816,7 @@
     }
     ['pointerdown', 'pointerup', 'pointermove', 'click', 'dblclick', 'wheel', 'contextmenu', 'keydown'].forEach(function (name) { root.addEventListener(name, function (event) { event.stopPropagation(); }); });
     window.addEventListener('pointerdown', function (event) {
-      if (!menuDrawing()) return;
+      if (!menuDrawing() || options.legacyActive()) return;
       if (event.target === surface && event.button === 0) suppressClick = false;
       if (event.target !== surface || !editMode() || event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || tool !== 'select') return;
       if (mobileTouchOwned(event)) return;
@@ -914,5 +1046,5 @@
       projectCopies: function (ent, posed) { return profileCopies(ent, h.solidMm, posed, map()); }
     };
   }
-  return { createHistory: createHistory, movePoint: movePoint, movePoints: movePoints, editPoint: editPoint, editEntity: editEntity, renamePoint: renamePoint, validateProfile: validateProfile, profileCopies: profileCopies, layoutOf: layoutOf, toView: toView, extent: extent, mount: mount };
+  return { EDIT_RULES: EDIT_RULES, editRules: editRules, assignMembers: assignMembers, linkPoints: linkPoints, detachPoint: detachPoint, common: common, createHistory: createHistory, movePoint: movePoint, movePoints: movePoints, editPoint: editPoint, editEntity: editEntity, renamePoint: renamePoint, validateProfile: validateProfile, profileCopies: profileCopies, layoutOf: layoutOf, toView: toView, extent: extent, mount: mount };
 });

@@ -1,0 +1,4 @@
+# Keep a specific missing-evidence diagnostic, not a guessed surface.
+# expect: 0V 0E 0F curves=0 unresolved=1 status=curve-projection-missing
+/datum -30 70
+/circle 20 -30 20 A plan

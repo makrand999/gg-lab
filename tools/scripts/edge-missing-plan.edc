@@ -1,0 +1,9 @@
+# EDGE-MISSING-PLAN: elevation a'-b' is drawn, plan a-b is missing.
+# Expected: 2 vertices, 0 edges. A drawn line in one view never invents
+# an edge that is absent from the other view.
+/datum -30 30
+/point "a'" 0 40 elevation
+/point "b'" 40 40 elevation
+/point a 0 -10 plan
+/point b 40 -10 plan
+/line "a'" "b'" A elevation

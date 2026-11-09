@@ -1,0 +1,7 @@
+# No shape declaration: a circle and its edge-on projection.
+# expect: 24V 24E 1F curves=1 unresolved=0 status=inferred
+/datum -30 70
+/circle 20 -30 20 A plan
+/point a' 0 15 elevation
+/point b' 40 15 elevation
+/line a' b' A elevation

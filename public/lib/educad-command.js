@@ -135,10 +135,12 @@
     { name: 'hatch', usage: '/hatch <x1> <y1> <x2> <y2> <spacing> [angle] [bis] [role]',
       hint: 'Section hatching clipped to a rectangle (mm)',
       args: [] },
-    { name: 'rename', usage: '/rename <old> <new>',
-      hint: 'Rename an entity',
+    { name: 'rename', usage: '/rename <old-or-id> <new> [local|linked|members] [member-id]',
+      hint: 'Change a display label, rename a linked member, or assign station members',
       args: [{ name: 'old', kind: 'point-name' },
-        { name: 'new', kind: 'point-new' }] },
+        { name: 'new', kind: 'point-new' },
+        { name: 'scope', kind: 'rename-scope', optional: true },
+        { name: 'member-id', kind: 'point-new', optional: true }] },
     { name: 'delete', usage: '/delete <name>',
       hint: 'Delete an entity (cascades off its lines)',
       args: [{ name: 'name', kind: 'point-name' }] },
@@ -147,6 +149,9 @@
       args: [{ name: 'name', kind: 'entity-name' },
         { name: 'bis', kind: 'bis-code' },
         { name: 'role', kind: 'role-name', optional: true }] },
+    { name: 'profile', usage: '/profile <xRef> <dRef> [s]',
+      hint: 'Set the side-view frame: sheet x = xRef + s * (depth - dRef)',
+      args: [{name:'xRef',kind:'number'}, {name:'dRef',kind:'number'}, {name:'s',kind:'number',optional:true}] },
     { name: 'datum', usage: '/datum [x1] [x2]',
       hint: 'XY ground datum (default -30 to 30)',
       args: [{ name: 'x1', kind: 'number', optional: true },
@@ -316,10 +321,12 @@
         Object.prototype.hasOwnProperty.call(ctx.entities, name)) {
       return true;
     }
+    if (ctx && ctx.entities && !Array.isArray(ctx.entities) && Object.keys(ctx.entities).some(function (key) { return ctx.entities[key] === name; })) return true;
     return entityNames(ctx).indexOf(name) !== -1;
   }
 
   function kindCandidates(kind, ctx) {
+    if (kind === 'rename-scope') return ['local', 'linked', 'members'];
     if (kind === 'point-name') return pointNames(ctx);
     if (kind === 'entity-name') {
       var seen = Object.create(null);
@@ -753,7 +760,10 @@
         return 'Draw open chain (' + args.join(', ') + ').';
       case 'rename':
         if (!hasEntity(ctx, args[0])) return 'Unknown point "' + args[0] + '".';
-        if (hasEntity(ctx, args[1])) return 'There is already a point "' + args[1] + '".';
+        if (args[2] === 'members') return 'Assign station members "' + args[1] + '" to "' + args[0] + '".';
+        if (args[2] === 'linked') return 'Rename the selected member across its linked stations to "' + args[1] + '".';
+        if (args[2] && args[2] !== 'local') return 'Choose local, linked, or members.';
+        if (args[0] !== args[1] && hasEntity(ctx, args[1])) return 'There is already a point "' + args[1] + '".';
         return 'Rename "' + args[0] + '" to "' + args[1] + '".';
       case 'delete':
         if (!hasEntity(ctx, args[0])) return 'Unknown point "' + args[0] + '".';
@@ -769,6 +779,8 @@
         var srole = args.length > 2 ? ', ' + normRole(args[2]) + ' view' : '';
         return 'Restyle "' + args[0] + '" as type ' + String(args[1]).toUpperCase() + srole + '.';
       }
+      case 'profile':
+        return 'Set the side-view coordinate frame on the XY datum.';
       case 'datum': {
         if (args.length === 1) return 'Usage: ' + spec.usage;
         if (args.length === 2) {
@@ -940,10 +952,10 @@
 
   function findEntity(table, name) {
     var list = table.list();
-    for (var i = 0; i < list.length; i++) {
-      if (list[i].name === name || list[i].caption === name) return list[i];
-    }
-    return null;
+    var exact = list.find(function (e) { return e.id === name; });
+    if (exact) return exact;
+    var matches = list.filter(function (e) { return e.name === name || e.caption === name; });
+    return matches.length === 1 ? matches[0] : null;
   }
 
   // displayName: the name users see and type. Sheet labels live in
@@ -962,7 +974,7 @@
   }
 
   // pointMap(entities): display-name -> {x,y} over POINTs for completion
-  // and previews. First label wins; caption-less dots keep their name.
+  // and previews. Ambiguous labels offer stable IDs instead of guessing.
   function pointMap(entities) {
     if (!Array.isArray(entities)) {
       throw new Error('educad-command: entities must be an array');
@@ -972,6 +984,7 @@
       var e = entities[i];
       if (!e || e.type !== 'POINT') continue;
       var label = displayName(e);
+      if (entities.filter(function (p) { return p && p.type === 'POINT' && displayName(p) === label; }).length > 1) label = e.id;
       if (label === '' || Object.prototype.hasOwnProperty.call(map, label)) continue;
       Object.defineProperty(map, label, { value: { x: e.x, y: e.y }, enumerable: true, writable: true, configurable: true });
     }
@@ -979,7 +992,7 @@
   }
 
   // entityMap(entities): display-name -> id over every entity for the
-  // /style seat and rename/delete previews. First label wins; uncaptioned
+  // /style seat and rename/delete previews. Ambiguous labels use IDs; uncaptioned
   // geometry keeps its engine id (the only handle it has).
   function entityMap(entities) {
     if (!Array.isArray(entities)) {
@@ -990,6 +1003,7 @@
       var e = entities[i];
       if (!e || typeof e.id !== 'string') continue;
       var label = displayName(e);
+      if (entities.filter(function (p) { return p && typeof p.id === 'string' && displayName(p) === label; }).length > 1) label = e.id;
       if (label === '' || Object.prototype.hasOwnProperty.call(map, label)) continue;
       Object.defineProperty(map, label, { value: e.id, enumerable: true, writable: true, configurable: true });
     }
@@ -1354,18 +1368,22 @@
           ids: hids };
       }
       case 'rename': {
-        var br = arity(2, 2);
+        var br = arity(2, 4);
         if (br) return br;
+        var scope = args[2] || 'local';
+        if (['local', 'linked', 'members'].indexOf(scope) === -1) return fail('Choose local, linked, or members.');
         if (!args[1].trim()) return fail('New name must not be empty.');
         var ro = findEntity(table, args[0]);
         if (ro === null) return fail('Unknown point "' + args[0] + '".');
-        if (findEntity(table, args[1]) !== null) {
+        if (scope === 'local' && table.list().some(function (e) { return e.id !== ro.id && (e.name === args[1] || e.caption === args[1]); })) {
           return fail('There is already a point "' + args[1] + '".');
         }
         try {
           if (ro.type === 'POINT' && getDrafting()) {
-            getDrafting().renamePoint(table, ro.id, args[1]);
+            if (scope === 'members') getDrafting().assignMembers(table, ro.id, args[1]);
+            else getDrafting().renamePoint(table, ro.id, args[1], {renameScope: scope, memberId: args[3]});
           } else if (typeof table.update === 'function') {
+            if (scope !== 'local') return fail('Member operations require a point station.');
             table.update(ro.id, { name: args[1], caption: args[1] });
           } else {
             ro.name = args[1];
@@ -1426,6 +1444,18 @@
             ('Restyled "' + args[0] + '" as type ' + patch.bisCode + ', ' + patch.viewRole + ' view.') :
             ('Restyled "' + args[0] + '" as type ' + patch.bisCode + '.'),
           ids: [se.id] };
+      }
+      case 'profile': {
+        var pfArity = arity(2, 3);
+        if (pfArity) return pfArity;
+        var pfX = parseNum(args[0]), pfD = parseNum(args[1]), pfS = args.length === 3 ? parseNum(args[2]) : 1;
+        if (pfX === null || pfD === null || (pfS !== 1 && pfS !== -1)) return fail('Profile needs numeric xRef/dRef and direction +1 or -1.');
+        var pfDatum = table.list().find(function(e) {return e.type === 'DATUM_AXIS';});
+        if (!pfDatum) return fail('Draw /datum before setting its /profile frame.');
+        var pfMeta = Object.assign({},pfDatum.meta || {});
+        pfMeta.draftingLayout = Object.assign({},pfMeta.draftingLayout || {},{xRef:pfX,dRef:pfD,s:pfS,three:true,side:pfS===1?'left':'right'});
+        table.update(pfDatum.id,{meta:pfMeta});
+        return {ok:true,message:'Set the side-view coordinate frame.',ids:[pfDatum.id]};
       }
       case 'datum': {
         var bdd = arity(0, 2);

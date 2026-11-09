@@ -5,7 +5,6 @@
 
 - [ ] No user-visible behavior change, or manual updated (`docs/MANUAL.md` + `npm run build:manual`)
 
-# Tests
+# Verification
 
-- [ ] `npm test` green locally
-- [ ] New/changed behavior covered by a suite in `tools/`
+- [ ] Affected figure checked with an `.edc` sheet (`node tools/edc.js <file.edc>`)

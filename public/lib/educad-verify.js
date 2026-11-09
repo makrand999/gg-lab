@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./educad-entities.js'));
   } else {
-    root.EduCADVerify = factory();
+    root.EduCADVerify = factory(root.EduCADEntities);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+})(typeof window !== 'undefined' ? window : globalThis, function (Entities) {
   'use strict';
   // EduCAD verify-only lesson checker: the student does competing-points
   // analysis (hidden verdicts in parens, projector member claims) and this
@@ -12,7 +12,7 @@
   // geometry and never feeds reconstruction: verdicts and claims are
   // student input, checked here and nowhere else. Without truth (hand
   // drawings) claim/verdict checks report unverifiable explicitly.
-  // Zero deps. Dual-env: browser via window.EduCADVerify, plain Node via
+  // Uses the shared entity identity model. Dual-env: browser via window.EduCADVerify, plain Node via
   // module.exports. Node-safe.
   var WORLD_UNITS = 'mm';
   var VERSION = '1.0.0-educad';
@@ -270,6 +270,7 @@
   // ({id -> {plan:{x,y}, elev:{x,y}}}) or a bundle carrying .corners, or
   // null. opts.eps (default 0.5 mm).
   function verify(entities, truth, opts) {
+    if (Entities && Array.isArray(entities) && entities.some(function (e) { return e.meta && Array.isArray(e.meta.members); })) entities = Entities.semanticEntities(entities, false);
     if (!Array.isArray(entities)) throw new Error('entities must be an array');
     var o = opts || {};
     var eps = (o.eps === undefined || o.eps === null) ? MATCH_EPS_MM : o.eps;

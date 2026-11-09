@@ -90,6 +90,7 @@
     // Resolve old name references with the complete snapshot, including
     // forward references, without changing the caller's saved payload.
     built.forEach(function (e) { e.meta = E.normalizeMeta(built, e); });
+    E.validateIdentityGraph(built);
     table.clear();
     built.forEach(function (e) { table.add(e); });
     return built.length;

@@ -1,0 +1,8 @@
+# Reflected side-view frame and an arc; both angle endpoints must transform.
+# expect: 7V 6E 0F curves=1 unresolved=0 status=inferred
+/datum -30 180
+/profile 100 0 -1
+/arc 70 40 20 0 90 A profile
+/point a 10 40 elevation
+/point b 10 60 elevation
+/line a b A elevation

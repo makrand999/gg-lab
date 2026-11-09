@@ -1,0 +1,11 @@
+# Circular boundary and two straight generators meeting at a point; no shape declaration.
+# expect: 25V 48E 25F curves=1 unresolved=0 status=inferred
+/datum -30 70
+/point o 20 -30 plan
+/point a' 0 0 elevation
+/point b' 40 0 elevation
+/point c' 20 50 elevation
+/circle o 20 A plan
+/line a' b' A elevation
+/line b' c' A elevation
+/line c' a' A elevation

@@ -10,6 +10,7 @@ var path = require('path');
 var C = require('../public/lib/educad-command.js');
 var E = require('../public/lib/educad-entities.js');
 var R = require('../public/lib/educad-reconstruct.js');
+var P = require('../public/lib/educad-project.js');
 
 function baseName(caption) {
   return String(caption).replace(/['’′]+$/, '').toLowerCase();
@@ -50,7 +51,8 @@ function summarize(table) {
   return { count: table.count(), byType: byType, roles: roles, hasDatum: hasDatum };
 }
 
-function runScript(text) {
+function runScript(text, options) {
+  options = options || {};
   E.resetIdCounter();
   var table = E.createTable();
   var env = { table: table };
@@ -72,15 +74,76 @@ function runScript(text) {
   // The 3D model is a pure function of the sheet: the same live
   // reconstruction the glass widget runs, headless. Representation
   // only — a script never edits the solid, it determines it.
-  var solid = R.reconstructLive(table.visibleEntities());
+  var solid = R.reconstruct(table.list(), {identity: options.strict ? 'explicit' : 'auto'});
+  var properties = topologyProperties(solid);
+  lines.forEach(function (line, i) {
+    var match = /^\s*#\s*expect:\s*(.*)$/i.exec(line);
+    if (!match) return;
+    var tokens = match[1].trim().split(/\s+/);
+    tokens.forEach(function (token) {
+      var count = /^(\d+)([VEF])$/.exec(token), property = /^([a-zA-Z]+)=(\S+)$/.exec(token);
+      var key = count ? count[2] : property ? property[1] : null;
+      var expected = count ? Number(count[1]) : property ? (/^\d+$/.test(property[2]) ? Number(property[2]) : property[2]) : null;
+      if (!key || !Object.prototype.hasOwnProperty.call(properties, key)) {
+        errors.push({ n: i + 1, line: line, message: 'Unknown topology expectation: ' + token });
+      } else if (properties[key] !== expected) {
+        errors.push({ n: i + 1, line: line, message: key + ': expected ' + expected + ', got ' + properties[key] });
+      }
+    });
+  });
   return {
     ok: errors.length === 0,
     steps: steps,
     errors: errors,
     projectors: proj,
     summary: summary,
-    solid: solid
+    solid: solid,
+    properties: properties
   };
+}
+
+// F counts logical regions, not the duplicated front/back display loops.
+function topologyProperties(solid) {
+  var g = solid && solid.geometry;
+  if (!g) return { V: 0, E: 0, F: 0, holes: 0, components: 0, closed: 0, open: 0, boundary: 0, curves: 0, minRadius: 0, maxRadius: 0, unresolved: (solid && solid.issues || []).length, status: (solid && solid.reason) || 'unavailable' };
+  var faces = g.faceRegions || (g.faces || []).map(function (f) { return { outer: f, holes: [] }; });
+  var unique = new Map();
+  faces.forEach(function (f) {
+    var key = f.outer.slice().sort(function(a,b) { return a-b; }).join(',') + '/' + f.holes.map(function(h) { return h.slice().sort(function(a,b) { return a-b; }).join(','); }).sort().join('/');
+    unique.set(key, f);
+  });
+  var uses = {}, adjacency = g.vertices.map(function () { return []; });
+  g.edges.forEach(function (e) { adjacency[e[0]].push(e[1]); adjacency[e[1]].push(e[0]); });
+  unique.forEach(function (f) { [f.outer].concat(f.holes).forEach(function(loop) {
+    loop.forEach(function(a,i) { var b=loop[(i+1)%loop.length], k=a<b?a+'_'+b:b+'_'+a; uses[k]=(uses[k]||0)+1; });
+  }); });
+  unique.forEach(function(f) { f.holes.forEach(function(h) { adjacency[f.outer[0]].push(h[0]); adjacency[h[0]].push(f.outer[0]); }); });
+  var seen = new Set(), components = 0;
+  adjacency.forEach(function (_, start) {
+    if (seen.has(start)) return;
+    components++; var stack=[start]; seen.add(start);
+    while(stack.length) adjacency[stack.pop()].forEach(function(v) { if(!seen.has(v)) { seen.add(v); stack.push(v); } });
+  });
+  var surfaces = g.surfaceComponents || g.components;
+  var top = P.projectGeometry(g, 'top'), front = P.projectGeometry(g, 'front');
+  return { V: g.vertices.length, E: g.edges.length, F: unique.size,
+    holes: Array.from(unique.values()).reduce(function(n,f) { return n+f.holes.length; },0),
+    components: components,
+    closed: surfaces ? surfaces.filter(function(c) { return c.closed; }).length : (g.solids || []).length,
+    open: surfaces ? surfaces.filter(function(c) { return !c.closed; }).length : (g.openSurfaces || []).length,
+    boundary: Object.keys(uses).filter(function(k) { return uses[k]===1; }).length,
+    profileInferred: g.profileInferred ? 1 : 0,
+    topHidden: top.filter(function(e) { return e.hidden; }).length,
+    frontHidden: front.filter(function(e) { return e.hidden; }).length,
+    splitHidden: top.filter(function(e) { return e.intervals && e.intervals.length > 1; }).length,
+    curves: (g.curves || []).length,
+    oblique: (g.curves || []).filter(function(c) { return c.oblique; }).length,
+    spheres: (g.spheres || []).length,
+    surfaceValidation: g.surfaceValidation ? g.surfaceValidation.status : 'none',
+    minRadius: (g.curves || []).length ? Math.min.apply(null,g.curves.map(function(c) {return c.radius;})) : 0,
+    maxRadius: (g.curves || []).length ? Math.max.apply(null,g.curves.map(function(c) {return c.radius;})) : 0,
+    unresolved: (solid.pipeline && solid.pipeline.diagnostics || []).length,
+    status: g.topologyStatus || 'ok' };
 }
 
 function solidLine(solid) {
@@ -88,8 +151,8 @@ function solidLine(solid) {
     return 'solid: unavailable (' + ((solid && solid.reason) || 'unknown') + ')';
   }
   var g = solid.geometry;
-  var f = Array.isArray(g.faces) ? g.faces.length : 0;
-  return 'solid: ok — ' + g.vertices.length + 'V ' + g.edges.length + 'E ' + f + 'F';
+  var f = topologyProperties(solid).F;
+  return 'solid: ok — ' + g.vertices.length + 'V ' + g.edges.length + 'E ' + f + 'F' + (g.topologyStatus && g.topologyStatus !== 'inferred' ? ' [' + g.topologyStatus + ']' : '');
 }
 
 function report(file, res) {
@@ -108,15 +171,16 @@ function report(file, res) {
   });
   out.push('  entities: ' + (types.join(', ') || 'none'));
   out.push('  ' + solidLine(res.solid));
+  ((res.solid.pipeline || {}).diagnostics || []).forEach(function(d) { out.push('  ' + d.code + (d.entityId ? ' [' + d.entityId + ']' : '') + ': ' + (d.message || d.label)); });
   return out.join('\n');
 }
 
 function main(argv) {
-  var args = argv.slice(2).filter(function (a) { return a !== '--solid'; });
+  var args = argv.slice(2).filter(function (a) { return a !== '--solid' && a !== '--strict'; });
   var wantSolid = argv.indexOf('--solid') !== -1;
   var file = args[0];
   if (!file) {
-    console.error('Usage: node tools/edc.js [--solid] <file.edc>');
+    console.error('Usage: node tools/edc.js [--solid] [--strict] <file.edc|file.edu>');
     return 2;
   }
   var text;
@@ -126,7 +190,7 @@ function main(argv) {
     console.error('edc: cannot read ' + file);
     return 2;
   }
-  var res = runScript(text);
+  var res = runScript(text, { strict: argv.indexOf('--strict') !== -1 });
   console.log(report(file, res));
   if (wantSolid) console.log(JSON.stringify(res.solid));
   return res.ok ? 0 : 1;

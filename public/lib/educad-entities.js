@@ -107,7 +107,7 @@
       assertFinite(thickness);
       if (thickness <= 0) throw new Error('thickness must be > 0');
     }
-    return {
+    var entity = {
       id: id,
       name: (opts.name === undefined) ? id : String(opts.name),
       type: type,
@@ -125,6 +125,8 @@
       showLabel: (opts.showLabel === undefined) ? false : !!opts.showLabel,
       meta: (opts.meta === undefined) ? {} : opts.meta
     };
+    validateMembers(entity);
+    return entity;
   }
 
   function bisStyleFor(code) {
@@ -263,6 +265,105 @@
     var matches = entities.filter(function (e) { return (!type || e.type === type) && (e.name === ref || e.caption === ref); });
     return matches.length === 1 ? matches[0] : null;
   }
+  // Labels are presentation. Members identify spatial points independently of
+  // names, positions and projection roles. Missing members means legacy data;
+  // an explicit empty array means an intentionally unassigned station.
+  function parseMembers(caption) {
+    return String(caption || '').split(',').map(function (part) {
+      var token = part.trim(), hidden = /^\(.*\)$/.test(token);
+      if (hidden) token = token.slice(1, -1).trim();
+      return { name: token.replace(/['′’]+$/, ''), hidden: hidden };
+    }).filter(function (m) { return m.name !== ''; });
+  }
+  function memberCaption(entity, ids) {
+    var role = entity.viewRole === 'BOTH' ? (entity.y < 0 ? 'PLAN' : 'ELEVATION') : entity.viewRole;
+    var suffix = role === 'ELEVATION' ? "'" : role === 'PROFILE' ? "''" : '';
+    return entity.meta.members.map(function (m) {
+      var token = (ids ? 'member_' + encodeURIComponent(m.id).replace(/'/g, '%27') : m.name) + suffix;
+      return m.hidden ? '(' + token + ')' : token;
+    }).join(',');
+  }
+  function validateMembers(entity) {
+    var members = entity.meta && entity.meta.members;
+    if (members === undefined) return;
+    if (entity.type !== 'POINT' || !Array.isArray(members)) throw new Error('Members belong to point stations and must be an array.');
+    var seen = Object.create(null);
+    members.forEach(function (m) {
+      if (!m || typeof m.id !== 'string' || !m.id || typeof m.name !== 'string' || !m.name.trim() || /[,()'′’]/.test(m.name) || typeof m.hidden !== 'boolean') throw new Error('Each member needs an ID, a base name and a hidden verdict.');
+      if (seen[m.id]) throw new Error('A station cannot contain the same member twice.');
+      seen[m.id] = true;
+    });
+  }
+  function identitySnapshot(entities, namespace) {
+    var list = JSON.parse(JSON.stringify(entities));
+    var occurrences = Object.create(null);
+    list.forEach(function (e) {
+      if (e.type !== 'POINT' || Array.isArray(e.meta && e.meta.members)) return;
+      var view = e.viewRole === 'BOTH' ? (e.y < 0 ? 'PLAN' : 'ELEVATION') : e.viewRole;
+      parseMembers(e.caption).forEach(function (m) {
+        var counts = occurrences[m.name] || (occurrences[m.name] = Object.create(null));
+        counts[view] = (counts[view] || 0) + 1;
+      });
+    });
+    // Explicit compatibility import for records predating member identities.
+    // Names are read once here; subsequent changes use stored IDs only.
+    list.forEach(function (e) {
+      if (e.type === 'POINT' && !Array.isArray(e.meta && e.meta.members)) {
+        e.meta = e.meta || {};
+        e.meta.members = parseMembers(e.caption).map(function (m, i) {
+          var counts = occurrences[m.name];
+          var ambiguous = Object.keys(counts).some(function (view) { return counts[view] > 1; });
+          return Object.assign({ id: (namespace || '') + (ambiguous ? 'legacy-point:' + e.id + ':' + i : 'legacy:' + m.name) }, m);
+        });
+        e.meta.labelOverride = true;
+        e.meta.membersDeclared = true;
+      }
+    });
+    list.forEach(function (e) {
+      e.meta = normalizeMeta(list, e);
+      validateMembers(e);
+    });
+    return list;
+  }
+  function validateIdentityGraph(entities) {
+    var names = Object.create(null);
+    entities.forEach(function (e) {
+      validateMembers(e);
+      var endpoints = e.meta && e.meta.endpointMemberIds;
+      if (endpoints !== undefined && (!Array.isArray(endpoints) || endpoints.length !== 2 ||
+          endpoints.some(function (id) { return id !== null && (typeof id !== 'string' || !id); }))) {
+        throw new Error('Line endpoint member IDs must contain two IDs or null entries.');
+      }
+      if (e.type !== 'POINT' || !Array.isArray(e.meta && e.meta.members)) return;
+      e.meta.members.forEach(function (m) {
+        if (names[m.id] !== undefined && names[m.id] !== m.name) throw new Error('A member ID must have one shared base name.');
+        names[m.id] = m.name;
+      });
+    });
+  }
+  // Adapt explicit identities to the existing mathematical readers. The
+  // adapter is pure: neither display labels nor stored entities are changed.
+  function semanticEntities(entities, ids) {
+    var list = identitySnapshot(entities), byId = Object.create(null);
+    list.forEach(function (e) { byId[e.id] = e; });
+    return list.map(function (e) {
+      if (e.type === 'POINT') e.caption = memberCaption(e, ids);
+      function memberToken(stationIndex, memberId) {
+        var station = byId[(e.meta.refs || [])[stationIndex]];
+        var member = station && station.meta.members && station.meta.members.find(function (m) { return m.id === memberId; });
+        if (!member) return 'missing-member_' + encodeURIComponent(memberId);
+        return ids ? 'member_' + encodeURIComponent(memberId).replace(/'/g, '%27') : member.name;
+      }
+      if (e.meta.fromMemberId) e.meta.fromMember = memberToken(0, e.meta.fromMemberId);
+      if (e.meta.toMemberId) e.meta.toMember = memberToken(1, e.meta.toMemberId);
+      if (Array.isArray(e.meta.endpointMemberIds)) {
+        e.meta.endpointMembers = e.meta.endpointMemberIds.map(function (id, i) {
+          return id ? memberToken(i, id) : null;
+        });
+      }
+      return e;
+    });
+  }
   function normalizeMeta(entities, entity) {
     var m = JSON.parse(JSON.stringify(entity.meta || {}));
     function id(ref) { var e = resolveReference(entities, ref); return e ? e.id : ref; }
@@ -278,6 +379,12 @@
         var pts = m.refs.map(function (r) { return resolveReference(entities, r, 'POINT'); }).filter(function (p) { return p && pointsCoincideMm(p.x, p.y, xy[0], xy[1]); });
         return pts.length === 1 ? pts[0].id : null;
       });
+    }
+    if (m.fromMember && !m.fromMemberId && m.refs) {
+      var source = entities.find(function (e) { return e.id === m.refs[0]; });
+      var wanted = parseMembers(m.fromMember)[0];
+      var matches = source && source.meta && source.meta.members && source.meta.members.filter(function (member) { return wanted && member.name === wanted.name; });
+      if (matches && matches.length === 1) m.fromMemberId = matches[0].id;
     }
     return m;
   }
@@ -331,6 +438,8 @@
     if (this._map[entity.id] !== undefined) throw new Error('duplicate entity id: ' + entity.id);
     if (!isValidType(entity.type)) throw new Error('unknown entity type: ' + String(entity.type));
     assertTwoPoints(entity.type, entity.x, entity.y, entity.x2, entity.y2);
+    validateMembers(entity);
+    validateIdentityGraph(this.list().concat([entity]));
     entity.meta = normalizeMeta(this.list().concat([entity]), entity);
     this._map[entity.id] = entity;
     this._order.push(entity.id);
@@ -340,7 +449,29 @@
 
   CadEntityTable.prototype.create = function (type, opts) {
     var e = createEntity(type, opts);
+    while ((!opts || opts.id === undefined || opts.id === null) && this.has(e.id)) e = createEntity(type, opts);
+    if (type === 'POINT' && e.meta.members === undefined) {
+      e.meta = Object.assign({}, e.meta, { members: parseMembers(e.caption || e.name).map(function (m, i) {
+        return Object.assign({ id: 'point:' + e.id + ':' + i }, m);
+      }), labelOverride: true });
+    }
     return this.add(e);
+  };
+  // Import a complete legacy drawing at an explicit compatibility boundary.
+  // Prepare every row before publishing any of it to subscribers.
+  CadEntityTable.prototype.importEntities = function (entities) {
+    this._assertWritable();
+    var self = this, seen = Object.create(null);
+    var prepared = entities.map(function (raw) { return createEntity(raw.type, JSON.parse(JSON.stringify(raw))); });
+    var built = identitySnapshot(prepared, prepared.length ? 'import:' + prepared[0].id + ':' : '');
+    built.forEach(function (e) {
+      if (self.has(e.id) || seen[e.id]) throw new Error('duplicate entity id: ' + e.id);
+      seen[e.id] = true;
+    });
+    validateIdentityGraph(self.list().concat(built));
+    built.forEach(function (e) { self._map[e.id] = e; self._order.push(e.id); });
+    built.forEach(function (e) { self._emit('add', e); });
+    return built;
   };
 
   CadEntityTable.prototype.get = function (id) {
@@ -404,6 +535,8 @@
       var ny2 = (patch.y2 !== undefined) ? patch.y2 : e.y2;
       assertTwoPoints(e.type, nx, ny, nx2, ny2);
     }
+    validateMembers(Object.assign({}, e, patch));
+    if (!this._batchValidation) validateIdentityGraph(this.list().map(function (row) { return row.id === id ? Object.assign({}, row, patch) : row; }));
     for (var key in patch) {
       if (Object.prototype.hasOwnProperty.call(patch, key) && Object.prototype.hasOwnProperty.call(e, key)) {
         e[key] = patch[key];
@@ -466,11 +599,13 @@
   CadEntityTable.prototype.updateMany = function (patches) {
     this._assertWritable();
     var self = this, temp = createTable(), ids = Object.keys(patches);
+    self.list().forEach(function (e) { temp.add(createEntity(e.type, JSON.parse(JSON.stringify(e)))); });
+    temp._batchValidation = true;
     ids.forEach(function (id) {
       var e = self.get(id); if (!e) throw new Error('unknown entity id: ' + id);
-      temp.add(createEntity(e.type, JSON.parse(JSON.stringify(e))));
       temp.update(id, patches[id]);
     });
+    validateIdentityGraph(temp.list());
     ids.forEach(function (id) { Object.assign(self.get(id), temp.get(id)); });
     ids.forEach(function (id) { self._emit('update', self.get(id)); });
     return ids;
@@ -574,6 +709,7 @@
     ARROW_RATIO: ARROW_RATIO, ARROW_FLIP_PX: ARROW_FLIP_PX,
     ARROW_FLIP_THRESHOLD_PX: ARROW_FLIP_PX,
     assertFinite: assertFinite,
+    parseMembers: parseMembers, memberCaption: memberCaption, validateMembers: validateMembers, validateIdentityGraph: validateIdentityGraph, identitySnapshot: identitySnapshot, semanticEntities: semanticEntities,
     resolveReference: resolveReference, normalizeMeta: normalizeMeta, endpointReferences: endpointReferences,
     resetIdCounter: resetIdCounter, nextId: nextId,
     clampRadius: clampRadius,

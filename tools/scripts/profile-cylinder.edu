@@ -1,0 +1,18 @@
+# Two profile circles and plan silhouettes define a cylinder along X.
+# expect: 48V 72E 26F curves=2 surfaceValidation=ok unresolved=0 status=inferred
+/datum -30 180
+/profile 100 0 1
+/circle 130 40 20 A profile
+/circle 130 40 20 A profile
+/point a1 10 -10 plan
+/point a2 10 -50 plan
+/line a1 a2 A plan
+/point b1 50 -10 plan
+/point b2 50 -50 plan
+/line b1 b2 A plan
+/point c1 10 -10 plan
+/point c2 50 -10 plan
+/line c1 c2 A plan
+/point d1 10 -50 plan
+/point d2 50 -50 plan
+/line d1 d2 A plan

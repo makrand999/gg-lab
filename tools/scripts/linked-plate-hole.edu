@@ -1,0 +1,47 @@
+# plate-hole
+# expect: 8V 8E 1F holes=1 open=1 boundary=8
+/datum -100 400
+/point v0 0 -10 plan
+/point "v0'" 0 20 elevation
+/point v1 80 -10 plan
+/point "v1'" 80 20 elevation
+/point v2 80 -90 plan
+/point "v2'" 80 20 elevation
+/point v3 0 -90 plan
+/point "v3'" 0 20 elevation
+/point v4 20 -30 plan
+/point "v4'" 20 20 elevation
+/point v5 60 -30 plan
+/point "v5'" 60 20 elevation
+/point v6 60 -70 plan
+/point "v6'" 60 20 elevation
+/point v7 20 -70 plan
+/point "v7'" 20 20 elevation
+/rename v0 v0 members
+/rename "v0'" v0 members
+/rename v1 v1 members
+/rename "v1'" v1 members
+/rename v2 v2 members
+/rename "v2'" v2 members
+/rename v3 v3 members
+/rename "v3'" v3 members
+/rename v4 v4 members
+/rename "v4'" v4 members
+/rename v5 v5 members
+/rename "v5'" v5 members
+/rename v6 v6 members
+/rename "v6'" v6 members
+/rename v7 v7 members
+/rename "v7'" v7 members
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v4 v5 A plan
+/line "v4'" "v5'" A elevation
+/line v5 v6 A plan
+/line v6 v7 A plan
+/line "v6'" "v7'" A elevation
+/line v7 v4 A plan

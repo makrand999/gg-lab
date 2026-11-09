@@ -359,15 +359,13 @@
     return 'input';
   }
 
-  // Exit edit mode. Returns {id, name} to write, {id, delete: true} when
-  // the buffer was emptied (blank + Enter removes the point), or null
-  // when unchanged. Trims accidental padding before comparing.
+  // A label edit never deletes geometry. Empty text clears only the display
+  // label; deletion is a separate operation. Null means unchanged.
   function commitRename(sel) {
     if (!sel || !sel.editing) return null;
     var ed = sel.editing;
     sel.editing = null;
     var name = ed.buffer.trim();
-    if (name === '') return { id: ed.id, delete: true };
     if (name === ed.original) return null;
     return { id: ed.id, name: name };
   }
@@ -590,7 +588,8 @@
   // Any empty click or Escape aborts back to idle with no creation.
   function createLineToolState() {
     return { phase: 'idle', p1Id: null, p1Mm: null,
-      p2Id: null, p2Mm: null, bisCode: null, p1Member: null };
+      p2Id: null, p2Mm: null, bisCode: null, p1Member: null,
+      p1MemberId: null, p2Member: null, p2MemberId: null };
   }
 
   function isLineToolActive(ls) {
@@ -608,6 +607,9 @@
     ls.p2Id = null;
     ls.p2Mm = null;
     ls.bisCode = null;
+    ls.p1MemberId = null;
+    ls.p2Member = null;
+    ls.p2MemberId = null;
     ls.p1Member = (member === undefined || member === null) ? null : String(member);
     return ls;
   }
@@ -686,6 +688,9 @@
       ls.p2Mm = null;
       ls.bisCode = null;
       ls.p1Member = null;
+      ls.p1MemberId = null;
+      ls.p2Member = null;
+      ls.p2MemberId = null;
     }
     return ls;
   }

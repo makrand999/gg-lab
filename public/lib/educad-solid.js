@@ -185,17 +185,27 @@
       }
       faces.push(loop);
     }
+    var faceHoles = faces.map(function (_, i) {
+      return ((spec.faceHoles || [])[i] || []).map(function (hole) {
+        if (!Array.isArray(hole) || hole.length < 3) throw new Error('hole needs >= 3 indices');
+        hole.forEach(function (v) { assertIndex(v, verts.length, 'hole index'); });
+        return hole.slice();
+      });
+    });
     var normals = [];
     for (var f = 0; f < faces.length; f++) {
       normals.push(newellNormal(verts, faces[f]));
     }
     var adj = {};
     for (var g = 0; g < faces.length; g++) {
-      var lp = faces[g];
+      var loops = [faces[g]].concat(faceHoles[g]);
+      for (var li = 0; li < loops.length; li++) {
+      var lp = loops[li];
       for (var h = 0; h < lp.length; h++) {
         var key = edgeKey(lp[h], lp[(h + 1) % lp.length]);
         if (!adj[key]) adj[key] = [];
         adj[key].push(g);
+      }
       }
     }
     var edgeFaces = [];
@@ -205,7 +215,7 @@
     }
     return {
       name: String(spec.name === undefined ? 'custom' : spec.name),
-      vertices: verts, edges: edges, faces: faces,
+      vertices: verts, edges: edges, faces: faces, faceHoles: faceHoles,
       faceNormals: normals, edgeFaces: edgeFaces
     };
   }
@@ -258,7 +268,8 @@
         name: geometry.name || 'custom',
         vertices: out,
         edges: geometry.edges || [],
-        faces: geometry.faces || []
+        faces: geometry.faces || [],
+        faceHoles: geometry.faceHoles || []
       }),
       transform: { cx: cx, cy: cy, cz: cz, scale: scale }
     };
@@ -1051,7 +1062,17 @@
           if (j) ctx.lineTo(pts[loop[j]].x, pts[loop[j]].y);
           else ctx.moveTo(pts[loop[j]].x, pts[loop[j]].y);
         }
-        ctx.fill();
+        ctx.closePath();
+        var holes = (solid.faceHoles || [])[i] || [];
+        holes.forEach(function (hole) {
+          if (!hole.every(function (v) { return !!pts[v]; })) return;
+          hole.forEach(function (v, j) {
+            if (j) ctx.lineTo(pts[v].x, pts[v].y);
+            else ctx.moveTo(pts[v].x, pts[v].y);
+          });
+          ctx.closePath();
+        });
+        ctx.fill('evenodd');
       }
     }
     ctx.beginPath();

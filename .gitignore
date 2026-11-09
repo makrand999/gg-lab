@@ -2,6 +2,10 @@ dustbin/
 node_modules/
 backend/build/
 backend/data/
+output/
+tmp/
+__pycache__/
+tools/__pycache__/
 # Local agent / planning notes (not part of the shipped repo)
 AGENTS.md
 HANDOFF.md

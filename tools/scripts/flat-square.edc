@@ -1,0 +1,16 @@
+# FLAT-SQUARE: plan shows the true square; elevation collapses all four
+# edges onto one line (the two depth edges collapse to the end points).
+# Expected: 4 vertices, 4 edges. One elevation line covers a-b and c-d;
+# the shared end stations cover the view-perpendicular edges b-c and d-a.
+/datum -30 70
+/point "a',d'" 0 40 elevation
+/point "b',c'" 40 40 elevation
+/point a 0 -10 plan
+/point b 40 -10 plan
+/point c 40 -50 plan
+/point d 0 -50 plan
+/line "a',d'" "b',c'" A elevation
+/line a b A plan
+/line b c A plan
+/line c d A plan
+/line d a A plan

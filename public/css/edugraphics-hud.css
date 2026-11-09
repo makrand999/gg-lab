@@ -40,6 +40,16 @@
   padding: 6px 10px;
   cursor: pointer;
 }
+button.edugraphics-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.edugraphics-menu-item:focus-visible { outline: 2px solid #0284c7; outline-offset: -2px; }
 .edugraphics-menu-item:hover { background: #eef; }
 /* EduCAD floating 3D wireframe cube: transparent stage sketched on the sheet. */
 .educad-solid {

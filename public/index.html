@@ -643,6 +643,9 @@
   <script src="lib/educad-solid.js?v=hp-vp-2"></script>
   <script src="lib/educad-settings.js?v=drawing-method-20261007-1"></script>
   <script src="lib/educad-spatial.js?v=inspect-20261007-1"></script>
+  <script src="lib/educad-strict.js"></script>
+  <script src="lib/educad-curve-reconstruct.js"></script>
+  <script src="lib/educad-oblique-kernel.js"></script>
   <script src="lib/educad-reconstruct.js?v=quiet-20261006-2"></script>
   <script src="lib/educad-ref3d.js"></script>
   <script src="lib/educad-verify.js"></script>
@@ -865,20 +868,34 @@
         pendingMember = null;
         setLineCursor(false);
       }
-      // Dot-menu parking: Ctrl+click on a geometric stack parks the
-      // candidate ids here until the student picks one (phase39: the
-      // old member chooser is retired — drawn Type G projectors declare
-      // correspondence, so banking never asks which corner).
+      // A hit may contain separate stations or several members at one station.
+      // Keep the chosen member identity with the bank until line creation.
       var dotMenu = null;
       var pendingMember = null;
       function hideDotMenu() {
         if (dotMenu) dotMenu.classList.remove('open');
       }
-      // Dot chooser: Ctrl+click on a geometric stack (two or more
-      // distinct dots in tolerance) asks which dot to bank. Choosing
-      // a banked dot unbanks it; anything else banks the dot itself.
-      // Correspondence is declared by drawn Type G projectors, never
-      // by the bank, so no member is attached here.
+      function dotChoices(ids) {
+        var choices = [];
+        ids.forEach(function (id) {
+          var ent = handle.table.get(id);
+          if (!ent) return;
+          var members = Array.isArray(ent.meta && ent.meta.members) ?
+            ent.meta.members : EduCADEntities.parseMembers(ent.caption);
+          if (members.length > 0) {
+            members.forEach(function (member) {
+              var label = EduCADEntities.memberCaption({ viewRole: ent.viewRole,
+                y: ent.y, meta: { members: [member] } });
+              choices.push({ cid: id, member: members.length > 1 ? member.name : null, memberId: member.id || null,
+                label: label + ' — ' + (ent.caption || ent.name || id) + ' [' + id + ']' });
+            });
+          } else {
+            choices.push({ cid: id, member: null, memberId: null,
+              label: (ent.caption || ent.name || id) + ' [' + id + ']' });
+          }
+        });
+        return choices;
+      }
       function showDotMenu(px, ids) {
         if (dotMenu && dotMenu.parentNode) {
           dotMenu.parentNode.removeChild(dotMenu);
@@ -886,15 +903,18 @@
         var m = document.createElement('div');
         m.className = 'edugraphics-menu';
         var head = document.createElement('div');
-        head.textContent = 'Bank which dot?';
+        var choices = dotChoices(ids);
+        head.textContent = pendingMember && (pendingMember.action === 'destination' || pendingMember.action === 'retarget') ?
+          'Choose line destination' : choices.some(function (choice) { return choice.member !== null; }) ?
+          'Choose overlapping point' : 'Bank which dot?';
         head.style.cssText = 'padding:4px 8px;font:600 12px system-ui,sans-serif;color:#475569;';
         m.appendChild(head);
-        ids.forEach(function (id, i) {
-          var ent = handle.table.get(id);
-          var row = document.createElement('div');
+        choices.forEach(function (choice, i) {
+          var row = document.createElement('button');
+          row.type = 'button';
           row.className = 'edugraphics-menu-item';
           row.setAttribute('data-dot', String(i));
-          row.textContent = (ent && (ent.caption || ent.name)) || String(id);
+          row.textContent = choice.label;
           m.appendChild(row);
         });
         m.addEventListener('click', function (e) {
@@ -902,19 +922,19 @@
             e.target.closest('[data-dot]') : null;
           if (row === null || pendingMember === null) return;
           var pick = pendingMember;
-          var chosen = handle.table.get(
-            ids[Number(row.getAttribute('data-dot'))]);
+          var choice = choices[Number(row.getAttribute('data-dot'))];
           pendingMember = null;
           hideDotMenu();
-          if (chosen === null) {
-            renderLayer2(pick.cursor, null);
-            return;
+          if (!choice || !handle.table.get(choice.cid)) return;
+          if (pick.action === 'retarget') {
+            userRetarget(choice, pick.cursor);
+          } else if (pick.action === 'destination') {
+            userLockTarget(choice.cid, pick.cursor, choice);
+          } else {
+            bankFromPick({ cid: choice.cid, cursor: pick.cursor,
+              memberId: choice.memberId }, choice.member);
           }
-          if (bankHas(chosen.id)) {
-            bankFromPick({ cid: chosen.id, cursor: pick.cursor }, null);
-            return;
-          }
-          bankFromPick({ cid: chosen.id, cursor: pick.cursor }, null);
+          c2.focus({ preventScroll: true });
         });
         document.getElementById('app-container').appendChild(m);
         dotMenu = m;
@@ -1017,6 +1037,10 @@
         renderLayer2(lastCursor, { snap: handle.snapCurrent });
         return true;
       }
+      function userAssignMembers(id, caption) {
+        EduCADDrafting.assignMembers(handle.table, id, caption);
+        renderLayer1(); renderLayer2(null, null);
+      }
       function userRenamePoint(id, newName) {
         var ent = handle.table.get(id);
         if (ent === null) return null;
@@ -1027,26 +1051,16 @@
       function userCommitRename() {
         var w = EduCADCanvas.commitRename(handle.sel);
         stopCaretTimer();
-        if (w && w.delete) {
-          var goneIds = null;
-          if (typeof handle.table.removeCascade === 'function') {
-            goneIds = handle.table.removeCascade(w.id);
-          } else {
-            handle.table.remove(w.id);
-            goneIds = [w.id];
-          }
-          cleanupAfterPointDelete(goneIds);
-          EduCADCanvas.deselect(handle.sel);
-          EduCADCanvas.clearTypedDist(handle.typedDist);
-        } else if (w && handle.table.get(w.id)) {
-          if (drafting) EduCADDrafting.renamePoint(handle.table, w.id, w.name);
-          else handle.table.update(w.id, { name: w.name, caption: w.name });
+        if (w && handle.table.get(w.id)) {
+          try {
+            EduCADDrafting.renamePoint(handle.table, w.id, w.name);
+          } catch (error) { drawingWarning(error.message); w = null; }
         }
         renderLayer1();
         renderLayer2(null, null);
         return w;
       }
-      function userLockTarget(id, cursor) {
+      function userLockTarget(id, cursor, choice) {
         var bank = handle.circlePicks.picks;
         if (bank.length !== 1) return false;
         var p1 = handle.table.get(bank[0].id);
@@ -1054,16 +1068,29 @@
         if (p1 === null || ent === null) return false;
         EduCADCanvas.anchorLineTool(handle.line, bank[0].id, p1.x, p1.y,
           bank[0].member || null);
+        handle.line.p1MemberId = bank[0].memberId || null;
         if (!EduCADCanvas.lockLineTarget(handle.line, id, ent.x, ent.y)) {
           EduCADCanvas.abortLineTool(handle.line);
           renderLayer2(cursor, null);
           return false;
         }
+        var targetChoices = dotChoices([id]);
+        choice = choice || (targetChoices.length === 1 ? targetChoices[0] : null);
+        handle.line.p2MemberId = choice && choice.memberId || null;
+        handle.line.p2Member = choice && choice.member || null;
         abortPolarTask();
         clearBank();
         showLineMenu(cursor);
         renderLayer2(cursor, null);
         return true;
+      }
+      function userRetarget(choice, cursor) {
+        var ent = handle.table.get(choice.cid);
+        if (!ent || !EduCADCanvas.retargetLineTool(handle.line, ent.id, ent.x, ent.y)) return;
+        handle.line.p2MemberId = choice.memberId || null;
+        handle.line.p2Member = choice.member || null;
+        showLineMenu(cursor);
+        renderLayer2(cursor, null);
       }
       // Circle finalizer: two banked points plus the clicked third draw
       // the circle (a banked corner claim applies to lines only).
@@ -1285,6 +1312,14 @@
         abortPlotTask();
         EduCADCanvas.clearTypedDist(handle.typedDist);
         if (bankHas(pick.cid)) {
+          var existing = handle.circlePicks.picks.find(function (p) { return p.id === pick.cid; });
+          if (member && ((existing.memberId || null) !== (pick.memberId || null) || existing.member !== member)) {
+            existing.member = member;
+            existing.memberId = pick.memberId || null;
+            renderLayer1();
+            renderLayer2(pick.cursor, null);
+            return;
+          }
           EduCADCanvas.toggleCirclePick(handle.circlePicks, pick.cid,
             cent.x, cent.y);
           if (handle.circlePicks.picks.length === 0) setLineCursor(false);
@@ -1296,6 +1331,7 @@
         setLineCursor(true);
         EduCADCanvas.toggleCirclePick(handle.circlePicks, pick.cid,
           cent.x, cent.y, member || null);
+        if (pick.memberId) handle.circlePicks.picks[handle.circlePicks.picks.length - 1].memberId = pick.memberId;
         renderLayer1();
         renderLayer2(pick.cursor, null);
       }
@@ -1384,6 +1420,7 @@
         var rest = EduCADSolid.normalizeGeometry(handle.solidMm).transform;
         var restMm = {
           name: handle.solidMm.name,
+          smoothSideFaces: handle.solidMm.smoothSideFaces ? handle.solidMm.smoothSideFaces.slice() : undefined,
           vertices: handle.solidMm.vertices.map(function (v) {
             return { x: v.x, y: v.y, z: v.z };
           }),
@@ -1392,6 +1429,9 @@
           }),
           faces: (handle.solidMm.faces || []).map(function (f) {
             return f.slice();
+          }),
+          faceHoles: (handle.solidMm.faceHoles || []).map(function (holes) {
+            return holes.map(function (hole) { return hole.slice(); });
           })
         };
         poseState = {
@@ -1544,22 +1584,16 @@
       // the table never sees it, and its endpoints are clamped posed
       // verts, so it needs no clamp of its own.
       function poseProjectedEdges(posed) {
-        var faces = poseState.mm.faces || [];
+        var shape = {name:poseState.mm.name,vertices:posed,edges:poseState.mm.edges,
+          faces:poseState.mm.faces || [],faceHoles:poseState.mm.faceHoles || [],
+          smoothSideFaces:poseState.mm.smoothSideFaces};
         var result = {
-          front: EduCADProject.projectSolid(posed, poseState.mm.edges,
-            faces, 'front'),
-          top: EduCADProject.projectSolid(posed, poseState.mm.edges,
-            faces, 'top')
+          front: EduCADProject.projectGeometry(shape, 'front'),
+          top: EduCADProject.projectGeometry(shape, 'top')
         };
         if (drafting && drafting.layout().three) {
           var layout = drafting.layout();
-          result.side = EduCADProject.projectSolid(posed, poseState.mm.edges, faces, layout.side, layout);
-        }
-        if (poseState.mm.name === 'cylinder' || poseState.mm.name === 'cone') {
-          var shape = { name: poseState.mm.name, vertices: posed, edges: poseState.mm.edges, faces: faces };
-          result.front = EduCADProject.projectGeometry(shape, 'front');
-          result.top = EduCADProject.projectGeometry(shape, 'top');
-          if (drafting && drafting.layout().three) result.side = EduCADProject.projectGeometry(shape, drafting.layout().side, drafting.layout());
+          result.side = EduCADProject.projectGeometry(shape, layout.side, layout);
         }
         return result;
       }
@@ -1570,7 +1604,7 @@
           poseState.center);
         var stage = EduCADPose.stageWithRest(posed, poseState.rest);
         var geom = EduCADSolid.createGeometry({ name: 'posed', vertices: stage,
-          edges: poseState.mm.edges, faces: poseState.mm.faces });
+          edges: poseState.mm.edges, faces: poseState.mm.faces, faceHoles: poseState.mm.faceHoles });
         EduCADSolid.setGeometry(handle.solid, geom, { normalize: false });
         poseState.sims = poseSimsFor(poseState.pose);
         poseState.overlay = (typeof EduCADProject !== 'undefined') ?
@@ -2255,18 +2289,25 @@
           var p1Ref = handle.line.p1Id;
           var p2Ref = handle.line.p2Id;
           var p1Member = handle.line.p1Member;
+          var p1MemberId = handle.line.p1MemberId;
+          var p2MemberId = handle.line.p2MemberId;
+          var p2Member = handle.line.p2Member;
           var spec = EduCADCanvas.finishLineStroke(handle.line);
           lineAnim = null;
           setLineCursor(false);
           if (spec) {
             var segMeta = { kind: 'user-line' };
+            if (p1MemberId && p2MemberId) segMeta.endpointMemberIds = [p1MemberId, p2MemberId];
             if (p1Ref !== null && p1Ref !== undefined &&
                 p2Ref !== null && p2Ref !== undefined) {
               segMeta.refs = [String(p1Ref), String(p2Ref)];
             }
             if (p1Member !== null && p1Member !== undefined) {
               segMeta.fromMember = String(p1Member);
+              if (p1MemberId) segMeta.fromMemberId = p1MemberId;
             }
+            if (p2MemberId) segMeta.toMemberId = p2MemberId;
+            if (p2Member) segMeta.toMember = p2Member;
             handle.table.create('SEGMENT', {
               x: spec.x1, y: spec.y1, x2: spec.x2, y2: spec.y2,
               bisCode: spec.bisCode, caption: '', showLabel: false,
@@ -2721,6 +2762,8 @@
           }
           if (lt.phase === 'menu' && lt.p2Mm) {
             var ap2 = EduCADViewport.forward(handle.view, lt.p2Mm);
+            if (lt.p2Member) EduCADCanvas.drawKnockoutLabel(ctx2, 'to ' + lt.p2Member,
+              ap2.x + 12, ap2.y - 12, { font: '12px sans-serif', fillStyle: '#0284c7' });
             ctx2.save();
             ctx2.strokeStyle = '#64748b';
             ctx2.lineWidth = 1;
@@ -3235,11 +3278,12 @@
               x: wfree.x, y: wfree.y, name: pname, caption: pname, showLabel: true,
               bisCode: 'B', viewRole: wfree.y >= 0 ? 'ELEVATION' : 'PLAN'
             });
-            bankFromPick({ cid: placed.id, cursor: cursor }, null);
+            bankFromPick({ cid: placed.id, cursor: cursor,
+              memberId: dotChoices([placed.id])[0].memberId }, null);
             renderLayer1();
             return;
           }
-          if (cids.length >= 2) {
+          if (dotChoices(cids).length >= 2) {
             pendingMember = { cids: cids, cursor: cursor };
             showDotMenu(cursor, cids);
             renderLayer2(cursor, null);
@@ -3248,7 +3292,8 @@
           var cid = cids[0];
           pendingMember = null;
           hideDotMenu();
-          bankFromPick({ cid: cid, cursor: cursor }, null);
+          var single = dotChoices([cid])[0];
+          bankFromPick({ cid: cid, cursor: cursor, memberId: single.memberId }, null);
           return;
         }
         if (pendingMember !== null) {
@@ -3289,8 +3334,16 @@
         var bank = handle.circlePicks.picks;
         if (bank.length === 1) {
           if (id !== null) {
-            if (id === bank[0].id) return;
-            userLockTarget(id, cursor);
+            var targets = EduCADCanvas.hitTestPointAll(handle.table.list(), cursor, handle.view)
+              .filter(function (candidate) { return candidate !== bank[0].id; });
+            if (!targets.length) return;
+            if (dotChoices(targets).length > 1) {
+              pendingMember = { cids: targets, cursor: cursor, action: 'destination' };
+              showDotMenu(cursor, targets);
+              renderLayer2(cursor, null);
+              return;
+            }
+            userLockTarget(targets[0], cursor);
             return;
           }
           var lid = EduCADCanvas.hitTestLine(liveEntities(), cursor, handle.view);
@@ -3356,11 +3409,14 @@
             }
           }
         } else if (handle.line.phase === 'menu') {
-          var ment = handle.table.get(id);
-          if (EduCADCanvas.retargetLineTool(handle.line, id, ment.x, ment.y)) {
-            showLineMenu(cursor);
-            renderLayer2(cursor, null);
-          }
+          var candidates = EduCADCanvas.hitTestPointAll(handle.table.list(), cursor, handle.view)
+            .filter(function (candidate) { return candidate !== handle.line.p1Id; });
+          var choices = dotChoices(candidates);
+          if (choices.length > 1) {
+            hideLineMenu();
+            pendingMember = { cids: candidates, cursor: cursor, action: 'retarget' };
+            showDotMenu(cursor, candidates);
+          } else if (choices.length === 1) userRetarget(choices[0], cursor);
           return;
         }
         if (id !== null) {
@@ -3657,31 +3713,31 @@
             TL: 80, thetaDeg: 30, phiDeg: 45,
             axMm: -30, yaPlan: -20, yaElev: 25
           });
-          prob.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          handle.table.importEntities(prob.entities);
         } else if (type === 'points') {
           var btn = document.getElementById('btn-demo-points');
           if (btn) btn.classList.add('active');
           var p1 = EduCADCurriculum.quadrantPoint({ quadrant: 1, xMm: -50, distHP: 35, distVP: 25, label: 'a' });
           var p3 = EduCADCurriculum.quadrantPoint({ quadrant: 3, xMm: 50, distHP: 30, distVP: 35, label: 'b' });
-          p1.entities.forEach(function (e) { handle.table.create(e.type, e); });
-          p3.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          handle.table.importEntities(p1.entities);
+          handle.table.importEntities(p3.entities);
         } else if (type === 'prism') {
           var btn = document.getElementById('btn-demo-prism');
           if (btn) btn.classList.add('active');
           var prism = EduCADCurriculum.regularSolid({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
-          prism.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          handle.table.importEntities(prism.entities);
           demoTruth = prism.corners || null;
         } else if (type === '3view') {
           var btn = document.getElementById('btn-demo-3view');
           if (btn) btn.classList.add('active');
           var sheet = EduCADCurriculum.threeViewSheet({ solid: 'PRISM', sizeMm: 35, heightMm: 70, xMm: 0 });
-          sheet.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          handle.table.importEntities(sheet.entities);
           demoTruth = sheet.corners || null;
         } else if (type === 'square') {
           var btn = document.getElementById('btn-demo-square');
           if (btn) btn.classList.add('active');
           var sq = EduCADCurriculum.profileSquare({ sizeMm: 40, xMm: 0 });
-          sq.entities.forEach(function (e) { handle.table.create(e.type, e); });
+          handle.table.importEntities(sq.entities);
           demoTruth = sq.corners || null;
         }
 
@@ -3900,8 +3956,8 @@
         if (a.op === 'rename') {
           ent = tutResolve(a.ref);
           if (ent === null) { done(false, 'A tutorial dot is gone — press Restart.'); return; }
-          userRenamePoint(ent.id, a.name);
-          done(true, '');
+          try { userAssignMembers(ent.id, a.name); done(true, ''); }
+          catch (error) { done(false, error.message); }
           return;
         }
         if (a.op === 'anchor') {
@@ -4114,9 +4170,8 @@
         spatialView.setEnabled(handle.measure.mode === 'view');
       }
 
-      // Live 2D -> 3D bridge: every table change rebuilds the glass from
-      // the current visible drawing, coalesced to one frame. 3D truth is
-      // derived and ephemeral; nothing is stored on entities.
+      // Shared primitive 2D -> 3D pipeline. Visibility is presentation;
+      // unsupported evidence and inferred surfaces remain explicit in diagnostics.
       if (handle.solid && typeof EduCADReconstruct !== 'undefined' &&
           typeof EduCADSolid.setGeometry === 'function') {
         (function () {
@@ -4127,8 +4182,11 @@
             // Pose mode owns the widget: the table cannot change under
             // it, and rebuilds must not wipe the live pose.
             if (EduCADMeasure.isPose(handle.measure)) return;
-            var res = EduCADReconstruct.reconstructLive(
-              handle.table.visibleEntities(), { ignoreProfile: true });
+            var list = handle.table.list();
+            // One pipeline: identities constrain correspondence; geometry
+            // families and surface inference are shared across all sheets.
+            var res = EduCADReconstruct.reconstruct(list);
+            handle.reconstruction = res;
             if (res.status === 'ok') {
               handle.solidMm = res.geometry;
               EduCADSolid.setGeometry(solid3d, res.geometry);
@@ -4158,7 +4216,7 @@
         cancelLegacy: cancelAuthoring, selectLegacy: function (id) { userSelectPoint(id, null); },
         undo: userUndo, redo: userRedo, solidAt: solidAt,
         solidSuppressed: function () { return solidSuppressClick; },
-        legacyActive: function () { return handle.sel.editing !== null ||
+        legacyActive: function () { return pendingMember !== null || handle.sel.editing !== null ||
           handle.circlePicks.picks.length > 0 || EduCADCanvas.isLineToolActive(handle.line) ||
           EduCADCanvas.isPolarToolActive(handle.polar) || EduCADCanvas.isPlotToolActive(handle.plot); },
         getPose: function () { return poseState; }

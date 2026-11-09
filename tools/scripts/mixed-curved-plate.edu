@@ -1,0 +1,27 @@
+# expect: 52V 76E 27F curves=2 unresolved=0 status=inferred minRadius=10 maxRadius=20
+# Unequal circular boundaries joined by straight generators.
+/datum -30 70
+/circle 20 -30 20 A plan
+/circle 20 -30 10 A plan
+/point a' 0 0 elevation
+/point b' 40 0 elevation
+/point c' 30 50 elevation
+/point d' 10 50 elevation
+/line a' b' A elevation
+/line b' c' A elevation
+/line c' d' A elevation
+/line d' a' A elevation
+/point v8 100 -10 plan
+/point "v8'" 100 20 elevation
+/point v9 140 -10 plan
+/point "v9'" 140 20 elevation
+/point v10 140 -50 plan
+/point "v10'" 140 20 elevation
+/point v11 100 -50 plan
+/point "v11'" 100 20 elevation
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan

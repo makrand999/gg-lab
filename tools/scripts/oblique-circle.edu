@@ -1,0 +1,5 @@
+# Two elliptical projections lift an oblique circle; the depth mirror is reported.
+# expect: 24V 24E 1F curves=1 oblique=1 unresolved=1 status=partial
+/datum -100 400
+/ellipse 0 0 20 10 A plan
+/ellipse 0 0 20 17.320508 A elevation

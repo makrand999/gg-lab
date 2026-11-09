@@ -1,0 +1,36 @@
+# expect: 8V 12E 6F unresolved=1 status=partial
+# hidden-box
+/datum -100 400
+/point v0 0 -10 plan
+/point "v0'" 0 20 elevation
+/point v1 40 -10 plan
+/point "v1'" 40 20 elevation
+/point v2 40 -50 plan
+/point "v2'" 40 20 elevation
+/point v3 0 -50 plan
+/point "v3'" 0 20 elevation
+/point v4 0 -10 plan
+/point "v4'" 0 60 elevation
+/point v5 40 -10 plan
+/point "v5'" 40 60 elevation
+/point v6 40 -50 plan
+/point "v6'" 40 60 elevation
+/point v7 0 -50 plan
+/point "v7'" 0 60 elevation
+/line v0 v1 E plan
+/line "v0'" "v1'" E elevation
+/line v1 v2 E plan
+/line v2 v3 E plan
+/line "v2'" "v3'" E elevation
+/line v3 v0 E plan
+/line v4 v5 E plan
+/line "v4'" "v5'" E elevation
+/line v5 v6 E plan
+/line v6 v7 E plan
+/line "v6'" "v7'" E elevation
+/line v7 v4 E plan
+/line "v0'" "v4'" E elevation
+/line "v1'" "v5'" E elevation
+/line "v2'" "v6'" E elevation
+/line "v3'" "v7'" E elevation
+/point lonely 200 100 elevation

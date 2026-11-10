@@ -143,8 +143,9 @@ function runScript(text, options) {
   }) ? 'ok' : 'issues';
   // Declarative surface queries exercise public APIs on the reconstructed
   // drawing. Expected values are recursive subsets with numeric tolerance.
-  // Trim queries also return the analytic certificate of the open result.
-  var surfaceChecks = 0, surfaceFailures = 0, querySurfaces = Object.create(null);
+  // Trim, split and attach results carry the analytic validation/certificate
+  // of the model they produce.
+  var surfaceChecks = 0, surfaceFailures = 0, querySurfaces = Object.create(null), queryCurves = Object.create(null);
   function matches(actual, expected) {
     if (typeof expected === 'number') return Number.isFinite(actual) && Math.abs(actual-expected) <= 1e-6*Math.max(1,Math.abs(expected));
     if (expected && typeof expected === 'object') return actual && Object.keys(expected).every(function(k) { return matches(actual[k],expected[k]); });
@@ -161,6 +162,15 @@ function runScript(text, options) {
         if (typeof ref === 'string') return querySurfaces[ref];
         return undefined;
       }
+      function pickCurve(ref) {
+        if (typeof ref === 'string') return queryCurves[ref];
+        if (typeof ref === 'number') return g && g.curves && g.curves[ref];
+        if (ref && typeof ref === 'object') return ref;
+        return undefined;
+      }
+      function modelOf(surfaces) {
+        return {version:1,contract:'analytic-surface-v1',surfaces:surfaces,diagnostics:[]};
+      }
       var result;
       if (request.operation === 'intersect') {
         var refs = request.surfaces || [
@@ -170,6 +180,55 @@ function runScript(text, options) {
         var first = pick(refs[0]), second = pick(refs[1]);
         if (!first || !second) throw new Error('Missing reconstructed surface');
         result = Surfaces.intersect(first,second);
+      } else if (request.operation === 'split') {
+        var splitSurface = pick(request.from !== undefined ? request.from : request.surface);
+        if (!splitSurface) throw new Error('Missing reconstructed surface');
+        var splitDiagnostics = [];
+        var splitResult = Surfaces.split(splitSurface,request.plane,g,splitDiagnostics);
+        if (splitResult) {
+          if (request.save && typeof request.save === 'object') {
+            if (request.save.positive) querySurfaces[request.save.positive] = splitResult.positive;
+            if (request.save.negative) querySurfaces[request.save.negative] = splitResult.negative;
+          } else if (typeof request.save === 'string') {
+            querySurfaces[request.save] = splitResult.positive;
+          }
+          var splitModel = modelOf(splitResult.surfaces);
+          result = {refused:false, section:splitResult.section, surfaces:splitResult.surfaces,
+            positive:splitResult.positive, negative:splitResult.negative,
+            validation:Surfaces.validate(splitModel,g),
+            certificate:Surfaces.certify(splitModel,g)};
+        } else result = {refused:true, diagnostic:splitDiagnostics[0] || null};
+      } else if (request.operation === 'intersectionCurves') {
+        var curveRefs = request.surfaces || [
+          request.from !== undefined ? request.from : request.surface,
+          request.with !== undefined ? request.with : request.other
+        ];
+        var curveFirst = pick(curveRefs[0]), curveSecond = pick(curveRefs[1]);
+        if (!curveFirst || !curveSecond) throw new Error('Missing reconstructed surface');
+        var promoted = Surfaces.intersectionCurves(Surfaces.intersect(curveFirst,curveSecond));
+        if (request.save && promoted) queryCurves[request.save] = promoted[0];
+        result = promoted ? {curves:promoted, count:promoted.length} : null;
+      } else if (request.operation === 'attach') {
+        var attachRefs = request.surfaces || [request.from !== undefined ? request.from : request.surface];
+        if (!Array.isArray(attachRefs)) attachRefs = [attachRefs];
+        var boundary = pickCurve(request.curve);
+        if (!boundary) throw new Error('Missing analytic boundary curve');
+        var attached = [], attachDiagnostics = [];
+        attachRefs.forEach(function(ref) {
+          var source = pick(ref);
+          if (!source) throw new Error('Missing reconstructed surface');
+          var clone = Surfaces.attachBoundary(source,boundary,g,attachDiagnostics);
+          if (!clone) throw new Error(attachDiagnostics.length ? attachDiagnostics[0].message : 'Boundary attachment refused');
+          attached.push(clone);
+        });
+        if (request.save) querySurfaces[request.save] = attached[0];
+        var attachModel = modelOf(attached), attachGraph = Surfaces.incidence(attachModel), boundaryUse = null;
+        attachGraph.uses.forEach(function(use) {
+          if (use.element === boundary) boundaryUse = {useCount:use.useCount, surfaceIds:use.surfaceIds.slice()};
+        });
+        result = {surfaces:attached, boundary:boundaryUse,
+          validation:Surfaces.validate(attachModel,g),
+          certificate:Surfaces.certify(attachModel,g)};
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

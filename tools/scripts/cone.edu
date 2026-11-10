@@ -10,10 +10,11 @@
 /line b' c' A elevation
 /line c' a' A elevation
 
-# expect: surfaceChecks=7 surfaceQueries=ok
+# expect: surfaceChecks=8 surfaceQueries=ok
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":0,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":20,"center":{"x":20,"y":0,"z":30}}}
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":25,"z":30},"normal":{"x":0,"y":-1,"z":0}},"expect":{"kind":"circle","radius":10,"center":{"x":20,"y":25,"z":30}}}
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":50,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"point","point":{"x":20,"y":50,"z":30}}}
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":25,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":false,"section":{"kind":"circle","radius":10,"center":{"x":20,"y":25,"z":30}},"surfaces":[{"kind":"cone","closed":false},{"kind":"cone","closed":false}],"validation":{"status":"partial","openBoundaries":1,"closedShells":0},"certificate":{"status":"partial","counts":{"sharedBoundaries":1,"openBoundaries":1,"closedShells":0}}}}
 # surface-query: {"operation":"trim","surface":0,"plane":{"origin":{"x":20,"y":25,"z":30},"normal":{"x":0,"y":1,"z":0}},"keepPositive":false,"expect":{"surface":{"kind":"cone","closed":false},"validation":{"status":"partial","openBoundaries":2},"certificate":{"status":"partial","counts":{"surfaces":1,"openBoundaries":2,"closedShells":0}}}}
 # surface-query: {"operation":"trim","surface":0,"plane":{"origin":{"x":0,"y":10,"z":0},"normal":{"x":1,"y":1,"z":0}},"expect":null}
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","relation":"transverse","radius":20,"center":{"x":20,"y":0,"z":30},"surfaceIds":["surface:0","surface:1"],"surfaceKinds":["cone","plane"]}}

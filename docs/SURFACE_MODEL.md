@@ -209,9 +209,114 @@ unparameterized conics, and tangent points are rejected. Inline section curves
 participate in the same boundary validation and incidence analysis as drawing
 curves. A trim is open until its new boundary is shared with another patch;
 sharing an inline section requires referencing the same section object. This is
-the first trimming operation; splitting arbitrary curved loops remains future
-work. `cone.edu` exercises a cone trim parallel to its base; an oblique conic
-cut is rejected rather than approximated.
+one trimming operation; `Surfaces.split` below now divides a surface whose
+loops stay wholly on one side, but a boundary loop that crosses the cutting
+plane is still not split into sub-arcs. `cone.edu` exercises a cone trim
+parallel to its base; an oblique conic cut is rejected rather than approximated.
+
+### Splitting a surface and sharing a boundary
+
+`Surfaces.split(surface, plane, geometry, diagnostics)` divides one bounded
+curved surface at a plane. It returns `null` when it cannot do so soundly. On
+success it returns:
+
+```js
+{
+  kind: 'split',
+  surfaceId,                    // the input surface id
+  plane: {origin, normal},
+  section,                      // one analytic circle/ellipse record
+  positive, negative,           // same objects as surfaces[0], surfaces[1]
+  surfaces: [positive, negative]
+}
+```
+
+`positive` is the side where the signed distance to the plane is positive.
+Both pieces carry the exact same `section` object in their new outer loop, so
+the cut is already a shared boundary with incidence 2. The result is therefore
+a valid two-patch model without a second construction step:
+
+- splitting a complete sphere through its centre gives two spherical caps and
+  one closed shell;
+- splitting the truncated-cylinder side above its base gives two cylinder bands
+  that share the new circle and retain one original end loop each;
+- splitting a cone between its apex and base gives a tip patch (bounded by the
+  section and the apex) and a frustum band (bounded by the section and base).
+
+The pieces keep the analytic kind and parameters, `sourceIds` (plus the
+section's source ids), `displayFaceIndices`, and the input `patchIndex`. Their
+ids are `<surface-id>/split:positive` and `<surface-id>/split:negative`; they
+also record `parentSurfaceId` and `splitBy`. The advisory `boundaryCurves`
+list and the single-cap metadata (`cap`, `recess`) are dropped because the
+pieces no longer have one mouth loop. Display faces are inherited, not
+re-tessellated; split is an analytic boundary operation.
+
+The operation is deliberately conservative:
+
+- only `cylinder`, `cone` and `sphere` supports are split; a bounded planar
+  face returns `split-plane-surface-unsupported`;
+- the plane section must be a closed `circle` or `ellipse`. A line set,
+  tangent point, classified conic, coplanar overlap or missing section is
+  refused;
+- every existing boundary loop must lie wholly on one side of the plane. A
+  loop that crosses the plane is refused with `split-loop-crosses-plane`; a
+  loop lying in the plane is refused with `split-loop-on-plane`. The operation
+  does not yet cut a circle, ellipse or arc into sub-arcs;
+- each piece must be bounded. A side with no retained loop is accepted only on
+  a sphere (compact support) or when it contains the cone apex. A cylinder side
+  with no retained end loop is refused with `split-patch-unbounded`, which also
+  covers a cut outside the bounded band;
+- a sphere patch that already has a loop is only split when `build` preserved
+  its recess `cap` metadata, the cut plane is parallel to the cap mouth, and
+  the section lies strictly between the pole and the mouth. Otherwise the
+  material side is ambiguous (`split-sphere-cap-unknown`) or the section is
+  outside the patch (`split-section-outside-patch`). A complete sphere has no
+  such ambiguity.
+
+`Surfaces.splitDiagnostic(surface, plane, geometry)` returns `null` when the
+same call would succeed, otherwise a `{code, message, ...}` record with fields
+such as `sectionKind`, `loopIndex` or `side`. `split` also accepts an optional
+fourth argument, an array that receives that same record, so a caller can get
+the reason in one traversal. Refusal codes include
+`split-surface-missing`, `split-plane-invalid`, `split-surface-kind-unsupported`,
+`split-plane-surface-unsupported`, `split-section-missing`,
+`split-section-not-closed`, `split-section-invalid`,
+`split-section-degenerate`, `split-boundary-invalid`, `split-surface-unbounded`,
+`split-loop-crosses-plane`, `split-loop-on-plane`, `split-sphere-cap-unknown`,
+`split-section-outside-patch` and `split-patch-unbounded`.
+
+`Surfaces.attachBoundary(surface, boundary, geometry, diagnostics)` clones a
+surface with one additional loop of the form `{kind:'outer', section:boundary}`.
+The exact boundary object is preserved, so calling it on two surfaces promotes
+that boundary from one use to two. `Surfaces.shareBoundary(a, b, boundary,
+geometry)` is the two-surface convenience form and returns
+`{boundary, surfaces:[a', b']}`. Attachment is a structural promotion, not a
+clip:
+
+- `boundary` must be a valid analytic circle or ellipse with a full closed
+  sweep (an arc is refused with `attach-boundary-open`);
+- its sampled points must lie on the target surface within
+  `surfaceTolerance` (otherwise `attach-boundary-off-surface`);
+- a surface cannot use the same boundary object twice
+  (`attach-boundary-duplicate`);
+- the clone sets `closed:false`, drops `cap`, records `parentSurfaceId` and
+  `attachedBoundary`, and gets the id
+  `<surface-id>/attach:<previous-loop-count>`;
+- the target surface is not re-clipped. Attaching an equator circle to a plane
+  square leaves the square loop in place; the model records both loops and the
+  shared boundary, but the plane's outer material region is unchanged. A caller
+  that needs a bounded cap must supply a surface whose loop is that cap.
+
+`Surfaces.intersectionCurves(result)` promotes a closed intersection or section
+result into one or more analytic boundary curve records. It accepts
+`kind:'circle'`, `kind:'ellipse'`, and the `kind:'circles'` pair from
+sphere/cylinder intersections. Each record is a full `0..2π` curve with
+`closed:true`, `promoted:'intersection'` and an `intersection` field containing
+the source `kind`, `relation`, `surfaceIds` and `surfaceKinds`. `line`,
+`lines`, `point`, `conic`, `plane-overlap`, `coincident` and `none` results
+return `null`; those do not bound a patch. The returned records are ordinary
+`section` loop elements, so `attachBoundary`, `split`, `validate`, `certify`
+and `incidence` consume them without a second curve vocabulary.
 
 `Surfaces.intersect(a, b)` returns the intersection of two supporting analytic
 surfaces. It does not sample the display mesh and does not clip the result to
@@ -460,6 +565,20 @@ Examples:
   loops are not used to clip a line, circle, or conic to the bounded patches.
 - Trimming handles one cutting plane at a time and does not split a loop that
   crosses the plane.
+- `split` handles one cutting plane at a time and only when every existing loop
+  is wholly on one side. It does not cut a circle, ellipse, arc or straight
+  edge into sub-elements, so a crossing loop is refused rather than
+  approximated. Planar faces, open line sections, tangent points and
+  parabola/hyperbola sections are refused. A sphere patch with an existing
+  loop needs recess `cap` metadata; a trimmed sphere does not yet carry enough
+  material-side information to be split again.
+- `split` uses the full analytic section of the supporting surface as the new
+  loop. The loop-side and per-side boundedness checks prove that section lies
+  inside the bounded patch for the accepted cases; there is no general
+  point-in-patch test for an arbitrary curved patch.
+- `attachBoundary`/`shareBoundary` only promote an existing boundary object
+  into another loop. They do not clip either surface, orient material, merge
+  coincident loops or remove an outer loop that the new loop should replace.
 - The model is inferred. The analytic certificate checks consistency of the
   stored decimal parameters and sampled boundaries; it does not prove that an
   inferred radius, axis or apex equals the author's intended exact geometry,
@@ -475,27 +594,67 @@ Examples:
 
 ## Drawing-script surface queries
 
-Drawing scripts can check the public section, trim, and intersection APIs on
-their reconstructed surfaces, without introducing a separate test suite:
+Drawing scripts can check the public section, trim, split, attachment and
+intersection APIs on their reconstructed surfaces, without introducing a
+separate test suite:
 
 ```text
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":0,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":20}}
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","relation":"transverse","radius":20}}
-# expect: surfaceChecks=2 surfaceQueries=ok
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":false,"section":{"kind":"circle","radius":20},"validation":{"closedShells":1}}}
+# expect: surfaceChecks=3 surfaceQueries=ok
 ```
 
 `expect` is a recursive subset of the result with numeric tolerance. An
 intersection query names its two operands with `surfaces: [a, b]`, where each
 entry is a reconstructed surface index or a saved name. `from` and `with` are
 accepted as an alternative pair; `from` also selects the single surface for a
-section or trim. A trim query returns `{surface, validation}` (or `null` if
-unsupported); `save` names the resulting surface for a subsequent query's
-`from` field. This allows a later cut or intersection to verify earlier section
-boundaries. Queries do not change the reconstructed drawing or its topology
-expectations.
+section, trim or split.
 
-New sheets exercise the intersection API: `surface-intersect-planes.edu`,
+Query result shapes:
+
+- **section** returns the analytic section record or `null`.
+- **intersect** returns the tagged intersection result or `null`.
+- **trim** returns `{surface, validation, certificate}` or `null`.
+- **split** returns `{refused:false, section, surfaces, positive, negative,
+  validation, certificate}` on success, or
+  `{refused:true, diagnostic}` when `Surfaces.split` returns `null`. The
+  validation and certificate cover the two-piece model, so a split sphere is
+  `ok` with one closed shell and a split cylinder band is `partial` with two
+  open end loops and one shared section.
+- **attach** names one or more surfaces with `surfaces:[...]` (or one with
+  `surface`/`from`) and a promoted curve with `curve`. It returns
+  `{surfaces, boundary, validation, certificate}`, where `boundary` is the
+  incidence record of the attached curve (`useCount`, `surfaceIds`). Attaching
+  the same curve to two surfaces reports `useCount:2`.
+- **intersectionCurves** promotes a circle/ellipse intersection and returns
+  `{curves, count}` or `null`.
+
+`save` stores the result for a later query: a string names one surface (trim,
+attach, or the positive split piece), `{positive, negative}` names both split
+pieces, and a string on `intersectionCurves` names the first promoted curve.
+This allows a later split, attachment or validation to reuse earlier analytic
+boundary objects. Queries do not change the reconstructed drawing or its
+topology expectations.
+
+New sheets exercise the split and promotion API:
+
+- `surface-split-sphere.edu` splits a complete sphere into two caps sharing one
+  equatorial circle, then proves that splitting the cap on its own edge is
+  refused (`split-loop-on-plane`).
+- `surface-split-cylinder.edu` splits the truncated-cylinder band below its
+  inclined end and refuses a later cut outside the remaining band
+  (`split-patch-unbounded`).
+- `surface-split-crossing.edu` refuses a cut whose plane crosses the inclined
+  top loop (`split-loop-crosses-plane`), refuses a line section and a planar
+  face, and refuses an invalid plane.
+- `surface-attach-shared.edu` promotes a sphere/plane intersection circle with
+  `intersectionCurves`, attaches that exact object to both surfaces, and checks
+  `boundary.useCount:2`.
+- `cone.edu` also splits a cone between its apex and base, producing a tip patch
+  and a frustum band that share the new circle.
+
+The other intersection sheets are `surface-intersect-planes.edu`,
 `surface-intersect-spheres.edu`, `surface-intersect-sphere-plane.edu`,
 `surface-intersect-cylinders.edu`, and
-`surface-intersect-sphere-cylinder.edu`. `cone.edu` also carries a cone–plane
-intersection query.
+`surface-intersect-sphere-cylinder.edu`.

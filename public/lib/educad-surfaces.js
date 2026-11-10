@@ -1333,6 +1333,284 @@
     return out;
   }
 
+  // A loop is usable by split when every boundary element it names exists.
+  // loopSide() returns 2 for both a crossing loop and an invalid one, so the
+  // two cases are separated before the side classification.
+  function loopValid(loop, curves, vertices) {
+    var ok = true;
+    (loop.curves || []).forEach(function (i) { if (!validCurve(curves[i])) ok = false; });
+    if (loop.section && !validCurve(loop.section)) ok = false;
+    if (loop.vertices && loop.vertices.length < 2) ok = false;
+    (loop.vertices || []).forEach(function (i) {
+      if (!vertices || !finite(vertices[i])) ok = false;
+    });
+    return ok;
+  }
+
+  // The bounded patch of a sphere is only explicit when build() preserved the
+  // recess cap metadata. Without it the material side of a single loop is
+  // ambiguous, so split refuses rather than guessing which cap is material.
+  function sphereCapContainsCut(surface, spec, cut) {
+    var cap = surface.cap;
+    if (!cap || !finite(cap.pole) || !finite(cap.mouth && cap.mouth.origin) ||
+        !Number.isFinite(cap.angle)) return {ok:false, reason:'unknown'};
+    var pole = unit(cap.pole), tol = surfaceTolerance(surface);
+    if (Math.abs(Math.abs(dot(spec.normal, pole)) - 1) > 1e-7)
+      return {ok:false, reason:'oblique'};
+    var mouthHeight = dot(sub(cap.mouth.origin, surface.center), pole);
+    var cutHeight = dot(sub(cut.center, surface.center), pole);
+    if (!(cutHeight > mouthHeight + tol) || !(cutHeight < surface.radius - tol))
+      return {ok:false, reason:'outside'};
+    return {ok:true};
+  }
+
+  // A side with no retained loop is bounded only on a compact sphere, or at a
+  // cone apex that lies on that side. A bare loop cannot cap a cylinder or an
+  // open cone band.
+  function splitSideBounded(surface, retained, spec, sign) {
+    if (surface.kind === 'sphere') return true;
+    if (retained > 0) return true;
+    if (surface.kind === 'cone' && finite(surface.apex || surface.origin)) {
+      var apex = surface.apex || surface.origin;
+      var distance = dot(spec.normal, sub(apex, spec.origin));
+      return sign * distance > surfaceTolerance(surface);
+    }
+    return false;
+  }
+
+  function splitPiece(surface, loops, cut, spec, sign) {
+    var out = {};
+    Object.keys(surface).forEach(function (k) { if (k !== 'loops') out[k] = surface[k]; });
+    out.id = (surface.id || 'surface') + '/split:' + (sign > 0 ? 'positive' : 'negative');
+    out.loops = loops.slice();
+    // Both pieces reference this exact object, so boundary incidence becomes
+    // 2 without a second geometric construction or a sampled seam.
+    out.loops.push({kind:'outer', section:cut});
+    out.closed = false;
+    // A split curved patch is no longer a single spherical cap, and the
+    // advisory boundaryCurves list no longer names every loop element.
+    delete out.cap;
+    delete out.recess;
+    delete out.boundaryCurves;
+    out.parentSurfaceId = surface.id === undefined ? null : surface.id;
+    out.splitBy = {surfaceId:out.parentSurfaceId,
+      plane:{origin:copyPoint(spec.origin), normal:copyPoint(spec.normal)},
+      sectionKind:cut.kind, side:sign > 0 ? 'positive' : 'negative'};
+    out.sourceIds = Array.from(new Set((surface.sourceIds || []).concat(cut.sourceIds || [])));
+    return out;
+  }
+
+  // Internal split plan. split() keeps the public "null means refused"
+  // contract; splitDiagnostic() exposes the reason without duplicating the
+  // classification. The optional diagnostics array on split() collects the
+  // same record for callers that prefer one traversal.
+  function splitPlan(surface, plane, geometry) {
+    function fail(code, message, detail) {
+      var diagnostic = {code:code, message:message};
+      Object.keys(detail || {}).forEach(function (k) { diagnostic[k] = detail[k]; });
+      return {ok:false, diagnostic:diagnostic};
+    }
+    if (!surface || !surface.kind) return fail('split-surface-missing',
+      'split needs a surface record with an analytic kind.');
+    if (surface.kind === 'plane') return fail('split-plane-surface-unsupported',
+      'Splitting a bounded planar face is not implemented; use the loop splitter instead.',
+      {surfaceKind:'plane'});
+    if (surface.kind !== 'cylinder' && surface.kind !== 'cone' && surface.kind !== 'sphere')
+      return fail('split-surface-kind-unsupported',
+        'The surface kind "' + surface.kind + '" has no split operation.', {surfaceKind:surface.kind});
+    var spec = planeSpec(plane);
+    if (!spec) return fail('split-plane-invalid', 'The cutting plane needs a finite origin and unit-able normal.');
+    var cut;
+    try { cut = section(surface, spec); }
+    catch (err) { return fail('split-section-failed',
+      'The section of ' + surface.id + ' by the cutting plane failed: ' + (err && err.message || err)); }
+    if (!cut) return fail('split-section-missing',
+      'The cutting plane does not meet ' + surface.id + '.');
+    if (cut.kind !== 'circle' && cut.kind !== 'ellipse')
+      return fail('split-section-not-closed',
+        'Only a closed circle or ellipse section can split a surface.', {sectionKind:cut.kind});
+    if (!validCurve(cut)) return fail('split-section-invalid',
+      'The section is not a valid analytic circle or ellipse.', {sectionKind:cut.kind});
+    var sr = radii(cut);
+    if (!(sr.u > EPS) || !(sr.v > EPS)) return fail('split-section-degenerate',
+      'The section has zero radius and cannot bound two patches.', {sectionKind:cut.kind});
+
+    var curves = geometry && geometry.curves || [];
+    var vertices = geometry && geometry.vertices || [];
+    var positiveLoops = [], negativeLoops = [], positiveRetained = 0, negativeRetained = 0;
+    var loops = surface.loops || [];
+    if (!loops.length && !(surface.kind === 'sphere' && surface.closed === true))
+      return fail('split-surface-unbounded',
+        'The input surface has neither a boundary loop nor closed compact support.',
+        {surfaceId:surface.id});
+    for (var i = 0; i < loops.length; i++) {
+      var loop = loops[i];
+      if (!loopValid(loop, curves, vertices))
+        return fail('split-boundary-invalid',
+          'Boundary loop ' + i + ' of ' + surface.id + ' references a missing or invalid element.',
+          {loopIndex:i});
+      var side = loopSide(loop, spec, curves, vertices);
+      if (side === 2) return fail('split-loop-crosses-plane',
+        'Boundary loop ' + i + ' crosses the cutting plane; analytic sub-loop construction is not implemented.',
+        {loopIndex:i, side:'both'});
+      if (side === 0) return fail('split-loop-on-plane',
+        'Boundary loop ' + i + ' lies in the cutting plane and cannot be assigned to one side.',
+        {loopIndex:i, side:'plane'});
+      if (side > 0) { positiveLoops.push(loop); positiveRetained++; }
+      else { negativeLoops.push(loop); negativeRetained++; }
+    }
+
+    if (surface.kind === 'sphere' && loops.length) {
+      var capCheck = sphereCapContainsCut(surface, spec, cut);
+      if (!capCheck.ok) {
+        if (capCheck.reason === 'unknown') return fail('split-sphere-cap-unknown',
+          'A bounded sphere patch without recess cap metadata has an ambiguous material side.',
+          {surfaceId:surface.id});
+        if (capCheck.reason === 'oblique') return fail('split-section-outside-patch',
+          'An oblique section circle is not wholly inside the spherical cap patch.',
+          {surfaceId:surface.id, reason:'oblique'});
+        return fail('split-section-outside-patch',
+          'The section circle is not strictly between the cap pole and its mouth loop.',
+          {surfaceId:surface.id, reason:'outside'});
+      }
+    }
+
+    if (!splitSideBounded(surface, positiveRetained, spec, 1))
+      return fail('split-patch-unbounded',
+        'The positive piece has no retained boundary loop and no compact support to bound it.',
+        {surfaceId:surface.id, side:'positive'});
+    if (!splitSideBounded(surface, negativeRetained, spec, -1))
+      return fail('split-patch-unbounded',
+        'The negative piece has no retained boundary loop and no compact support to bound it.',
+        {surfaceId:surface.id, side:'negative'});
+
+    var positive = splitPiece(surface, positiveLoops, cut, spec, 1);
+    var negative = splitPiece(surface, negativeLoops, cut, spec, -1);
+    var result = {kind:'split', surfaceId:surface.id === undefined ? null : surface.id,
+      plane:{origin:copyPoint(spec.origin), normal:copyPoint(spec.normal)},
+      section:cut, positive:positive, negative:negative,
+      surfaces:[positive, negative]};
+    return {ok:true, result:result};
+  }
+
+  // Split a bounded analytic surface by a plane. Both returned pieces carry
+  // the same closed section object as the new loop, so the section is a shared
+  // boundary (incidence 2) immediately. Returns null when a sound split cannot
+  // be formed; the optional diagnostics array receives {code,message,...}.
+  function split(surface, plane, geometry, diagnostics) {
+    var plan = splitPlan(surface, plane, geometry);
+    if (!plan.ok) {
+      if (Array.isArray(diagnostics) && plan.diagnostic) diagnostics.push(plan.diagnostic);
+      return null;
+    }
+    return plan.result;
+  }
+
+  // Reason a split is refused, or null when split() would succeed. This keeps
+  // the null-returning public API and still reports a precise failure.
+  function splitDiagnostic(surface, plane, geometry) {
+    var plan = splitPlan(surface, plane, geometry);
+    return plan.ok ? null : plan.diagnostic;
+  }
+
+  function loopReferencesCurve(loop, boundary, curves) {
+    if (loop.section === boundary) return true;
+    return (loop.curves || []).some(function (i) { return curves[i] === boundary; });
+  }
+
+  // Clone a surface with one more analytic loop. The exact same boundary
+  // object is stored, so attaching it to a second surface raises its incidence
+  // from 1 to 2. This is the promotion step for a future trim/intersection
+  // chain; it does not clip the surface or create new geometry.
+  function attachBoundary(surface, boundary, geometry, diagnostics) {
+    function fail(code, message) {
+      if (Array.isArray(diagnostics)) diagnostics.push({code:code, message:message});
+      return null;
+    }
+    if (!surface || !surface.kind) return fail('attach-surface-missing',
+      'attachBoundary needs a surface record.');
+    if (!boundary || typeof boundary !== 'object' || !validCurve(boundary))
+      return fail('attach-boundary-invalid',
+        'attachBoundary needs a finite analytic circle or ellipse.');
+    var start = Number.isFinite(boundary.startAngle) ? boundary.startAngle : 0;
+    var sweep = Number.isFinite(boundary.sweepAngle) ? boundary.sweepAngle : TAU;
+    if (sweep < TAU - 1e-9) return fail('attach-boundary-open',
+      'attachBoundary needs a full closed curve, not an arc.');
+    var curves = geometry && geometry.curves || [];
+    var loops = surface.loops || [];
+    if (loops.some(function (loop) { return loopReferencesCurve(loop, boundary, curves); }))
+      return fail('attach-boundary-duplicate',
+        'The surface already uses this boundary object.');
+    var tol = surfaceTolerance(surface);
+    for (var k = 0; k <= 16; k++) {
+      var point = curvePoint(boundary, start + sweep*k/16);
+      var residual = surfaceResidual(surface, point);
+      if (!Number.isFinite(residual) || residual > tol)
+        return fail('attach-boundary-off-surface',
+          'The boundary curve does not lie on ' + surface.id + '.');
+    }
+    var out = {};
+    Object.keys(surface).forEach(function (key) { out[key] = surface[key]; });
+    out.id = (surface.id || 'surface') + '/attach:' + loops.length;
+    out.loops = loops.slice();
+    out.loops.push({kind:'outer', section:boundary});
+    out.closed = false;
+    // A spherical cap has exactly one mouth loop; an attached loop invalidates
+    // that claim, so the cap record is not carried onto the clone.
+    delete out.cap;
+    out.parentSurfaceId = surface.id === undefined ? null : surface.id;
+    out.attachedBoundary = {kind:boundary.kind || 'curve', closed:true,
+      loopIndex:out.loops.length - 1};
+    out.sourceIds = Array.from(new Set((surface.sourceIds || []).concat(boundary.sourceIds || [])));
+    return out;
+  }
+
+  // Convenience promotion for two surfaces: each clone references the same
+  // boundary object, making its incidence 2 in one operation.
+  function shareBoundary(a, b, boundary, geometry, diagnostics) {
+    if (!a || !b || a === b) {
+      if (Array.isArray(diagnostics)) diagnostics.push({code:'share-surfaces-invalid',
+        message:'shareBoundary needs two distinct surface records.'});
+      return null;
+    }
+    var first = attachBoundary(a, boundary, geometry, diagnostics);
+    if (!first) return null;
+    var second = attachBoundary(b, boundary, geometry, diagnostics);
+    if (!second) return null;
+    return {boundary:boundary, surfaces:[first, second]};
+  }
+
+  // Promote a closed intersection/section result into analytic boundary
+  // records. Only circle/ellipse families are closed loops here; lines, points
+  // and classified conics return null because they do not bound a patch.
+  function intersectionCurves(result) {
+    if (!result || typeof result !== 'object') return null;
+    var components = null;
+    if (result.kind === 'circle' || result.kind === 'ellipse') components = [result];
+    else if (result.kind === 'circles' && Array.isArray(result.circles)) components = result.circles;
+    if (!components) return null;
+    var promoted = components.map(function (c) {
+      if (!c || !finite(c.center) || !finite(c.u) || !finite(c.v)) return null;
+      var curve = {kind:c.kind || (result.kind === 'ellipse' ? 'ellipse' : 'circle'),
+        center:copyPoint(c.center), u:copyPoint(c.u), v:copyPoint(c.v)};
+      if (c.radiusU !== undefined || c.radiusV !== undefined) {
+        curve.radiusU = c.radiusU === undefined ? c.radius : c.radiusU;
+        curve.radiusV = c.radiusV === undefined ? c.radius : c.radiusV;
+      } else curve.radius = c.radius;
+      if (!validCurve(curve)) return null;
+      curve.closed = true;
+      curve.startAngle = 0;
+      curve.sweepAngle = TAU;
+      curve.promoted = 'intersection';
+      curve.intersection = {kind:result.kind, relation:result.relation,
+        surfaceIds:(result.surfaceIds || []).slice(),
+        surfaceKinds:(result.surfaceKinds || []).slice()};
+      if (Array.isArray(c.sourceIds) && c.sourceIds.length) curve.sourceIds = c.sourceIds.slice();
+      return curve;
+    }).filter(Boolean);
+    return promoted.length ? promoted : null;
+  }
+
   return {
     build:build,
     validate:validate,
@@ -1342,6 +1620,11 @@
     section:section,
     intersect:intersect,
     trim:trim,
+    split:split,
+    splitDiagnostic:splitDiagnostic,
+    attachBoundary:attachBoundary,
+    shareBoundary:shareBoundary,
+    intersectionCurves:intersectionCurves,
     planeSpec:planeSpec,
     point:curvePoint,
     radii:radii,

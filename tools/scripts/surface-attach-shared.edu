@@ -1,0 +1,24 @@
+# A promoted sphere/plane intersection becomes one shared boundary. The same
+# analytic circle object is attached to both open surfaces, so its use count
+# changes from 1 to 2 without sampling the display mesh.
+# expect: 90V 256E 169F spheres=1 surfaces=2 surfaceKinds=plane,sphere surfaceLoops=1 surfaceShells=1 surfaceOpen=1 surfaceBoundary=4 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component surfaceCertificateChecks=17 unresolved=0 status=inferred
+/datum -300 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/point p1 100 -10 plan
+/point p2 140 -10 plan
+/point p3 140 -50 plan
+/point p4 100 -50 plan
+/point "p1'" 100 30 elevation
+/point "p2'" 140 30 elevation
+/point "p3'" 140 30 elevation
+/point "p4'" 100 30 elevation
+/line p1 p2 A plan
+/line p2 p3 A plan
+/line p3 p4 A plan
+/line p4 p1 A plan
+/line "p1'" "p2'" A elevation
+
+# expect: surfaceChecks=2 surfaceQueries=ok
+# surface-query: {"operation":"intersectionCurves","surfaces":[0,1],"save":"equator","expect":{"count":1,"curves":[{"kind":"circle","radius":20,"closed":true,"promoted":"intersection","center":{"x":20,"y":30,"z":30},"intersection":{"kind":"circle","relation":"transverse","surfaceIds":["surface:0","surface:1"]}}]}}
+# surface-query: {"operation":"attach","surfaces":[0,1],"curve":"equator","save":"shared","expect":{"boundary":{"useCount":2,"surfaceIds":["surface:0/attach:0","surface:1/attach:1"]},"surfaces":[{"kind":"sphere","closed":false,"loops":[{"kind":"outer","section":{"kind":"circle","radius":20}}]},{"kind":"plane","closed":false}],"validation":{"status":"partial","openBoundaries":4,"closedShells":0},"certificate":{"status":"partial","counts":{"sharedBoundaries":1,"openBoundaries":4,"closedShells":0}}}}

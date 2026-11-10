@@ -1,0 +1,21 @@
+# A cutting plane that crosses the inclined top loop cannot be promoted into
+# two shared sub-loops yet. split() returns null and reports the precise loop
+# that crosses; it does not clip or approximate the ellipse.
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
+/datum -30 80
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 0 0 elevation
+/point b 40 0 elevation
+/point c 40 50 elevation
+/point d 0 10 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+
+# expect: surfaceChecks=4 surfaceQueries=ok
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":25,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-loop-crosses-plane","loopIndex":1}}}
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":0,"z":30},"normal":{"x":1,"y":0,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-section-not-closed","sectionKind":"lines"}}}
+# surface-query: {"operation":"split","surface":1,"plane":{"origin":{"x":0,"y":10,"z":0},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-plane-surface-unsupported"}}}
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":0,"z":30},"normal":{"x":0,"y":0,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-plane-invalid"}}}

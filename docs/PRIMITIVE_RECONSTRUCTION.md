@@ -195,7 +195,8 @@ The bounded analytic model is attached as `geometry.surfaces`, with
 plane, cylinder, cone or sphere, keeps outer/inner boundary loops, shares
 boundary curves between caps and side surfaces, and validates boundaries
 against the analytic definitions. Analytic plane sections are available through
-`EduCADSurfaces.section`; single-plane trimming is available through
+`EduCADSurfaces.section`; exact surface–surface intersections through
+`EduCADSurfaces.intersect`; and single-plane trimming through
 `EduCADSurfaces.trim`. See [Bounded analytic surface model](SURFACE_MODEL.md).
 
 ## Representation and display
@@ -269,6 +270,11 @@ node tools/edc.js tools/scripts/cone-oblique-profile.edu
 node tools/edc.js tools/scripts/cone-oblique-plan.edu
 node tools/edc.js tools/scripts/cone-oblique-edge-on.edu
 node tools/edc.js tools/scripts/cone-oblique-conflict.edu
+node tools/edc.js tools/scripts/surface-intersect-planes.edu
+node tools/edc.js tools/scripts/surface-intersect-spheres.edu
+node tools/edc.js tools/scripts/surface-intersect-sphere-plane.edu
+node tools/edc.js tools/scripts/surface-intersect-cylinders.edu
+node tools/edc.js tools/scripts/surface-intersect-sphere-cylinder.edu
 node tools/edc.js tools/scripts/spline-through.edu
 node tools/edc.js tools/scripts/spline-reversed.edu
 node tools/edc.js tools/scripts/spline-closed.edu
@@ -328,10 +334,13 @@ confirms the curve was rebuilt from it rather than keeping stale control points.
 
 This starts the agreed pipeline; it is not complete reconstruction for every
 geometric solid. Full-circle inclined traces, closed and open ellipse/edge-on
-line pairs, inclined circular cone bases with tangent generators, and a first
+geometric solid. Full-circle inclined traces, closed and open ellipse/edge-on
+line pairs, inclined circular cone bases with tangent generators, exact
+analytic surface–surface intersections for the supported plane, sphere,
+parallel-cylinder and axis-through-centre sphere–cylinder families, and a first
 bounded plane/cylinder/cone/sphere model are implemented. Important next
-capabilities are oblique cones and non-circular elliptical bases,
-surface–surface intersections, curved recesses/fillets, and certification of
+capabilities are oblique cones and non-circular elliptical bases, curved
+recesses/fillets, broader skew-axis surface intersections, and certification of
 the analytic surfaces rather than only their display triangles. Spheres,
 two-view oblique circles, elliptical arc chains, arc/line pairs, and
 interpolated station curves with cross-view consistency checks are supported;

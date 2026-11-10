@@ -1,0 +1,27 @@
+# A sphere and a coaxial cylinder whose axis passes through the sphere centre,
+# with planar caps. The exact sphere/cylinder intersection is two circles.
+# A trimmed hemisphere is saved and then intersected by name.
+# expect: 134V 324E 194F spheres=1 curves=2 surfaces=4 surfaceKinds=cylinder,plane,sphere surfaceLoops=4 surfaceShells=2 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceChecks=7 surfaceQueries=ok unresolved=0 status=inferred
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/point o 20 -30 plan
+/circle o 10 A plan
+/point a 10 0 elevation
+/point b 30 0 elevation
+/point c 30 60 elevation
+/point d 10 60 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+
+# surface:0 = sphere (20,30,30) r20; surface:1 = cylinder r10 on y;
+# surface:2 = plane y=0; surface:3 = plane y=60.
+# surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circles","relation":"transverse","surfaceIds":["surface:0","surface:1"],"circles":[{"center":{"x":20,"y":47.3205080757,"z":30},"radius":10},{"center":{"x":20,"y":12.6794919243,"z":30},"radius":10}]}}
+# surface-query: {"operation":"intersect","surfaces":[1,0],"expect":{"kind":"circles","surfaceIds":["surface:1","surface:0"],"surfaceKinds":["cylinder","sphere"]}}
+# surface-query: {"operation":"intersect","surfaces":[0,2],"expect":{"kind":"none","relation":"none","surfaceIds":["surface:0","surface:2"]}}
+# surface-query: {"operation":"intersect","surfaces":[1,2],"expect":{"kind":"circle","relation":"transverse","radius":10,"center":{"x":20,"y":0,"z":30},"surfaceIds":["surface:1","surface:2"]}}
+# surface-query: {"operation":"intersect","surfaces":[2,3],"expect":{"kind":"none","relation":"none","reason":"parallel","distance":60}}
+# surface-query: {"operation":"trim","surface":0,"save":"hemisphere","plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"surface":{"closed":false},"validation":{"status":"partial"}}}
+# surface-query: {"operation":"intersect","from":"hemisphere","with":1,"expect":{"kind":"circles","surfaceIds":["surface:0/trim","surface:1"]}}

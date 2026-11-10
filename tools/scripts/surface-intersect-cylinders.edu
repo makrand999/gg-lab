@@ -1,0 +1,43 @@
+# Three parallel-axis cylinders. Surfaces 0 and 1 overlap, surface 2 is far
+# away. The caps supply planes for circle, ellipse, and coincident tests.
+# expect: 144V 216E 78F curves=6 surfaces=9 surfaceKinds=cylinder,plane surfaceLoops=12 surfaceShells=3 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceChecks=6 surfaceQueries=ok diagnostics=curve-projection-ambiguous status=partial
+/datum -100 300
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 0 0 elevation
+/point b 40 0 elevation
+/point c 40 50 elevation
+/point d 0 10 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+/point p 50 -30 plan
+/circle p 20 A plan
+/point e 30 0 elevation
+/point f 70 0 elevation
+/point g 70 50 elevation
+/point h 30 10 elevation
+/line e f A elevation
+/line f g A elevation
+/line g h A elevation
+/line h e A elevation
+/point q 200 -30 plan
+/circle q 10 A plan
+/point i 190 0 elevation
+/point j 210 0 elevation
+/point k 210 50 elevation
+/point l 190 10 elevation
+/line i j A elevation
+/line j k A elevation
+/line k l A elevation
+/line l i A elevation
+
+# surface:0 = cylinder x20 r20, surface:1 = cylinder x50 r20,
+# surface:2 = cylinder x200 r10. Base planes: 3, 4, 5. Inclined caps: 6, 7, 8.
+# surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"lines","relation":"transverse","surfaceIds":["surface:0","surface:1"],"lines":[{"origin":{"x":35,"y":0,"z":16.7712434447},"direction":{"x":0,"y":1,"z":0}},{"origin":{"x":35,"y":0,"z":43.2287565553},"direction":{"x":0,"y":1,"z":0}}]}}
+# surface-query: {"operation":"intersect","surfaces":[0,2],"expect":{"kind":"none","relation":"none","reason":"separate","distance":180,"gap":150}}
+# surface-query: {"operation":"intersect","surfaces":[0,0],"expect":{"kind":"coincident","relation":"coincident","surfaceIds":["surface:0","surface:0"]}}
+# surface-query: {"operation":"intersect","surfaces":[0,3],"expect":{"kind":"circle","relation":"transverse","radius":20,"center":{"x":20,"y":0,"z":30},"surfaceIds":["surface:0","surface:3"]}}
+# surface-query: {"operation":"intersect","surfaces":[0,6],"expect":{"kind":"ellipse","relation":"transverse","radiusU":28.2842712475,"radiusV":20,"center":{"x":20,"y":30,"z":30},"surfaceIds":["surface:0","surface:6"]}}
+# surface-query: {"operation":"intersect","surfaces":[3,4],"expect":{"kind":"plane-overlap","relation":"coincident","surfaceIds":["surface:3","surface:4"]}}

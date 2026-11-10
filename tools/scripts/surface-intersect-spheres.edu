@@ -1,0 +1,23 @@
+# Five sphere silhouettes. Surface 0 intersects surface 2 in a circle,
+# touches surfaces 1 and 3 tangentially (inside and outside), and misses
+# surface 4. Reusing surface 0 tests the coincident case.
+# expect: 430V 1260E 840F spheres=5 surfaces=5 surfaceKinds=sphere surfaceLoops=0 surfaceShells=5 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceChecks=5 surfaceQueries=ok
+/datum -200 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/circle 10 -30 10 A plan
+/circle 10 30 10 A elevation
+/circle 40 -30 10 A plan
+/circle 40 30 10 A elevation
+/circle 50 -30 10 A plan
+/circle 50 30 10 A elevation
+/circle 100 -30 10 A plan
+/circle 100 30 10 A elevation
+
+# surface:0 centre (20,30,30) r20; surface:1 r10 at x10; surface:2 r10 at x40;
+# surface:3 r10 at x50; surface:4 r10 at x100.
+# surface-query: {"operation":"intersect","surfaces":[0,4],"expect":{"kind":"none","relation":"none","reason":"separate","distance":80,"gap":50}}
+# surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"point","relation":"tangent","tangent":"internal","degenerate":true,"point":{"x":0,"y":30,"z":30},"surfaceIds":["surface:0","surface:1"]}}
+# surface-query: {"operation":"intersect","surfaces":[0,2],"expect":{"kind":"circle","relation":"transverse","radius":9.6824583655,"center":{"x":37.5,"y":30,"z":30},"surfaceIds":["surface:0","surface:2"]}}
+# surface-query: {"operation":"intersect","surfaces":[0,3],"expect":{"kind":"point","relation":"tangent","tangent":"external","point":{"x":40,"y":30,"z":30},"surfaceIds":["surface:0","surface:3"]}}
+# surface-query: {"operation":"intersect","surfaces":[0,0],"expect":{"kind":"coincident","relation":"coincident","surfaceIds":["surface:0","surface:0"]}}

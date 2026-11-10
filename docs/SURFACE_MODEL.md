@@ -88,10 +88,68 @@ circle/ellipse sections can currently become trim boundaries; open line sets,
 unparameterized conics, and tangent points are rejected. Inline section curves
 participate in the same boundary validation and incidence analysis as drawing
 curves. A trim is open until its new boundary is shared with another patch;
-sharing an inline section requires referencing the same section object. This is the first trimming
-operation; general surface–surface intersections and splitting of arbitrary
-curved loops remain future work. `cone.edu` exercises a cone trim parallel to
-its base; an oblique conic cut is rejected rather than approximated.
+sharing an inline section requires referencing the same section object. This is
+the first trimming operation; splitting arbitrary curved loops remains future
+work. `cone.edu` exercises a cone trim parallel to its base; an oblique conic
+cut is rejected rather than approximated.
+
+`Surfaces.intersect(a, b)` returns the intersection of two supporting analytic
+surfaces. It does not sample the display mesh and does not clip the result to
+either surface's boundary loops. A supported pair always returns a result;
+`kind: 'none'` means the supporting surfaces do not meet. An unsupported pair
+returns `null`, so a caller can distinguish "no intersection" from "not
+implemented".
+
+Every result carries:
+
+- `kind`: `line`, `lines`, `circle`, `circles`, `ellipse`, `conic`, `point`,
+  `plane-overlap`, `coincident`, or `none`;
+- `surfaceIds` in the argument order and `surfaceKinds` in the same order;
+- `relation`: `transverse`, `tangent`, `coincident`, `degenerate`, or `none`;
+- `reason` for `none` (`parallel`, `separate`, `contained`, `concentric`,
+  `coaxial`, or `no-section`);
+- `tangent: 'external' | 'internal'` for the sphere and parallel-cylinder
+  tangencies where that distinction is meaningful, and `degenerate: true` for
+  a zero-dimensional point result.
+
+Parameters use the same vocabulary as `section`: `origin`/`direction` for a
+line, `lines` for a pair of lines, `center`/`u`/`v`/`radius` for a circle,
+`circles` for two circles, `plane` for coplanar planes, and `point` for a
+point. `ellipse` and `conic` reuse the section fields.
+
+Supported exact families and formulas:
+
+- **plane–plane**: non-parallel planes meet in the line through the planes with
+  direction `n1 × n2`; parallel coincident planes return `plane-overlap` with
+  `relation: 'coincident'`; distinct parallel planes return `none`.
+- **plane–sphere, plane–cylinder, plane–cone**: these delegate to `section`,
+  so the result is exactly the section kind: circle, ellipse, generator line
+  set, tangent point, apex point, or classified cone conic. A plane
+  perpendicular to the cone axis through its apex is a point result with
+  `relation: 'degenerate'`; the pre-existing `section` classification limits
+  still apply to oblique apex planes.
+- **sphere–sphere**: with `d = |c2 - c1|`, `h = (d² + r1² - r2²) / (2d)` and
+  `ρ = sqrt(r1² - h²)`, a transverse pair meets in the circle centred at
+  `c1 + h(c2 - c1)/d` with radius `ρ`. Equal centres and radii are coincident;
+  `d = r1 + r2` or `d = |r1 - r2|` is an external or internal tangent point;
+  separated or nested spheres return `none`.
+- **parallel/coaxial cylinder–cylinder**: with perpendicular axis distance `p`,
+  `h = (p² + r1² - r2²) / (2p)` and `s = sqrt(r1² - h²)`, a transverse pair
+  meets in the two lines through `o1 + h e ± s w` parallel to the common axis,
+  where `e` is the unit offset between axes and `w = a × e`. `s = 0` gives one
+  tangent line; coaxial equal-radius cylinders are coincident; coaxial or
+  separated/nested cylinders return `none`.
+- **sphere–cylinder**: supported when the cylinder axis passes through the
+  sphere centre. With `h = sqrt(R² - r²)`, `R > r` gives two circles centred at
+  `c ± h a` with the cylinder radius; `R = r` gives one tangent circle; `R < r`
+  returns `none`. The reversed pair produces the same components. An offset
+  axis is supported only for the clearly separate/nested `none` cases; a
+  possible quartic intersection returns `null`.
+
+Tolerances are relative (`1e-6` of the largest relevant radius or distance) so
+that reconstructed drawings with small numeric noise still classify tangency
+and coincidence correctly. Near-parallel planes are reported as parallel
+rather than as a very distant line.
 
 ## End-to-end case: cone over an inclined circle
 
@@ -179,9 +237,14 @@ reports `curve-projection-ambiguous` and retains both candidate levels.
   boundaries, are not modelled.
 - Cone sections are classified but not yet returned as trimmed ellipse/hyperbola
   boundary curves.
-- General cylinder–cylinder, cone–cylinder and curved-surface intersections are
-  not implemented. Coaxial/parallel special cases can be added without changing
-  the model shape.
+- Skew or intersecting-axis cylinder–cylinder intersections and
+  cone–cylinder/cone–sphere pairs are not implemented; `intersect` returns
+  `null` for them. An offset-axis sphere–cylinder is a quartic curve: clearly
+  separate or nested cases return `none`, but when the two surfaces may meet
+  the result is `null`. The parallel/coaxial cylinder and axis-through-centre
+  sphere/cylinder cases above are exact.
+- Intersection results describe the unbounded supporting surfaces. Boundary
+  loops are not used to clip a line, circle, or conic to the bounded patches.
 - Trimming handles one cutting plane at a time and does not split a loop that
   crosses the plane.
 - The model is inferred. It does not replace the exact declared-triangle
@@ -189,16 +252,27 @@ reports `curve-projection-ambiguous` and retains both candidate levels.
 
 ## Drawing-script surface queries
 
-Drawing scripts can check the public section and trim APIs on their reconstructed
-surfaces, without introducing a separate test suite:
+Drawing scripts can check the public section, trim, and intersection APIs on
+their reconstructed surfaces, without introducing a separate test suite:
 
 ```text
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":0,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":20}}
-# expect: surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","relation":"transverse","radius":20}}
+# expect: surfaceChecks=2 surfaceQueries=ok
 ```
 
-`expect` is a recursive subset of the result with numeric tolerance. A trim
-query returns `{surface, validation}` (or `null` if unsupported); `save` names
-the resulting surface for a subsequent query's `from` field. This allows a
-later cut to verify earlier section boundaries. Queries do not change the
-reconstructed drawing or its topology expectations.
+`expect` is a recursive subset of the result with numeric tolerance. An
+intersection query names its two operands with `surfaces: [a, b]`, where each
+entry is a reconstructed surface index or a saved name. `from` and `with` are
+accepted as an alternative pair; `from` also selects the single surface for a
+section or trim. A trim query returns `{surface, validation}` (or `null` if
+unsupported); `save` names the resulting surface for a subsequent query's
+`from` field. This allows a later cut or intersection to verify earlier section
+boundaries. Queries do not change the reconstructed drawing or its topology
+expectations.
+
+New sheets exercise the intersection API: `surface-intersect-planes.edu`,
+`surface-intersect-spheres.edu`, `surface-intersect-sphere-plane.edu`,
+`surface-intersect-cylinders.edu`, and
+`surface-intersect-sphere-cylinder.edu`. `cone.edu` also carries a cone–plane
+intersection query.

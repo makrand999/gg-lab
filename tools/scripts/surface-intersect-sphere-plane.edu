@@ -1,0 +1,54 @@
+# A sphere and three parallel horizontal planes at y=30 (through the centre),
+# y=10 (tangent), and y=0 (clear of the sphere). The planes are drawn as plan
+# squares with edge-on elevation traces away from the sphere silhouette.
+# expect: 98V 264E 171F spheres=1 surfaces=4 surfaceKinds=plane,sphere surfaceLoops=3 surfaceShells=1 surfaceOpen=3 surfaceBoundary=12 surfaceModel=partial surfaceChecks=6 surfaceQueries=ok unresolved=0 status=inferred
+/datum -300 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/point p1 100 -10 plan
+/point p2 140 -10 plan
+/point p3 140 -50 plan
+/point p4 100 -50 plan
+/point "p1'" 100 30 elevation
+/point "p2'" 140 30 elevation
+/point "p3'" 140 30 elevation
+/point "p4'" 100 30 elevation
+/line p1 p2 A plan
+/line p2 p3 A plan
+/line p3 p4 A plan
+/line p4 p1 A plan
+/line "p1'" "p2'" A elevation
+/point q1 200 -10 plan
+/point q2 240 -10 plan
+/point q3 240 -50 plan
+/point q4 200 -50 plan
+/point "q1'" 200 10 elevation
+/point "q2'" 240 10 elevation
+/point "q3'" 240 10 elevation
+/point "q4'" 200 10 elevation
+/line q1 q2 A plan
+/line q2 q3 A plan
+/line q3 q4 A plan
+/line q4 q1 A plan
+/line "q1'" "q2'" A elevation
+/point r1 300 -10 plan
+/point r2 340 -10 plan
+/point r3 340 -50 plan
+/point r4 300 -50 plan
+/point "r1'" 300 0 elevation
+/point "r2'" 340 0 elevation
+/point "r3'" 340 0 elevation
+/point "r4'" 300 0 elevation
+/line r1 r2 A plan
+/line r2 r3 A plan
+/line r3 r4 A plan
+/line r4 r1 A plan
+/line "r1'" "r2'" A elevation
+
+# surface:0 = sphere, surface:1 = y=30, surface:2 = y=10, surface:3 = y=0.
+# surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","relation":"transverse","radius":20,"center":{"x":20,"y":30,"z":30},"surfaceIds":["surface:0","surface:1"]}}
+# surface-query: {"operation":"intersect","surfaces":[0,2],"expect":{"kind":"point","relation":"tangent","point":{"x":20,"y":10,"z":30},"surfaceIds":["surface:0","surface:2"]}}
+# surface-query: {"operation":"intersect","surfaces":[0,3],"expect":{"kind":"none","relation":"none","surfaceIds":["surface:0","surface:3"]}}
+# surface-query: {"operation":"intersect","surfaces":[1,2],"expect":{"kind":"none","relation":"none","reason":"parallel","distance":20}}
+# surface-query: {"operation":"intersect","surfaces":[1,1],"expect":{"kind":"plane-overlap","relation":"coincident"}}
+# surface-query: {"operation":"intersect","surfaces":[1,0],"expect":{"kind":"circle","radius":20,"surfaceIds":["surface:1","surface:0"],"surfaceKinds":["plane","sphere"]}}

@@ -395,6 +395,172 @@
     return null;
   }
 
+  // Surface–surface intersections. Only exact analytic families are handled:
+  // plane/plane, plane/quadric (through section), sphere/sphere,
+  // parallel-axis cylinder/cylinder, and a sphere with a cylinder whose axis
+  // passes through the sphere centre. A supported pair always returns a
+  // result; `kind:'none'` means the supporting surfaces miss. An unsupported
+  // pair returns null rather than a sampled or approximate curve.
+  function tolerance(values) {
+    var scale = 1;
+    values.forEach(function (v) {
+      if (Number.isFinite(v)) scale = Math.max(scale, Math.abs(v));
+    });
+    return 1e-6 * scale;
+  }
+  function copyFields(source) {
+    var out = {};
+    Object.keys(source || {}).forEach(function (k) { out[k] = source[k]; });
+    return out;
+  }
+  function none(reason, extra) {
+    var result = {kind:'none', relation:'none', reason:reason};
+    Object.keys(extra || {}).forEach(function (k) { result[k] = extra[k]; });
+    return result;
+  }
+  function tagged(result, a, b) {
+    result.surfaceIds = [a.id === undefined ? null : a.id, b.id === undefined ? null : b.id];
+    result.surfaceKinds = [a.kind, b.kind];
+    if (result.kind === 'point') result.degenerate = true;
+    return result;
+  }
+
+  function planePlane(a, b) {
+    var pa = planeSpec(a), pb = planeSpec(b);
+    if (!pa || !pb) return null;
+    var direction = cross(pa.normal, pb.normal);
+    var tol = tolerance([length(pa.origin), length(pb.origin)]);
+    if (length(direction) <= EPS) {
+      var distance = Math.abs(dot(pa.normal, sub(pb.origin, pa.origin)));
+      if (distance <= tol) return {kind:'plane-overlap', relation:'coincident',
+        plane:{origin:pa.origin, normal:pa.normal}};
+      return none('parallel', {distance:distance});
+    }
+    var cut = section(a, b);
+    return {kind:'line', relation:'transverse', origin:cut.origin, direction:cut.direction};
+  }
+
+  // A plane section is already the exact intersection of one plane with one
+  // quadric. Reuse it, adding the pair identity and the relation.
+  function planeQuadric(plane, surface) {
+    var cut = section(surface, plane);
+    if (!cut) return none('no-section');
+    var result = copyFields(cut);
+    if (cut.kind === 'point') result.relation = cut.sectionType === 'tangent' ? 'tangent' : 'degenerate';
+    else if (/tangent/.test(cut.sectionType || '')) result.relation = 'tangent';
+    else result.relation = 'transverse';
+    return result;
+  }
+
+  function sphereSphere(a, b) {
+    var delta = sub(b.center, a.center), d = length(delta);
+    var r1 = a.radius, r2 = b.radius;
+    var tol = tolerance([r1, r2, d]);
+    if (d <= tol) {
+      if (Math.abs(r1 - r2) <= tol) return {kind:'coincident', relation:'coincident',
+        center:a.center, radius:r1};
+      return none('concentric', {distance:d});
+    }
+    var e = mul(delta, 1/d);
+    if (d > r1 + r2 + tol) return none('separate', {distance:d, gap:d - r1 - r2});
+    if (d < Math.abs(r1 - r2) - tol) return none('contained', {distance:d});
+    var h = (d*d + r1*r1 - r2*r2) / (2*d);
+    var rho2 = r1*r1 - h*h;
+    if (rho2 <= tol*tol) {
+      // External tangency touches between the centres; internal tangency
+      // touches on the far side of the smaller sphere.
+      var point;
+      if (Math.abs(d - r1 - r2) <= Math.abs(d - Math.abs(r1 - r2))) {
+        point = add(a.center, mul(e, r1));
+        return {kind:'point', relation:'tangent', tangent:'external', point:point};
+      }
+      point = add(a.center, mul(e, r1 >= r2 ? r1 : -r1));
+      return {kind:'point', relation:'tangent', tangent:'internal', point:point};
+    }
+    var b2 = basis(e);
+    return {kind:'circle', relation:'transverse', center:add(a.center, mul(e, h)),
+      u:b2.u, v:b2.v, radius:Math.sqrt(rho2)};
+  }
+
+  // Parallel/coaxial cylinders intersect in zero, one or two lines. Skew and
+  // intersecting-axis cylinders (a quartic curve) are not approximated.
+  function cylinderCylinder(a, b) {
+    var axis = unit(a.axis), otherAxis = unit(b.axis);
+    if (length(cross(axis, otherAxis)) > 1e-7) return null;
+    var delta = sub(b.origin, a.origin);
+    var perp = sub(delta, mul(axis, dot(delta, axis)));
+    var p = length(perp);
+    var r1 = a.radius, r2 = b.radius;
+    var tol = tolerance([r1, r2, p]);
+    if (p <= tol) {
+      if (Math.abs(r1 - r2) <= tol) return {kind:'coincident', relation:'coincident',
+        origin:a.origin, axis:axis, radius:r1};
+      return none('coaxial', {distance:p});
+    }
+    if (p > r1 + r2 + tol) return none('separate', {distance:p, gap:p - r1 - r2});
+    if (p < Math.abs(r1 - r2) - tol) return none('contained', {distance:p});
+    var e = mul(perp, 1/p);
+    var h = (p*p + r1*r1 - r2*r2) / (2*p);
+    var s2 = r1*r1 - h*h;
+    var origin = add(a.origin, mul(e, h));
+    if (s2 <= tol*tol) {
+      return {kind:'line', relation:'tangent',
+        tangent:p >= r1 + r2 - tol ? 'external' : 'internal',
+        origin:origin, direction:axis};
+    }
+    var s = Math.sqrt(s2), w = unit(cross(axis, e));
+    return {kind:'lines', relation:'transverse', lines:[
+      {origin:add(origin, mul(w, s)), direction:axis},
+      {origin:add(origin, mul(w, -s)), direction:axis}
+    ]};
+  }
+
+  // Exact sphere/cylinder case: the cylinder axis passes through the sphere
+  // centre, so both are surfaces of revolution about that axis. The general
+  // offset-axis case is a quartic space curve and stays unsupported.
+  function sphereCylinder(sphere, cylinder) {
+    var axis = unit(cylinder.axis);
+    var delta = sub(sphere.center, cylinder.origin);
+    var axial = dot(delta, axis);
+    var offset = length(sub(delta, mul(axis, axial)));
+    var tol = tolerance([sphere.radius, cylinder.radius, offset]);
+    if (offset > tol) {
+      // An offset axis is a quartic curve, but the clearly disjoint cases are
+      // still decidable from the radial distance range of the sphere.
+      var gap = offset - cylinder.radius - sphere.radius;
+      if (gap > tol) return none('separate', {distance:offset, gap:gap});
+      if (offset + sphere.radius < cylinder.radius - tol) return none('contained', {distance:offset});
+      return null;
+    }
+    var center = add(cylinder.origin, mul(axis, axial));
+    var h2 = sphere.radius*sphere.radius - cylinder.radius*cylinder.radius;
+    if (h2 < -tol*tol) return none('contained', {distance:offset});
+    var b = basis(axis);
+    if (Math.abs(h2) <= tol*tol) {
+      return {kind:'circle', relation:'tangent', center:center,
+        u:b.u, v:b.v, radius:cylinder.radius};
+    }
+    var h = Math.sqrt(h2);
+    return {kind:'circles', relation:'transverse', circles:[
+      {center:add(center, mul(axis, h)), u:b.u, v:b.v, radius:cylinder.radius},
+      {center:add(center, mul(axis, -h)), u:b.u, v:b.v, radius:cylinder.radius}
+    ]};
+  }
+
+  function intersect(a, b) {
+    if (!a || !b || !a.kind || !b.kind) return null;
+    var result;
+    if (a.kind === 'plane' && b.kind === 'plane') result = planePlane(a, b);
+    else if (a.kind === 'plane') result = planeQuadric(a, b);
+    else if (b.kind === 'plane') result = planeQuadric(b, a);
+    else if (a.kind === 'sphere' && b.kind === 'sphere') result = sphereSphere(a, b);
+    else if (a.kind === 'cylinder' && b.kind === 'cylinder') result = cylinderCylinder(a, b);
+    else if (a.kind === 'sphere' && b.kind === 'cylinder') result = sphereCylinder(a, b);
+    else if (a.kind === 'cylinder' && b.kind === 'sphere') result = sphereCylinder(b, a);
+    else return null;
+    return result && tagged(result, a, b);
+  }
+
   function loopSide(loop, spec, curves, vertices) {
     var distances = [], invalid = false;
     function distance(p) { return dot(spec.normal, sub(p, spec.origin)); }
@@ -457,6 +623,7 @@
     validate:validate,
     summarize:summarize,
     section:section,
+    intersect:intersect,
     trim:trim,
     planeSpec:planeSpec,
     point:curvePoint,

@@ -155,15 +155,30 @@ function runScript(text, options) {
     surfaceChecks++;
     try {
       var request = JSON.parse(query[1]), g = solid.geometry;
-      var surface = request.from ? querySurfaces[request.from] : g && (g.surfaces || [])[request.surface];
-      if (!surface) throw new Error('Missing reconstructed surface');
+      function pick(ref) {
+        if (typeof ref === 'number') return g && (g.surfaces || [])[ref];
+        if (typeof ref === 'string') return querySurfaces[ref];
+        return undefined;
+      }
       var result;
-      if (request.operation === 'section') result = Surfaces.section(surface,request.plane);
-      else if (request.operation === 'trim') {
-        var trimmed = Surfaces.trim(surface,request.plane,request.keepPositive,g);
-        if (request.save && trimmed) querySurfaces[request.save] = trimmed;
-        result = trimmed && {surface:trimmed, validation:Surfaces.validate({surfaces:[trimmed]},g)};
-      } else throw new Error('Unknown surface operation');
+      if (request.operation === 'intersect') {
+        var refs = request.surfaces || [
+          request.from !== undefined ? request.from : request.surface,
+          request.with !== undefined ? request.with : request.other
+        ];
+        var first = pick(refs[0]), second = pick(refs[1]);
+        if (!first || !second) throw new Error('Missing reconstructed surface');
+        result = Surfaces.intersect(first,second);
+      } else {
+        var surface = pick(request.from !== undefined ? request.from : request.surface);
+        if (!surface) throw new Error('Missing reconstructed surface');
+        if (request.operation === 'section') result = Surfaces.section(surface,request.plane);
+        else if (request.operation === 'trim') {
+          var trimmed = Surfaces.trim(surface,request.plane,request.keepPositive,g);
+          if (request.save && trimmed) querySurfaces[request.save] = trimmed;
+          result = trimmed && {surface:trimmed, validation:Surfaces.validate({surfaces:[trimmed]},g)};
+        } else throw new Error('Unknown surface operation');
+      }
       if (!Object.prototype.hasOwnProperty.call(request,'expect') || !matches(result,request.expect))
         throw new Error('Expected '+JSON.stringify(request.expect)+', got '+JSON.stringify(result));
     } catch (err) {

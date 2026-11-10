@@ -35,11 +35,16 @@
     var l1 = tr / 2 + disc, l2 = tr / 2 - disc;
     if (!(l1 > EPS * EPS) || !(l2 > 0)) return null;
     var a = Math.sqrt(2 * l1), b = Math.sqrt(2 * l2);
+    // A near-axis-aligned ellipse has a tiny but nonzero xy from rounding.
+    // Compare it relatively, or the eigenvector above collapses to noise.
     var mx = 1, my = 0;
-    if (Math.abs(xy) > 1e-12) { mx = l1 - yy; my = xy; }
+    if (Math.abs(xy) > 1e-12 * Math.max(1, xx + yy)) { mx = l1 - yy; my = xy; }
     else if (xx < yy) { mx = 0; my = 1; }
     var ml = Math.hypot(mx, my);
-    if (!(ml > EPS)) { mx = 1; my = 0; ml = 1; }
+    if (!(ml > EPS)) {
+      if (xx < yy) { mx = 0; my = 1; } else { mx = 1; my = 0; }
+      ml = 1;
+    }
     mx /= ml; my /= ml;
     var maxErr = 0;
     for (i = 0; i < points.length; i++) {

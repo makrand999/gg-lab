@@ -39,6 +39,9 @@ The model is built from the same patches used by the preview:
   analytic boundary curve;
 - a ruled patch between coaxial/silhouette-matched boundaries becomes a
   `cylinder` or `cone`, with generators attached through `sourceIds`;
+- a closed circle in a general plane becomes a bounded `plane` cap on its own,
+  or a `cone` when tangent generator strokes support one apex on that circle's
+  plane normal. The cap and cone share the analytic boundary curve;
 - a sphere silhouette pair becomes a `sphere`.
 
 The straight-wire adapters expose `faceRegions` rather than `surfacePatches`;
@@ -90,6 +93,43 @@ operation; general surface–surface intersections and splitting of arbitrary
 curved loops remain future work. `cone.edu` exercises a cone trim parallel to
 its base; an oblique conic cut is rejected rather than approximated.
 
+## End-to-end case: cone over an inclined circle
+
+`cone-oblique-boundary.edu` draws a circle in a general plane as a closed
+approximating polyline in plan and elevation, then two tangent generators in
+elevation. The pipeline:
+
+1. pairs the two projected ellipses and recovers the 3D base circle (centre,
+   plane normal, and radius) without a solid name;
+2. projects that circle back to each view and tests the straight strokes for
+   tangency, deriving the two tangency stations and their common projected
+   apex;
+3. intersects the elevation projection ray with the base circle's plane
+   normal, which fixes the 3D apex;
+4. adds the 24-facet cone side and the planar base cap, both sharing the
+   analytic circle boundary.
+
+The model reports 25 vertices, 48 edges, 25 faces, one `cone` and one `plane`,
+two boundary loops, and one closed shell. The extra section query checks the
+analytic cone against the base plane.
+
+```sh
+node tools/edc.js tools/scripts/cone-oblique-boundary.edu
+node tools/edc.js tools/scripts/cone-oblique-profile.edu
+node tools/edc.js tools/scripts/cone-oblique-plan.edu
+node tools/edc.js tools/scripts/cone-oblique-edge-on.edu
+node tools/edc.js tools/scripts/cone-oblique-conflict.edu
+```
+
+`cone-oblique-profile.edu` uses a plan/profile pair with a mirrored frame.
+`cone-oblique-plan.edu` supplies the generators in plan.
+`cone-oblique-edge-on.edu` sees the base plane edge-on in elevation, so the
+plan ellipse and the elevation line run recover the circle before the two
+elevation tangents fix the apex. In
+`cone-oblique-conflict.edu` the tangent generators meet off the base normal;
+the pipeline reports `cone-apex-conflict` and leaves the boundary as a planar
+cap rather than inferring an oblique cone.
+
 ## End-to-end case: truncated cylinder
 
 `truncated-cylinder.edu` draws a plan circle, a slanted elevation trace, and
@@ -132,6 +172,11 @@ reports `curve-projection-ambiguous` and retains both candidate levels.
 - Principal/oblique circles, inclined full-circle traces, and oblique arcs
   (including arc/line pairs) are lifted. A partial inclined trace of a full
   circular boundary still reports `curve-inclined-arc-unsupported`.
+- A bounded cone requires a circular base. Its apex must lie on the base
+  circle's plane normal; an oblique cone reports `cone-apex-conflict`, and a
+  boundary with no agreeing tangent-pair evidence stays planar. Cones over a
+  non-circular 3D ellipse, and frusta between two independently inclined
+  boundaries, are not modelled.
 - Cone sections are classified but not yet returned as trimmed ellipse/hyperbola
   boundary curves.
 - General cylinder–cylinder, cone–cylinder and curved-surface intersections are

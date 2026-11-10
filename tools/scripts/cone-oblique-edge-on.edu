@@ -1,0 +1,87 @@
+# Inclined circular base seen edge-on in elevation: the plan ellipse and the
+# elevation line run recover the circle, and two elevation tangents meet at
+# the apex. No solid name is declared.
+# expect: 25V 48E 25F curves=1 oblique=1 obliqueReprojection=ok surfaces=2 surfaceKinds=cone,plane surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+/datum -100 400
+/profile 100 0 1
+/point plan0 19.8336046869 -14.0013519810 plan
+/point plan1 17.6136237467 -14.2805251968 plan
+/point plan2 15.4661516413 -15.0373267000 plan
+/point plan3 13.4564382242 -16.2487614600 plan
+/point plan4 11.6455476203 -17.8780206446 plan
+/point plan5 10.0885028245 -19.8756000378 plan
+/point plan6 8.8326138549 -22.1808042008 plan
+/point plan7 7.9160402623 -24.7235906713 plan
+/point plan8 7.3666316716 -27.4266981694 plan
+/point plan9 7.2010815848 -30.2079941414 plan
+/point plan10 7.4244201574 -32.9829703167 plan
+/point plan11 8.0298613600 -35.6673104483 plan
+/point plan12 8.9990091680 -38.1794522198 plan
+/point plan13 10.3024165157 -40.4430654746 plan
+/point plan14 11.9004800303 -42.3893714694 plan
+/point plan15 13.7446433606 -43.9592326814 plan
+/point plan16 15.7788725371 -45.1049496721 plan
+/point plan17 17.9413585355 -45.7917104105 plan
+/point plan18 20.1663953131 -45.9986480190 plan
+/point plan19 22.3863762533 -45.7194748032 plan
+/point plan20 24.5338483587 -44.9626733000 plan
+/point plan21 26.5435617758 -43.7512385400 plan
+/point plan22 28.3544523797 -42.1219793554 plan
+/point plan23 29.9114971755 -40.1243999622 plan
+/point plan24 31.1673861451 -37.8191957992 plan
+/point plan25 32.0839597377 -35.2764093287 plan
+/point plan26 32.6333683284 -32.5733018306 plan
+/point plan27 32.7989184152 -29.7920058586 plan
+/point plan28 32.5755798426 -27.0170296833 plan
+/point plan29 31.9701386400 -24.3326895517 plan
+/point plan30 31.0009908320 -21.8205477802 plan
+/point plan31 29.6975834843 -19.5569345254 plan
+/point plan32 28.0995199697 -17.6106285306 plan
+/point plan33 26.2553566394 -16.0407673186 plan
+/point plan34 24.2211274629 -14.8950503279 plan
+/point plan35 22.0586414645 -14.2082895895 plan
+/line plan0 plan1 A plan
+/line plan1 plan2 A plan
+/line plan2 plan3 A plan
+/line plan3 plan4 A plan
+/line plan4 plan5 A plan
+/line plan5 plan6 A plan
+/line plan6 plan7 A plan
+/line plan7 plan8 A plan
+/line plan8 plan9 A plan
+/line plan9 plan10 A plan
+/line plan10 plan11 A plan
+/line plan11 plan12 A plan
+/line plan12 plan13 A plan
+/line plan13 plan14 A plan
+/line plan14 plan15 A plan
+/line plan15 plan16 A plan
+/line plan16 plan17 A plan
+/line plan17 plan18 A plan
+/line plan18 plan19 A plan
+/line plan19 plan20 A plan
+/line plan20 plan21 A plan
+/line plan21 plan22 A plan
+/line plan22 plan23 A plan
+/line plan23 plan24 A plan
+/line plan24 plan25 A plan
+/line plan25 plan26 A plan
+/line plan26 plan27 A plan
+/line plan27 plan28 A plan
+/line plan28 plan29 A plan
+/line plan29 plan30 A plan
+/line plan30 plan31 A plan
+/line plan31 plan32 A plan
+/line plan32 plan33 A plan
+/line plan33 plan34 A plan
+/line plan34 plan35 A plan
+/line plan35 plan0 A plan
+/point elev-a0 32.8000000000 20.4000000000 elevation
+/point elev-a1 7.2000000000 39.6000000000 elevation
+/line elev-a0 elev-a1 A elevation
+/point apex 44.0000000000 62.0000000000 elevation
+/line apex elev-a0 A elevation
+/line apex elev-a1 A elevation
+
+# expect: surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0.6,"y":0.8,"z":0}},"expect":{"kind":"circle","center":{"x":20,"y":30,"z":30},"radius":16}}

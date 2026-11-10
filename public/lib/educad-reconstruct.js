@@ -2812,6 +2812,17 @@
         geometry.curves.push(c);
       });
     }
+    // A circle in a general plane projects to ellipses. If tangent generator
+    // strokes support one apex on the base plane normal, infer a bounded cone
+    // and its planar cap. The oblique boundary itself stays the shared loop.
+    if (geometry && geometry.curves.some(function(c) {return c.oblique;}) && Curves.inferBoundedCones) {
+      var cones = Curves.inferBoundedCones(geometry,normalized,frame);
+      cones.consumedIds.forEach(function(id) {used.add(id);});
+      diagnostics = diagnostics.concat(cones.issues);
+      diagnostics = diagnostics.filter(function(d,i,all) {
+        return all.findIndex(function(p) {return p.code===d.code && p.entityId===d.entityId;})===i;
+      });
+    }
     var consumedPoints = new Set(oblique.pointIds || []), neededPoints = new Set();
     list.forEach(function(e) {
       var meta=e.meta || {}, refs=meta.endpointRefs || meta.refs || [];

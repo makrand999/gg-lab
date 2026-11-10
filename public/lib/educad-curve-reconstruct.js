@@ -653,5 +653,251 @@
     return {geometry:geometry.vertices.length?geometry:null,issues:issues,consumedIds:Array.from(used),
       unresolvedIds:ink.filter(function(e) {return (isCurve(e)||e.type==='SEGMENT') && !used.has(e.id);}).map(function(e) {return e.id;})};
   }
-  return { reconstruct:reconstruct, point:point, isCurve:isCurve, resolveProfileFrame:resolveProfileFrame };
+  // ---- Bounded cones over inclined circular boundaries ----
+  // A circle in a general plane projects to an ellipse in a principal view.
+  // Two straight silhouette strokes tangent to that projection and meeting at
+  // a common point locate the projected apex. The 3D apex is then the point on
+  // the base circle's plane normal that projects to it. This is the same
+  // surface family as the coaxial cone path, but the tangency and apex are
+  // derived from the actual projected conic instead of center.x +/- radius.
+  function cvAdd(a,b) {return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z};}
+  function cvSub(a,b) {return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};}
+  function cvMul(a,s) {return {x:a.x*s,y:a.y*s,z:a.z*s};}
+  function cvDot(a,b) {return a.x*b.x+a.y*b.y+a.z*b.z;}
+  function cvCross(a,b) {return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
+  function cvUnit(v) {
+    var l=Math.hypot(v.x,v.y,v.z);
+    return l>EPS?{x:v.x/l,y:v.y/l,z:v.z/l}:null;
+  }
+  function cvNormal(c) {return cvUnit(cvCross(c.u,c.v));}
+  function sheetPoint(p,role,profile) {
+    if(role==='PLAN') return {x:p.x,y:-p.z};
+    if(role==='ELEVATION') return {x:p.x,y:p.y};
+    if(role==='PROFILE'&&profile) return {x:profile.xRef+profile.s*(p.z-profile.dRef),y:p.y};
+    return null;
+  }
+  function sheetVector(v,role,profile) {
+    if(role==='PLAN') return {x:v.x,y:-v.z};
+    if(role==='ELEVATION') return {x:v.x,y:v.y};
+    if(role==='PROFILE'&&profile) return {x:profile.s*v.z,y:v.y};
+    return null;
+  }
+  function curveRadii(c) {
+    return {u:c.radiusU===undefined?c.radius:c.radiusU,v:c.radiusV===undefined?c.radius:c.radiusV};
+  }
+  function anglePoint(c,a) {
+    var start=c.startAngle||0,sweep=c.sweepAngle===undefined?TAU:c.sweepAngle;
+    return Parametric.point(c,sweep?((a-start)/sweep):0);
+  }
+  function projectedConic(c,role,profile) {
+    var center=sheetPoint(c.center,role,profile),ru=sheetVector(c.u,role,profile),rv=sheetVector(c.v,role,profile);
+    if(!center||!ru||!rv) return null;
+    var radii=curveRadii(c);
+    return {center:center,u:{x:ru.x*radii.u,y:ru.y*radii.u},v:{x:rv.x*radii.v,y:rv.y*radii.v}};
+  }
+  function coneTolerance(c) {
+    var radii=curveRadii(c);
+    return Math.max(0.75,0.01*Math.max(radii.u,radii.v));
+  }
+  // A line is tangent to x(t)=center+u*cos(t)+v*sin(t) exactly when its
+  // signed support at the centre equals the conic's support in that normal
+  // direction. Solving that sinusoid gives the tangency station on the drawn
+  // boundary, including the degenerate line projection of an edge-on circle.
+  function segmentTangency(conic,segment,tol) {
+    var dx=segment.x2-segment.x,dy=segment.y2-segment.y,len=Math.hypot(dx,dy);
+    if(len<EPS) return null;
+    var a=-dy/len,b=dx/len,c=-(a*segment.x+b*segment.y);
+    var d0=a*conic.center.x+b*conic.center.y+c;
+    var A=a*conic.u.x+b*conic.u.y,B=a*conic.v.x+b*conic.v.y,rho=Math.hypot(A,B);
+    if(rho<EPS||Math.abs(Math.abs(d0)-rho)>tol) return null;
+    var t=Math.atan2(-d0*B,-d0*A);
+    return {t:t};
+  }
+  function lineIntersection(a,b) {
+    var dx1=a.x2-a.x,dy1=a.y2-a.y,dx2=b.x2-b.x,dy2=b.y2-b.y;
+    var den=dx1*dy2-dy1*dx2,scale=Math.hypot(dx1,dy1)*Math.hypot(dx2,dy2);
+    if(Math.abs(den)<=1e-9*scale) return null;
+    var t=((b.x-a.x)*dy2-(b.y-a.y)*dx2)/den;
+    return {x:a.x+t*dx1,y:a.y+t*dy1};
+  }
+  // Accept split/overlapping strokes along the same tangent. The union must
+  // start at the tangency station and reach the common apex station.
+  function tangentStrokeEvidence(segments,role,from,to,tol) {
+    var dx=to.x-from.x,dy=to.y-from.y,len2=dx*dx+dy*dy;
+    if(len2<EPS*EPS) return [];
+    var len=Math.sqrt(len2),slack=tol/len,intervals=[];
+    segments.forEach(function(s) {
+      if(viewOf(s)!==role) return;
+      if(Math.abs((s.x-from.x)*dy-(s.y-from.y)*dx)/len>tol) return;
+      if(Math.abs((s.x2-from.x)*dy-(s.y2-from.y)*dx)/len>tol) return;
+      var a=((s.x-from.x)*dx+(s.y-from.y)*dy)/len2;
+      var b=((s.x2-from.x)*dx+(s.y2-from.y)*dy)/len2;
+      intervals.push({a:Math.min(a,b),b:Math.max(a,b),id:s.id});
+    });
+    if(!intervals.length) return [];
+    intervals.sort(function(a,b) {return a.a-b.a;});
+    var reach=0,ids=[],first=Infinity;
+    intervals.forEach(function(i) {
+      if(i.a<=reach+1e-6) {reach=Math.max(reach,i.b);ids.push(i.id);first=Math.min(first,i.a);}
+    });
+    if(first>slack||reach<1-slack) return [];
+    return Array.from(new Set(ids));
+  }
+  // The base plane normal is the only direction a right circular cone's apex
+  // can lie along. Intersect that line with the view's projection ray.
+  function solveConeApex(c,role,projected,profile,tol) {
+    var normal=cvNormal(c);
+    if(!normal) return {state:'invalid'};
+    var fixed=[];
+    if(role==='PLAN') fixed=[{axis:'x',value:projected.x},{axis:'z',value:-projected.y}];
+    else if(role==='ELEVATION') fixed=[{axis:'x',value:projected.x},{axis:'y',value:projected.y}];
+    else if(role==='PROFILE'&&profile&&profile.s) {
+      fixed=[{axis:'y',value:projected.y},{axis:'z',value:profile.dRef+(projected.x-profile.xRef)/profile.s}];
+    } else return {state:'invalid'};
+    var best=null;
+    fixed.forEach(function(f) {
+      var coef=normal[f.axis];
+      if(Math.abs(coef)>1e-6&&(!best||Math.abs(coef)>Math.abs(best.coef))) best={axis:f.axis,coef:coef};
+    });
+    if(!best) {
+      // The normal is parallel to this view's projection ray. If the ray is
+      // the normal line itself the apex height is genuinely open; a distinct
+      // parallel ray cannot contain any right-cone apex.
+      var centerOnSheet=sheetPoint(c.center,role,profile);
+      if(centerOnSheet&&Math.hypot(centerOnSheet.x-projected.x,centerOnSheet.y-projected.y)<=tol)
+        return {state:'undetermined'};
+      return {state:'conflict',residual:Infinity};
+    }
+    var t=(fixed.find(function(f) {return f.axis===best.axis;}).value-c.center[best.axis])/best.coef;
+    var residual=0;
+    fixed.forEach(function(f) {residual=Math.max(residual,Math.abs(c.center[f.axis]+t*normal[f.axis]-f.value));});
+    if(residual>tol) return {state:'conflict',residual:residual};
+    if(Math.abs(t)*Math.hypot(normal.x,normal.y,normal.z)<tol) return {state:'degenerate'};
+    return {state:'ok',apex:cvAdd(c.center,cvMul(normal,t)),t:t};
+  }
+  function candidateConeApices(c,segments,profile) {
+    var tol=coneTolerance(c),out=[];
+    ['PLAN','ELEVATION','PROFILE'].forEach(function(role) {
+      if(role==='PROFILE'&&!profile) return;
+      var conic=projectedConic(c,role,profile);
+      if(!conic) return;
+      var viewSegments=segments.filter(function(s) {return viewOf(s)===role;});
+      var tangents=[];
+      viewSegments.forEach(function(s) {
+        var tg=segmentTangency(conic,s,tol);
+        if(!tg) return;
+        var p3=anglePoint(c,tg.t),p2=sheetPoint(p3,role,profile);
+        if(!p2) return;
+        tg.segment=s;tg.projected=p2;
+        tangents.push(tg);
+      });
+      for(var i=0;i<tangents.length;i++) for(var j=i+1;j<tangents.length;j++) {
+        var a=tangents[i],b=tangents[j];
+        if(Math.hypot(a.projected.x-b.projected.x,a.projected.y-b.projected.y)<=tol) continue;
+        var apex2=lineIntersection(a.segment,b.segment);
+        if(!apex2) continue;
+        var left=tangentStrokeEvidence(viewSegments,role,a.projected,apex2,tol);
+        var right=tangentStrokeEvidence(viewSegments,role,b.projected,apex2,tol);
+        if(!left.length||!right.length) continue;
+        var candidate={role:role,point:apex2,ids:Array.from(new Set(left.concat(right)))};
+        var duplicate=out.find(function(q) {return q.role===role&&Math.hypot(q.point.x-apex2.x,q.point.y-apex2.y)<=tol;});
+        if(duplicate) duplicate.ids=Array.from(new Set(duplicate.ids.concat(candidate.ids)));
+        else out.push(candidate);
+      }
+    });
+    return out;
+  }
+  function addInferredCone(geometry,ci,apex,sourceIds) {
+    var c=geometry.curves[ci],normal=cvNormal(c);
+    if(!normal||!c.displayVertices||c.displayVertices.length<3) return false;
+    var height=cvDot(cvSub(apex,c.center),normal);
+    if(Math.abs(height)<EPS) return false;
+    var positive=height>0,apexIndex=geometry.vertices.length;
+    geometry.vertices.push({x:apex.x,y:apex.y,z:apex.z});
+    var faceIndices=[];
+    for(var i=0;i<c.displayVertices.length;i++) {
+      var j=(i+1)%c.displayVertices.length,a=c.displayVertices[i],b=c.displayVertices[j];
+      var loop=[a,b,apexIndex];
+      if(!positive) loop.reverse();
+      geometry.edges.push([a,apexIndex]);
+      faceIndices.push(geometry.faces.length);
+      geometry.smoothSideFaces.push(geometry.faces.length);
+      geometry.faces.push(loop);
+    }
+    var cap=c.displayVertices.slice();
+    if(positive) cap.reverse();
+    var capIndex=geometry.faces.length;
+    geometry.faces.push(cap);
+    var axis=cvUnit(cvSub(apex,c.center));
+    geometry.surfacePatches.push({kind:'cone',analyticKind:'cone',axis:axis,origin:c.center,
+      radius:c.radius,halfAngle:Math.atan2(c.radius,Math.abs(height)),
+      boundaryCurves:[ci],apex:{x:apex.x,y:apex.y,z:apex.z},faceIndices:faceIndices,
+      sourceIds:sourceIds.slice()});
+    geometry.surfacePatches.push({kind:'plane',boundaryCurves:[ci],faceIndices:[capIndex],
+      sourceIds:c.sourceIds.slice()});
+    return true;
+  }
+  // Public surface-inference stage for curves that were lifted by the oblique
+  // kernel. It mutates the geometry and returns consumed stroke IDs and
+  // specific diagnostics. A boundary with no tangent-pair evidence is left as
+  // a standalone planar boundary rather than promoted to a guessed cone.
+  function inferBoundedCones(geometry,entities,profile) {
+    if(!geometry||!Array.isArray(geometry.curves)||!geometry.curves.length) return {consumedIds:[],issues:[]};
+    var issues=[],consumed=new Set();
+    geometry.surfacePatches=geometry.surfacePatches||[];
+    geometry.smoothSideFaces=geometry.smoothSideFaces||[];
+    var bound=new Set();
+    geometry.surfacePatches.forEach(function(p) {
+      (p.boundaryCurves||[]).forEach(function(i) {bound.add(i);});
+    });
+    var boundarySources=new Set();
+    geometry.curves.forEach(function(c) {
+      (c.sourceIds||[]).forEach(function(id) {boundarySources.add(id);});
+    });
+    var segments=(entities||[]).filter(function(e) {
+      return e&&e.type==='SEGMENT'&&!helper(e)&&!boundarySources.has(e.id);
+    });
+    geometry.curves.forEach(function(c,ci) {
+      if(bound.has(ci)||c.kind!=='circle') return;
+      var sweep=c.sweepAngle===undefined?TAU:c.sweepAngle;
+      if(Math.abs(sweep-TAU)>1e-6) return;
+      var candidates=candidateConeApices(c,segments,profile);
+      if(!candidates.length) return;
+      candidates.forEach(function(candidate) {candidate.ids.forEach(function(id) {consumed.add(id);});});
+      var tol=coneTolerance(c),determined=[],conflict=false;
+      candidates.forEach(function(candidate) {
+        var solved=solveConeApex(c,candidate.role,candidate.point,profile,tol);
+        if(solved.state==='ok') {
+          var duplicate=determined.find(function(q) {return Math.hypot(q.apex.x-solved.apex.x,q.apex.y-solved.apex.y,q.apex.z-solved.apex.z)<=tol;});
+          if(!duplicate) determined.push({apex:solved.apex,candidate:candidate});
+        } else if(solved.state==='conflict') conflict=true;
+      });
+      var entityId=(c.sourceIds||[])[0];
+      function report(code,message) {issues.push({code:code,entityId:entityId,message:message});}
+      if(determined.length>1) {
+        report('cone-apex-ambiguous','Distinct tangent-generator pairs support different apices; the cone is unresolved.');
+        return;
+      }
+      if(!determined.length) {
+        if(conflict) report('cone-apex-conflict','The tangent generators do not meet the base circle\'s plane normal; an oblique cone is not supported.');
+        else report('cone-apex-undetermined','The tangent generators leave the apex position along the base normal undetermined.');
+        return;
+      }
+      var apex=determined[0].apex,mismatch=null,evidence=[];
+      candidates.forEach(function(candidate) {
+        evidence=Array.from(new Set(evidence.concat(candidate.ids)));
+        if(mismatch) return;
+        var projected=sheetPoint(apex,candidate.role,profile);
+        if(!projected||Math.hypot(projected.x-candidate.point.x,projected.y-candidate.point.y)>tol) mismatch=candidate;
+      });
+      if(mismatch) {
+        report('cone-apex-conflict','Generator evidence in the declared views does not agree on one apex for this base boundary.');
+        return;
+      }
+      if(addInferredCone(geometry,ci,apex,evidence)) bound.add(ci);
+    });
+    return {consumedIds:Array.from(consumed),issues:issues};
+  }
+  return { reconstruct:reconstruct, point:point, isCurve:isCurve, resolveProfileFrame:resolveProfileFrame,
+    inferBoundedCones:inferBoundedCones };
 });

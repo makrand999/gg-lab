@@ -101,6 +101,29 @@ member IDs, source station IDs, and 3D positions, separately from tessellation.
 Missing or incompatible ellipse projections retain their diagnostics even when
 no oblique circle can be reconstructed and the pipeline uses straight geometry.
 
+A closed circular boundary in a general plane can bound a cone without naming
+the solid. Each declared view projects the analytic circle to a conic. A
+straight stroke tangent to that conic at a boundary station is a candidate
+silhouette generator; two such strokes that meet at one projected point and
+cover the interval from their tangency stations to that point identify a
+projected apex. The 3D apex is the intersection of that projection ray with the
+base circle's plane normal, so the inferred analytic surface is a right
+circular cone over the inclined circle. Tangency is evaluated from the actual
+projected ellipse, not from `centre.x +/- radius`, and works in plan,
+elevation, and the side frame. When the base plane is edge-on in a view, the
+existing ellipse/line-run pair supplies the circle and the same degenerate-conic
+tangency math supplies the generators. Generator evidence from several views must agree
+on one apex. The base cap and the cone share the same analytic boundary loop,
+so a complete drawing yields one closed shell. If tangent generators exist but
+their apex does not lie on the base normal, the drawing reports
+`cone-apex-conflict`; several distinct supported apices report
+`cone-apex-ambiguous`; a view whose projection ray is parallel to the base
+normal cannot fix the apex along that normal and reports
+`cone-apex-undetermined` when no other view resolves it. A boundary with no
+tangent-pair evidence stays a planar boundary. An oblique cone (apex off the
+base-plane normal), a cone over a non-circular 3D ellipse, and a frustum
+between two independently inclined boundaries remain unsupported.
+
 Open, unbranched elliptical segment chains are fitted with a normalized conic
 (at least 12 stations). Their ordered endpoints and swept portions must agree
 in the recovered circle plane across views. The output is an analytic `arc`,
@@ -241,6 +264,11 @@ node tools/edc.js tools/scripts/truncated-cylinder-depth-axis.edu
 node tools/edc.js tools/scripts/truncated-cylinder-mismatch.edu
 node tools/edc.js tools/scripts/truncated-cylinder-missing-surface.edu
 node tools/edc.js tools/scripts/truncated-cylinder-ambiguous.edu
+node tools/edc.js tools/scripts/cone-oblique-boundary.edu
+node tools/edc.js tools/scripts/cone-oblique-profile.edu
+node tools/edc.js tools/scripts/cone-oblique-plan.edu
+node tools/edc.js tools/scripts/cone-oblique-edge-on.edu
+node tools/edc.js tools/scripts/cone-oblique-conflict.edu
 node tools/edc.js tools/scripts/spline-through.edu
 node tools/edc.js tools/scripts/spline-reversed.edu
 node tools/edc.js tools/scripts/spline-closed.edu
@@ -300,8 +328,9 @@ confirms the curve was rebuilt from it rather than keeping stale control points.
 
 This starts the agreed pipeline; it is not complete reconstruction for every
 geometric solid. Full-circle inclined traces, closed and open ellipse/edge-on
-line pairs, and a first bounded plane/cylinder/cone/sphere model are implemented.
-Important next capabilities are general elliptical boundaries on cones,
+line pairs, inclined circular cone bases with tangent generators, and a first
+bounded plane/cylinder/cone/sphere model are implemented. Important next
+capabilities are oblique cones and non-circular elliptical bases,
 surface–surface intersections, curved recesses/fillets, and certification of
 the analytic surfaces rather than only their display triangles. Spheres,
 two-view oblique circles, elliptical arc chains, arc/line pairs, and

@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./educad-parametric.js'));
   } else {
-    root.EduCADRef3d = factory();
+    root.EduCADRef3d = factory(root.EduCADParametric);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+})(typeof window !== 'undefined' ? window : globalThis, function (Parametric) {
   'use strict';
   // EduCAD reference-3D previews: the teacher's browser derives a small 3D
   // shape from the 2D model answer and stores it on the question; students
@@ -92,6 +92,8 @@
           name: String(g.name === undefined ? 'wireframe' : g.name),
           vertices: verts, edges: edges, faces: faces,
           curves: g.curves || [], surfacePatches: g.surfacePatches || [],
+          surfaces: g.surfaces || [], surfaceModel: g.surfaceModel || null,
+          analyticSurfaceValidation: g.analyticSurfaceValidation || null,
           smoothSideFaces: g.smoothSideFaces, topologyStatus: g.topologyStatus,
           faceHoles: (g.faceHoles || faces.map(function() { return []; })).map(function(holes) { return holes.map(function(hole) { return copyFace(hole, verts.length); }); })
         }
@@ -137,12 +139,21 @@
         return Array.isArray(values) && values.every(function(v) {return Number.isInteger(v) && v>=0 && v<count;});
       }
       if (g.smoothSideFaces !== undefined && !indices(g.smoothSideFaces,g.faces.length)) return false;
+      if (g.surfaces !== undefined && !Array.isArray(g.surfaces)) return false;
+      if (g.surfaceModel !== undefined && g.surfaceModel !== null && typeof g.surfaceModel !== 'object') return false;
       if (g.curves !== undefined) {
         if (!Array.isArray(g.curves)) return false;
         for (var ci=0;ci<g.curves.length;ci++) {
           var c=g.curves[ci];
-          if (!c || ['circle','circular-arc'].indexOf(c.kind)===-1 || !isFiniteNumber(c.radius) || c.radius<=0 ||
+          if(c && c.kind==='nurbs') {
+            if(!Parametric.validate(c)||!indices(c.displayVertices,g.vertices.length)||!indices(c.displayEdges,g.edges.length))return false;
+            continue;
+          }
+          if (!c || ['circle','circular-arc','ellipse'].indexOf(c.kind)===-1 ||
               !isFiniteNumber(c.startAngle) || !isFiniteNumber(c.sweepAngle) || c.sweepAngle<=0) return false;
+          if (c.kind === 'ellipse') {
+            if (!isFiniteNumber(c.radiusU) || c.radiusU<=0 || !isFiniteNumber(c.radiusV) || c.radiusV<=0) return false;
+          } else if (!isFiniteNumber(c.radius) || c.radius<=0) return false;
           copyVertex(c.center); copyVertex(c.u); copyVertex(c.v);
           if (!indices(c.displayVertices,g.vertices.length) || !indices(c.displayEdges,g.edges.length)) return false;
         }

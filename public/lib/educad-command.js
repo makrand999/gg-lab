@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory(function () { return require('./educad-drafting.js'); });
+    module.exports = factory(function () { return require('./educad-drafting.js'); }, require('./educad-parametric.js'));
   } else {
-    root.EduCADCommand = factory(function () { return root.EduCADDrafting; });
+    root.EduCADCommand = factory(function () { return root.EduCADDrafting; }, root.EduCADParametric);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function (getDrafting) {
+})(typeof window !== 'undefined' ? window : globalThis, function (getDrafting, Parametric) {
   'use strict';
   // EduCAD slash commands: draw the sheet without a mouse, Minecraft-style.
   // Users and agents type /<cmd> into the sheet's command line; this module
@@ -125,6 +125,15 @@
       args: [{ name: 'p1', kind: 'point-name' },
         { name: 'p2', kind: 'point-name' },
         { name: 'p3', kind: 'point-name', variadic: true }] },
+    { name: 'curve-through', usage: '/curve-through <p1> <p2> [p3 ...] [closed] [plan|elevation|profile]',
+      hint: 'Interpolate a natural or periodic cubic curve through ordered points',
+      args: [{name:'points',kind:'point-name',variadic:true}] },
+    { name: 'circle-through', usage: '/circle-through <p1> <p2> <p3> [plan|elevation|profile]',
+      hint: 'Exact circle through three non-collinear points',
+      args: [{name:'points',kind:'point-name',variadic:true}] },
+    { name: 'arc-through', usage: '/arc-through <start> <through> <end> [plan|elevation|profile]',
+      hint: 'Exact circular arc through three ordered points',
+      args: [{name:'points',kind:'point-name',variadic:true}] },
     { name: 'polyline', usage: '/polyline <p1> <p2> [p3 ...]',
       hint: 'Open chain through named points (curves)',
       args: [{ name: 'p1', kind: 'point-name' },
@@ -690,6 +699,7 @@
     if (p.name === 'circle' || p.name === 'arc' || p.name === 'ellipse') {
       return previewRound(p.name, args, ctx);
     }
+    if (['curve-through','circle-through','arc-through'].indexOf(p.name)!==-1) return spec.hint+' — '+spec.usage;
     if (p.name === 'hatch') return previewHatch(args, ctx);
     var fixed = spec.args;
     var need = 0;
@@ -1031,7 +1041,7 @@
     var args = p.args;
 
     var readOnly = env.readOnly === true;
-    var mutating = ['point', 'line', 'ray', 'xline', 'circle', 'arc', 'text',
+    var mutating = ['curve-through', 'circle-through', 'arc-through', 'point', 'line', 'ray', 'xline', 'circle', 'arc', 'text',
       'dimension', 'polygon', 'polyline', 'ellipse', 'hatch', 'rename',
       'delete', 'style', 'datum', 'clear', 'undo', 'demo',
       'tutorial'].indexOf(p.name) !== -1;
@@ -1139,6 +1149,31 @@
         return { ok: true,
           message: xverbs[p.name] + args[0] + ' → ' + args[1] + '.',
           ids: [seg.ent.id] };
+      }
+      case 'curve-through':
+      case 'circle-through':
+      case 'arc-through': {
+        var tokens=args.slice(), curveRole=null, closed=false;
+        if(tokens.length && ['plan','elevation','profile'].indexOf(tokens[tokens.length-1].toLowerCase())!==-1) curveRole=tokens.pop().toUpperCase();
+        if(tokens[tokens.length-1]==='closed') {closed=true;tokens.pop();}
+        if(p.name!=='curve-through' && (closed||tokens.length!==3)) return fail('Usage: '+spec.usage);
+        var through=[];
+        for(var ti=0;ti<tokens.length;ti++) {var found=needPoint(tokens[ti]);if(found.fail)return found.fail;through.push(found.ent);}
+        if(!through.length)return fail('Usage: '+spec.usage);
+        curveRole=curveRole||through[0].viewRole;
+        if(['PLAN','ELEVATION','PROFILE'].indexOf(curveRole)===-1 || through.some(function(e){return e.viewRole!==curveRole;}))
+          return fail('All defining points must belong to the same declared view.');
+        try {
+          var cm={refs:through.map(function(e){return e.id;}),throughRefs:through.map(function(e){return e.id;}),construction:p.name};
+          var options={bisCode:'A',viewRole:curveRole,meta:cm};
+          if(p.name==='curve-through') {
+            cm.curve=Parametric.interpolate(through,closed);
+            options.x=through[0].x;options.y=through[0].y;
+          } else {Object.assign(options,Parametric.throughCircle(through,p.name==='arc-through'));cm.throughDirection=options.throughDirection;}
+          var made=create(p.name==='curve-through'?'CURVE':p.name==='circle-through'?'CIRCLE':'CIRCULAR_ARC',options);
+          if(made.fail)return made.fail;
+          return {ok:true,ids:[made.ent.id],message:p.name==='curve-through'?'Drew an interpolated '+(closed?'periodic':'natural')+' cubic curve through '+through.length+' points.':'Drew an exact '+(p.name==='circle-through'?'circle':'arc')+' through three points.'};
+        } catch(error) {return fail(error.message);}
       }
       case 'circle':
       case 'arc': {

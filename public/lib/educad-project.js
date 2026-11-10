@@ -287,11 +287,18 @@
     });
   }
 
+  // Point visibility uses the same face/hole ray test as edge intervals.
+  function pointHidden(geometry, point, view) {
+    var direction=view==='top'?[0,1,0]:view==='front'?[0,0,1]:view==='left'?[-1,0,0]:[1,0,0];
+    var verts=geometry.vertices.concat([point]), index=verts.length-1;
+    return edgeHiddenAt(verts,geometry.faces || [],geometry.faceHoles || [],{},index,index,
+      direction[0],direction[1],direction[2],0);
+  }
   return {
     VERSION: VERSION,
     WORLD_UNITS: WORLD_UNITS,
     VIEWS: VIEWS,
     HIT_EPS: HIT_EPS,
-    projectSolid: projectSolid, projectGeometry: projectGeometry
+    projectSolid: projectSolid, projectGeometry: projectGeometry, pointHidden: pointHidden
   };
 });

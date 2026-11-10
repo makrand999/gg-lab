@@ -42,6 +42,10 @@ frame (`/profile`, `options.profile`, or `meta.draftingLayout`) always wins. If
 none is declared but profile ink exists, the frame is inferred from the profile
 and front extents using the drafting layout convention, and the geometry is
 marked `profileInferred`.
+Frame extents include analytic circle and arc extrema; unused portions of an
+arc's supporting circle do not enlarge those extents.
+The oblique stage uses the same frame resolver, including validation of
+explicit frames and inference for drawings containing only elliptical loops.
 
 Coaxial circular boundaries with two corroborating straight silhouette
 generators define an inferred ruled patch. Equal radii, unequal radii, and chains
@@ -74,17 +78,94 @@ and `surfacePatches.kind: 'sphere'`, not through a solid name.
 
 A circle in a general plane projects as an ellipse. `educad-oblique-kernel.js`
 groups closed elliptical loops, fits their centres/axes, recovers each plane
-normal from the major/minor axes, and combines centers from two views. The
-projected ellipse fixes the normal up to a mirror in depth, so a two-view
-oblique circle is retained with `oblique-curve-ambiguous` unless further
-visibility or point evidence selects one mirror. The reconstructed curve uses
-the same analytic curve representation as principal circles.
+normal from the major/minor axes, and combines centers from two views. A
+single projected ellipse leaves two possible plane normals (ignoring overall
+normal sign). The kernel intersects these candidates across each view pair;
+generic tilted ellipses select one plane. A closed ellipse can also pair with
+a straight **edge-on run** in another view: the run supplies the missing centre
+coordinate and its slope selects the depth mirror, while the ellipse supplies
+the radius. The run must cover the same projected extent, so a polygon that
+merely approximates an ellipse is not silently promoted; line pairing requires
+a sufficiently dense projected loop. Corresponding boundary points can
+select a remaining mirror: their recovered 3D positions must lie on the circle
+and its plane. Both ordinary linked station names and explicit member IDs are
+supported. Unlinked points do not choose a plane, and points on both candidate
+planes leave the ambiguity intact. Contradictory boundary points produce
+`oblique-point-conflict`. If two planes still fit both views and point evidence,
+one supported circle is retained with `oblique-curve-ambiguous`. Matching
+circles from additional view pairs merge their source evidence rather than
+duplicating geometry. The reconstructed curve uses the same analytic curve
+representation as principal circles.
+Accepted point constraints are retained in each circle's `pointEvidence`, with
+member IDs, source station IDs, and 3D positions, separately from tessellation.
+Missing or incompatible ellipse projections retain their diagnostics even when
+no oblique circle can be reconstructed and the pipeline uses straight geometry.
+
+Open, unbranched elliptical segment chains are fitted with a normalized conic
+(at least 12 stations). Their ordered endpoints and swept portions must agree
+in the recovered circle plane across views. The output is an analytic `arc`,
+including major arcs and sweeps crossing the angular origin; display segments
+never close an open arc. Incompatible sweeps report `oblique-arc-conflict`.
+Degenerate or ill-conditioned fits remain with the straight-primitive stage;
+an edge-on chain paired with an ellipse is not yet an oblique-arc input.
+
+### Free-form station curves
+
+`/curve-through <p1> <p2> ... [closed] [view]` interpolates an ordered station
+chain with a natural or periodic cubic. The entity stores its NURBS control
+points, knots, positive weights, interpolation points and uniform station
+parameters in `meta.curve`; `/circle-through` and `/arc-through` fit an exact
+circle or arc through three ordered stations and use the same analytic curve
+contract. Editing a defining point rebuilds the curve, and the point editor
+refuses to edit derived control points directly.
+
+Curves with the same station count and closure in different views are candidate
+projections of one spatial curve. Every supplied view must agree at the
+defining stations. The station order may be reversed, and a closed curve may
+start at any station; explicit member identities select the order when present,
+then suffix-stripped station names provide the compatibility fallback. The
+accepted result is one NURBS with `sourceEvidence` recording each contributing
+view and the station order used. A contradictory third view is not ignored in
+favour of two agreeing views: it reports `curve-projection-conflict`. Several
+remaining orderings report `curve-correspondence-ambiguous`, and a single view
+reports `curve-correspondence-missing`. A parametric boundary alone does not
+select a spanning surface, so a reconstructed curve is retained with
+`curve-surface-unresolved`.
+
+Visible (A) and hidden (E) strokes can select a remaining mirror when independent
+straight geometry reconstructs occluding faces. Both candidates are checked
+against those faces and their holes using the shared projection ray test at
+three interior stations per source segment. No occluder, or visibility that
+fits both candidates, leaves the ambiguity intact. Contradictory visibility
+reports `oblique-visibility-conflict`. `visibilityEvidence` retains stroke and
+occluder source IDs plus the sample count. This is sampled visibility evidence,
+not exact certification of an entire curved interval. Occlusion by newly inferred
+curved patches is not used to choose the plane, avoiding circular inference.
+
+A full circle seen in true shape also pairs with a **slanted** edge-on trace in
+the other view. The trace's x extent is the circle diameter and its slope fixes
+a cutting plane through the missing axis, so the spatial boundary is an analytic
+ellipse rather than a circle. Two matching silhouette generators bound the
+cylinder side surface between that ellipse and the original circle. This
+reconstructs a truncated cylinder without reading a solid name; the same
+operation covers the opposite slope and a side-view (`PROFILE`) trace. A trace
+that covers only part of the circle is reported as
+`curve-inclined-arc-unsupported`; two distinct traces for one circle are
+retained with `curve-projection-ambiguous`.
 
 Standalone planar circular boundaries share the planar containment/hole engine
 with straight boundaries. Open arcs remain curves with no automatically invented
 spanning surface. Independent straight components can coexist with curved ones.
 Resolved geometry remains visible when another curve cannot be reconstructed;
 `topologyStatus: 'partial'` and entity-specific diagnostics identify that omission.
+
+The bounded analytic model is attached as `geometry.surfaces`, with
+`geometry.surfaceModel` and `geometry.analyticSurfaceValidation`. It names each
+plane, cylinder, cone or sphere, keeps outer/inner boundary loops, shares
+boundary curves between caps and side surfaces, and validates boundaries
+against the analytic definitions. Analytic plane sections are available through
+`EduCADSurfaces.section`; single-plane trimming is available through
+`EduCADSurfaces.trim`. See [Bounded analytic surface model](SURFACE_MODEL.md).
 
 ## Representation and display
 
@@ -97,11 +178,15 @@ center + radius * (u * cos(angle) + v * sin(angle))
 ```
 
 Each curve records `sourceIds` and its display vertex/edge indices.
-`geometry.surfacePatches` records planar or ruled patches and their circular
-boundaries, generators' source IDs, or apex. These definitions are separate from
-the mesh used by the existing renderer. A full circle currently uses 24 display
-segments; script V/E/F counts describe that display geometry, not the count of
-analytic primitives. Reference previews preserve the analytic definitions.
+`geometry.surfacePatches` records the display-facing patches (plane, cylinder,
+cone or sphere) and their boundary curves, generators' source IDs, or apex.
+`geometry.surfaces` is the bounded analytic model described above; it is
+separate from the mesh and from the patch display records. An inclined boundary
+uses the same `curves` representation with `kind: 'ellipse'`, `radiusU` and
+`radiusV` (angles are measured in the ellipse's `u`/`v` basis). A full circle or
+ellipse currently uses 24 display segments; script V/E/F counts describe that
+display geometry, not the count of analytic primitives. Reference previews
+preserve the analytic definitions and the surface model.
 
 Smooth side-facet metadata lets orthographic/pose projections suppress interior
 mesh generators while retaining silhouette generators. `projectGeometry` now
@@ -130,6 +215,28 @@ node tools/edc.js tools/scripts/partial-hidden-edge.edu
 node tools/edc.js tools/scripts/inferred-profile-frame.edu
 node tools/edc.js tools/scripts/sphere.edu
 node tools/edc.js tools/scripts/oblique-circle.edu
+node tools/edc.js tools/scripts/oblique-line-circle.edu
+node tools/edc.js tools/scripts/oblique-line-elevation-plan.edu
+node tools/edc.js tools/scripts/oblique-line-conflict.edu
+node tools/edc.js tools/scripts/truncated-cylinder.edu
+node tools/edc.js tools/scripts/truncated-cylinder-opposite.edu
+node tools/edc.js tools/scripts/truncated-cylinder-profile.edu
+node tools/edc.js tools/scripts/truncated-cylinder-depth-axis.edu
+node tools/edc.js tools/scripts/truncated-cylinder-mismatch.edu
+node tools/edc.js tools/scripts/truncated-cylinder-missing-surface.edu
+node tools/edc.js tools/scripts/truncated-cylinder-ambiguous.edu
+node tools/edc.js tools/scripts/spline-through.edu
+node tools/edc.js tools/scripts/spline-reversed.edu
+node tools/edc.js tools/scripts/spline-closed.edu
+node tools/edc.js tools/scripts/spline-profile.edu
+node tools/edc.js tools/scripts/spline-elevation-profile.edu
+node tools/edc.js tools/scripts/spline-three-view.edu
+node tools/edc.js tools/scripts/spline-conflict.edu
+node tools/edc.js tools/scripts/spline-third-view-conflict.edu
+node tools/edc.js tools/scripts/spline-ambiguous.edu
+node tools/edc.js tools/scripts/spline-missing-view.edu
+node tools/edc.js tools/scripts/circle-through.edu
+node tools/edc.js tools/scripts/arc-through.edu
 ```
 
 `--strict` now selects explicit correspondence constraints in the shared pipeline;
@@ -140,30 +247,53 @@ can retain the resolved wire and report that point separately.
 
 In addition to existing topology expectations, scripts can assert `curves`,
 `minRadius`, `maxRadius`, `topHidden`, `splitHidden`, `profileInferred`,
-`curves`, `oblique`, `spheres`, `surfaceValidation`, `unresolved`, and `status`:
+`oblique`, `obliqueReprojection`, `spheres`, `surfaceValidation`, `surfaces`,
+`surfaceKinds`, `surfaceLoops`, `surfaceShells`, `surfaceOpen`,
+`surfaceBoundary`, `surfaceModel`, `obliquePoints`, `obliquePointFit`,
+`obliqueArcs`, `arcSweep`, `obliqueVisibility`, `obliqueVisibilityFit`,
+`parametricCurves`, `curveFit`, `curveReprojection`, `curvePreview`,
+`throughEdit`, `diagnostics`, `unresolved`, and `status`:
 
 ```
 # expect: 48V 72E 26F curves=2 minRadius=10 maxRadius=20 unresolved=0 status=inferred
 # expect: 6V 5E 1F topHidden=1 splitHidden=1
 # expect: 24V 24E 1F profileInferred=1
 # expect: 86V 252E 168F spheres=1
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+# expect: parametricCurves=1 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved status=partial
 ```
 
 `unresolved` counts reported diagnostics. A missing-view script may deliberately
 expect an unavailable result. No separate unit-test files or suites are added.
+`obliqueReprojection=ok` checks source segment endpoints against the analytic
+circle projected into each source view, independently of display tessellation.
+`obliquePoints` counts retained point constraints; `obliquePointFit=ok` checks
+their positions against the analytic circle. `diagnostics` asserts sorted,
+comma-separated diagnostic codes, or `none`.
+`obliqueArcs` counts analytic oblique arcs; `arcSweep` lists their rounded sweeps
+in degrees. Reprojection checks include arc membership, not just the supporting
+ellipse. `obliqueVisibility` counts curves carrying visibility evidence, and
+`obliqueVisibilityFit=ok` rechecks source-stroke midpoints against the final model.
+`parametricCurves` counts accepted NURBS boundaries. `curveFit=ok` re-evaluates
+each interpolation point through its control points; `curveReprojection=ok`
+samples the 3D curve back into every source view; `curvePreview=ok` validates
+the persisted reference preview; `throughEdit=ok` moves a defining station and
+confirms the curve was rebuilt from it rather than keeping stale control points.
 
 ## Remaining work
 
 This starts the agreed pipeline; it is not complete reconstruction for every
-geometric solid. Important next capabilities are mirror-disambiguated oblique
-circles/arcs, arbitrary cross-view arc correspondence, curved recesses/fillets
-and general curved patches, curved intersections, and certification of the
-analytic surfaces rather than only their display triangles. Spheres and
-two-view oblique circles are supported; other curved families are not.
-Profile frames are inferred when necessary, and overlapping projections are
-resolved when a declared view selects one interpretation; contours that remain
-genuinely ambiguous between the available views stay unresolved. The current
-planar/ruled surface choices are stated inference conventions, not a proof of
-uniqueness. Analytic curve rendering and the solid widget's interval drawing
-still use tessellation, and numeric robustness at extreme scales remains work
-to do.
+geometric solid. Full-circle inclined traces, closed ellipse + edge-on line
+pairs, and a first bounded plane/cylinder/cone/sphere model are implemented.
+Important next capabilities are open ellipse/edge-on **arc** correspondence,
+general elliptical boundaries on cones, surface–surface intersections, curved
+recesses/fillets, and certification of the analytic surfaces rather than only
+their display triangles. Spheres, two-view oblique circles, elliptical arc
+chains, and interpolated station curves with cross-view consistency checks are
+supported; other curved families are not. Profile frames are inferred when
+necessary, and overlapping projections are resolved when a declared view
+selects one interpretation; contours that remain genuinely ambiguous between
+the available views stay unresolved. The current planar/ruled surface choices
+are stated inference conventions, not a proof of uniqueness. Analytic curve
+rendering and the solid widget's interval drawing still use tessellation, and
+numeric robustness at extreme scales remains work to do.

@@ -1,0 +1,7 @@
+# A linked point at the common diameter cannot select either plane.
+# expect: curves=1 obliquePoints=1 obliquePointFit=ok obliqueReprojection=ok unresolved=1 diagnostics=oblique-curve-ambiguous status=partial
+/datum -100 400
+/ellipse 0 0 20 10 A plan
+/ellipse 0 0 20 17.3205080757 A elevation
+/point p 20 0 plan
+/point p' 20 0 elevation

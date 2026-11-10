@@ -1,0 +1,10 @@
+# Third-view evidence corroborates one 3D circle, not another copy of it.
+# expect: 24V 24E 1F curves=1 profileInferred=1 unresolved=0 status=inferred
+/datum -30 180
+/circle 20 -30 20 A plan
+/point a 0 40 elevation
+/point b 40 40 elevation
+/line a b A elevation
+/point c 110 40 profile
+/point d 150 40 profile
+/line c d A profile

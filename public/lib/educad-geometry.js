@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
-  else root.EduCADGeometry = factory();
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-parametric.js'));
+  else root.EduCADGeometry = factory(root.EduCADParametric);
+})(typeof window !== 'undefined' ? window : globalThis, function (Parametric) {
   'use strict';
   // Entity angles are degrees CCW in world coordinates. Screen tolerance is
   // converted at the boundary; geometry and coverage stay in millimeters.
@@ -83,7 +83,14 @@
     for (var i = 1; i <= count; i++) { var b = at(i); out.push({ a: a, b: b }); a = b; }
     return out;
   }
-  return { RAD: RAD, degrees: degrees, arcSweep: arcSweep, angleOnArc: angleOnArc,
+  function curveSegments(e,error) {
+    if(e.type!=='CURVE')return roundSegments(e,error);
+    if(!Parametric.validate(e.meta&&e.meta.curve))return [];
+    var points=Parametric.tessellate(e.meta.curve,error),out=[];
+    for(var i=1;i<points.length;i++)out.push({a:points[i-1].point,b:points[i].point});
+    return out;
+  }
+  return { curveSegments:curveSegments, RAD: RAD, degrees: degrees, arcSweep: arcSweep, angleOnArc: angleOnArc,
     spanDistance: spanDistance, roundDistance: roundDistance,
     capsuleIntervals: capsuleIntervals, segmentCovered: segmentCovered, roundSegments: roundSegments };
 });

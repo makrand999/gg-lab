@@ -1,0 +1,9 @@
+# Each linked point fits a different mirror; no single circle fits both.
+# expect: 2V 0E 0F curves=0 diagnostics=oblique-curve-projection-missing,oblique-point-conflict status=partial
+/datum -100 400
+/ellipse 0 0 20 10 A plan
+/ellipse 0 0 20 17.3205080757 A elevation
+/point p 18.6465469121 3.6161543196 plan
+/point p' 18.6465469121 6.2633630096 elevation
+/point q 15.1672375198 6.5183377102 plan
+/point q' 15.1672375198 -11.2900920950 elevation

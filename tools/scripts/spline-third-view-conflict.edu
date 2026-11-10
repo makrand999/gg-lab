@@ -1,0 +1,20 @@
+# Same station count and order identify one spatial curve without matching labels.
+# The profile disagrees with the plan, so the third view must reject the pair.
+# expect: parametricCurves=0 diagnostics=curve-projection-conflict unresolved=3
+/datum -60 180
+/profile 100 0 1
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point d 60 -50 plan
+/curve-through a b c d plan
+/point e' 0 10 elevation
+/point f' 20 40 elevation
+/point g' 40 20 elevation
+/point h' 60 60 elevation
+/curve-through e' f' g' h' elevation
+/point i'' 115 10 profile
+/point j'' 135 40 profile
+/point k'' 125 20 profile
+/point l'' 155 60 profile
+/curve-through i'' j'' k'' l'' profile

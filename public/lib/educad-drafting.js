@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-geometry.js'), require('./educad-entities.js'));
-  else root.EduCADDrafting = factory(root.EduCADGeometry, root.EduCADEntities);
-})(typeof window !== 'undefined' ? window : globalThis, function (Geometry, Entities) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-geometry.js'), require('./educad-entities.js'), require('./educad-parametric.js'));
+  else root.EduCADDrafting = factory(root.EduCADGeometry, root.EduCADEntities, root.EduCADParametric);
+})(typeof window !== 'undefined' ? window : globalThis, function (Geometry, Entities, Parametric) {
   'use strict';
   var EPS = 1e-6;
   var LINE_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION'];
@@ -283,6 +283,13 @@
           Object.assign(patch, { x: a.x, x2: a.x, y: Math.min(a.y, b.y) - 5, y2: Math.max(a.y, b.y) + 5 });
         }
       }
+      if(meta.throughRefs && meta.throughRefs.some(function(id){return changes[id];})) {
+        var through=meta.throughRefs.map(function(id){var p=list.find(function(row){return row.id===id;});if(!p)throw new Error('A defining curve point is missing.');return final(p);});
+        if(e.type==='CURVE') {
+          patch.meta=Object.assign({},meta,{curve:Parametric.interpolate(through,meta.curve.closed)});
+          patch.x=through[0].x;patch.y=through[0].y;
+        } else Object.assign(patch,Parametric.throughCircle(through,e.type==='CIRCULAR_ARC'));
+      }
       if (e.type === 'CIRCLE' || e.type === 'CIRCULAR_ARC') {
         var center = E.resolveReference(list, meta.centerRef, 'POINT'), rim = E.resolveReference(list, meta.radiusRef, 'POINT');
         if (center && (changes[center.id] || (rim && changes[rim.id]))) {
@@ -307,6 +314,7 @@
   }
   function editEntity(table, E, id, patch, map) {
     var e = table.get(id); if (!e || e.locked) throw new Error('Select an unlocked entity to edit.');
+    if(e.meta&&e.meta.throughRefs&&['x','y','x2','y2','radius','startAngle','endAngle'].some(function(k){return patch[k]!==undefined&&patch[k]!==e[k];})) throw new Error('Edit the defining points to change this curve.');
     var requested = Object.assign({}, e, patch);
     E.createEntity(e.type, requested);
     if ((e.type === 'CIRCLE' || e.type === 'CIRCULAR_ARC') && patch.radius !== undefined && patch.radius < E.RADIUS_MIN_MM) throw new Error('The radius must be at least 0.01 mm.');
@@ -361,6 +369,7 @@
     var projectedPoints = geometry.vertices.map(function (v) { return toView(v, 'PROFILE', map); });
     function segmentsFor(e) {
       if (LINE_TYPES.indexOf(e.type) !== -1) return [{ a: e, b: { x: e.x2, y: e.y2 } }];
+      if(e.type==='CURVE') return null; // Display samples cannot certify curve coverage.
       if (e.type === 'CIRCLE' || e.type === 'CIRCULAR_ARC') return Geometry.roundSegments(e, curveError);
       return [];
     }
@@ -721,14 +730,14 @@
       root.querySelector('[data-action="redo"]').hidden = !editing;
       if (!e || editorId !== e.id) { editorOpen = false; editorId = e && e.id; }
       selectionRow.hidden = !authoring || !e;
-      root.querySelector('.drafting-selection-name').textContent = e ? (e.caption || (e.type === 'POINT' ? 'Point' : e.type === 'CIRCLE' ? 'Circle' : 'Edge')) : '';
+      root.querySelector('.drafting-selection-name').textContent = e ? (e.caption || (e.type === 'POINT' ? 'Point' : e.type === 'CIRCLE' ? 'Circle' : e.type==='CURVE'?'Interpolated curve':'Edge')) : '';
       root.querySelector('[data-action="edit-selection"]').setAttribute('aria-expanded', String(editorOpen));
       editor.hidden = !authoring || !e || !editorOpen;
       if (e && !editor.contains(document.activeElement)) {
         root.querySelector('.drafting-kind').textContent = e.type === 'POINT' ? 'Point' : e.type === 'CIRCLE' ? 'Circle' : e.type === 'DIMENSION' ? 'Dimension' : 'Edge';
         ['caption', 'x', 'y', 'x2', 'y2', 'radius'].forEach(function (key) {
           var input = editor.elements[key], visible = key === 'caption' ? e.type === 'POINT' : key === 'radius' ? e.type === 'CIRCLE' || e.type === 'CIRCULAR_ARC' : key === 'x2' || key === 'y2' ? LINE_TYPES.indexOf(e.type) !== -1 : true;
-          input.parentNode.hidden = !visible; input.disabled = !visible || e.locked;
+          input.parentNode.hidden = !visible; input.disabled = !visible || e.locked || !!(e.meta&&e.meta.throughRefs);
           input.value = key === 'caption' ? e.caption : String(Number(e[key].toFixed(8)));
         });
         editor.querySelectorAll('[data-point-rule]').forEach(function (label) { label.hidden = e.type !== 'POINT'; label.querySelector('select').disabled = e.locked; });

@@ -630,6 +630,7 @@
   </script>
 
   <!-- Core Modules -->
+  <script src="lib/educad-parametric.js"></script>
   <script src="lib/educad-geometry.js"></script>
   <script src="lib/educad-viewport.js"></script>
   <script src="lib/educad-canvas.js"></script>
@@ -646,6 +647,8 @@
   <script src="lib/educad-strict.js"></script>
   <script src="lib/educad-curve-reconstruct.js"></script>
   <script src="lib/educad-oblique-kernel.js"></script>
+  <script src="lib/educad-surfaces.js"></script>
+  <script src="lib/educad-parametric-reconstruct.js"></script>
   <script src="lib/educad-reconstruct.js?v=quiet-20261006-2"></script>
   <script src="lib/educad-ref3d.js"></script>
   <script src="lib/educad-verify.js"></script>
@@ -2616,6 +2619,14 @@
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, 3, 0, 2 * Math.PI);
           ctx.fill();
+        } else if (ent.type === 'CURVE') {
+          var pieces=EduCADGeometry.curveSegments(ent,0.5/v.s);
+          ctx.beginPath();
+          pieces.forEach(function(piece,i) {
+            var a=EduCADViewport.forward(v,piece.a),b=EduCADViewport.forward(v,piece.b);
+            if(!i)ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+          });
+          ctx.stroke();
         } else if (ent.type === 'CIRCLE' || ent.type === 'CIRCULAR_ARC') {
           var center = EduCADViewport.forward(v, { x: ent.x, y: ent.y });
           var rPx = ent.radius * v.s;

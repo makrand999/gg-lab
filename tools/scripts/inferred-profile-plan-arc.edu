@@ -1,0 +1,10 @@
+# Arc depth extrema exclude the circle centre and unused parts of the circle.
+# expect: curves=1 profileInferred=1 unresolved=0 status=inferred
+/datum -30 180
+/arc 20 -30 20 210 330 A plan
+/point a 2.6794919243 40 elevation
+/point b 37.3205080757 40 elevation
+/line a b A elevation
+/point c 110 40 profile
+/point d 120 40 profile
+/line c d A profile

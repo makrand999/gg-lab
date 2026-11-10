@@ -1,0 +1,7 @@
+# An ellipse in plan and its edge-on line in elevation determine one oblique circle.
+# expect: 24V 24E 1F curves=1 oblique=1 obliqueReprojection=ok unresolved=0 status=inferred
+/datum -100 400
+/ellipse 20 -30 14.1421356237 20 A plan
+/point a 5.8578643763 44.1421356237 elevation
+/point b 34.1421356237 15.8578643763 elevation
+/line a b A elevation

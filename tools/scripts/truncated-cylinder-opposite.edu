@@ -1,0 +1,14 @@
+# The same inclined cut with the opposite slope: the ellipse orientation and
+# cap winding must follow the drawn trace, not a preferred direction.
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+/datum -30 80
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 0 0 elevation
+/point b 40 0 elevation
+/point c 40 10 elevation
+/point d 0 50 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation

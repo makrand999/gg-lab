@@ -1,5 +1,5 @@
 # Two profile circles and plan silhouettes define a cylinder along X.
-# expect: 48V 72E 26F curves=2 surfaceValidation=ok unresolved=0 status=inferred
+# expect: 48V 72E 26F curves=2 surfaceModel=ok surfaceShells=1 surfaceBoundary=0 surfaceValidation=ok unresolved=0 status=inferred
 /datum -30 180
 /profile 100 0 1
 /circle 130 40 20 A profile

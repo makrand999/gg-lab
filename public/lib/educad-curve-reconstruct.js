@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
-  else root.EduCADCurveReconstruct = factory();
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-parametric.js'));
+  else root.EduCADCurveReconstruct = factory(root.EduCADParametric);
+})(typeof window !== 'undefined' ? window : globalThis, function (Parametric) {
   'use strict';
 
   // First primitive lifting stage: a circle/arc seen in true shape in one
@@ -24,11 +24,14 @@
     var xs = angles.map(function (a) { return e.x + e.radius * Math.cos(a); });
     return { start: start, sweep: sweep, min: Math.min.apply(null, xs), max: Math.max.apply(null, xs) };
   }
+  function radii(curve) {
+    var a = curve.radiusU === undefined ? curve.radius : curve.radiusU;
+    var b = curve.radiusV === undefined ? curve.radius : curve.radiusV;
+    return { u: a, v: b };
+  }
   function point(curve, a) {
-    var c = Math.cos(a) * curve.radius, s = Math.sin(a) * curve.radius;
-    return { x: curve.center.x + curve.u.x*c + curve.v.x*s,
-      y: curve.center.y + curve.u.y*c + curve.v.y*s,
-      z: curve.center.z + curve.u.z*c + curve.v.z*s };
+    if(curve.kind==='nurbs')return Parametric.point(curve,a);
+    return Parametric.point(curve,(a-(curve.startAngle||0))/(curve.sweepAngle===undefined?TAU:curve.sweepAngle));
   }
   function reconstructPair(entities) {
     var ink = entities.filter(function (e) { return e && !helper(e); });
@@ -58,7 +61,37 @@
       });
       return runs;
     }
+    // Slanted edge-on traces are the projection of a circle whose plane is
+    // inclined to the projection plane. They are distinct from the horizontal
+    // traces of planes parallel to the projection plane.
+    function slantedRuns(role) {
+      var rows = [];
+      function sameLine(m1,b1,m2,b2) {
+        return Math.abs(m1-m2) <= 1e-6*(1+Math.abs(m1)) &&
+          Math.abs(b1-b2) <= 1e-5*(1+Math.abs(b1));
+      }
+      segments.forEach(function (s) {
+        if (side(s) !== role || near(s.y, s.y2) || near(s.x, s.x2)) return;
+        var m = (s.y2-s.y)/(s.x2-s.x), b = s.y - m*s.x;
+        var row = rows.find(function (r) { return sameLine(r.m,r.b,m,b); });
+        if (!row) { row = { m:m, b:b, intervals: [] }; rows.push(row); }
+        row.intervals.push({ min: Math.min(s.x,s.x2), max: Math.max(s.x,s.x2), ids: [s.id] });
+      });
+      var runs = [];
+      rows.forEach(function (row) {
+        row.intervals.sort(function (a,b) { return a.min-b.min || a.max-b.max; });
+        var merged = [];
+        row.intervals.forEach(function (i) {
+          var last = merged[merged.length-1];
+          if (last && i.min <= last.max + EPS) { last.max = Math.max(last.max,i.max); last.ids = last.ids.concat(i.ids); }
+          else merged.push({min:i.min,max:i.max,ids:i.ids.slice()});
+        });
+        merged.forEach(function (r) { r.m = row.m; r.b = row.b; runs.push(r); });
+      });
+      return runs;
+    }
     var runs = { PLAN: horizontalRuns('PLAN'), ELEVATION: horizontalRuns('ELEVATION') };
+    var slants = { PLAN: slantedRuns('PLAN'), ELEVATION: slantedRuns('ELEVATION') };
     sourceCurves.forEach(function (e) {
       var view = side(e), span = curveSpan(e);
       if (!view) { issue('curve-view-unsupported', e, 'This curve needs a true-shape principal view with an edge-on projection in a paired view.'); return; }
@@ -78,7 +111,6 @@
         });
         if (mates.length) matches = matches.filter(function (r) { return mates.every(function (p) { return near(p.x,e.x) && near(p.y,r.y); }); });
       }
-      if (!matches.length) { issue('curve-projection-missing', e, 'Needs a matching edge-on projection with the same horizontal extent in the other view.'); return; }
       matches.forEach(function (r) {
         var c = { kind: e.type === 'CIRCLE' ? 'circle' : 'circular-arc',
           center: {x:e.x,y:view === 'PLAN' ? r.y : e.y,z:view === 'PLAN' ? -e.y : -r.y},
@@ -93,9 +125,52 @@
         else curves.push(c);
         c.sourceIds.forEach(function (id) { used.add(id); });
       });
+      // A full circle plus a slanted trace in the paired view describes one
+      // elliptical boundary in an inclined plane. The trace's x extent is the
+      // circle diameter; its slope fixes the plane through the missing axis.
+      if (e.type === 'CIRCLE') slants[other].forEach(function (r) {
+        if (!near(r.min,span.min) || !near(r.max,span.max)) return;
+        var m = r.m, b = r.b, len = Math.hypot(1,m), c;
+        if (view === 'PLAN') c = { kind:'ellipse', center:{x:e.x,y:m*e.x+b,z:-e.y},
+          u:{x:1/len,y:m/len,z:0}, v:{x:0,y:0,z:-1}, radiusU:e.radius*len, radiusV:e.radius, radius:e.radius,
+          startAngle:span.start, sweepAngle:span.sweep };
+        else c = { kind:'ellipse', center:{x:e.x,y:e.y,z:-(m*e.x+b)},
+          u:{x:1/len,y:0,z:-m/len}, v:{x:0,y:1,z:0}, radiusU:e.radius*len, radiusV:e.radius, radius:e.radius,
+          startAngle:span.start, sweepAngle:span.sweep };
+        c.sourceIds = [e.id].concat(r.ids);
+        c.sourceView = view;
+        c.displayVertices = [];
+        c.displayEdges = [];
+        // Coordinate of the trace at the centre station in the paired view.
+        c.edgeOnCoordinate = m*e.x+b;
+        c.inclinedTrace = { m:m, b:b, view:other, ids:r.ids.slice() };
+        var duplicate = curves.find(function (d) { return d.kind === c.kind && d.sourceView === c.sourceView &&
+          near(d.center.x,c.center.x) && near(d.center.y,c.center.y) && near(d.center.z,c.center.z) &&
+          near(radii(d).u,radii(c).u) && near(radii(d).v,radii(c).v) &&
+          near(d.u.x,c.u.x) && near(d.u.y,c.u.y) && near(d.u.z,c.u.z) &&
+          near(d.startAngle,c.startAngle) && near(d.sweepAngle,c.sweepAngle); });
+        if (duplicate) duplicate.sourceIds = Array.from(new Set(duplicate.sourceIds.concat(c.sourceIds)));
+        else curves.push(c);
+        c.sourceIds.forEach(function (id) { used.add(id); });
+      });
+      var inclined = curves.filter(function(c) {return c.inclinedTrace && c.sourceIds.indexOf(e.id)!==-1;});
+      if (inclined.length > 1) issue('curve-projection-ambiguous', e,
+        'Several inclined traces fit this circle; the cut level is unresolved.');
+      if (!inclined.length && e.type === 'CIRCLE') {
+        var contained = slants[other].filter(function(r) {
+          var mid = (r.min + r.max) / 2;
+          return r.min >= span.min-EPS && r.max <= span.max+EPS &&
+            Math.abs(mid - e.x) <= 0.25*e.radius &&
+            !(near(r.min,span.min) && near(r.max,span.max));
+        });
+        if (contained.length) issue('curve-inclined-arc-unsupported', e,
+          'An inclined trace covers only part of this circle; inclined arcs are not reconstructed yet.');
+      }
+      if (!matches.length && !inclined.length)
+        issue('curve-projection-missing', e, 'Needs a matching edge-on projection with the same horizontal extent in the other view.');
     });
     curves.forEach(function (c) {
-      var n = Math.max(2, Math.ceil(SAMPLES*c.sweepAngle/TAU)), closed = c.kind === 'circle';
+      var n = Math.max(2, Math.ceil(SAMPLES*c.sweepAngle/TAU)), closed = c.kind === 'circle' || c.kind === 'ellipse';
       for (var i=0;i<(closed?n:n+1);i++) { c.displayVertices.push(vertices.length); vertices.push(point(c,c.startAngle+c.sweepAngle*i/n)); }
       for (var j=0;j<n;j++) { c.displayEdges.push(edges.length); edges.push([c.displayVertices[j],c.displayVertices[(j+1)%c.displayVertices.length]]); }
     });
@@ -120,10 +195,24 @@
       return reach>=1-EPS?ids:[];
     }
     function axial(c) { return c.sourceView === 'PLAN' ? c.center.y : c.center.z; }
+    function sub(a,b) {return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};}
+    function add(a,b) {return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z};}
+    function mul(a,s) {return {x:a.x*s,y:a.y*s,z:a.z*s};}
+    function dot(a,b) {return a.x*b.x+a.y*b.y+a.z*b.z;}
+    function cross(a,b) {return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
+    function unit(v) {var l=Math.hypot(v.x,v.y,v.z);return l>EPS?{x:v.x/l,y:v.y/l,z:v.z/l}:{x:0,y:1,z:0};}
+    function curveNormal(c) {return unit(cross(c.u,c.v));}
+    // The two silhouette generators of a surface join the same angular station
+    // on its boundaries. This also gives the cap orientation axis.
+    function generatorPoint(c, positive) {
+      var p=point(c,positive?c.startAngle:c.startAngle+Math.PI);
+      return c.sourceView==='PLAN'?{x:p.x,y:p.y}:{x:p.x,y:-p.z};
+    }
     var bound = new Set();
     // A straight generator at each silhouette bounds a ruled patch between
-    // coaxial circles. Equal and unequal radii use exactly the same operation.
-    var circular = curves.filter(function(c) {return c.kind==='circle';});
+    // coaxial boundaries. A true-shape circle and an inclined ellipse use the
+    // same operation: their generators meet at matching angular stations.
+    var circular = curves.filter(function(c) {return c.kind==='circle'||c.kind==='ellipse';});
     circular.sort(function(a,b) {return axial(a)-axial(b);});
     circular.forEach(function(a,ai) {
       var candidates = circular.slice(ai+1).filter(function(b) {
@@ -132,8 +221,10 @@
       });
       if(!candidates.length) return;
       var b=candidates[0], view=a.sourceView==='PLAN'?'ELEVATION':'PLAN';
-      var left=lineEvidence(view,a.center.x-a.radius,a.edgeOnCoordinate,b.center.x-b.radius,b.edgeOnCoordinate);
-      var right=lineEvidence(view,a.center.x+a.radius,a.edgeOnCoordinate,b.center.x+b.radius,b.edgeOnCoordinate);
+      var aL=generatorPoint(a,false), aR=generatorPoint(a,true);
+      var bL=generatorPoint(b,false), bR=generatorPoint(b,true);
+      var left=lineEvidence(view,aL.x,aL.y,bL.x,bL.y);
+      var right=lineEvidence(view,aR.x,aR.y,bR.x,bR.y);
       if(!left.length || !right.length) return;
       left.concat(right).forEach(function(id) {used.add(id);});
       var indices=[];
@@ -143,7 +234,12 @@
         indices.push(faces.length);smooth.push(faces.length);
         faces.push([a.displayVertices[i],a.displayVertices[j],b.displayVertices[j],b.displayVertices[i]]);
       }
-      patches.push({kind:'ruled',boundaryCurves:[curves.indexOf(a),curves.indexOf(b)],faceIndices:indices,sourceIds:left.concat(right)});
+      var axis=unit(sub(b.center,a.center));
+      var sameRadius=near(a.radius,b.radius);
+      patches.push({kind:sameRadius?'cylinder':'cone',analyticKind:sameRadius?'cylinder':'cone',
+        origin:a.center,axis:axis,radius:a.radius,
+        halfAngle:sameRadius?0:Math.atan2(Math.abs(a.radius-b.radius),Math.hypot(sub(b.center,a.center).x,sub(b.center,a.center).y,sub(b.center,a.center).z)),
+        boundaryCurves:[curves.indexOf(a),curves.indexOf(b)],faceIndices:indices,sourceIds:left.concat(right)});
       bound.add(a);bound.add(b);
     });
     // A collapsed circular boundary is a point. This is the same ruled-surface
@@ -170,19 +266,35 @@
         if(!positive) loop.reverse();
         edges.push([c.displayVertices[i],index]);indices.push(faces.length);smooth.push(faces.length);faces.push(loop);
       }
-      patches.push({kind:'ruled',boundaryCurves:[curves.indexOf(c)],apex:apex,faceIndices:indices,sourceIds:a.left.concat(a.right)});
+      var apexAxis=unit(sub(apex,c.center));
+      patches.push({kind:'cone',analyticKind:'cone',axis:apexAxis,origin:c.center,radius:c.radius,
+        halfAngle:Math.atan2(c.radius,Math.hypot(sub(apex,c.center).x,sub(apex,c.center).y,sub(apex,c.center).z)),
+        boundaryCurves:[curves.indexOf(c)],apex:apex,faceIndices:indices,sourceIds:a.left.concat(a.right)});
       c.apexDirection=positive?1:-1;bound.add(c);
       a.left.concat(a.right).forEach(function(id) {used.add(id);});
     });
+    // An inclined boundary without a connecting side surface leaves the
+    // cylinder/cut interpretation incomplete; report it instead of showing
+    // two unrelated end disks as a finished object.
+    curves.forEach(function(c) {
+      if (c.inclinedTrace && !bound.has(c)) issue('curve-surface-missing', {id:c.sourceIds[0]},
+        'An inclined boundary has no supporting generators; the connecting surface is unresolved.');
+    });
     // End disks are inferred planar patches. Internal rings shared by two
-    // ruled patches do not get an artificial interior cap.
+    // side patches do not get an artificial interior cap.
     circular.forEach(function(c) {
-      var ci=curves.indexOf(c),incident=patches.filter(function(p) {return p.kind==='ruled' && p.boundaryCurves.indexOf(ci)!==-1;});
+      var ci=curves.indexOf(c),incident=patches.filter(function(p) {return p.boundaryCurves && p.boundaryCurves.indexOf(ci)!==-1 && p.kind!=='plane';});
       if(incident.length>1) return;
       var loop=c.displayVertices.slice(),indices=[];
       if(incident.length) {
-        var patch=incident[0],other=patch.boundaryCurves.filter(function(i) {return i!==ci;})[0];
-        if(c.apexDirection===1 || other!==undefined && axial(curves[other])>axial(c)) loop.reverse();
+        var patch=incident[0];
+        if(patch.axis) {
+          var outward=dot(sub(c.center,patch.origin),patch.axis)>EPS?1:-1;
+          if(dot(cross(c.u,c.v),patch.axis)*outward<0) loop.reverse();
+        } else {
+          var other=patch.boundaryCurves.filter(function(i) {return i!==ci;})[0];
+          if(c.apexDirection===1 || other!==undefined && axial(curves[other])>axial(c)) loop.reverse();
+        }
         indices.push(faces.length);faces.push(loop);
       } else { indices.push(faces.length);faces.push(loop);indices.push(faces.length);faces.push(loop.slice().reverse()); }
       patches.push({kind:'plane',boundaryCurves:[ci],faceIndices:indices,sourceIds:c.sourceIds.slice()});
@@ -206,6 +318,17 @@
       if (!e || e.type==='DATUM_AXIS' || e.type==='TEXT' || e.type==='DIMENSION') return;
       if (e.meta && ['axis','locus','projector'].indexOf(e.meta.kind)!==-1) return;
       if (viewOf(e)!==role) return;
+      if (isCurve(e)) {
+        var span=curveSpan(e), angles=[span.start,span.start+span.sweep];
+        [0,Math.PI/2,Math.PI,3*Math.PI/2].forEach(function(t) {
+          if(angle(t-span.start)<=span.sweep+EPS) angles.push(t);
+        });
+        angles.forEach(function(t) {
+          xs.push(e.x+e.radius*Math.cos(t));
+          if(role==='PLAN') zs.push(-e.y-e.radius*Math.sin(t));
+        });
+        return;
+      }
       xs.push(e.x);
       if (e.type==='SEGMENT' || e.type==='LINE' || e.type==='RAY') xs.push(e.x2);
       if (e.radius) xs.push(e.x-e.radius,e.x+e.radius);
@@ -307,10 +430,8 @@
     for (var j3=0;j3<lon;j3++) tri(bottom,ring(lat-1,j3+1),ring(lat-1,j3));
     return {vertices:vertices,edges:edges,faces:faces};
   }
-  // Principal views are coordinate observations. Rotate each view pair into
-  // one canonical two-view problem, then transform the inferred primitives
-  // back. This reuses the same curve and ruled-patch construction for all axes.
-  function reconstruct(entities, options) {
+  // Share frame validation and inference with the oblique primitive stage.
+  function resolveProfileFrame(entities, options) {
     options = options || {};
     var ink = entities.filter(function(e) {return e && !helper(e);});
     var frames = ink.filter(function(e) {return e.meta && e.meta.draftingLayout;}).map(function(e) {return e.meta.draftingLayout;});
@@ -327,6 +448,16 @@
     if (profile && frames.some(function(f) {return f.xRef!==profile.xRef || f.dRef!==profile.dRef || f.s!==profile.s;})) {
       frameIssue = {code:'profile-frame-conflict',message:'The declared side-view coordinate frames disagree.'}; profile = null;
     }
+    return {profile:profile || null, issue:frameIssue, inferred:inferredProfile};
+  }
+  // Principal views are coordinate observations. Rotate each view pair into
+  // one canonical two-view problem, then transform the inferred primitives
+  // back. This reuses the same curve and ruled-patch construction for all axes.
+  function reconstruct(entities, options) {
+    options = options || {};
+    var ink = entities.filter(function(e) {return e && !helper(e);});
+    var resolved = resolveProfileFrame(entities,options);
+    var profile=resolved.profile, frameIssue=resolved.issue, inferredProfile=resolved.inferred;
     var pairs = [{roles:['PLAN','ELEVATION'], maps:[function(x,y) {return [x,y];},function(x,y) {return [x,y];}],world:function(p) {return {x:p.x,y:p.y,z:p.z};}, reflected:false}];
     if (profile) {
       var depth = function(x) {return profile.dRef+profile.s*(x-profile.xRef);};
@@ -464,12 +595,16 @@
       }));
       geometry.surfacePatches=geometry.surfacePatches.concat(g.surfacePatches.map(function(p) {
         var patch=Object.assign({},p,{boundaryCurves:p.boundaryCurves.map(function(i) {return i+co;}),faceIndices:p.faceIndices.map(function(i) {return i+fo;})});
-        if(p.apex) patch.apex=pair.world(p.apex);
+        ['origin','center','apex','axis','normal','u','v'].forEach(function(key) {
+          if(p[key]) patch[key]=pair.world(p[key]);
+        });
         return patch;
       }));
       geometry.smoothSideFaces=geometry.smoothSideFaces.concat(g.smoothSideFaces.map(function(i) {return i+fo;}));
       choice.result.consumedIds.forEach(function(id) {used.add(id);});
-      choice.result.issues.filter(function(i) {return i.code==='curve-surface-ambiguous';}).forEach(function(i) {selectedIssues.push(i);});
+      choice.result.issues.filter(function(i) {
+        return ['curve-surface-ambiguous','curve-surface-missing','curve-projection-ambiguous','curve-inclined-arc-unsupported'].indexOf(i.code)!==-1;
+      }).forEach(function(i) {selectedIssues.push(i);});
       // Several distinct source projections each yielding several levels is the
       // cross-product ambiguity left when no third view selects a pairing.
       var sourceGroups=new Map();
@@ -518,5 +653,5 @@
     return {geometry:geometry.vertices.length?geometry:null,issues:issues,consumedIds:Array.from(used),
       unresolvedIds:ink.filter(function(e) {return (isCurve(e)||e.type==='SEGMENT') && !used.has(e.id);}).map(function(e) {return e.id;})};
   }
-  return { reconstruct:reconstruct, point:point, isCurve:isCurve };
+  return { reconstruct:reconstruct, point:point, isCurve:isCurve, resolveProfileFrame:resolveProfileFrame };
 });

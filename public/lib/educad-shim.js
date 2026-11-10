@@ -69,7 +69,7 @@
     'Text', 'Dimension'];
   var STYLE_TO_BIS = { 0: 'A', 1: 'B', 2: 'E', 3: 'G', 4: 'H', 5: 'K' };
   var GGB_TYPES = { POINT: 'point', SEGMENT: 'segment', LINE: 'line', RAY: 'ray',
-    CIRCLE: 'circle', CIRCULAR_ARC: 'arc', DIMENSION: 'dimension', TEXT: 'text',
+    CIRCLE: 'circle', CIRCULAR_ARC: 'arc', CURVE: 'curve', DIMENSION: 'dimension', TEXT: 'text',
     DATUM_AXIS: 'axis' };
   var FALLBACK_DASH = { A: [], B: [], E: [8, 4], G: [12, 3, 2, 3],
     H: [12, 3, 2, 3], K: [12, 3, 2, 3, 2, 3] };
@@ -115,7 +115,7 @@
   // Minimal fallback entity store (mm-only, same field shape as the Phase 2
   // table). Used only when neither injected deps nor globals are present.
   var FALLBACK_TYPES = ['POINT', 'SEGMENT', 'LINE', 'RAY', 'CIRCLE',
-    'CIRCULAR_ARC', 'DIMENSION', 'TEXT', 'DATUM_AXIS'];
+    'CIRCULAR_ARC', 'CURVE', 'DIMENSION', 'TEXT', 'DATUM_AXIS'];
   var FALLBACK_BIS = ['A', 'B', 'E', 'G', 'H', 'K'];
   var FALLBACK_ROLES = ['PLAN', 'ELEVATION', 'BOTH'];
 
@@ -1901,6 +1901,11 @@
           if (e.type === 'POINT') {
             out.push('<circle cx="' + fmtPx(p1.x) + '" cy="' + fmtPx(p1.y) +
               '" r="3" fill="' + escXml(col) + '"/>');
+          } else if (e.type === 'CURVE') {
+            var kernel=typeof module!=='undefined'&&module.exports?require('./educad-parametric.js'):window.EduCADParametric;
+            var samples=kernel.tessellate(e.meta.curve,0.25/view.s);
+            var path=samples.map(function(sample,i){var p=fwdPx(sample.point.x,sample.point.y);return (i?'L ':'M ')+fmtPx(p.x)+' '+fmtPx(p.y);}).join(' ');
+            out.push('<path d="'+path+'" fill="none" stroke="'+escXml(col)+'" stroke-width="'+fmtPx(sty.widthPx)+'"'+dashAttr+'/>');
           } else if (e.type === 'CIRCLE') {
             out.push('<circle cx="' + fmtPx(p1.x) + '" cy="' + fmtPx(p1.y) +
               '" r="' + fmtPx(e.radius * view.s) + '" fill="none" stroke="' +

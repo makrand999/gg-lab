@@ -1,12 +1,14 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = factory(require('./educad-entities.js'), require('./educad-strict.js'),
-      require('./educad-curve-reconstruct.js'), require('./educad-oblique-kernel.js'));
+      require('./educad-curve-reconstruct.js'), require('./educad-oblique-kernel.js'),function() {return require('./educad-project.js');},
+      require('./educad-surfaces.js'), require('./educad-parametric.js'), require('./educad-parametric-reconstruct.js'));
   } else {
     root.EduCADReconstruct = factory(root.EduCADEntities, root.EduCADStrict,
-      root.EduCADCurveReconstruct, root.EduCADObliqueKernel);
+      root.EduCADCurveReconstruct, root.EduCADObliqueKernel,function() {return root.EduCADProject;},
+      root.EduCADSurfaces, root.EduCADParametric, root.EduCADParametricReconstruct);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function (Entities, Strict, Curves, Oblique) {
+})(typeof window !== 'undefined' ? window : globalThis, function (Entities, Strict, Curves, Oblique, getProject, Surfaces, Parametric, ParametricReconstruct) {
   'use strict';
   // EduCAD two/three-view reconstruction: plan + elevation drawings, with
   // an optional first-angle profile (side) view, resolve to a 3D wireframe
@@ -2655,21 +2657,90 @@
 
   // Public primitive pipeline. The old entry points remain compatibility
   // adapters; the app, reference previews and scripts all enter here.
+  // The public pipeline keeps generic parametric boundaries analytic. Their
+  // samples are display wire only, never input to planar surface guessing.
+  function reconstructParametric(list, opts) {
+    var ink=list.filter(function(e){return e.type==='CURVE';}),refs=new Set(ink.flatMap(function(e){return (e.meta||{}).throughRefs||[];}));
+    var needed=new Set(list.filter(function(e){return e.type!=='CURVE'&&e.type!=='POINT';}).flatMap(function(e){return (e.meta||{}).refs||[];}));
+    var rest=list.filter(function(e){return e.type!=='CURVE'&&!(e.type==='POINT'&&refs.has(e.id)&&!needed.has(e.id));});
+    var hasRest=rest.some(function(e){return ['POINT','SEGMENT','LINE','RAY','CIRCLE','CIRCULAR_ARC'].indexOf(e.type)!==-1;});
+    var base=hasRest?reconstruct(rest,opts):{geometry:null,issues:[]}, resolved=Curves.resolveProfileFrame(list,opts);
+    var lifted=ParametricReconstruct.reconstruct(autoMembersForStrict(list),resolved.profile);
+    var diagnostics=((base.pipeline||{}).diagnostics||base.issues||[]).concat(lifted.issues);
+    if(resolved.issue)diagnostics.push(resolved.issue);
+    var g=base.geometry;
+    if(lifted.curves.length) {
+      if(!g)g={name:'parametric curve preview',vertices:[],edges:[],faces:[],curves:[],surfacePatches:[],smoothSideFaces:[]};
+      if(!g.curves)g.curves=[];
+      lifted.curves.forEach(function(c){
+        var samples=Parametric.tessellate(c,0.1),offset=g.vertices.length;
+        if(c.closed)samples.pop();
+        c.displayVertices=samples.map(function(s,i){g.vertices.push(s.point);return offset+i;});
+        c.displayEdges=[];
+        for(var i=0;i<samples.length-(c.closed?0:1);i++) {c.displayEdges.push(g.edges.length);g.edges.push([offset+i,offset+(i+1)%samples.length]);}
+        g.curves.push(c);
+      });
+      g.profileMap=resolved.profile;g.topologyStatus=diagnostics.length?'partial':'inferred';
+      var model=Surfaces.build(g);g.surfaces=model.surfaces;g.surfaceModel=model.summary;g.analyticSurfaceValidation=Surfaces.validate(model,g);
+      g.surfaceModel.status=g.analyticSurfaceValidation.status;
+    }
+    return {status:g?'ok':'unavailable',reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
+      label:diagnostics.length?diagnostics[0].message:'Parametric curves reconstructed',geometry:g,
+      determination:diagnostics.length?'partial':'inferred',issues:diagnostics,
+      pipeline:{version:1,input:'vertices-edges-curves',identity:opts.identity==='explicit'?'explicit':'inferred',stage:'surface-inference',diagnostics:diagnostics}};
+  }
+
   function reconstruct(entities, opts) {
     opts = opts || {};
     var list = Array.isArray(entities) ? entities.filter(Boolean).map(function(e) {
       return Object.assign({}, e, { visible: true });
     }) : [];
+    if(list.some(function(e){return e.type==='CURVE';})) return reconstructParametric(list,opts);
     var declared = opts.identity === 'explicit' || list.some(function(e) { return e.meta && e.meta.membersDeclared; });
     var topology = opts.topology || list.some(function(e) { return e.meta && e.meta.reconstructionTopology; });
     var curveInk = list.filter(function(e) {
       var meta = e.meta || {};
       return Curves.isCurve(e) && meta.reconstructionRole !== 'construction' && !DROP_META[meta.kind];
     });
-    var frame = opts.profile || (list.find(function(e) {return e.meta && e.meta.draftingLayout;}) || {meta:{}}).meta.draftingLayout;
-    var oblique = Oblique && Oblique.reconstruct ? Oblique.reconstruct(list,{profile:frame}) :
+    var normalized = autoMembersForStrict(list);
+    var resolvedFrame = Curves.resolveProfileFrame(list,opts), frame=resolvedFrame.profile;
+    function visibilityProvider(curveIds) {
+      var excluded=new Set(curveIds), pending=true, occluder=null;
+      return function classify(point,role) {
+        var projector=getProject();
+        if(!projector || !projector.pointHidden) return null;
+        if(pending) {
+          pending=false;
+          var refs=new Set(),needed=new Set();
+          normalized.forEach(function(e) {
+            ((e.meta || {}).endpointRefs || (e.meta || {}).refs || []).forEach(function(id) {
+              (excluded.has(e.id)?refs:needed).add(id);
+            });
+          });
+          var rows=normalized.filter(function(e) {return !excluded.has(e.id) && !Curves.isCurve(e) && !(refs.has(e.id) && !needed.has(e.id));});
+          var result=declared?reconstructStrict(rows,opts):liveCore(rows,opts.eps===undefined?MATCH_EPS_MM:opts.eps);
+          if(result.geometry && result.geometry.faces.length) {occluder=result.geometry;classify.sourceIds=rows.map(function(e) {return e.id;});}
+        }
+        if(!occluder) return null;
+        var view=role==='PLAN'?'top':role==='ELEVATION'?'front':frame && frame.s===-1?'right':'left';
+        return projector.pointHidden(occluder,point,view);
+      };
+    }
+    var oblique = Oblique && Oblique.reconstruct ? Oblique.reconstruct(normalized,{profile:frame,visibilityProvider:visibilityProvider}) :
       {curves:[],consumedIds:[],issues:[]};
+    if(resolvedFrame.issue && (oblique.curves.length || oblique.issues.length)) oblique.issues.unshift(resolvedFrame.issue);
     var obliqueIds = new Set(oblique.consumedIds);
+    function attachSurfaceModel(g) {
+      if (!g || g.surfaceModel || !Surfaces || !Surfaces.build) return g;
+      var model = Surfaces.build(g);
+      if (model) {
+        g.surfaces = model.surfaces;
+        g.surfaceModel = model.summary;
+        g.analyticSurfaceValidation = Surfaces.validate(model, g);
+        if (g.analyticSurfaceValidation) g.surfaceModel.status = g.analyticSurfaceValidation.status;
+      }
+      return g;
+    }
     function finish(result, stage, diagnostics) {
       diagnostics = diagnostics || result.issues || [];
       result.pipeline = { version: 1, input: 'vertices-edges-curves', identity: declared ? 'explicit' : 'inferred',
@@ -2696,13 +2767,18 @@
     if (topology) return finish(reconstructStrict(list,opts), 'declared-topology');
     if (!curveInk.length && !oblique.curves.length) {
       var straight = declared ? reconstructStrict(list,opts) : liveCore(list,opts.eps === undefined ? MATCH_EPS_MM : opts.eps);
-      var missing=unmatchedPoints(straight.geometry);
-      if(missing.length) {straight.determination='partial';straight.geometry.topologyStatus='partial';}
+      var missing=unmatchedPoints(straight.geometry).concat(oblique.issues);
+      if(missing.length && straight.geometry) {straight.determination='partial';straight.geometry.topologyStatus='partial';}
+      if(oblique.issues.length && !straight.geometry && straight.determination!=='inconsistent') {
+        straight.reason=oblique.issues[0].code;
+        straight.label=oblique.issues[0].message;
+      }
       var straightValidation=validateInferredSurfaces(straight.geometry);
       if(straightValidation) straight.geometry.surfaceValidation=straightValidation;
-      return finish(straight, 'surface-inference',missing.concat(straight.issues || []));
+      attachSurfaceModel(straight.geometry);
+      straight.issues=missing.concat(straight.issues || []);
+      return finish(straight, 'surface-inference',straight.issues);
     }
-    var normalized = autoMembersForStrict(list);
     if (declared) {
       // Explicit observations remain hard constraints. A curve centre or
       // silhouette endpoint need not itself have two point observations,
@@ -2713,25 +2789,30 @@
     var lifted = curveInk.length ? Curves.reconstruct(normalized,opts) : {geometry:null,issues:[],consumedIds:[]};
     var geometry = lifted.geometry;
     var diagnostics = lifted.issues.filter(function(d) {return !d.entityId || !obliqueIds.has(d.entityId);}).concat(oblique.issues);
+    diagnostics=diagnostics.filter(function(d,i,all) {
+      return all.findIndex(function(p) {return p.code===d.code && p.entityId===d.entityId;})===i;
+    });
     var used = new Set(lifted.consumedIds);
     oblique.consumedIds.forEach(function(id) {used.add(id);});
     if (oblique.curves.length) {
       if (!geometry) geometry = {name:'primitive surface',vertices:[],edges:[],faces:[],curves:[],spheres:[],surfacePatches:[],smoothSideFaces:[]};
+      geometry.profileMap=frame;
+      if(resolvedFrame.inferred && frame) geometry.profileInferred=true;
       oblique.curves.forEach(function(c) {
-        var n=24, vo=geometry.vertices.length;
+        var closed=c.kind==='circle', n=closed?24:Math.max(2,Math.ceil(24*c.sweepAngle/(2*Math.PI)-1e-7)), vo=geometry.vertices.length;
         c.displayVertices=[]; c.displayEdges=[];
-        for (var i=0;i<n;i++) {
-          geometry.vertices.push(Curves.point(c, 2*Math.PI*i/n));
+        for (var i=0;i<(closed?n:n+1);i++) {
+          geometry.vertices.push(Curves.point(c, c.startAngle+c.sweepAngle*i/n));
           c.displayVertices.push(vo+i);
         }
         for (var j=0;j<n;j++) {
           c.displayEdges.push(geometry.edges.length);
-          geometry.edges.push([vo+j,vo+(j+1)%n]);
+          geometry.edges.push([vo+j,closed?vo+(j+1)%n:vo+j+1]);
         }
         geometry.curves.push(c);
       });
     }
-    var consumedPoints = new Set(), neededPoints = new Set();
+    var consumedPoints = new Set(oblique.pointIds || []), neededPoints = new Set();
     list.forEach(function(e) {
       var meta=e.meta || {}, refs=meta.endpointRefs || meta.refs || [];
       if (Curves.isCurve(e) || used.has(e.id)) refs.forEach(function(id) {consumedPoints.add(id);});
@@ -2806,13 +2887,16 @@
     geometry.edges.forEach(function(e,i) {displayEdges.set(Math.min(e[0],e[1])+'_'+Math.max(e[0],e[1]),i);});
     (geometry.curves || []).forEach(function(c) {
       c.displayEdges=[];
-      var n=c.displayVertices.length, count=c.kind==='circle'?n:n-1;
+      var n=c.displayVertices.length, closed=c.kind==='circle'||c.kind==='ellipse', count=closed?n:n-1;
       for(var i=0;i<count;i++) {
         var a=c.displayVertices[i],b=c.displayVertices[(i+1)%n],index=displayEdges.get(Math.min(a,b)+'_'+Math.max(a,b));
         if(index!==undefined) c.displayEdges.push(index);
       }
     });
     diagnostics = diagnostics.concat(unmatchedPoints(geometry,consumedPoints));
+    // Bounded analytic surface model: patch inference stays the source of the
+    // display, while each patch exposes its analytic family and ordered loops.
+    attachSurfaceModel(geometry);
     var inferredValidation = validateInferredSurfaces(geometry);
     if (inferredValidation) geometry.surfaceValidation = inferredValidation;
     geometry.topologyStatus = diagnostics.length ? 'partial' : 'inferred';
@@ -2834,6 +2918,16 @@
       result.declaredGeometry = g;
       result.geometry = Object.assign({}, g, planar, { name: 'inferred surface preview',
         surfaceComponents: planar.components || [] });
+    }
+    if (result.geometry && Surfaces && Surfaces.build) {
+      var model = Surfaces.build(result.geometry);
+      if (model) {
+        result.geometry.surfaces = model.surfaces;
+        result.geometry.surfaceModel = model.summary;
+        result.geometry.analyticSurfaceValidation = Surfaces.validate(model, result.geometry);
+        if (result.geometry.analyticSurfaceValidation)
+          result.geometry.surfaceModel.status = result.geometry.analyticSurfaceValidation.status;
+      }
     }
     return result;
   }

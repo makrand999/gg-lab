@@ -1,0 +1,13 @@
+# One spatial curve: matching station identities constrain all coordinates.
+# expect: curves=1 parametricCurves=1 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=1 status=partial
+/datum -60 160
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point d 60 -50 plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/point d' 60 60 elevation
+/curve-through a b c d plan
+/curve-through a' b' c' d' elevation

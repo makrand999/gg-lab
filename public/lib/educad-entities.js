@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./educad-parametric.js'));
   } else {
-    root.EduCADEntities = factory();
+    root.EduCADEntities = factory(root.EduCADParametric);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+})(typeof window !== 'undefined' ? window : globalThis, function (Parametric) {
   'use strict';
   // World coordinates in mm only inside entities and solvers.
   // Screen px is ephemeral render only (never stored on entities).
@@ -14,7 +14,7 @@
   var COINCIDENT_TOL_MM = 1e-6;
   var RADIUS_MIN_MM = 0.01;
 
-  var ENTITY_TYPES = ['POINT', 'SEGMENT', 'LINE', 'RAY', 'CIRCLE', 'CIRCULAR_ARC', 'DIMENSION', 'TEXT', 'DATUM_AXIS'];
+  var ENTITY_TYPES = ['POINT', 'SEGMENT', 'LINE', 'RAY', 'CIRCLE', 'CIRCULAR_ARC', 'CURVE', 'DIMENSION', 'TEXT', 'DATUM_AXIS'];
   // Core line property: a line-like entity IS two distinct points. These
   // types can never be created, added, or updated into a coincident
   // (zero-length) state -- endpoints within COINCIDENT_TOL_MM are one
@@ -125,6 +125,7 @@
       showLabel: (opts.showLabel === undefined) ? false : !!opts.showLabel,
       meta: (opts.meta === undefined) ? {} : opts.meta
     };
+    if(type==='CURVE' && !Parametric.validate(entity.meta.curve)) throw new Error('Invalid parametric curve definition.');
     validateMembers(entity);
     return entity;
   }
@@ -367,7 +368,7 @@
   function normalizeMeta(entities, entity) {
     var m = JSON.parse(JSON.stringify(entity.meta || {}));
     function id(ref) { var e = resolveReference(entities, ref); return e ? e.id : ref; }
-    ['refs', 'vertices', 'endpointRefs'].forEach(function (key) { if (Array.isArray(m[key])) m[key] = m[key].map(id); });
+    ['refs', 'vertices', 'endpointRefs', 'throughRefs'].forEach(function (key) { if (Array.isArray(m[key])) m[key] = m[key].map(id); });
     ['centerRef', 'radiusRef', 'polygon'].forEach(function (key) { if (typeof m[key] === 'string') m[key] = id(m[key]); });
     if ((entity.type === 'CIRCLE' || entity.type === 'CIRCULAR_ARC') && !m.centerRef && m.refs && m.refs.length <= 2) {
       var c = resolveReference(entities, m.refs[0], 'POINT');
@@ -535,6 +536,7 @@
       var ny2 = (patch.y2 !== undefined) ? patch.y2 : e.y2;
       assertTwoPoints(e.type, nx, ny, nx2, ny2);
     }
+    if(e.type==='CURVE' && !Parametric.validate((patch.meta||e.meta).curve)) throw new Error('Invalid parametric curve definition.');
     validateMembers(Object.assign({}, e, patch));
     if (!this._batchValidation) validateIdentityGraph(this.list().map(function (row) { return row.id === id ? Object.assign({}, row, patch) : row; }));
     for (var key in patch) {
@@ -552,6 +554,7 @@
     var e = this._map[id];
     if (e === undefined) throw new Error('unknown entity id: ' + String(id));
     assertFinite(dxMm, dyMm);
+    if(e.meta&&e.meta.throughRefs) throw new Error('Move the defining points to change this curve.');
     if (e.locked) throw new Error('entity is locked (XY datum): ' + id);
     e.x += dxMm; e.y += dyMm; e.x2 += dxMm; e.y2 += dyMm;
     this._emit('move', e);

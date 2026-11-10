@@ -1,0 +1,22 @@
+# A planar square for analytic plane-section queries, with explicit stations.
+/datum -30 70
+/point a 0 -10 plan
+/point "a'" 0 40 elevation
+/point b 40 -10 plan
+/point "b'" 40 40 elevation
+/point c 40 -50 plan
+/point "c'" 40 40 elevation
+/point d 0 -50 plan
+/point "d'" 0 40 elevation
+/line a b A plan
+/line "a'" "b'" A elevation
+/line b c A plan
+/line c d A plan
+/line "c'" "d'" A elevation
+/line d a A plan
+
+# expect: surfaceChecks=4 surfaceQueries=ok
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":10,"y":0,"z":0},"normal":{"x":1,"y":0,"z":0}},"expect":{"kind":"line","origin":{"x":10,"y":40}}}
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":0,"y":40,"z":0},"normal":{"x":0,"y":-1,"z":0}},"expect":{"kind":"plane-overlap"}}
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":0,"y":50,"z":0},"normal":{"x":0,"y":1,"z":0}},"expect":null}
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":10,"y":40,"z":0},"normal":{"x":1,"y":1,"z":0}},"expect":{"kind":"line","origin":{"x":10,"y":40}}}

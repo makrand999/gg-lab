@@ -284,7 +284,11 @@ representation, assumptions, limits, and `.edu` verification commands.
 Major's UI and script runner now call `EduCADReconstruct.reconstruct`. It uses
 explicit identities as constraints and reconstructs supported curves through
 the same primitive pipeline for linked and plain-label drawings. Its inferred
-curve/surface results carry no exact-surface certificate. The low-level strict
-kernel and compatibility wrapper described above retain their narrower contract.
-See [Primitive reconstruction](PRIMITIVE_RECONSTRUCTION.md) for the implemented
+curve/surface results carry no exact-surface certificate. Inferred patches also
+produce a bounded analytic surface model (`geometry.surfaces`) whose planes,
+cylinders, cones and spheres have explicit loops and validated boundaries; this
+model is inferred and separate from the exact declared-triangle certificate. The
+low-level strict kernel and compatibility wrapper described above retain their
+narrower contract. See [Primitive reconstruction](PRIMITIVE_RECONSTRUCTION.md)
+and [Bounded analytic surface model](SURFACE_MODEL.md) for the implemented
 geometry families, partial-result diagnostics, and remaining limitations.

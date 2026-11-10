@@ -104,6 +104,7 @@
   // the click path must degrade to "nothing to show", not a crash.
   function inspectEntity(ent) {
     if (!ent || ent.visible === false) return null;
+    if(ent.type==='CURVE'&&ent.meta&&ent.meta.curve) return {kind:'curve',title:'Interpolated curve',rows:[ent.meta.curve.closed?'Closed periodic cubic':'Open natural cubic',String((ent.meta.throughRefs||[]).length)+' defining points','Edit the defining points to change the curve.']};
     if (ent.type === 'POINT') {
       if (!finite(ent.x) || !finite(ent.y)) return null;
       return {
@@ -214,6 +215,13 @@
     for (i = 0; i < entities.length; i++) {
       e = entities[i];
       if (!e || e.visible === false) continue;
+      if(e.type==='CURVE') {
+        var query={x:(cursorPx.x-view.tx)/view.s,y:(view.ty-cursorPx.y)/view.s};
+        var pieces=Geometry.curveSegments(e,0.5/view.s),distance=Infinity;
+        pieces.forEach(function(piece){distance=Math.min(distance,Geometry.spanDistance(query,piece.a,piece.b,'SEGMENT')*view.s);});
+        if(distance<=tol&&(best===null||distance<bestD)){best=e.id;bestD=distance;}
+        continue;
+      }
       if (ROUND_MEASURABLE.indexOf(e.type) === -1) continue;
       if (!finite(e.x) || !finite(e.y) || !finite(e.radius)) continue;
       if (!(e.radius > 0) || !finite(view.s)) continue;

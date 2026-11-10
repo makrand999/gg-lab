@@ -1,0 +1,9 @@
+# Boundary stations select a plane only when they correspond.
+# expect: 24V 24E 1F curves=1 oblique=1 obliqueReprojection=ok obliquePoints=1 obliquePointFit=ok unresolved=1 diagnostics=oblique-curve-projection-missing status=partial
+/datum -100 400
+/ellipse 0 0 20 10 A plan
+/ellipse 0 0 20 17.3205080757 A elevation
+/point p 18.6465469121 3.6161543196 plan
+/point p' 18.6465469121 6.2633630096 elevation
+
+/ellipse 100 -30 10 5 A plan

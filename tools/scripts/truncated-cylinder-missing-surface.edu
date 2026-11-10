@@ -1,0 +1,12 @@
+# The inclined boundary is present but its generators are missing. Report the
+# unresolved connecting surface instead of presenting two unrelated end disks.
+# expect: 48V 48E 2F curves=2 surfaces=2 surfaceKinds=plane surfaceOpen=2 surfaceModel=partial diagnostics=curve-surface-missing unresolved=1 status=partial
+/datum -30 80
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 0 0 elevation
+/point b 40 0 elevation
+/point c 40 50 elevation
+/point d 0 10 elevation
+/line a b A elevation
+/line c d A elevation

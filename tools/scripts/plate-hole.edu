@@ -1,5 +1,5 @@
 # plate-hole
-# expect: 8V 8E 1F holes=1 open=1 boundary=8
+# expect: 8V 8E 1F holes=1 open=1 boundary=8 surfaces=1 surfaceLoops=2 surfaceShells=0 surfaceOpen=1 surfaceBoundary=8 surfaceModel=partial
 /datum -100 400
 /point v0 0 -10 plan
 /point "v0'" 0 20 elevation

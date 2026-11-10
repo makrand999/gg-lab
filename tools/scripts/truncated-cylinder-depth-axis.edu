@@ -1,0 +1,14 @@
+# The cylinder axis is depth instead of height: a true-shape circle in
+# elevation and an inclined edge-on trace in plan.
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+/datum -30 80
+/point o 20 30 elevation
+/circle o 20 A elevation
+/point a 0 0 plan
+/point b 40 0 plan
+/point d 0 -10 plan
+/point c 40 -50 plan
+/line a b A plan
+/line d c A plan
+/line a d A plan
+/line b c A plan

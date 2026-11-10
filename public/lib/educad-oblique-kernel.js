@@ -404,7 +404,8 @@
   function project(p,role,profile,vector) {
     if(role==='PLAN') return {x:p.x,y:-p.z};
     if(role==='ELEVATION') return {x:p.x,y:p.y};
-    return {x:profile.s*p.z+(vector?0:profile.xRef-profile.s*profile.dRef),y:p.y};
+    if(role==='PROFILE'&&profile)return {x:profile.s*p.z+(vector?0:profile.xRef-profile.s*profile.dRef),y:p.y};
+    return null;
   }
   function parameter(p,curve,role,profile) {
     var c=project(curve.center,role,profile),u=project(curve.u,role,profile,true),v=project(curve.v,role,profile,true);

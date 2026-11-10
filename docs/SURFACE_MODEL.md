@@ -87,7 +87,8 @@ participate in the same boundary validation and incidence analysis as drawing
 curves. A trim is open until its new boundary is shared with another patch;
 sharing an inline section requires referencing the same section object. This is the first trimming
 operation; general surface–surface intersections and splitting of arbitrary
-curved loops remain future work.
+curved loops remain future work. `cone.edu` exercises a cone trim parallel to
+its base; an oblique conic cut is rejected rather than approximated.
 
 ## End-to-end case: truncated cylinder
 

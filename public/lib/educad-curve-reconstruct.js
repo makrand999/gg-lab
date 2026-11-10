@@ -819,11 +819,11 @@
   }
   function cylinderRecessMesh(M,axis,depth,a,u,v,lon) {
     var vertices=[],faces=[],edges=[],edgeMap=new Map();
-    var bottom=add3(M,mul3(axis,depth)),topRing=[],bottomRing=[];
+    var bottom=add(M,mul(axis,depth)),topRing=[],bottomRing=[];
     for(var j=0;j<lon;j++) {
-      var t=TAU*j/lon,radial=add3(mul3(u,Math.cos(t)*a),mul3(v,Math.sin(t)*a));
-      topRing.push(vertices.length);vertices.push(add3(M,radial));
-      bottomRing.push(vertices.length);vertices.push(add3(bottom,radial));
+      var t=TAU*j/lon,radial=add(mul(u,Math.cos(t)*a),mul(v,Math.sin(t)*a));
+      topRing.push(vertices.length);vertices.push(add(M,radial));
+      bottomRing.push(vertices.length);vertices.push(add(bottom,radial));
     }
     function edge(i,j) {
       var key=i<j?i+'_'+j:j+'_'+i;
@@ -838,13 +838,13 @@
     for(var j=0;j<lon;j++) {
       var j2=(j+1)%lon,loop=[topRing[j],topRing[j2],bottomRing[j2],bottomRing[j]];
       var p0=vertices[loop[0]],p1=vertices[loop[1]],p2=vertices[loop[2]];
-      var n=cross3(sub3(p1,p0),sub3(p2,p0));
-      var centroid=mul3(add3(add3(p0,p1),p2),1/3);
-      var along=dot3(sub3(centroid,M),axis);
-      var radial=sub3(sub3(centroid,M),mul3(axis,along));
+      var n=cross(sub(p1,p0),sub(p2,p0));
+      var centroid=mul(add(add(p0,p1),p2),1/3);
+      var along=dot(sub(centroid,M),axis);
+      var radial=sub(sub(centroid,M),mul(axis,along));
       // A cavity is viewed from inside: orient the display facets toward the
       // axis, matching the inward-facing spherical-recess bowl.
-      if(dot3(n,radial)>0) loop.reverse();
+      if(dot(n,radial)>0) loop.reverse();
       sideFaces.push(faces.length);faces.push(loop);
       edge(bottomRing[j],topRing[j]);
     }
@@ -919,12 +919,12 @@
       var bottomFree=(cand.bottomStation-o0.y)/axis2.y;
       var freeDelta=bottomFree-mouthFree;
       if(Math.abs(freeDelta)<=1e-6*Math.max(1,a)) return;
-      var axis=mul3(V.normal,freeDelta>0?1:-1),outward=mul3(axis,-1);
+      var axis=mul(V.normal,freeDelta>0?1:-1),outward=mul(axis,-1);
       var u=V.u,v=V.v;
-      if(dot3(cross3(u,v),outward)<0) v=mul3(v,-1);
+      if(dot(cross(u,v),outward)<0) v=mul(v,-1);
       var mouthCenter=V.to3D(C.x,C.y,mouthFree);
       var resolved={circle:C,view:V,mouthCenter:mouthCenter,radius:a,axis:axis,outward:outward,
-        depth:Math.abs(freeDelta),bottomCenter:add3(mouthCenter,mul3(axis,Math.abs(freeDelta))),
+        depth:Math.abs(freeDelta),bottomCenter:add(mouthCenter,mul(axis,Math.abs(freeDelta))),
         u:u,v:v,mouthRun:cand.mouthRun,bottomRun:cand.bottomRun,span:cand.span};
       var mouthIds=cand.mouthRun&&cand.closedMouth?cand.mouthRun.exactIds.slice():[];
       var bottomIds=cand.bottomRun.ids.slice();

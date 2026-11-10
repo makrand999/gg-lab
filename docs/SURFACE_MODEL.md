@@ -128,8 +128,9 @@ reports `curve-projection-ambiguous` and retains both candidate levels.
 
 ## Limits
 
-- Only principal/oblique circles and the new inclined full-circle traces are
-  lifted; inclined arcs are reported unsupported.
+- Principal/oblique circles, inclined full-circle traces, and oblique arcs
+  (including arc/line pairs) are lifted. A partial inclined trace of a full
+  circular boundary still reports `curve-inclined-arc-unsupported`.
 - Cone sections are classified but not yet returned as trimmed ellipse/hyperbola
   boundary curves.
 - General cylinder–cylinder, cone–cylinder and curved-surface intersections are

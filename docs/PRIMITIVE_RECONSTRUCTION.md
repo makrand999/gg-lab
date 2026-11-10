@@ -106,8 +106,16 @@ Open, unbranched elliptical segment chains are fitted with a normalized conic
 in the recovered circle plane across views. The output is an analytic `arc`,
 including major arcs and sweeps crossing the angular origin; display segments
 never close an open arc. Incompatible sweeps report `oblique-arc-conflict`.
-Degenerate or ill-conditioned fits remain with the straight-primitive stage;
-an edge-on chain paired with an ellipse is not yet an oblique-arc input.
+Degenerate or ill-conditioned fits remain with the straight-primitive stage.
+
+An open elliptical arc can also pair with a straight **edge-on run** in another
+view. The run's supporting line locates the missing centre coordinate, and its
+covered interval must equal the arc's projected interval. This is solved from
+the line equation rather than the run midpoint, so major arcs work even when
+the run ends are interior projection extrema rather than arc endpoints.
+Endpoint/radius evidence supplies a fallback when the run is parallel to the
+missing axis. An incompatible run reports `oblique-line-conflict`; an arc with
+no matching run retains `oblique-curve-projection-missing`.
 
 ### Free-form station curves
 
@@ -218,6 +226,14 @@ node tools/edc.js tools/scripts/oblique-circle.edu
 node tools/edc.js tools/scripts/oblique-line-circle.edu
 node tools/edc.js tools/scripts/oblique-line-elevation-plan.edu
 node tools/edc.js tools/scripts/oblique-line-conflict.edu
+node tools/edc.js tools/scripts/oblique-quarter-arc.edu
+node tools/edc.js tools/scripts/oblique-major-arc.edu
+node tools/edc.js tools/scripts/oblique-arc-line.edu
+node tools/edc.js tools/scripts/oblique-arc-line-slanted.edu
+node tools/edc.js tools/scripts/oblique-arc-line-elevation-plan.edu
+node tools/edc.js tools/scripts/oblique-arc-line-profile.edu
+node tools/edc.js tools/scripts/oblique-major-arc-line.edu
+node tools/edc.js tools/scripts/oblique-arc-line-conflict.edu
 node tools/edc.js tools/scripts/truncated-cylinder.edu
 node tools/edc.js tools/scripts/truncated-cylinder-opposite.edu
 node tools/edc.js tools/scripts/truncated-cylinder-profile.edu
@@ -283,17 +299,17 @@ confirms the curve was rebuilt from it rather than keeping stale control points.
 ## Remaining work
 
 This starts the agreed pipeline; it is not complete reconstruction for every
-geometric solid. Full-circle inclined traces, closed ellipse + edge-on line
-pairs, and a first bounded plane/cylinder/cone/sphere model are implemented.
-Important next capabilities are open ellipse/edge-on **arc** correspondence,
-general elliptical boundaries on cones, surface–surface intersections, curved
-recesses/fillets, and certification of the analytic surfaces rather than only
-their display triangles. Spheres, two-view oblique circles, elliptical arc
-chains, and interpolated station curves with cross-view consistency checks are
-supported; other curved families are not. Profile frames are inferred when
-necessary, and overlapping projections are resolved when a declared view
-selects one interpretation; contours that remain genuinely ambiguous between
-the available views stay unresolved. The current planar/ruled surface choices
-are stated inference conventions, not a proof of uniqueness. Analytic curve
-rendering and the solid widget's interval drawing still use tessellation, and
-numeric robustness at extreme scales remains work to do.
+geometric solid. Full-circle inclined traces, closed and open ellipse/edge-on
+line pairs, and a first bounded plane/cylinder/cone/sphere model are implemented.
+Important next capabilities are general elliptical boundaries on cones,
+surface–surface intersections, curved recesses/fillets, and certification of
+the analytic surfaces rather than only their display triangles. Spheres,
+two-view oblique circles, elliptical arc chains, arc/line pairs, and
+interpolated station curves with cross-view consistency checks are supported;
+other curved families are not. Profile frames are inferred when necessary, and
+overlapping projections are resolved when a declared view selects one
+interpretation; contours that remain genuinely ambiguous between the available
+views stay unresolved. The current planar/ruled surface choices are stated
+inference conventions, not a proof of uniqueness. Analytic curve rendering and
+the solid widget's interval drawing still use tessellation, and numeric
+robustness at extreme scales remains work to do.

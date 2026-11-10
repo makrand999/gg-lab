@@ -224,7 +224,7 @@ function checkObliqueReprojection(solid, entities) {
         // Edge-on source: the analytic circle must project to the same line
         // segment, not to a degenerate inverse-basis formula.
         var pts=[];
-        for(var k=0;k<24;k++) {
+        for(var k=0;k<=24;k++) {
           var a=c.startAngle+c.sweepAngle*k/24;
           pts.push(project({x:c.center.x+c.radius*(c.u.x*Math.cos(a)+c.v.x*Math.sin(a)),
             y:c.center.y+c.radius*(c.u.y*Math.cos(a)+c.v.y*Math.sin(a)),

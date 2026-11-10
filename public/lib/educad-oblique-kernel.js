@@ -205,33 +205,89 @@
     });
     return ok && out.x !== undefined && out.y !== undefined && out.z !== undefined ? out : null;
   }
+  function runPoint(run,t) {
+    return {x:run.dx*t - run.dy*run.c, y:run.dy*t + run.dx*run.c};
+  }
+  // For an open projected arc the run's midpoint is not the circle centre.
+  // Solve the missing centre coordinate from the run's supporting line, then
+  // keep endpoint/radius evidence as a fallback for a degenerate line equation.
+  function centersFromLoopAndArcLine(loop, run, profile) {
+    var base = centerFromLoop(loop, profile);
+    if (!base) return [];
+    var axes = ['x','y','z'], missing = axes.filter(function(k) { return base[k] === undefined; });
+    if (missing.length !== 1) return [];
+    var axis = missing[0], known = axes.filter(function(k) { return k !== axis; });
+    var ends = [runPoint(run,run.min), runPoint(run,run.max)];
+    var first = loop.points[0], last = loop.points[loop.points.length-1];
+    var tol = Math.max(TOL, 0.02*run.length), out = [];
+    function add(center) {
+      var p = project(center, run.role, profile);
+      if (!p || Math.abs(run.dx*p.y - run.dy*p.x - run.c) > tol) return;
+      if (!out.some(function(q) { return Math.hypot(q.x-center.x,q.y-center.y,q.z-center.z) < TOL; })) out.push(center);
+    }
+    // The run's supporting line is affine in the missing centre coordinate.
+    // Solve it first; this is the robust path for major arcs whose run ends
+    // are extrema inside the arc rather than the arc endpoints.
+    var p0 = Object.assign({}, base), p1 = Object.assign({}, base);
+    p0[axis] = 0; p1[axis] = 1;
+    var q0 = project(p0, run.role, profile), q1 = project(p1, run.role, profile);
+    if (q0 && q1) {
+      var off0 = run.dx*q0.y - run.dy*q0.x - run.c, off1 = run.dx*q1.y - run.dy*q1.x - run.c;
+      if (Math.abs(off1-off0) > 1e-9) {
+        var center = Object.assign({}, base); center[axis] = -off0/(off1-off0); add(center);
+      }
+    }
+    // Fall back to endpoint/radius evidence when the run is parallel to the
+    // missing axis, so the line equation alone cannot locate the centre.
+    for (var reverse=0; reverse<2; reverse++) {
+      var P = mergeCenter(partialFromPoint(first,loop.role,profile), partialFromPoint(reverse?ends[1]:ends[0],run.role,profile));
+      var Q = mergeCenter(partialFromPoint(last,loop.role,profile), partialFromPoint(reverse?ends[0]:ends[1],run.role,profile));
+      if (!P || !Q) continue;
+      var remP = loop.a*loop.a, remQ = loop.a*loop.a;
+      known.forEach(function(k) { remP -= (P[k]-base[k])*(P[k]-base[k]); remQ -= (Q[k]-base[k])*(Q[k]-base[k]); });
+      if (remP < -tol*tol || remQ < -tol*tol) continue;
+      var rootsP = [P[axis]+Math.sqrt(Math.max(0,remP)), P[axis]-Math.sqrt(Math.max(0,remP))];
+      var rootsQ = [Q[axis]+Math.sqrt(Math.max(0,remQ)), Q[axis]-Math.sqrt(Math.max(0,remQ))];
+      rootsP.forEach(function(a) { rootsQ.forEach(function(b) {
+        if (Math.abs(a-b) > tol) return;
+        var center = Object.assign({}, base); center[axis] = (a+b)/2; add(center);
+      }); });
+    }
+    return out;
+  }
   // A circle is edge-on in a view exactly when its normal has no component
   // along that view's projection axis.
   function edgeOnInRole(n, role) {
     var axis = role === 'PLAN' ? 'y' : role === 'ELEVATION' ? 'z' : 'x';
     return Math.abs(n[axis]) <= 1e-6;
   }
-  function projectedLineSpan(curve, role, profile) {
-    var center = project(curve.center, role, profile);
-    var samples = [];
-    for (var i=0;i<24;i++) samples.push(project(curvePoint(curve, TAU*i/24), role, profile));
-    var pu = project({x:curve.center.x+curve.u.x,y:curve.center.y+curve.u.y,z:curve.center.z+curve.u.z}, role, profile);
-    var pv = project({x:curve.center.x+curve.v.x,y:curve.center.y+curve.v.y,z:curve.center.z+curve.v.z}, role, profile);
-    var dx = {x:pu.x-center.x, y:pu.y-center.y}, dy = {x:pv.x-center.x, y:pv.y-center.y};
-    if (Math.abs(dx.x*dy.y - dx.y*dy.x) > 1e-7) return null;
-    var dir = Math.hypot(dx.x,dx.y) > EPS ? {x:dx.x,y:dx.y} : {x:dy.x,y:dy.y};
-    var len = Math.hypot(dir.x,dir.y);
-    if (!(len > EPS)) return null;
-    dir.x/=len; dir.y/=len;
-    var ts = samples.map(function (p) { return (p.x-center.x)*dir.x + (p.y-center.y)*dir.y; });
-    return {center:center, dir:dir, min:Math.min.apply(null,ts), max:Math.max.apply(null,ts), radius:curve.radius};
-  }
-  function lineRunMatches(span, run) {
-    if (!span) return false;
-    if (Math.abs(Math.abs(span.dir.x*run.dx + span.dir.y*run.dy) - 1) > 0.02) return false;
-    if (Math.hypot((run.mid.x-span.center.x)*span.dir.y - (run.mid.y-span.center.y)*span.dir.x) > Math.max(TOL, 0.02*run.length)) return false;
+  // Compare a candidate curve's projection with a straight edge-on run,
+  // including the run's supporting line and its covered interval. The run is
+  // not assumed to be centred on the circle, so this also supports arcs.
+  function lineRunMatchesCurve(curve, run, profile) {
+    var start = curve.kind === 'arc' ? curve.startAngle : 0;
+    var sweep = curve.kind === 'arc' ? curve.sweepAngle : TAU;
     var tol = Math.max(TOL, 0.02*run.length);
-    return Math.abs(run.length - (span.max-span.min)) <= tol;
+    var center = project(curve.center, run.role, profile);
+    if (!center || Math.abs(run.dx*center.y - run.dy*center.x - run.c) > tol) return false;
+    var lo = Infinity, hi = -Infinity;
+    for (var i=0;i<=24;i++) {
+      var p = project(curvePoint(curve, start+sweep*i/24), run.role, profile);
+      if (!p || Math.abs(run.dx*p.y - run.dy*p.x - run.c) > tol) return false;
+      var t = run.dx*p.x + run.dy*p.y;
+      if (t < lo) lo = t;
+      if (t > hi) hi = t;
+    }
+    return Math.abs(lo-run.min) <= tol && Math.abs(hi-run.max) <= tol;
+  }
+  function sameCurveGeometry(a, b) {
+    if (!a || !b || a.kind !== b.kind || !near(a.radius,b.radius,TOL) ||
+        !near(a.center.x,b.center.x,TOL) || !near(a.center.y,b.center.y,TOL) || !near(a.center.z,b.center.z,TOL) ||
+        !samePlane(cross(a.u,a.v),cross(b.u,b.v))) return false;
+    if (a.kind === 'circle') return true;
+    if (!near(a.sweepAngle,b.sweepAngle,0.02)) return false;
+    var pa = curvePoint(a,a.startAngle+a.sweepAngle/2), pb = curvePoint(b,b.startAngle+b.sweepAngle/2);
+    return Math.hypot(pa.x-pb.x,pa.y-pb.y,pa.z-pb.z) < TOL;
   }
   function normalFromLoop(loop, profile) {
     var ratio = Math.max(0, Math.min(1, loop.b / loop.a));
@@ -456,16 +512,8 @@
         }
         if (candidates.length > 1) issues.push({code:'oblique-curve-ambiguous',entityId:a.segments[0],
           message:'The projections determine the oblique circle up to a mirror in depth; add visibility or point evidence to select one.'});
-        var chosen=candidates[0],normal=cross(chosen.u,chosen.v);
-        var duplicate = curves.find(function(c) {
-          return near(c.radius, radius, TOL) &&
-            near(c.center.x, center.x, TOL) && near(c.center.y, center.y, TOL) && near(c.center.z, center.z, TOL) &&
-            samePlane(cross(c.u,c.v),normal) && c.kind===chosen.kind &&
-            (c.kind==='circle' || near(c.sweepAngle,chosen.sweepAngle,0.02) &&
-              Math.hypot(curvePoint(c,c.startAngle+c.sweepAngle/2).x-curvePoint(chosen,chosen.startAngle+chosen.sweepAngle/2).x,
-                curvePoint(c,c.startAngle+c.sweepAngle/2).y-curvePoint(chosen,chosen.startAngle+chosen.sweepAngle/2).y,
-                curvePoint(c,c.startAngle+c.sweepAngle/2).z-curvePoint(chosen,chosen.startAngle+chosen.sweepAngle/2).z)<TOL);
-        });
+        var chosen=candidates[0];
+        var duplicate = curves.find(function(c) { return sameCurveGeometry(c,chosen); });
         if (duplicate) duplicate.sourceIds = Array.from(new Set(duplicate.sourceIds.concat(sources)));
         else {duplicate=chosen;curves.push(duplicate);}
         if(chosen.visibilityEvidence) duplicate.visibilityEvidence=chosen.visibilityEvidence;
@@ -477,46 +525,52 @@
         sources.forEach(function(id) { used.add(id); });
       }
     }
-    // A circle whose plane is edge-on in one view projects to an ellipse in
-    // another view and a straight run in the edge-on view. The ellipse fixes
-    // the radius and two normal candidates; the run's slope and midpoint select
-    // the mirror and the missing centre coordinate.
+    // A circle or arc whose plane is edge-on in one view projects to an
+    // ellipse in another view and a straight run in the edge-on view. The
+    // ellipse fixes the radius and normal candidates. A closed circle uses the
+    // run midpoint for its centre; an open arc solves the missing coordinate
+    // from the run's supporting line and checks the covered interval instead.
     var lineRuns = [];
     ['PLAN','ELEVATION','PROFILE'].forEach(function(role) {
       lineRuns = lineRuns.concat(lineRunsInView(list, role));
     });
     loops.forEach(function(loop) {
-      if (!loop.closed || loop.segments.length < MIN_LINE_SEGS ||
+      if (loop.segments.length < (loop.closed ? MIN_LINE_SEGS : MIN_SEGS-1) ||
           loop.segments.some(function(id) { return used.has(id); })) return;
       var radius = loop.a;
       lineRuns.forEach(function(run) {
         if (run.role === loop.role || run.ids.some(function(id) { return used.has(id); })) return;
-        if (Math.abs(run.length - 2*radius) > Math.max(TOL, 0.02*radius)) return;
-        var center = centerFromLoopAndLine(loop, run, profile);
-        if (!center) return;
+        if (loop.closed && Math.abs(run.length - 2*radius) > Math.max(TOL, 0.02*radius)) return;
+        var centers = loop.closed ? [centerFromLoopAndLine(loop, run, profile)] : centersFromLoopAndArcLine(loop, run, profile);
+        centers = centers.filter(Boolean);
+        if (!centers.length) return;
         var normals = normalCandidates(loop, profile).filter(function(n) { return edgeOnInRole(n, run.role); });
         if (!normals.length) return;
         var sources = loop.segments.concat(run.ids);
-        var candidates = normals.map(function(n) {
-          var curve = makeCurve(center, n, radius, sources, loop.role, run.role);
-          var span = projectedLineSpan(curve, run.role, profile);
-          if (!lineRunMatches(span, run)) return null;
-          curve.obliqueLine = {role:run.role, ids:run.ids.slice()};
-          return curve;
-        }).filter(Boolean);
+        var candidates = [];
+        centers.forEach(function(center) {
+          normals.forEach(function(n) {
+            var curve = makeCurve(center, n, radius, sources, loop.role, run.role);
+            if (!loop.closed) {
+              var range = arcRange(loop, curve, profile);
+              if (!range) return;
+              curve.kind = 'arc'; curve.startAngle = range.start; curve.sweepAngle = range.sweep;
+            }
+            if (!lineRunMatchesCurve(curve, run, profile)) return;
+            curve.obliqueLine = {role:run.role, ids:run.ids.slice()};
+            candidates.push(curve);
+          });
+        });
+        candidates = candidates.filter(function(c,i) { return candidates.findIndex(function(q) { return sameCurveGeometry(c,q); }) === i; });
         if (!candidates.length) {
           issues.push({code:'oblique-line-conflict',entityId:loop.segments[0],
-            message:'The straight edge-on trace does not match the circle plane supported by this ellipse.'});
+            message:'The straight edge-on trace does not match the elliptical projection and its plane.'});
           return;
         }
         if (candidates.length > 1) issues.push({code:'oblique-curve-ambiguous',entityId:loop.segments[0],
-          message:'The projected ellipse and line leave a depth mirror; add a third view or point evidence.'});
-        var chosen = candidates[0], normal = cross(chosen.u, chosen.v);
-        var duplicate = curves.find(function(c) {
-          return near(c.radius, radius, TOL) &&
-            near(c.center.x, center.x, TOL) && near(c.center.y, center.y, TOL) && near(c.center.z, center.z, TOL) &&
-            samePlane(cross(c.u,c.v), normal) && c.kind === 'circle';
-        });
+          message:'The projected curve and line leave a depth mirror; add a third view or point evidence.'});
+        var chosen = candidates[0];
+        var duplicate = curves.find(function(c) { return sameCurveGeometry(c, chosen); });
         if (duplicate) duplicate.sourceIds = Array.from(new Set(duplicate.sourceIds.concat(sources)));
         else { duplicate = chosen; curves.push(duplicate); }
         sources.forEach(function(id) { used.add(id); });

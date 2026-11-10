@@ -1,7 +1,7 @@
 # Five sphere silhouettes. Surface 0 intersects surface 2 in a circle,
 # touches surfaces 1 and 3 tangentially (inside and outside), and misses
 # surface 4. Reusing surface 0 tests the coincident case.
-# expect: 430V 1260E 840F spheres=5 surfaces=5 surfaceKinds=sphere surfaceLoops=0 surfaceShells=5 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceChecks=5 surfaceQueries=ok
+# expect: 430V 1260E 840F spheres=5 surfaces=5 surfaceKinds=sphere surfaceLoops=0 surfaceShells=5 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceChecks=5 surfaceQueries=ok
 /datum -200 400
 /circle 20 -30 20 A plan
 /circle 20 30 20 A elevation

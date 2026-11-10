@@ -224,19 +224,43 @@
     return keys;
   }
 
-  function analyze(model) {
-    var usage = new Map(), surfKeys = new Map();
-    model.surfaces.forEach(function (s) {
-      var keys = [];
-      (s.loops || []).forEach(function (loop) {
-        loopElements(loop).forEach(function (k) {
-          keys.push(k);
-          if (!usage.has(k)) usage.set(k, []);
-          usage.get(k).push(s.id);
+  // Canonical boundary incidence for the whole model. Both the lightweight
+  // validation summary and the detailed certificate consume this graph, so a
+  // shared seam cannot be counted differently by the two checks.
+  function incidence(model) {
+    var sectionIds = new Map(), uses = new Map(), bySurface = new Map();
+    function elementId(element) {
+      if (typeof element === 'string') return element;
+      if (element && typeof element === 'object') {
+        if (!sectionIds.has(element)) sectionIds.set(element, 'section:' + sectionIds.size);
+        return sectionIds.get(element);
+      }
+      return 'invalid-element';
+    }
+    (model.surfaces || []).forEach(function (s, si) {
+      var ids = [];
+      (s.loops || []).forEach(function (loop, li) {
+        loopElements(loop).forEach(function (element) {
+          var id = elementId(element);
+          ids.push(id);
+          if (!uses.has(id)) uses.set(id, {id:id, element:element, kind:boundaryElementKind(element),
+            useCount:0, surfaceIds:[], surfaceUses:[], loopRefs:[]});
+          var use = uses.get(id);
+          use.useCount++;
+          use.surfaceUses.push(s.id);
+          if (use.surfaceIds.indexOf(s.id) === -1) use.surfaceIds.push(s.id);
+          use.loopRefs.push({surfaceIndex:si, surfaceId:s.id, loopIndex:li});
         });
       });
-      surfKeys.set(s.id, keys);
+      bySurface.set(s.id, ids);
     });
+    return {uses:uses, bySurface:bySurface, elementId:elementId};
+  }
+
+  function analyze(model) {
+    var graph = incidence(model), usage = new Map();
+    graph.uses.forEach(function (use, id) { usage.set(id, use.surfaceUses.slice()); });
+    var surfKeys = graph.bySurface;
     var parent = new Map();
     model.surfaces.forEach(function (s) { parent.set(s.id, s.id); });
     function find(x) { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; }
@@ -506,20 +530,13 @@
     var vertices = geometry && geometry.vertices || [];
     var issues = [];
     var counters = {checks:0, exactChecks:0, numericChecks:0};
-    var sectionIds = new Map();
+    var graph = incidence(model);
+    var elementId = graph.elementId;
 
     function unique(values) {
       var out = [];
       (values || []).forEach(function(v) { if (out.indexOf(v) === -1) out.push(v); });
       return out;
-    }
-    function elementId(element) {
-      if (typeof element === 'string') return element;
-      if (element && typeof element === 'object') {
-        if (!sectionIds.has(element)) sectionIds.set(element, 'section:' + sectionIds.size);
-        return sectionIds.get(element);
-      }
-      return 'invalid-element';
     }
     function issue(code, message, detail) {
       detail = detail || {};
@@ -596,23 +613,10 @@
       idCounts.set(key, (idCounts.get(key) || 0) + 1);
     });
 
-    // Pass 1: assign deterministic boundary IDs and count every use. Section
-    // objects keep reference identity, so two separately built but equal
-    // sections do not become shared merely because their numbers match.
-    var uses = new Map();
-    model.surfaces.forEach(function (s, si) {
-      (s.loops || []).forEach(function (loop, li) {
-        loopElements(loop).forEach(function (element) {
-          var id = elementId(element);
-          if (!uses.has(id)) uses.set(id, {id:id, element:element, kind:boundaryElementKind(element),
-            useCount:0, surfaceIds:[], loopRefs:[]});
-          var use = uses.get(id);
-          use.useCount++;
-          if (use.surfaceIds.indexOf(s.id) === -1) use.surfaceIds.push(s.id);
-          use.loopRefs.push({surfaceIndex:si, surfaceId:s.id, loopIndex:li});
-        });
-      });
-    });
+    // Pass 1 uses the canonical incidence graph. Section objects keep
+    // reference identity, so two separately built but equal sections do not
+    // become shared merely because their numbers match.
+    var uses = graph.uses;
 
     function loopIncidence(loop) {
       var ids = loopElements(loop).map(elementId);
@@ -1333,6 +1337,7 @@
     build:build,
     validate:validate,
     certify:certify,
+    incidence:incidence,
     summarize:summarize,
     section:section,
     intersect:intersect,

@@ -5,7 +5,9 @@ alone do not say how a surface is bounded, which side is material, or how two
 patches share an edge. `public/lib/educad-surfaces.js` adds that layer next to
 the display geometry. The model is inferred; `Surfaces.certify` separately
 records what can be checked analytically, without turning inferred surfaces
-into declared ones.
+into declared ones. See [Toward a bounded analytic surface
+complex](SURFACE_COMPLEX.md) for how cone, recess, intersection and certificate
+operations share the same boundary vocabulary.
 
 ## Representation
 

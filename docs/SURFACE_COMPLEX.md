@@ -139,7 +139,8 @@ Implemented now:
 
 Not yet unified:
 
-- the three vector-helper bundles in `educad-curve-reconstruct.js`;
+- the curve/silhouette projection helpers themselves; their vector arithmetic
+  now comes from the shared `educad-vec3.js`;
 - a generic candidate resolver for overlapping inferred surfaces;
 - `split` for a loop that crosses a cutting surface;
 - automatic promotion of an intersection curve into a shared boundary loop;
@@ -147,7 +148,8 @@ Not yet unified:
 - exact interval arithmetic for the numeric certificate checks.
 
 The shared incidence graph is the first concrete step. It makes validation,
-certification and future trimming agree on boundary identity. The next
-refactor should move the curve/silhouette projection helpers into one module
-and add `split`, after which a fillet is a cylinder patch with two shared loops
-rather than a new reader.
+certification and future trimming agree on boundary identity, and
+`educad-vec3.js` removes the duplicated vector arithmetic. The next refactor
+should move the curve/silhouette projection helpers into one module and add
+`split`, after which a fillet is a cylinder patch with two shared loops rather
+than a new reader.

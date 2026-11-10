@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-parametric.js'));
-  else root.EduCADCurveReconstruct = factory(root.EduCADParametric);
-})(typeof window !== 'undefined' ? window : globalThis, function (Parametric) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-parametric.js'), require('./educad-vec3.js'));
+  else root.EduCADCurveReconstruct = factory(root.EduCADParametric, root.EduCADVec3);
+})(typeof window !== 'undefined' ? window : globalThis, function (Parametric, Vec3) {
   'use strict';
 
   // First primitive lifting stage: a circle/arc seen in true shape in one
@@ -9,6 +9,13 @@
   // vertices/edges below are only the display approximation. No solid names.
   var TAU = 2 * Math.PI, EPS = 1e-6, SAMPLES = 24;
   function near(a, b) { return Math.abs(a - b) <= EPS; }
+  // One vector implementation for every stage in this file. Local names keep
+  // the long geometry expressions readable.
+  var add = Vec3.add, sub = Vec3.sub, mul = Vec3.mul, dot = Vec3.dot, cross = Vec3.cross;
+  // The coaxial ruled-surface stage historically treated a zero normal as the
+  // Y axis; the oblique-cone stage needs null so it can reject a degeneracy.
+  function unit(v) { return Vec3.unit(v, EPS) || {x:0, y:1, z:0}; }
+  function cvUnit(v) { return Vec3.unit(v, EPS); }
   function helper(e) {
     var m = e.meta || {};
     return m.reconstructionRole === 'construction' || ['axis', 'projector', 'locus'].indexOf(m.kind) !== -1;
@@ -195,12 +202,6 @@
       return reach>=1-EPS?ids:[];
     }
     function axial(c) { return c.sourceView === 'PLAN' ? c.center.y : c.center.z; }
-    function sub(a,b) {return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};}
-    function add(a,b) {return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z};}
-    function mul(a,s) {return {x:a.x*s,y:a.y*s,z:a.z*s};}
-    function dot(a,b) {return a.x*b.x+a.y*b.y+a.z*b.z;}
-    function cross(a,b) {return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
-    function unit(v) {var l=Math.hypot(v.x,v.y,v.z);return l>EPS?{x:v.x/l,y:v.y/l,z:v.z/l}:{x:0,y:1,z:0};}
     function curveNormal(c) {return unit(cross(c.u,c.v));}
     // The two silhouette generators of a surface join the same angular station
     // on its boundaries. This also gives the cap orientation axis.
@@ -437,13 +438,6 @@
   // and the two must satisfy R^2 = a^2 + offset^2. This is a bounded curved
   // recess, not a solid/feature-name reader. Only PLAN/ELEVATION pairs are
   // used; PROFILE-mouth recesses remain unsupported.
-  function dot3(a,b) {return a.x*b.x+a.y*b.y+a.z*b.z;}
-  function cross3(a,b) {return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
-  function sub3(a,b) {return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};}
-  function add3(a,b) {return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z};}
-  function mul3(a,s) {return {x:a.x*s,y:a.y*s,z:a.z*s};}
-  function len3(v) {return Math.hypot(v.x,v.y,v.z);}
-  function near3(a,b,tol) {return len3(sub3(a,b))<=tol;}
   function principalFrame(role) {
     if(role==='PLAN') return {role:'PLAN',free:'y',u:{x:1,y:0,z:0},v:{x:0,y:0,z:-1},
       normal:{x:0,y:1,z:0},
@@ -507,33 +501,33 @@
     var mouthFree=(mf1+mf2)/2,M=V.to3D(C.x,C.y,mouthFree);
     var mid=at(span.start+span.sweep/2);
     var Pmid=W.to3D(mid.x,mid.y,O[W.free]);
-    var side=dot3(sub3(Pmid,M),V.normal);
+    var side=dot(sub(Pmid,M),V.normal);
     if(Math.abs(side)<=tol) return null;
-    var outward=mul3(V.normal,side<0?1:-1),pole=mul3(outward,-1);
+    var outward=mul(V.normal,side<0?1:-1),pole=mul(outward,-1);
     for(var k=1;k<8;k++) {
       var p=at(span.start+span.sweep*k/8),P=W.to3D(p.x,p.y,O[W.free]);
-      if(dot3(sub3(P,M),outward)>tol) return null;
+      if(dot(sub(P,M),outward)>tol) return null;
     }
-    var poleAngle=Math.atan2(dot3(pole,W.v),dot3(pole,W.u));
+    var poleAngle=Math.atan2(dot(pole,W.v),dot(pole,W.u));
     if(!arcHasAngle(poleAngle,span.start,span.sweep,1e-5)) return null;
     // The rim pair must straddle the mouth centre before a radius/endpoint
     // mismatch is worth reporting as a recess conflict.
-    if(len3(add3(sub3(E1,M),sub3(E2,M)))>Math.max(tol,0.25*a)) return null;
-    if(Math.abs(len3(sub3(E1,M))-a)>tol || Math.abs(len3(sub3(E2,M))-a)>tol)
+    if(Vec3.length(add(sub(E1,M),sub(E2,M)))>Math.max(tol,0.25*a)) return null;
+    if(Math.abs(Vec3.length(sub(E1,M))-a)>tol || Math.abs(Vec3.length(sub(E2,M))-a)>tol)
       return {conflict:'The silhouette arc endpoints do not meet the mouth circle.'};
-    var q=sub3(O,M),offset=dot3(q,V.normal);
+    var q=sub(O,M),offset=dot(q,V.normal);
     if(Math.abs(Math.hypot(a,offset)-R)>tol)
       return {conflict:'The silhouette radius does not satisfy R^2 = mouthRadius^2 + offset^2.'};
-    var cosAngle=dot3(q,outward)/R;
+    var cosAngle=dot(q,outward)/R;
     if(cosAngle<-1-tol/R || cosAngle>1+tol/R)
       return {conflict:'The sphere centre is not consistent with the mouth circle.'};
     var capAngle=Math.acos(Math.max(-1,Math.min(1,cosAngle)));
     if(!(capAngle>1e-4) || !(capAngle<Math.PI-1e-4))
       return {conflict:'The recess cap is degenerate.'};
-    var depth=R-dot3(q,outward);
+    var depth=R-dot(q,outward);
     if(!(depth>tol)) return {conflict:'The recess depth is not positive.'};
     var u=V.u,v=V.v;
-    if(dot3(cross3(u,v),outward)<0) v=mul3(v,-1);
+    if(dot(cross(u,v),outward)<0) v=mul(v,-1);
     return {circle:C,arc:A,view:V,otherView:W,center:O,radius:R,mouthCenter:M,
       mouthRadius:a,outward:outward,pole:pole,capAngle:capAngle,depth:depth,u:u,v:v,
       closure:mouthLineEvidence(ink,W,W.project(E1),W.project(E2),used)};
@@ -541,26 +535,26 @@
   function sphereCapMesh(O,R,pole,thetaMax,halfU,halfV,lon) {
     var vertices=[],faces=[],edges=[],edgeMap=new Map();
     var poleIndex=vertices.length;
-    vertices.push(add3(O,mul3(pole,R)));
+    vertices.push(add(O,mul(pole,R)));
     var rings=Math.max(2,Math.ceil(6*thetaMax/Math.PI));
     var ringIndices=[];
     for(var i=1;i<=rings;i++) {
       var theta=thetaMax*i/rings,ring=[];
       for(var j=0;j<lon;j++) {
         var t=TAU*j/lon;
-        var radial=add3(mul3(halfU,Math.cos(t)),mul3(halfV,Math.sin(t)));
-        var p=add3(add3(O,mul3(pole,R*Math.cos(theta))),mul3(radial,R*Math.sin(theta)));
+        var radial=add(mul(halfU,Math.cos(t)),mul(halfV,Math.sin(t)));
+        var p=add(add(O,mul(pole,R*Math.cos(theta))),mul(radial,R*Math.sin(theta)));
         ring.push(vertices.length);vertices.push(p);
       }
       ringIndices.push(ring);
     }
     function face(a,b,c) {
       var pa=vertices[a],pb=vertices[b],pc=vertices[c];
-      var n=cross3(sub3(pb,pa),sub3(pc,pa));
-      var centroid=mul3(add3(add3(pa,pb),pc),1/3);
+      var n=cross(sub(pb,pa),sub(pc,pa));
+      var centroid=mul(add(add(pa,pb),pc),1/3);
       // A recess is viewed from inside its bowl: orient the display mesh
       // toward the sphere centre, unlike the outward full-sphere mesh.
-      if(dot3(n,sub3(centroid,O))>0) {var swap=b;b=c;c=swap;}
+      if(dot(n,sub(centroid,O))>0) {var swap=b;b=c;c=swap;}
       faces.push([a,b,c]);
     }
     var first=ringIndices[0];
@@ -644,10 +638,10 @@
         var tol=1e-5*Math.max(1,cand.radius),group=null;
         for(var i=0;i<groups.length;i++) {
           var g=groups[i];
-          if(near3(g.center,cand.center,tol) && Math.abs(g.radius-cand.radius)<=tol &&
-             near3(g.mouthCenter,cand.mouthCenter,tol) &&
+          if(Vec3.near(g.center,cand.center,tol) && Math.abs(g.radius-cand.radius)<=tol &&
+             Vec3.near(g.mouthCenter,cand.mouthCenter,tol) &&
              Math.abs(g.capAngle-cand.capAngle)<=1e-5 &&
-             dot3(g.outward,cand.outward)>1-1e-6) {group=g;break;}
+             dot(g.outward,cand.outward)>1-1e-6) {group=g;break;}
         }
         if(!group) {group={center:cand.center,radius:cand.radius,mouthCenter:cand.mouthCenter,
           outward:cand.outward,capAngle:cand.capAngle,candidates:[],closureIds:[],
@@ -908,16 +902,7 @@
   // the base circle's plane normal that projects to it. This is the same
   // surface family as the coaxial cone path, but the tangency and apex are
   // derived from the actual projected conic instead of center.x +/- radius.
-  function cvAdd(a,b) {return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z};}
-  function cvSub(a,b) {return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};}
-  function cvMul(a,s) {return {x:a.x*s,y:a.y*s,z:a.z*s};}
-  function cvDot(a,b) {return a.x*b.x+a.y*b.y+a.z*b.z;}
-  function cvCross(a,b) {return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
-  function cvUnit(v) {
-    var l=Math.hypot(v.x,v.y,v.z);
-    return l>EPS?{x:v.x/l,y:v.y/l,z:v.z/l}:null;
-  }
-  function cvNormal(c) {return cvUnit(cvCross(c.u,c.v));}
+  function cvNormal(c) {return cvUnit(cross(c.u,c.v));}
   function sheetPoint(p,role,profile) {
     if(role==='PLAN') return {x:p.x,y:-p.z};
     if(role==='ELEVATION') return {x:p.x,y:p.y};
@@ -1021,7 +1006,7 @@
     fixed.forEach(function(f) {residual=Math.max(residual,Math.abs(c.center[f.axis]+t*normal[f.axis]-f.value));});
     if(residual>tol) return {state:'conflict',residual:residual};
     if(Math.abs(t)*Math.hypot(normal.x,normal.y,normal.z)<tol) return {state:'degenerate'};
-    return {state:'ok',apex:cvAdd(c.center,cvMul(normal,t)),t:t};
+    return {state:'ok',apex:add(c.center,mul(normal,t)),t:t};
   }
   function candidateConeApices(c,segments,profile) {
     var tol=coneTolerance(c),out=[];
@@ -1058,7 +1043,7 @@
   function addInferredCone(geometry,ci,apex,sourceIds) {
     var c=geometry.curves[ci],normal=cvNormal(c);
     if(!normal||!c.displayVertices||c.displayVertices.length<3) return false;
-    var height=cvDot(cvSub(apex,c.center),normal);
+    var height=dot(sub(apex,c.center),normal);
     if(Math.abs(height)<EPS) return false;
     var positive=height>0,apexIndex=geometry.vertices.length;
     geometry.vertices.push({x:apex.x,y:apex.y,z:apex.z});
@@ -1076,7 +1061,7 @@
     if(positive) cap.reverse();
     var capIndex=geometry.faces.length;
     geometry.faces.push(cap);
-    var axis=cvUnit(cvSub(apex,c.center));
+    var axis=cvUnit(sub(apex,c.center));
     geometry.surfacePatches.push({kind:'cone',analyticKind:'cone',axis:axis,origin:c.center,
       radius:c.radius,halfAngle:Math.atan2(c.radius,Math.abs(height)),
       boundaryCurves:[ci],apex:{x:apex.x,y:apex.y,z:apex.z},faceIndices:faceIndices,

@@ -17,8 +17,9 @@
     function names(p){return String(p.caption||p.name||'').split(',').map(function(part){
       return part.trim().replace(/^\((.*)\)$/,'$1').replace(/['′’]+$/,'');
     }).filter(Boolean);}
-    function shared(a,b){return ids(a).some(function(id){return ids(b).indexOf(id)!==-1;}) ||
-      names(a).some(function(name){return names(b).indexOf(name)!==-1;});}
+    function sharedIds(a,b){return ids(a).some(function(id){return ids(b).indexOf(id)!==-1;});}
+    function sharedNames(a,b){return names(a).some(function(name){return names(b).indexOf(name)!==-1;});}
+    function shared(a,b){return sharedIds(a,b)||sharedNames(a,b);}
     function linkedTo(a,b){return stations(a).some(function(p){return stations(b).some(function(q){return shared(p,q);});});}
     function coords(p,role) {
       if(role==='PLAN') return {x:p.x,z:-p.y};
@@ -94,9 +95,10 @@
       }
       return true;
     });
-    // Curves with the same station count and closure in different views are
-    // candidate projections of one 3D curve. Build connected components so a
-    // third view cannot be silently ignored after a two-view pair is found.
+    // Curves with the same station count and closure in different views form a
+    // correspondence family. Within a family, match curves into one group per
+    // spatial curve instead of treating the whole family as one curve: two
+    // independent splines in plan and two in elevation must stay separate.
     var parent=rows.map(function(_,i){return i;});
     function find(i){while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;}
     function union(i,j){var a=find(i),b=find(j);if(a!==b)parent[b]=a;}
@@ -107,11 +109,76 @@
       if(componentIndex[root]===undefined){componentIndex[root]=components.length;components.push([]);}
       components[componentIndex[root]].push(e);
     });
+    var rowIndex=new Map(rows.map(function(e,i){return [e,i];}));
+    // Spatial geometry is compared modulo station direction and, for a closed
+    // curve, modulo the starting station. Two different matchings that produce
+    // the same curve are not an ambiguity in the reconstructed geometry.
+    function roundedPoints(points) {
+      return points.map(function(p){return [p.x,p.y,p.z].map(function(v){return Math.round(v*1e7)/1e7;}).join(',');});
+    }
+    function sequenceKey(sequence,closed) {
+      if(!closed)return sequence.join(';');
+      var best=null;
+      for(var i=0;i<sequence.length;i++) {
+        var key=sequence.slice(i).concat(sequence.slice(0,i)).join(';');
+        if(best===null||key<best)best=key;
+      }
+      return best;
+    }
+    function pointsKey(points,closed) {
+      var forward=sequenceKey(roundedPoints(points),closed);
+      var backward=sequenceKey(roundedPoints(points.slice().reverse()),closed);
+      return forward<backward?forward:backward;
+    }
+    function stationKeys(p) {
+      return ids(p).map(function(id){return 'id:'+id;}).concat(names(p).map(function(name){return 'name:'+name;}));
+    }
+    // A group is identity-consistent when no station identity appears at two
+    // different parameter positions. Shared IDs are authoritative; the
+    // suffix-stripped names are the compatibility fallback.
+    function identityConflict(evidence) {
+      var seen=Object.create(null),conflict=false;
+      evidence.forEach(function(entry) {
+        var S=stations(entry.row);
+        entry.order.forEach(function(stationIndex,k) {
+          stationKeys(S[stationIndex]).forEach(function(key) {
+            if(seen[key]!==undefined&&seen[key]!==k)conflict=true;
+            else seen[key]=k;
+          });
+        });
+      });
+      return conflict;
+    }
+    function identityScore(evidence) {
+      var idHits=0,nameHits=0;
+      for(var a=0;a<evidence.length;a++)for(var b=a+1;b<evidence.length;b++) {
+        var A=stations(evidence[a].row),B=stations(evidence[b].row);
+        var oa=evidence[a].order,ob=evidence[b].order;
+        for(var k=0;k<oa.length;k++) {
+          var pa=A[oa[k]],pb=B[ob[k]];
+          if(sharedIds(pa,pb))idHits++;
+          else if(sharedNames(pa,pb))nameHits++;
+        }
+      }
+      return idHits*1000000+nameHits;
+    }
+    function compareRows(a,b) {
+      for(var i=0;i<Math.min(a.rows.length,b.rows.length);i++) {
+        var ai=rowIndex.get(a.rows[i]),bi=rowIndex.get(b.rows[i]);
+        if(ai!==bi)return ai-bi;
+      }
+      return a.rows.length-b.rows.length;
+    }
     components.forEach(function(component) {
       if(component.length===1) {
         diag('curve-correspondence-missing',component[0],'No compatible second view supplies all three coordinates at the defining stations.');
         return;
       }
+      function diagnose(code,message) {
+        component.forEach(function(e){diag(code,e,message);});
+      }
+      // Every cross-view pair proposes full 3D station sequences. Each
+      // sequence is then tested against the other curves in the family.
       var candidates=[];
       for(var ci=0;ci<component.length;ci++)for(var cj=ci+1;cj<component.length;cj++) {
         if(!plausible(component[ci],component[cj]))continue;
@@ -120,30 +187,101 @@
             candidates.push({points:solution.points,refs:stations(component[ci])});
         });
       }
-      var solutions=[];
-      candidates.forEach(function(candidate){
-        var evidence=[];
-        for(var k=0;k<component.length;k++) {
-          var order=orderFor(candidate.points,candidate.refs,component[k]);
+      // A group is one spatial curve: at most one source curve per view. A
+      // candidate can be shared by several alternative curves in one view;
+      // those alternatives become separate group options, so the partition
+      // below has to choose a mutually consistent matching.
+      var groups=[];
+      candidates.forEach(function(candidate) {
+        var support=[],byRole=Object.create(null),roleOrder=[];
+        component.forEach(function(row) {
+          var order=orderFor(candidate.points,candidate.refs,row);
           if(!order)return;
-          evidence.push({entityId:component[k].id,order:order});
-        }
-        if(!solutions.some(function(s){return samePoints(s.points,candidate.points);}))
-          solutions.push({points:candidate.points,evidence:evidence});
+          var entry={row:row,order:order};
+          support.push(entry);
+          if(!byRole[row.viewRole]){byRole[row.viewRole]=[];roleOrder.push(row.viewRole);}
+          byRole[row.viewRole].push(entry);
+        });
+        if(roleOrder.length<2)return;
+        var choices=[[]];
+        roleOrder.forEach(function(role) {
+          var next=[];
+          choices.forEach(function(prefix) {
+            byRole[role].forEach(function(entry){next.push(prefix.concat([entry]));});
+          });
+          choices=next;
+        });
+        choices.forEach(function(evidence) {
+          if(identityConflict(evidence))return;
+          evidence=evidence.slice().sort(function(a,b){return rowIndex.get(a.row)-rowIndex.get(b.row);});
+          groups.push({rows:evidence.map(function(e){return e.row;}),evidence:evidence,
+            points:candidate.points,score:identityScore(evidence)});
+        });
       });
-      if(solutions.length!==1) {
-        var code=solutions.length?'curve-correspondence-ambiguous':'curve-projection-conflict';
-        var message=solutions.length?'Several curve correspondences fit these stations; link identities or add a constraining view.':
-          'The corresponding views disagree at the defining stations; correct the conflicting projection.';
-        component.forEach(function(e){diag(code,e,message);});
+      // Deduplicate options identical in row assignment and geometry.
+      var options=[];
+      groups.forEach(function(group) {
+        var key=group.evidence.map(function(e){return e.row.id+':'+e.order.join(',');}).join('|')+
+          '@'+pointsKey(group.points,group.rows[0].meta.curve.closed);
+        if(!options.some(function(o){return o.key===key;})){group.key=key;options.push(group);}
+      });
+      options.sort(function(a,b) {
+        return b.score-a.score || compareRows(a,b) ||
+          (pointsKey(a.points,a.rows[0].meta.curve.closed)<pointsKey(b.points,b.rows[0].meta.curve.closed)?-1:1);
+      });
+      // Partition the family into spatial curves. Every source curve belongs
+      // to exactly one group; a full partition is required so a contradictory
+      // third view cannot be dropped in favour of a two-view pair.
+      var solutions=[],cap=512;
+      function walk(remaining,chosen) {
+        if(solutions.length>=cap)return;
+        if(!remaining.length){solutions.push(chosen.slice());return;}
+        var first=remaining[0];
+        for(var oi=0;oi<options.length;oi++) {
+          var group=options[oi];
+          if(group.rows.indexOf(first)===-1)continue;
+          if(!group.rows.every(function(row){return remaining.indexOf(row)!==-1;}))continue;
+          chosen.push(group);
+          walk(remaining.filter(function(row){return group.rows.indexOf(row)===-1;}),chosen);
+          chosen.pop();
+          if(solutions.length>=cap)return;
+        }
+      }
+      walk(component.slice(),[]);
+      if(!solutions.length) {
+        diagnose('curve-projection-conflict','The corresponding views disagree at the defining stations; correct the conflicting projection.');
         return;
       }
-      var curve=P.interpolate(solutions[0].points,component[0].meta.curve.closed);
-      curve.sourceIds=Array.from(new Set(component.flatMap(function(e){return [e.id].concat(e.meta.throughRefs);})));
-      curve.sourceEvidence=solutions[0].evidence;
-      curve.surfaceInference={status:'unresolved',reason:'A parametric boundary alone does not select its spanning surface.'};
-      curves.push(curve);
-      diag('curve-surface-unresolved',component[0],'The 3D curve is reconstructed; its spanning surface is not determined by the curve alone.');
+      // Shared member IDs are authoritative, then suffix-stripped names. Only
+      // when identity evidence is equally strong is a remaining difference a
+      // genuine correspondence ambiguity.
+      var top=-1;
+      solutions.forEach(function(solution){
+        var score=solution.reduce(function(sum,group){return sum+group.score;},0);
+        if(score>top)top=score;
+      });
+      var best=solutions.filter(function(solution){
+        return solution.reduce(function(sum,group){return sum+group.score;},0)===top;
+      });
+      function geometryKey(solution) {
+        return solution.map(function(group){
+          return pointsKey(group.points,group.rows[0].meta.curve.closed);
+        }).sort().join('|');
+      }
+      var keys=Array.from(new Set(best.map(geometryKey)));
+      if(keys.length!==1) {
+        diagnose('curve-correspondence-ambiguous','Several curve correspondences fit these stations; link identities or add a constraining view.');
+        return;
+      }
+      var chosen=best[0];
+      chosen.forEach(function(group) {
+        var curve=P.interpolate(group.points,group.rows[0].meta.curve.closed);
+        curve.sourceIds=Array.from(new Set(group.rows.flatMap(function(e){return [e.id].concat(e.meta.throughRefs);})));
+        curve.sourceEvidence=group.evidence.map(function(e){return {entityId:e.row.id,order:e.order};});
+        curve.surfaceInference={status:'unresolved',reason:'A parametric boundary alone does not select its spanning surface.'};
+        curves.push(curve);
+        diag('curve-surface-unresolved',group.rows[0],'The 3D curve is reconstructed; its spanning surface is not determined by the curve alone.');
+      });
     });
     return {curves:curves,issues:issues};
   }

@@ -1,0 +1,19 @@
+# Two independent splines in plan and elevation stay two spatial curves.
+# expect: curves=2 parametricCurves=2 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=2 status=partial
+/datum -60 180
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point d 100 -10 plan
+/point e 120 -30 plan
+/point f 140 -20 plan
+/curve-through a b c plan
+/curve-through d e f plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/point d' 100 10 elevation
+/point e' 120 40 elevation
+/point f' 140 20 elevation
+/curve-through a' b' c' elevation
+/curve-through d' e' f' elevation

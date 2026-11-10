@@ -1,0 +1,20 @@
+# Both curves occupy the same station positions in every view and no member ID
+# or base name links them, so the matching itself remains ambiguous.
+# expect: parametricCurves=0 diagnostics=curve-correspondence-ambiguous unresolved=4
+/datum -60 180
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point d 0 -40 plan
+/point e 20 -60 plan
+/point f 40 -50 plan
+/curve-through a b c plan
+/curve-through d e f plan
+/point u 0 10 elevation
+/point v 20 40 elevation
+/point w 40 20 elevation
+/point x 0 50 elevation
+/point y 20 80 elevation
+/point z 40 60 elevation
+/curve-through u v w elevation
+/curve-through x y z elevation

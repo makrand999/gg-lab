@@ -162,17 +162,30 @@ circle or arc through three ordered stations and use the same analytic curve
 contract. Editing a defining point rebuilds the curve, and the point editor
 refuses to edit derived control points directly.
 
-Curves with the same station count and closure in different views are candidate
-projections of one spatial curve. Every supplied view must agree at the
-defining stations. The station order may be reversed, and a closed curve may
-start at any station; explicit member identities select the order when present,
-then suffix-stripped station names provide the compatibility fallback. The
-accepted result is one NURBS with `sourceEvidence` recording each contributing
-view and the station order used. A contradictory third view is not ignored in
-favour of two agreeing views: it reports `curve-projection-conflict`. Several
-remaining orderings report `curve-correspondence-ambiguous`, and a single view
-reports `curve-correspondence-missing`. A parametric boundary alone does not
-select a spanning surface, so a reconstructed curve is retained with
+Curves with the same station count and closure form a correspondence family,
+not one spatial curve. Every cross-view pair proposes a full 3D station
+sequence by combining the coordinates each view supplies. A proposal is
+supported by any curve whose projected stations match it. The family is then
+partitioned into spatial curves with at most one source curve per view; each
+accepted curve is one NURBS with `sourceEvidence` recording its contributing
+views and station orders. Two independent splines in plan and two in elevation
+therefore produce two curves rather than one over-constrained conflict.
+
+Shared member IDs are authoritative when ordering stations; suffix-stripped
+station names are the compatibility fallback. The station order may be
+reversed, and a closed curve may start at any station. Geometry is compared
+modulo station direction and, for a closed curve, modulo the starting station.
+When identities do not select one matching, every candidate is checked against
+every declared view. A complete partition with one geometry is accepted;
+equally strong partitions with different geometry report
+`curve-correspondence-ambiguous`; a family that cannot be partitioned
+consistently reports `curve-projection-conflict`; a curve with no compatible
+second view reports `curve-correspondence-missing`. A contradictory third view
+is not ignored in favour of a two-view pair. Deterministic tie-breaking
+prefers more shared IDs, then more shared base names, then source order. A
+family is all-or-nothing: an unmatched or contradictory member blocks the other
+curves in the same station-count/closure family. A parametric boundary alone
+does not select a spanning surface, so a reconstructed curve is retained with
 `curve-surface-unresolved`.
 
 Visible (A) and hidden (E) strokes can select a remaining mirror when independent
@@ -302,6 +315,11 @@ node tools/edc.js tools/scripts/spline-conflict.edu
 node tools/edc.js tools/scripts/spline-third-view-conflict.edu
 node tools/edc.js tools/scripts/spline-ambiguous.edu
 node tools/edc.js tools/scripts/spline-missing-view.edu
+node tools/edc.js tools/scripts/spline-multiple.edu
+node tools/edc.js tools/scripts/spline-multiple-identity.edu
+node tools/edc.js tools/scripts/spline-multi-view.edu
+node tools/edc.js tools/scripts/spline-multiple-ambiguous.edu
+node tools/edc.js tools/scripts/spline-multiple-conflict.edu
 node tools/edc.js tools/scripts/circle-through.edu
 node tools/edc.js tools/scripts/arc-through.edu
 ```

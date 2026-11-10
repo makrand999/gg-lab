@@ -1,0 +1,20 @@
+# Shared member IDs select the matching even though both curves occupy the
+# same station positions, so the identity evidence beats the geometric tie.
+# expect: curves=2 parametricCurves=2 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=2 status=partial
+/datum -60 180
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point d 0 -40 plan
+/point e 20 -60 plan
+/point f 40 -50 plan
+/curve-through a b c plan
+/curve-through d e f plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/point d' 0 50 elevation
+/point e' 20 80 elevation
+/point f' 40 60 elevation
+/curve-through a' b' c' elevation
+/curve-through d' e' f' elevation

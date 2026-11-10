@@ -1,0 +1,15 @@
+# Spherical recess: a full circular mouth in plan plus a cap-silhouette arc
+# in elevation. The shared radius and the arc centre determine the sphere;
+# the mouth stroke closes the cavity. No solid or feature name is declared.
+# Here mouth radius = sphere radius = 20, so the cap is a hemisphere (depth 20).
+# expect: 73V 192E 120F recesses=1 surfaces=2 surfaceKinds=plane,sphere surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+/datum -30 80
+/circle 20 -30 20 A plan
+/arc 20 100 20 180 360 A elevation
+/point a 0 100 elevation
+/point b 40 100 elevation
+/line a b A elevation
+
+# The analytic sphere section 10 mm below its centre has radius sqrt(20^2-10^2).
+# expect: surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":90,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":17.3205080757}}

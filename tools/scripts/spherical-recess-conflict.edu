@@ -1,0 +1,11 @@
+# Spherical-recess conflict: the silhouette arc has radius 25 while the mouth
+# circle has radius 20, so the two cannot bound one sphere. The arc is not
+# silently consumed; the mouth circle remains an ordinary planar boundary and
+# the mismatch is reported.
+# expect: recesses=0 surfaces=1 surfaceKinds=plane surfaceLoops=1 surfaceOpen=1 surfaceModel=partial diagnostics=curve-projection-missing,recess-evidence-conflict status=partial
+/datum -30 80
+/circle 20 -30 20 A plan
+/arc 20 100 25 180 360 A elevation
+/point a 0 100 elevation
+/point b 40 100 elevation
+/line a b A elevation

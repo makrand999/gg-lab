@@ -20,6 +20,11 @@ the display geometry. It is still an inferred model, not an exact certificate.
 - `sourceIds`: drawing entities that produced the surface.
 - `displayFaceIndices`: the display faces that approximate it.
 - `closed`: true only for a surface with no boundary, such as a complete sphere.
+  A spherical patch with a boundary loop (a recess cap) is not closed.
+
+A plane may carry both vertex loops and analytic inner loops; the recess mouth
+closure uses an analytic outer loop. A sphere may carry one analytic boundary
+loop. The complete-sphere silhouette case still has no loops.
 
 `geometry.surfaceModel` summarizes the model: surface count and kinds, boundary
 loops, closed shells, open components and open boundary elements.
@@ -43,6 +48,9 @@ The model is built from the same patches used by the preview:
   or a `cone` when tangent generator strokes support one apex on that circle's
   plane normal. The cap and cone share the analytic boundary curve;
 - a sphere silhouette pair becomes a `sphere`.
+- a spherical recess becomes an open `sphere` with the mouth circle as its
+  outer loop; an edge-on mouth stroke adds a coplanar closure sharing that
+  loop.
 
 The straight-wire adapters expose `faceRegions` rather than `surfacePatches`;
 the builder accepts either form. The app, saved previews and the `.edu` runner
@@ -58,6 +66,8 @@ therefore receive the same surface records from the same public pipeline.
 - sampled boundary points lie on their claimed surface;
 - a cylinder boundary's own plane sections the cylinder back to that boundary;
 - plane boundaries lie in their plane;
+- a spherical cap's pole, angle and mouth plane agree with its boundary loop
+  (`R cos(angle)` along the pole, mouth radius `R sin(angle)`);
 - every boundary is used by at most two surfaces;
 - connected components are closed when every boundary is shared exactly twice.
 
@@ -225,6 +235,76 @@ example:
 The mismatch case reports `curve-inclined-arc-unsupported`; the two-cut case
 reports `curve-projection-ambiguous` and retains both candidate levels.
 
+## End-to-end case: spherical recess
+
+This is the first curved recess/fillet capability. It is a bounded spherical
+recess, not a solid/feature-name reader and not general Boolean geometry.
+
+The drawing supplies:
+
+1. a full circular mouth in one principal view (by default PLAN);
+2. a circular-arc silhouette in the other principal view (by default
+   ELEVATION), running from one mouth rim through the cap apex to the other rim;
+3. optionally, the edge-on mouth stroke covering the mouth diameter.
+
+Let the mouth circle have centre `M`, outward normal `n`, and radius `a`. Lift
+the silhouette arc centre into 3D on the mouth axis to get the sphere centre
+`O`, and let its radius be `R`. The arc endpoints must be antipodal points of
+the mouth circle. The candidate is accepted only when
+
+```text
+q = O - M
+h = q . n
+a^2 + h^2 = R^2
+```
+
+and the arc contains the pole direction `-n`, with its interior on the cavity
+side `(p - M) . n <= 0`. These conditions are checked analytically from the
+drawn primitives, not from display samples. The resulting patch is
+
+```text
+{ p : |p - O| = R,  (p - M) . n <= 0 }
+```
+
+with cap angle `acos(h/R)` and depth `R - h`. A hemisphere has `h = 0`; a
+shallow cap has `h > 0`; a cap deeper than a hemisphere has `h < 0`.
+
+The mouth circle is added as one analytic boundary curve. The sphere patch has
+one outer loop referencing that curve. If an edge-on mouth stroke covers the
+diameter, a coplanar plane closure shares the same curve, yielding one closed
+cavity shell. The closure has no display face: the mouth is an opening, not a
+material face. Without the stroke the sphere patch is retained open and
+`recess-mouth-unclosed` is reported. A conflicting arc is not consumed; the
+mouth circle stays an ordinary boundary and `recess-evidence-conflict` is
+reported.
+
+`geometry.recesses` records the analytic result:
+
+```text
+{kind:'spherical', center, radius,
+ mouth:{center, normal, radius}, depth, capAngle,
+ closure:'plane'|'open', sourceIds}
+```
+
+The public expectation is `recesses`. The analytic surface is the sphere patch;
+the tessellated bowl is display geometry only.
+
+```sh
+node tools/edc.js tools/scripts/spherical-recess.edu
+node tools/edc.js tools/scripts/spherical-recess-shallow.edu
+node tools/edc.js tools/scripts/spherical-recess-elevation-mouth.edu
+node tools/edc.js tools/scripts/spherical-recess-open.edu
+node tools/edc.js tools/scripts/spherical-recess-conflict.edu
+```
+
+Examples:
+
+```text
+# expect: 73V 192E 120F recesses=1 surfaces=2 surfaceKinds=plane,sphere surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+# expect: 73V 192E 120F recesses=1 surfaces=1 surfaceKinds=sphere surfaceLoops=1 surfaceShells=0 surfaceOpen=1 surfaceBoundary=1 surfaceModel=partial surfaceValidation=ok unresolved=1 diagnostics=recess-mouth-unclosed status=partial
+# expect: recesses=0 surfaces=1 surfaceKinds=plane surfaceLoops=1 surfaceOpen=1 surfaceModel=partial diagnostics=curve-projection-missing,recess-evidence-conflict status=partial
+```
+
 ## Limits
 
 - Principal/oblique circles, inclined full-circle traces, and oblique arcs
@@ -235,6 +315,20 @@ reports `curve-projection-ambiguous` and retains both candidate levels.
   boundary with no agreeing tangent-pair evidence stays planar. Cones over a
   non-circular 3D ellipse, and frusta between two independently inclined
   boundaries, are not modelled.
+- The only curved recess implemented is the spherical recess described above.
+  It needs a full circular mouth in PLAN or ELEVATION and a rim-to-rim
+  silhouette arc in the other of those two views. Elliptical mouths, partial
+  mouth arcs, partial silhouette arcs, full-circle silhouettes (which remain
+  sphere or ambiguity candidates), PROFILE mouths, and cylindrical/torus
+  fillets are not inferred.
+- The spherical recess is a single cap. It does not subtract material from an
+  independently reconstructed surrounding face, and it does not merge the
+  mouth circle into an inner loop of a drawn planar face. When no face is
+  available the model closes the cavity with a plane closure, or leaves it
+  open if no edge-on mouth stroke is drawn.
+- The recess display mesh is an inward-facing tessellation for viewing the
+  bowl. The analytic patch is the sphere with its mouth loop; the mesh is not
+  the source of truth.
 - Cone sections are classified but not yet returned as trimmed ellipse/hyperbola
   boundary curves.
 - Skew or intersecting-axis cylinder–cylinder intersections and

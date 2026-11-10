@@ -82,9 +82,11 @@ It does not prove that the input has a unique physical interpretation. It uses
 floating-point geometric tolerances and does not perform the strict kernel's
 exact pairwise surface-intersection certification on inferred polygon regions.
 Complicated intersecting/touching contours and incomplete drawings may remain
-wire-only or unresolved. It does not infer arbitrary curved surfaces, fillets,
-threads, section semantics, dimensions, or not-to-scale geometry. The shared pipeline supports an initial circular-boundary/ruled-surface family and a
-bounded analytic surface model; see [Primitive reconstruction](PRIMITIVE_RECONSTRUCTION.md)
+wire-only or unresolved. It does not infer arbitrary curved surfaces,
+cylindrical/torus fillets, threads, section semantics, dimensions, or
+not-to-scale geometry. The shared pipeline supports an initial
+circular-boundary/ruled-surface family, spherical recesses, and a bounded
+analytic surface model; see [Primitive reconstruction](PRIMITIVE_RECONSTRUCTION.md)
 and [Bounded analytic surface model](SURFACE_MODEL.md). Older named readers
 remain only in compatibility APIs. Explicit triangular surfaces retain
 the stronger exact contract documented in RECONSTRUCTION_CONTRACT.md.

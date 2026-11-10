@@ -296,7 +296,7 @@ function checkObliqueVisibility(solid,entities) {
 // F counts logical regions, not the duplicated front/back display loops.
 function topologyProperties(solid) {
   var g = solid && solid.geometry;
-  if (!g) return { V: 0, E: 0, F: 0, holes: 0, components: 0, closed: 0, open: 0, boundary: 0, curves: 0, minRadius: 0, maxRadius: 0, surfaces: 0, surfaceKinds: 'none', surfaceLoops: 0, surfaceShells: 0, surfaceOpen: 0, surfaceBoundary: 0, surfaceModel: 'none', unresolved: (solid && solid.issues || []).length, status: (solid && solid.reason) || 'unavailable' };
+  if (!g) return { V: 0, E: 0, F: 0, holes: 0, components: 0, closed: 0, open: 0, boundary: 0, curves: 0, minRadius: 0, maxRadius: 0, surfaces: 0, surfaceKinds: 'none', surfaceLoops: 0, surfaceShells: 0, surfaceOpen: 0, surfaceBoundary: 0, surfaceModel: 'none', recesses: 0, unresolved: (solid && solid.issues || []).length, status: (solid && solid.reason) || 'unavailable' };
   var faces = g.faceRegions || (g.faces || []).map(function (f) { return { outer: f, holes: [] }; });
   var unique = new Map();
   faces.forEach(function (f) {
@@ -339,6 +339,7 @@ function topologyProperties(solid) {
     surfaceBoundary: modelCheck ? modelCheck.openBoundaries : 0,
     surfaceModel: modelCheck ? modelCheck.status : 'none',
     surfaceValidation: g.surfaceValidation ? g.surfaceValidation.status : 'none',
+    recesses: (g.recesses || []).length,
     minRadius: (g.curves || []).length ? Math.min.apply(null,g.curves.map(function(c) {return c.radius||0;})) : 0,
     maxRadius: (g.curves || []).length ? Math.max.apply(null,g.curves.map(function(c) {return c.radius||0;})) : 0,
     unresolved: (solid.pipeline && solid.pipeline.diagnostics || []).length,

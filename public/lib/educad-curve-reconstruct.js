@@ -430,6 +430,250 @@
     for (var j3=0;j3<lon;j3++) tri(bottom,ring(lat-1,j3+1),ring(lat-1,j3));
     return {vertices:vertices,edges:edges,faces:faces};
   }
+  // --- Spherical recess inference -----------------------------------------
+  // A full circular mouth in one principal view plus a circular-arc
+  // silhouette in the other view determine a sphere: the mouth circle fixes
+  // the axis and mouth radius, the silhouette fixes the sphere centre/radius,
+  // and the two must satisfy R^2 = a^2 + offset^2. This is a bounded curved
+  // recess, not a solid/feature-name reader. Only PLAN/ELEVATION pairs are
+  // used; PROFILE-mouth recesses remain unsupported.
+  function dot3(a,b) {return a.x*b.x+a.y*b.y+a.z*b.z;}
+  function cross3(a,b) {return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
+  function sub3(a,b) {return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};}
+  function add3(a,b) {return {x:a.x+b.x,y:a.y+b.y,z:a.z+b.z};}
+  function mul3(a,s) {return {x:a.x*s,y:a.y*s,z:a.z*s};}
+  function len3(v) {return Math.hypot(v.x,v.y,v.z);}
+  function near3(a,b,tol) {return len3(sub3(a,b))<=tol;}
+  function principalFrame(role) {
+    if(role==='PLAN') return {role:'PLAN',free:'y',u:{x:1,y:0,z:0},v:{x:0,y:0,z:-1},
+      normal:{x:0,y:1,z:0},
+      to3D:function(u,v,free) {return {x:u,y:free,z:-v};},
+      project:function(p) {return {x:p.x,y:-p.z};}};
+    if(role==='ELEVATION') return {role:'ELEVATION',free:'z',u:{x:1,y:0,z:0},v:{x:0,y:1,z:0},
+      normal:{x:0,y:0,z:1},
+      to3D:function(u,v,free) {return {x:u,y:v,z:free};},
+      project:function(p) {return {x:p.x,y:p.y};}};
+    return null;
+  }
+  function sheetArcSpan(e) {
+    if(e.type==='CIRCLE') return {start:0,sweep:TAU};
+    var start=e.startAngle*Math.PI/180;
+    var sweep=((e.endAngle-e.startAngle)%360+360)%360*Math.PI/180;
+    return {start:start,sweep:sweep};
+  }
+  function arcHasAngle(a,start,sweep,tol) {
+    var off=((a-start)%TAU+TAU)%TAU;
+    return off<=sweep+tol || off>=TAU-tol;
+  }
+  // A recess is closed only when the drawing supplies the edge-on mouth
+  // stroke. Exact/contained strokes are consumed; a longer face edge is
+  // treated as corroboration but is left for the straight-wire stage.
+  function mouthLineEvidence(ink,W,p1,p2,used) {
+    var dx=p2.x-p1.x,dy=p2.y-p1.y,len2=dx*dx+dy*dy;
+    if(len2<EPS*EPS) return {found:false,ids:[]};
+    var lineTol=1e-5*Math.max(1,Math.sqrt(len2)),ids=[],found=false;
+    ink.forEach(function(s) {
+      if(!s || s.type!=='SEGMENT' || used.has(s.id) || viewOf(s)!==W.role) return;
+      if(Math.abs((s.x-p1.x)*dy-(s.y-p1.y)*dx)>lineTol*Math.sqrt(len2) ||
+         Math.abs((s.x2-p1.x)*dy-(s.y2-p1.y)*dx)>lineTol*Math.sqrt(len2)) return;
+      var t1=((s.x-p1.x)*dx+(s.y-p1.y)*dy)/len2;
+      var t2=((s.x2-p1.x)*dx+(s.y2-p1.y)*dy)/len2;
+      var a=Math.min(t1,t2),b=Math.max(t1,t2);
+      if(a>1e-4 || b<1-1e-4) return;
+      found=true;
+      if(a>=-1e-4 && b<=1+1e-4) ids.push(s.id);
+    });
+    return {found:found,ids:ids};
+  }
+  function recessCandidate(C,V,A,W,ink,used) {
+    var a=C.radius,R=A.radius;
+    if(!(a>EPS) || !(R>EPS) || V.role===W.role) return null;
+    var tol=1e-4*Math.max(1,a,R);
+    var C0=V.to3D(C.x,C.y,0),O=W.to3D(A.x,A.y,0);
+    O[W.free]=C0[W.free];
+    var op=V.project(O);
+    // Not even on the mouth axis: this is an unrelated circle/arc pair.
+    if(Math.abs(op.x-C.x)>tol || Math.abs(op.y-C.y)>tol) return null;
+    var span=sheetArcSpan(A);
+    if(!(span.sweep>EPS)) return null;
+    function at(t) {return {x:A.x+R*Math.cos(t),y:A.y+R*Math.sin(t)};}
+    var q1=at(span.start),q2=at(span.start+span.sweep);
+    var E1=W.to3D(q1.x,q1.y,O[W.free]),E2=W.to3D(q2.x,q2.y,O[W.free]);
+    var mf1=E1[V.free],mf2=E2[V.free];
+    // An arc whose ends are not on one mouth plane is not a rim-to-rim cap
+    // silhouette; leave it to the ordinary curve stage instead of claiming a
+    // recess conflict.
+    if(Math.abs(mf1-mf2)>tol) return null;
+    var mouthFree=(mf1+mf2)/2,M=V.to3D(C.x,C.y,mouthFree);
+    var mid=at(span.start+span.sweep/2);
+    var Pmid=W.to3D(mid.x,mid.y,O[W.free]);
+    var side=dot3(sub3(Pmid,M),V.normal);
+    if(Math.abs(side)<=tol) return null;
+    var outward=mul3(V.normal,side<0?1:-1),pole=mul3(outward,-1);
+    for(var k=1;k<8;k++) {
+      var p=at(span.start+span.sweep*k/8),P=W.to3D(p.x,p.y,O[W.free]);
+      if(dot3(sub3(P,M),outward)>tol) return null;
+    }
+    var poleAngle=Math.atan2(dot3(pole,W.v),dot3(pole,W.u));
+    if(!arcHasAngle(poleAngle,span.start,span.sweep,1e-5)) return null;
+    // The rim pair must straddle the mouth centre before a radius/endpoint
+    // mismatch is worth reporting as a recess conflict.
+    if(len3(add3(sub3(E1,M),sub3(E2,M)))>Math.max(tol,0.25*a)) return null;
+    if(Math.abs(len3(sub3(E1,M))-a)>tol || Math.abs(len3(sub3(E2,M))-a)>tol)
+      return {conflict:'The silhouette arc endpoints do not meet the mouth circle.'};
+    var q=sub3(O,M),offset=dot3(q,V.normal);
+    if(Math.abs(Math.hypot(a,offset)-R)>tol)
+      return {conflict:'The silhouette radius does not satisfy R^2 = mouthRadius^2 + offset^2.'};
+    var cosAngle=dot3(q,outward)/R;
+    if(cosAngle<-1-tol/R || cosAngle>1+tol/R)
+      return {conflict:'The sphere centre is not consistent with the mouth circle.'};
+    var capAngle=Math.acos(Math.max(-1,Math.min(1,cosAngle)));
+    if(!(capAngle>1e-4) || !(capAngle<Math.PI-1e-4))
+      return {conflict:'The recess cap is degenerate.'};
+    var depth=R-dot3(q,outward);
+    if(!(depth>tol)) return {conflict:'The recess depth is not positive.'};
+    var u=V.u,v=V.v;
+    if(dot3(cross3(u,v),outward)<0) v=mul3(v,-1);
+    return {circle:C,arc:A,view:V,otherView:W,center:O,radius:R,mouthCenter:M,
+      mouthRadius:a,outward:outward,pole:pole,capAngle:capAngle,depth:depth,u:u,v:v,
+      closure:mouthLineEvidence(ink,W,W.project(E1),W.project(E2),used)};
+  }
+  function sphereCapMesh(O,R,pole,thetaMax,halfU,halfV,lon) {
+    var vertices=[],faces=[],edges=[],edgeMap=new Map();
+    var poleIndex=vertices.length;
+    vertices.push(add3(O,mul3(pole,R)));
+    var rings=Math.max(2,Math.ceil(6*thetaMax/Math.PI));
+    var ringIndices=[];
+    for(var i=1;i<=rings;i++) {
+      var theta=thetaMax*i/rings,ring=[];
+      for(var j=0;j<lon;j++) {
+        var t=TAU*j/lon;
+        var radial=add3(mul3(halfU,Math.cos(t)),mul3(halfV,Math.sin(t)));
+        var p=add3(add3(O,mul3(pole,R*Math.cos(theta))),mul3(radial,R*Math.sin(theta)));
+        ring.push(vertices.length);vertices.push(p);
+      }
+      ringIndices.push(ring);
+    }
+    function face(a,b,c) {
+      var pa=vertices[a],pb=vertices[b],pc=vertices[c];
+      var n=cross3(sub3(pb,pa),sub3(pc,pa));
+      var centroid=mul3(add3(add3(pa,pb),pc),1/3);
+      // A recess is viewed from inside its bowl: orient the display mesh
+      // toward the sphere centre, unlike the outward full-sphere mesh.
+      if(dot3(n,sub3(centroid,O))>0) {var swap=b;b=c;c=swap;}
+      faces.push([a,b,c]);
+    }
+    var first=ringIndices[0];
+    for(var f=0;f<lon;f++) face(poleIndex,first[f],first[(f+1)%lon]);
+    for(var r=0;r<rings-1;r++) {
+      var A=ringIndices[r],B=ringIndices[r+1];
+      for(var c2=0;c2<lon;c2++) {
+        var a=A[c2],b=A[(c2+1)%lon],c=B[c2],d=B[(c2+1)%lon];
+        face(a,b,c);face(b,d,c);
+      }
+    }
+    faces.forEach(function(f) {
+      for(var k=0;k<3;k++) {
+        var a=f[k],b=f[(k+1)%3],key=a<b?a+'_'+b:b+'_'+a;
+        if(!edgeMap.has(key)) {edgeMap.set(key,edges.length);edges.push([a,b]);}
+      }
+    });
+    var boundary=ringIndices[rings-1],boundaryEdges=[];
+    for(var e=0;e<lon;e++) {
+      var a2=boundary[e],b2=boundary[(e+1)%lon],key2=a2<b2?a2+'_'+b2:b2+'_'+a2;
+      boundaryEdges.push(edgeMap.get(key2));
+    }
+    return {vertices:vertices,faces:faces,edges:edges,boundaryVertices:boundary,
+      boundaryEdges:boundaryEdges};
+  }
+  function addSphericalRecess(geometry,cand,sourceIds,closureIds,closed) {
+    var mesh=sphereCapMesh(cand.center,cand.radius,cand.pole,cand.capAngle,cand.u,cand.v,SAMPLES);
+    var vo=geometry.vertices.length,eo=geometry.edges.length,fo=geometry.faces.length;
+    geometry.vertices=geometry.vertices.concat(mesh.vertices);
+    geometry.edges=geometry.edges.concat(mesh.edges.map(function(e) {return [e[0]+vo,e[1]+vo];}));
+    geometry.faces=geometry.faces.concat(mesh.faces.map(function(f) {return f.map(function(v) {return v+vo;});}));
+    var faceIndices=mesh.faces.map(function(_,i) {return i+fo;});
+    geometry.smoothSideFaces=geometry.smoothSideFaces.concat(faceIndices);
+    var ci=geometry.curves.length;
+    var curve={kind:'circle',center:cand.mouthCenter,u:cand.u,v:cand.v,radius:cand.mouthRadius,
+      startAngle:0,sweepAngle:TAU,sourceIds:[cand.circle.id].concat(closureIds),
+      sourceView:cand.view.role,recessMouth:true,
+      displayVertices:mesh.boundaryVertices.map(function(v) {return v+vo;}),
+      displayEdges:mesh.boundaryEdges.map(function(e) {return e+eo;})};
+    geometry.curves.push(curve);
+    var sphereIndex=geometry.surfacePatches.length;
+    geometry.surfacePatches.push({kind:'sphere',center:cand.center,radius:cand.radius,
+      boundaryCurves:[ci],cap:{pole:cand.pole,angle:cand.capAngle,
+        mouth:{origin:cand.mouthCenter,normal:cand.outward}},
+      faceIndices:faceIndices,sourceIds:sourceIds.slice(),recess:true});
+    if(closed) geometry.surfacePatches.push({kind:'plane',boundaryCurves:[ci],faceIndices:[],
+      closure:'recess-mouth',recessMouth:true,
+      sourceIds:[cand.circle.id].concat(closureIds)});
+    if(!geometry.recesses) geometry.recesses=[];
+    geometry.recesses.push({kind:'spherical',center:cand.center,radius:cand.radius,
+      mouth:{center:cand.mouthCenter,normal:cand.outward,radius:cand.mouthRadius},
+      depth:cand.depth,capAngle:cand.capAngle,closure:closed?'plane':'open',
+      sourceIds:sourceIds.slice(),mouthCurve:ci,surface:sphereIndex});
+  }
+  function inferRecesses(ink,used,geometry) {
+    var issues=[],records=[],claimed=new Set();
+    var circles=ink.filter(function(e) {return e && e.type==='CIRCLE' && !helper(e) &&
+      !used.has(e.id) && principalFrame(viewOf(e));});
+    var arcs=ink.filter(function(e) {return e && e.type==='CIRCULAR_ARC' && !helper(e) &&
+      !used.has(e.id) && principalFrame(viewOf(e));});
+    circles.forEach(function(C) {
+      if(used.has(C.id)) return;
+      var V=principalFrame(viewOf(C)),valid=[],conflicts=[];
+      arcs.forEach(function(A) {
+        if(claimed.has(A.id) || used.has(A.id)) return;
+        var W=principalFrame(viewOf(A));
+        if(!W || W.role===V.role) return;
+        var cand=recessCandidate(C,V,A,W,ink,used);
+        if(!cand) return;
+        if(cand.conflict) conflicts.push({C:C,A:A,message:cand.conflict});
+        else valid.push(cand);
+      });
+      if(!valid.length) {
+        if(conflicts.length) issues.push({code:'recess-evidence-conflict',entityId:C.id,
+          message:conflicts[0].message,
+          sourceIds:[C.id].concat(conflicts.map(function(c) {return c.A.id;}))});
+        return;
+      }
+      var groups=[];
+      valid.forEach(function(cand) {
+        var tol=1e-5*Math.max(1,cand.radius),group=null;
+        for(var i=0;i<groups.length;i++) {
+          var g=groups[i];
+          if(near3(g.center,cand.center,tol) && Math.abs(g.radius-cand.radius)<=tol &&
+             near3(g.mouthCenter,cand.mouthCenter,tol) &&
+             Math.abs(g.capAngle-cand.capAngle)<=1e-5 &&
+             dot3(g.outward,cand.outward)>1-1e-6) {group=g;break;}
+        }
+        if(!group) {group={center:cand.center,radius:cand.radius,mouthCenter:cand.mouthCenter,
+          outward:cand.outward,capAngle:cand.capAngle,candidates:[],closureIds:[],
+          closure:false};groups.push(group);}
+        group.candidates.push(cand);
+        cand.closure.ids.forEach(function(id) {if(group.closureIds.indexOf(id)===-1) group.closureIds.push(id);});
+        group.closure=group.closure||cand.closure.found;
+      });
+      if(groups.length>1) {
+        issues.push({code:'recess-evidence-ambiguous',entityId:C.id,
+          message:'Several silhouette arcs fit this mouth circle with different sphere geometry; the recess is unresolved.',
+          sourceIds:[C.id].concat(valid.map(function(c) {return c.arc.id;}))});
+        return;
+      }
+      var group=groups[0],cand=group.candidates[0];
+      var sourceIds=Array.from(new Set([C.id].concat(group.candidates.map(function(c) {return c.arc.id;}),group.closureIds)));
+      if(!group.closure) issues.push({code:'recess-mouth-unclosed',entityId:C.id,
+        message:'The spherical recess is determined, but no edge-on mouth stroke closes it; the cap is retained open.'});
+      addSphericalRecess(geometry,cand,sourceIds,group.closureIds,group.closure);
+      sourceIds.forEach(function(id) {used.add(id);claimed.add(id);});
+      records.push({kind:'spherical',center:cand.center,radius:cand.radius,
+        mouthCenter:cand.mouthCenter,mouthRadius:cand.mouthRadius,depth:cand.depth,
+        closure:group.closure?'plane':'open',sourceIds:sourceIds.slice()});
+    });
+    return {records:records,issues:issues};
+  }
   // Share frame validation and inference with the oblique primitive stage.
   function resolveProfileFrame(entities, options) {
     options = options || {};
@@ -479,7 +723,7 @@
       return q;
     }
     var used=new Set(), curvesIn=ink.filter(isCurve), sourceById=new Map(ink.map(function(e) {return [e.id,e];}));
-    var geometry={name:'primitive surface',vertices:[],edges:[],faces:[],curves:[],spheres:[],surfacePatches:[],smoothSideFaces:[]};
+    var geometry={name:'primitive surface',vertices:[],edges:[],faces:[],curves:[],spheres:[],surfacePatches:[],smoothSideFaces:[],recesses:[]};
     var selectedIssues=[], explanations=new Map(), ambiguousSources=new Set();
     function sourceKey(e) {
       function r(v) {return Math.round(v*1e6)/1e6;}
@@ -500,6 +744,10 @@
         sourceIds:s.sourceIds.slice(),faceIndices:indices});
       s.sourceIds.forEach(function(id) {used.add(id);});
     });
+    // A full mouth circle plus a cap-silhouette arc determines a spherical
+    // recess. This runs before paired curve lifting so the same primitives are
+    // not also reported as unrelated circles/arcs.
+    inferRecesses(ink,used,geometry).issues.forEach(function(issue) {selectedIssues.push(issue);});
     function project(p,role) {
       return role==='PLAN'?[p.x,-p.z]:role==='ELEVATION'?[p.x,p.y]:[profile.xRef+profile.s*(p.z-profile.dRef),p.y];
     }

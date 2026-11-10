@@ -99,8 +99,28 @@
           if (!finite(patch.center) || !(patch.radius > 0)) {
             diag('surface-invalid-sphere', 'A sphere needs a finite centre and positive radius.', sourceIds); return;
           }
-          surface = {kind:'sphere', center:patch.center, radius:patch.radius, loops:[],
-            closed:true, sourceIds:sourceIds, displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+          // A complete sphere silhouette has no boundary. A spherical patch
+          // (for example a recess cap) keeps its analytic boundary loop.
+          var sphereBoundary = (patch.boundaryCurves || []).slice();
+          var sphereLoops = [];
+          if (patch.curveLoops && patch.curveLoops.length) {
+            sphereLoops = patch.curveLoops.map(function (l) {
+              return {kind:l.kind || 'outer', curves:(l.curves || []).slice()};
+            });
+            sphereBoundary = [];
+            sphereLoops.forEach(function (l) { sphereBoundary = sphereBoundary.concat(l.curves); });
+          } else if (sphereBoundary.length) {
+            sphereLoops = [{kind:'outer', curves:sphereBoundary.slice()}];
+          }
+          if (sphereBoundary.some(function (i) { return !validCurve(curves[i]); })) {
+            diag('surface-invalid-boundary', 'A spherical patch references a missing analytic boundary.', sourceIds); return;
+          }
+          surface = {kind:'sphere', center:patch.center, radius:patch.radius, loops:sphereLoops,
+            closed:sphereLoops.length === 0, sourceIds:sourceIds,
+            displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+          if (sphereBoundary.length) surface.boundaryCurves = sphereBoundary;
+          if (patch.cap) surface.cap = patch.cap;
+          if (patch.recess) surface.recess = true;
         } else if (patch.kind === 'plane') {
           if (patch.outer && patch.outer.length >= 3) {
             var pts = patch.outer.map(function (i) { return vertices[i]; });
@@ -112,9 +132,19 @@
             var b = basis(n);
             var loops = [{kind:'outer', vertices:patch.outer.slice()}];
             (patch.holes || []).forEach(function (h) { loops.push({kind:'inner', vertices:h.slice()}); });
+            var innerInvalid = false;
+            (patch.innerCurves || []).forEach(function (i) {
+              if (!validCurve(curves[i])) {
+                diag('surface-invalid-boundary', 'A planar inner boundary references a missing analytic curve.', sourceIds);
+                innerInvalid = true; return;
+              }
+              loops.push({kind:'inner', curves:[i]});
+            });
+            if (innerInvalid) return;
             surface = {kind:'plane', origin:pts[0], normal:n, u:b.u, v:b.v, loops:loops,
               boundaryCurves:(patch.boundaryCurves || []).slice(), closed:false, sourceIds:sourceIds,
               displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+            if (patch.closure) surface.closure = patch.closure;
           } else if (patch.boundaryCurves && patch.boundaryCurves.length) {
             var ci = patch.boundaryCurves[0], c = curves[ci];
             if (!validCurve(c)) {
@@ -128,6 +158,8 @@
             surface = {kind:'plane', origin:c.center, normal:cn, u:c.u, v:c.v,
               loops:[{kind:'outer', curves:[ci]}], boundaryCurves:[ci], closed:false,
               sourceIds:sourceIds, displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+            if (patch.closure) surface.closure = patch.closure;
+            if (patch.recessMouth) surface.recessMouth = true;
           } else {
             diag('surface-unbounded-plane', 'A planar patch has no boundary loop.', sourceIds); return;
           }
@@ -242,6 +274,31 @@
       }
       if (s.kind === 'cylinder' || s.kind === 'cone') {
         if (!finite(s.axis) || Math.abs(length(s.axis)-1) > EPS) add('surface-invalid-axis', 'Surface ' + s.id + ' needs a unit axis.', s.sourceIds);
+      }
+      if (s.kind === 'sphere' && s.cap) {
+        if (!finite(s.cap.pole) || Math.abs(length(s.cap.pole)-1) > EPS ||
+            !Number.isFinite(s.cap.angle) || !(s.cap.angle > 0) || !(s.cap.angle < Math.PI)) {
+          add('surface-invalid-cap', 'Surface ' + s.id + ' has an invalid spherical-cap pole or angle.', s.sourceIds);
+        } else if (s.cap.mouth && finite(s.cap.mouth.origin) && finite(s.cap.mouth.normal) &&
+                   Math.abs(length(s.cap.mouth.normal)-1) > EPS) {
+          add('surface-invalid-cap', 'Surface ' + s.id + ' has an invalid cap mouth plane.', s.sourceIds);
+        } else if (s.cap.mouth) {
+          var capTol = 1e-5 * Math.max(1, s.radius || 1);
+          var capAxis = mul(s.cap.pole, -1);
+          var capDistance = dot(sub(s.cap.mouth.origin, s.center), s.cap.pole);
+          if (Math.abs(dot(s.cap.mouth.normal, capAxis) - 1) > 1e-7 ||
+              Math.abs(capDistance - s.radius * Math.cos(s.cap.angle)) > capTol)
+            add('surface-cap-mismatch', 'Surface ' + s.id + ' cap plane does not match its pole and angle.', s.sourceIds);
+          (s.loops || []).forEach(function (loop) {
+            loopCurves(loop, curves).forEach(function (c) {
+              if (!validCurve(c)) return;
+              var ca = radii(c).u;
+              if (Math.abs(length(sub(c.center, s.cap.mouth.origin))) > capTol ||
+                  Math.abs(ca - (s.radius || 0) * Math.sin(s.cap.angle)) > capTol)
+                add('surface-cap-mismatch', 'Surface ' + s.id + ' cap boundary does not match the mouth circle.', s.sourceIds);
+            });
+          });
+        }
       }
       var tol = 1e-5 * Math.max(1, s.radius || 1);
       // Boundary curves must lie on their analytic surface.

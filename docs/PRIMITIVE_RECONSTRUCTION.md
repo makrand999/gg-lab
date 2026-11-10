@@ -76,6 +76,18 @@ radius and projected centres fix the sphere centre, and the display mesh is a
 smooth analytic sphere approximation; it is reported through `geometry.spheres`
 and `surfacePatches.kind: 'sphere'`, not through a solid name.
 
+A full circular mouth in one principal view and a rim-to-rim circular-arc
+silhouette in the other determine a **spherical recess**. The mouth circle
+fixes its axis and radius `a`; the lifted silhouette centre gives the sphere
+centre `O` and radius `R`; the arc endpoints must be antipodal mouth points.
+The accepted patch is the cap `{p : |p-O| = R, (p-M).n <= 0}` with
+`a^2 + (q.n)^2 = R^2`, where `q = O - M`. An edge-on mouth stroke adds a
+coplanar closure sharing the mouth loop; without it the cap is retained open.
+The result is recorded in `geometry.recesses` and as a bounded `sphere` patch
+with one outer loop. This is a spherical recess only: cylindrical/torus
+fillets, elliptical mouths, partial mouth arcs and PROFILE mouths remain
+unsupported. See [Bounded analytic surface model](SURFACE_MODEL.md).
+
 A circle in a general plane projects as an ellipse. `educad-oblique-kernel.js`
 groups closed elliptical loops, fits their centres/axes, recovers each plane
 normal from the major/minor axes, and combines centers from two views. A
@@ -246,6 +258,11 @@ node tools/edc.js tools/scripts/overlapping-curve-projections.edu
 node tools/edc.js tools/scripts/partial-hidden-edge.edu
 node tools/edc.js tools/scripts/inferred-profile-frame.edu
 node tools/edc.js tools/scripts/sphere.edu
+node tools/edc.js tools/scripts/spherical-recess.edu
+node tools/edc.js tools/scripts/spherical-recess-shallow.edu
+node tools/edc.js tools/scripts/spherical-recess-elevation-mouth.edu
+node tools/edc.js tools/scripts/spherical-recess-open.edu
+node tools/edc.js tools/scripts/spherical-recess-conflict.edu
 node tools/edc.js tools/scripts/oblique-circle.edu
 node tools/edc.js tools/scripts/oblique-line-circle.edu
 node tools/edc.js tools/scripts/oblique-line-elevation-plan.edu
@@ -299,10 +316,10 @@ In addition to existing topology expectations, scripts can assert `curves`,
 `minRadius`, `maxRadius`, `topHidden`, `splitHidden`, `profileInferred`,
 `oblique`, `obliqueReprojection`, `spheres`, `surfaceValidation`, `surfaces`,
 `surfaceKinds`, `surfaceLoops`, `surfaceShells`, `surfaceOpen`,
-`surfaceBoundary`, `surfaceModel`, `obliquePoints`, `obliquePointFit`,
-`obliqueArcs`, `arcSweep`, `obliqueVisibility`, `obliqueVisibilityFit`,
-`parametricCurves`, `curveFit`, `curveReprojection`, `curvePreview`,
-`throughEdit`, `diagnostics`, `unresolved`, and `status`:
+`surfaceBoundary`, `surfaceModel`, `recesses`, `obliquePoints`,
+`obliquePointFit`, `obliqueArcs`, `arcSweep`, `obliqueVisibility`,
+`obliqueVisibilityFit`, `parametricCurves`, `curveFit`, `curveReprojection`,
+`curvePreview`, `throughEdit`, `diagnostics`, `unresolved`, and `status`:
 
 ```
 # expect: 48V 72E 26F curves=2 minRadius=10 maxRadius=20 unresolved=0 status=inferred
@@ -334,15 +351,17 @@ confirms the curve was rebuilt from it rather than keeping stale control points.
 
 This starts the agreed pipeline; it is not complete reconstruction for every
 geometric solid. Full-circle inclined traces, closed and open ellipse/edge-on
+This starts the agreed pipeline; it is not complete reconstruction for every
 geometric solid. Full-circle inclined traces, closed and open ellipse/edge-on
-line pairs, inclined circular cone bases with tangent generators, exact
-analytic surface–surface intersections for the supported plane, sphere,
-parallel-cylinder and axis-through-centre sphere–cylinder families, and a first
-bounded plane/cylinder/cone/sphere model are implemented. Important next
-capabilities are oblique cones and non-circular elliptical bases, curved
-recesses/fillets, broader skew-axis surface intersections, and certification of
-the analytic surfaces rather than only their display triangles. Spheres,
-two-view oblique circles, elliptical arc chains, arc/line pairs, and
+line pairs, inclined circular cone bases with tangent generators, spherical
+recesses, exact analytic surface–surface intersections for the supported plane,
+sphere, parallel-cylinder and axis-through-centre sphere–cylinder families, and
+a first bounded plane/cylinder/cone/sphere model are implemented. Important
+next capabilities are oblique cones and non-circular elliptical bases,
+cylindrical and torus fillets, merging a recess mouth into a surrounding face's
+inner loop, broader skew-axis surface intersections, and certification of the
+analytic surfaces rather than only their display triangles. Spheres, spherical
+recesses, two-view oblique circles, elliptical arc chains, arc/line pairs, and
 interpolated station curves with cross-view consistency checks are supported;
 other curved families are not. Profile frames are inferred when necessary, and
 overlapping projections are resolved when a declared view selects one

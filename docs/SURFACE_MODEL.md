@@ -3,7 +3,9 @@
 Major's primitive pipeline reconstructs curves and then infers surfaces. Curves
 alone do not say how a surface is bounded, which side is material, or how two
 patches share an edge. `public/lib/educad-surfaces.js` adds that layer next to
-the display geometry. It is still an inferred model, not an exact certificate.
+the display geometry. The model is inferred; `Surfaces.certify` separately
+records what can be checked analytically, without turning inferred surfaces
+into declared ones.
 
 ## Representation
 
@@ -29,6 +31,9 @@ loop. The complete-sphere silhouette case still has no loops.
 `geometry.surfaceModel` summarizes the model: surface count and kinds, boundary
 loops, closed shells, open components and open boundary elements.
 `geometry.analyticSurfaceValidation` records the model checks.
+`geometry.analyticCertificate` records the detailed analytic certificate
+described below. It is separate from `geometry.surfaceValidation`, which is the
+display-triangle certificate.
 
 A boundary curve may be shared by two surfaces. That is the model's seam: the
 same object is referenced by both loops, so a cap and a side surface cannot
@@ -55,12 +60,12 @@ The model is built from the same patches used by the preview:
 The straight-wire adapters expose `faceRegions` rather than `surfacePatches`;
 the builder accepts either form. The app, saved previews and the `.edu` runner
 therefore receive the same surface records from the same public pipeline.
-`educad-ref3d.js` preserves the records in saved previews and accepts the new
-`ellipse` analytic curve kind.
+`educad-ref3d.js` preserves the records and `analyticCertificate` in saved
+previews and accepts the new `ellipse` analytic curve kind.
 
-## Validation
+## Validation and analytic certificate
 
-`Surfaces.validate(model, geometry)` checks:
+`Surfaces.validate(model, geometry)` is the lightweight consistency check:
 
 - finite analytic parameters and positive radii;
 - sampled boundary points lie on their claimed surface;
@@ -75,6 +80,109 @@ The result is `ok`, `partial` (open but consistent), or `issues`. This is
 separate from `surfaceValidation`, which checks only the display triangulation.
 A curved analytic surface is not certified by a triangle mesh; the checks above
 test the analytic definitions and their boundaries.
+
+`Surfaces.certify(model, geometry)` returns the detailed
+`analytic-surface-certificate-v1` certificate. It inspects only the bounded
+surface model, never the display triangles, and it never changes the model.
+Its status uses the same words:
+
+- `ok`: every surface check passed and every shell is closed;
+- `partial`: no failed check, but at least one open boundary or open component
+  (or the model contains no analytic surfaces);
+- `issues`: at least one failed check, invalid parameter, non-manifold or
+  self-shared boundary, or build diagnostic.
+
+The certificate shape is:
+
+```js
+{
+  contract: 'analytic-surface-certificate-v1',
+  modelContract: 'analytic-surface-v1',
+  arithmetic: 'mixed-exact-rational-and-numeric',
+  status: 'ok' | 'partial' | 'issues',
+  surfaceCount, boundaryCount,
+  counts: {
+    surfaces, boundaryLoops, boundaries, sharedBoundaries, openBoundaries,
+    nonmanifoldBoundaries, selfSharedBoundaries, closedShells, openComponents,
+    checks, exactChecks, numericChecks, errors, warnings, issues
+  },
+  surfaces: [{
+    id, kind, closed, sourceIds, displayFaceIndices, parameters,
+    loops: [{
+      id, kind, elements, sourceIds,
+      incidence: {
+        elements: [{id, useCount, surfaces}],
+        shared, open, nonmanifold, selfShared
+      },
+      checks, status
+    }],
+    checks: [{
+      id, check, status, arithmetic, method,
+      residual, tolerance, samples, exactPass, exactReason, issue
+    }],
+    status
+  }],
+  boundaries: [{
+    id, kind, sourceIds, useCount, surfaces, status,
+    curveIndex, vertices, sectionType
+  }],
+  shells: [{
+    id, surfaces, boundaryIds, boundaryCount, openBoundaryIds, closed,
+    status, sourceIds
+  }],
+  issues: [{
+    id, code, severity, message, sourceIds,
+    surfaceId, boundaryId, surfaceIds, boundaryIds,
+    check, arithmetic, residual, tolerance
+  }]
+}
+```
+
+`parameters` contains the analytic definition: plane origin/normal/frame;
+cylinder origin/axis/radius; cone origin/axis/radius/apex/halfAngle; sphere
+centre/radius. A `check.issue` field is the code that would be used if that
+check failed; an `issues[]` entry is an actual finding. The order is
+deterministic: model diagnostics, surfaces and loops in model order, boundary
+records in element order, then shells.
+
+### Exact versus numeric checks
+
+Exact checks are evaluated by rational arithmetic on the exact decimal values
+of the stored JavaScript numbers:
+
+- stable ids, kind, boundedness, closed-flag consistency and boundary
+  incidence/closure counts;
+- finiteness;
+- exactly positive radii and half-angle positivity;
+- plane vertex coplanarity, using a homogeneous determinant rather than a
+  normalized normal;
+- cylinder boundary radius equality when the drawn radius is exactly the
+  stored radius.
+
+Numeric checks carry an explicit `tolerance` and usually a `residual`:
+
+- unit normals, axes and plane frames;
+- sampled boundary-on-surface residuals (33 samples per analytic curve);
+- cylinder boundary section reproduction (centre and both radii);
+- boundary-centre offsets from a cylinder or cone axis;
+- cone apex-on-axis and half-angle/base-radius relations.
+
+These are marked `arithmetic: 'numeric'` and `method: 'numeric-*'`. They are
+tolerance checks, not rigorous interval enclosures. If exact plane coplanarity
+fails because the stored decimal vertices carry floating-point construction
+error, but the numeric residual is within tolerance, the certificate reports
+the check as numeric with `exactPass: false` and `exactReason`; it does not
+claim exact coplanarity.
+
+Typical issue codes are `certificate-plane-normal-invalid`,
+`certificate-plane-frame-invalid`, `certificate-cylinder-radius-invalid`,
+`certificate-cylinder-axis-invalid`, `certificate-cylinder-radius-mismatch`,
+`certificate-cylinder-section-mismatch`, `certificate-cone-apex-off-axis`,
+`certificate-cone-half-angle-invalid`, `certificate-sphere-radius-invalid`,
+`certificate-boundary-off-surface`, `certificate-boundary-nonmanifold`,
+`certificate-boundary-self-shared`, `certificate-open-component` and
+`certificate-empty-model`. Warnings (open components, empty models) produce
+`partial`; all other listed codes produce `issues`.
 
 ## Intersections and trimming
 
@@ -225,11 +333,20 @@ node tools/edc.js tools/scripts/truncated-cylinder-ambiguous.edu
 ```
 
 The `.edu` properties are `surfaces`, `surfaceKinds`, `surfaceLoops`,
-`surfaceShells`, `surfaceOpen`, `surfaceBoundary`, and `surfaceModel`. For
-example:
+`surfaceShells`, `surfaceOpen`, `surfaceBoundary`, `surfaceModel`,
+`surfaceCertificate`, `surfaceCertificateIssues`, and
+`surfaceCertificateChecks`. For example:
 
 ```text
-# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
+```
+
+`surfaceCertificateIssues` is the sorted, comma-separated set of certificate
+issue codes (`none` when empty). A trim query result includes its own
+`certificate` object, so an open trim can be checked directly:
+
+```text
+# surface-query: {"operation":"trim","surface":0,"plane":{"origin":{"x":0,"y":5,"z":0},"normal":{"x":0,"y":1,"z":0}},"expect":{"surface":{"closed":false},"validation":{"status":"partial","openBoundaries":2},"certificate":{"status":"partial","counts":{"surfaces":1,"openBoundaries":2}}}}
 ```
 
 The mismatch case reports `curve-inclined-arc-unsupported`; the two-cut case
@@ -341,8 +458,18 @@ Examples:
   loops are not used to clip a line, circle, or conic to the bounded patches.
 - Trimming handles one cutting plane at a time and does not split a loop that
   crosses the plane.
-- The model is inferred. It does not replace the exact declared-triangle
-  certificate in `RECONSTRUCTION_CONTRACT.md`.
+- The model is inferred. The analytic certificate checks consistency of the
+  stored decimal parameters and sampled boundaries; it does not prove that an
+  inferred radius, axis or apex equals the author's intended exact geometry,
+  does not check material side or orientation, and does not replace the exact
+  declared-triangle certificate in `RECONSTRUCTION_CONTRACT.md`.
+- The display triangulation is certified separately as
+  `inferred-triangle-v1` (`geometry.surfaceValidation`). Curved surfaces are
+  not certified by that mesh certificate, and the analytic certificate never
+  uses the mesh as evidence.
+- Boundary incidence follows the ordered `loops`. A `surface.boundaryCurves`
+  entry that is not part of a loop is advisory patch metadata and is not counted
+  as a boundary element.
 
 ## Drawing-script surface queries
 

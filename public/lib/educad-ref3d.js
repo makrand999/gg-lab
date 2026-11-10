@@ -95,6 +95,7 @@
           surfaces: g.surfaces || [], surfaceModel: g.surfaceModel || null,
           recesses: g.recesses || [],
           analyticSurfaceValidation: g.analyticSurfaceValidation || null,
+          analyticCertificate: g.analyticCertificate || null,
           smoothSideFaces: g.smoothSideFaces, topologyStatus: g.topologyStatus,
           faceHoles: (g.faceHoles || faces.map(function() { return []; })).map(function(holes) { return holes.map(function(hole) { return copyFace(hole, verts.length); }); })
         }
@@ -143,6 +144,12 @@
       if (g.surfaces !== undefined && !Array.isArray(g.surfaces)) return false;
       if (g.recesses !== undefined && !Array.isArray(g.recesses)) return false;
       if (g.surfaceModel !== undefined && g.surfaceModel !== null && typeof g.surfaceModel !== 'object') return false;
+      if (g.analyticSurfaceValidation !== undefined && g.analyticSurfaceValidation !== null &&
+          typeof g.analyticSurfaceValidation !== 'object') return false;
+      if (g.analyticCertificate !== undefined && g.analyticCertificate !== null) {
+        if (typeof g.analyticCertificate !== 'object') return false;
+        if (['ok','partial','issues'].indexOf(g.analyticCertificate.status) === -1) return false;
+      }
       if (g.curves !== undefined) {
         if (!Array.isArray(g.curves)) return false;
         for (var ci=0;ci<g.curves.length;ci++) {

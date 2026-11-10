@@ -143,6 +143,7 @@ function runScript(text, options) {
   }) ? 'ok' : 'issues';
   // Declarative surface queries exercise public APIs on the reconstructed
   // drawing. Expected values are recursive subsets with numeric tolerance.
+  // Trim queries also return the analytic certificate of the open result.
   var surfaceChecks = 0, surfaceFailures = 0, querySurfaces = Object.create(null);
   function matches(actual, expected) {
     if (typeof expected === 'number') return Number.isFinite(actual) && Math.abs(actual-expected) <= 1e-6*Math.max(1,Math.abs(expected));
@@ -176,7 +177,8 @@ function runScript(text, options) {
         else if (request.operation === 'trim') {
           var trimmed = Surfaces.trim(surface,request.plane,request.keepPositive,g);
           if (request.save && trimmed) querySurfaces[request.save] = trimmed;
-          result = trimmed && {surface:trimmed, validation:Surfaces.validate({surfaces:[trimmed]},g)};
+          result = trimmed && {surface:trimmed, validation:Surfaces.validate({surfaces:[trimmed]},g),
+            certificate:Surfaces.certify({version:1,contract:'analytic-surface-v1',surfaces:[trimmed],diagnostics:[]},g)};
         } else throw new Error('Unknown surface operation');
       }
       if (!Object.prototype.hasOwnProperty.call(request,'expect') || !matches(result,request.expect))
@@ -296,7 +298,7 @@ function checkObliqueVisibility(solid,entities) {
 // F counts logical regions, not the duplicated front/back display loops.
 function topologyProperties(solid) {
   var g = solid && solid.geometry;
-  if (!g) return { V: 0, E: 0, F: 0, holes: 0, components: 0, closed: 0, open: 0, boundary: 0, curves: 0, minRadius: 0, maxRadius: 0, surfaces: 0, surfaceKinds: 'none', surfaceLoops: 0, surfaceShells: 0, surfaceOpen: 0, surfaceBoundary: 0, surfaceModel: 'none', recesses: 0, unresolved: (solid && solid.issues || []).length, status: (solid && solid.reason) || 'unavailable' };
+  if (!g) return { V: 0, E: 0, F: 0, holes: 0, components: 0, closed: 0, open: 0, boundary: 0, curves: 0, minRadius: 0, maxRadius: 0, surfaces: 0, surfaceKinds: 'none', surfaceLoops: 0, surfaceShells: 0, surfaceOpen: 0, surfaceBoundary: 0, surfaceModel: 'none', surfaceCertificate: 'none', surfaceCertificateIssues: 'none', surfaceCertificateChecks: 0, recesses: 0, unresolved: (solid && solid.issues || []).length, status: (solid && solid.reason) || 'unavailable' };
   var faces = g.faceRegions || (g.faces || []).map(function (f) { return { outer: f, holes: [] }; });
   var unique = new Map();
   faces.forEach(function (f) {
@@ -317,6 +319,8 @@ function topologyProperties(solid) {
   });
   var surfaces = g.surfaceComponents || g.components;
   var analytic = g.surfaces || [], model = g.surfaceModel || null, modelCheck = g.analyticSurfaceValidation || null;
+  var certificate = g.analyticCertificate || null;
+  var certificateIssues = certificate ? Array.from(new Set((certificate.issues || []).map(function(i) { return i.code; }))).sort() : [];
   var top = P.projectGeometry(g, 'top'), front = P.projectGeometry(g, 'front');
   return { V: g.vertices.length, E: g.edges.length, F: unique.size,
     holes: Array.from(unique.values()).reduce(function(n,f) { return n+f.holes.length; },0),
@@ -338,6 +342,9 @@ function topologyProperties(solid) {
     surfaceOpen: model ? model.openSurfaces : 0,
     surfaceBoundary: modelCheck ? modelCheck.openBoundaries : 0,
     surfaceModel: modelCheck ? modelCheck.status : 'none',
+    surfaceCertificate: certificate ? certificate.status : 'none',
+    surfaceCertificateIssues: certificateIssues.length ? certificateIssues.join(',') : 'none',
+    surfaceCertificateChecks: certificate && certificate.counts ? certificate.counts.checks : 0,
     surfaceValidation: g.surfaceValidation ? g.surfaceValidation.status : 'none',
     recesses: (g.recesses || []).length,
     minRadius: (g.curves || []).length ? Math.min.apply(null,g.curves.map(function(c) {return c.radius||0;})) : 0,

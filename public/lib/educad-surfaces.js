@@ -351,6 +351,660 @@
       surfaces:(model.surfaces || []).length, issues:issues};
   }
 
+  // Analytic certificate. The validation above answers "is this model
+  // consistent?"; this records the evidence for each check and is deliberately
+  // independent of the display triangles. Exact checks use the stored decimal
+  // values as rationals. Everything else is numeric with an explicit tolerance;
+  // a numeric check is not a rigorous interval enclosure.
+  var DECIMAL_RE = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i;
+  function exactNormalize(n, d) {
+    if (!d) throw new Error('Zero denominator');
+    if (d < 0n) { n = -n; d = -d; }
+    var a = n < 0n ? -n : n, b = d;
+    while (b) { var r = a % b; a = b; b = r; }
+    var g = a || 1n;
+    return {n:n/g, d:d/g};
+  }
+  function exactNumber(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    var match = String(value).match(DECIMAL_RE);
+    if (!match) return null;
+    var fraction = match[3] || '', exponent = Number(match[4] || 0) - fraction.length;
+    var n = BigInt(match[2] + fraction) * (match[1] ? -1n : 1n), d = 1n;
+    if (exponent >= 0) n *= 10n ** BigInt(exponent);
+    else d = 10n ** BigInt(-exponent);
+    return exactNormalize(n, d);
+  }
+  function exactAdd(a, b) { return exactNormalize(a.n*b.d + b.n*a.d, a.d*b.d); }
+  function exactSub(a, b) { return exactNormalize(a.n*b.d - b.n*a.d, a.d*b.d); }
+  function exactMul(a, b) { return exactNormalize(a.n*b.n, a.d*b.d); }
+  function exactZero(a) { return a.n === 0n; }
+  function exactEqual(a, b) { return a.n === b.n && a.d === b.d; }
+  function exactVector(v) {
+    if (!finite(v)) return null;
+    var x = exactNumber(v.x), y = exactNumber(v.y), z = exactNumber(v.z);
+    return x && y && z ? [x, y, z] : null;
+  }
+  function exactSubVectors(a, b) { return [exactSub(a[0],b[0]), exactSub(a[1],b[1]), exactSub(a[2],b[2])]; }
+  function exactCrossVectors(a, b) {
+    return [exactSub(exactMul(a[1],b[2]), exactMul(a[2],b[1])),
+      exactSub(exactMul(a[2],b[0]), exactMul(a[0],b[2])),
+      exactSub(exactMul(a[0],b[1]), exactMul(a[1],b[0]))];
+  }
+  function exactDotVectors(a, b) {
+    return exactAdd(exactAdd(exactMul(a[0],b[0]), exactMul(a[1],b[1])), exactMul(a[2],b[2]));
+  }
+  function exactZeroVector(v) { return v.every(exactZero); }
+  function exactNumbersEqual(a, b) {
+    var x = exactNumber(a), y = exactNumber(b);
+    return !!(x && y && exactEqual(x, y));
+  }
+  function exactPositive(value) {
+    var x = exactNumber(value);
+    return !!(x && x.n > 0n);
+  }
+  // True when every point is exactly coplanar in the stored decimal model.
+  // The predicate is homogeneous, so no normal normalization is involved.
+  function exactCoplanar(points) {
+    if (!points || points.length < 3) return {ok:false, reason:'fewer-than-three'};
+    var exactPoints = points.map(exactVector);
+    if (exactPoints.some(function (p) { return !p; })) return {ok:false, reason:'non-finite'};
+    var p0 = exactPoints[0], i1 = -1, i;
+    for (i=1;i<exactPoints.length;i++) {
+      if (!exactZeroVector(exactSubVectors(exactPoints[i], p0))) { i1 = i; break; }
+    }
+    if (i1 < 0) return {ok:false, reason:'coincident'};
+    var e1 = exactSubVectors(exactPoints[i1], p0), i2 = -1;
+    for (i=1;i<exactPoints.length;i++) {
+      if (i === i1) continue;
+      var e = exactSubVectors(exactPoints[i], p0);
+      if (!exactZeroVector(exactCrossVectors(e1, e))) { i2 = i; break; }
+    }
+    if (i2 < 0) return {ok:false, reason:'collinear'};
+    var n = exactCrossVectors(e1, exactSubVectors(exactPoints[i2], p0));
+    for (i=0;i<exactPoints.length;i++) {
+      if (i === 0 || i === i1 || i === i2) continue;
+      if (!exactZero(exactDotVectors(n, exactSubVectors(exactPoints[i], p0))))
+        return {ok:false, reason:'noncoplanar', pointIndex:i};
+    }
+    return {ok:true};
+  }
+
+  function copyPoint(p) { return finite(p) ? {x:p.x, y:p.y, z:p.z} : null; }
+  function surfaceParameters(s) {
+    if (!s) return {};
+    if (s.kind === 'plane') return {origin:copyPoint(s.origin), normal:copyPoint(s.normal),
+      u:copyPoint(s.u), v:copyPoint(s.v)};
+    if (s.kind === 'cylinder') return {origin:copyPoint(s.origin), axis:copyPoint(s.axis), radius:s.radius};
+    if (s.kind === 'cone') return {origin:copyPoint(s.origin), axis:copyPoint(s.axis),
+      radius:s.radius, apex:copyPoint(s.apex), halfAngle:s.halfAngle};
+    if (s.kind === 'sphere') return {center:copyPoint(s.center), radius:s.radius};
+    return {};
+  }
+  function surfaceTolerance(s) {
+    var radius = Math.abs((s && s.radius) || 0);
+    return 1e-5 * Math.max(1, Number.isFinite(radius) ? radius : 1);
+  }
+  function surfaceResidual(s, p) {
+    if (!s || !finite(p)) return Infinity;
+    if (s.kind === 'plane') {
+      return finite(s.origin) && finite(s.normal) ? Math.abs(dot(sub(p, s.origin), s.normal)) : Infinity;
+    }
+    if (s.kind === 'cylinder') {
+      if (!finite(s.origin) || !finite(s.axis) || !(s.radius > 0)) return Infinity;
+      var cd = sub(p, s.origin), ca = dot(cd, unit(s.axis));
+      return Math.abs(Math.sqrt(Math.max(0, dot(cd,cd) - ca*ca)) - s.radius);
+    }
+    if (s.kind === 'cone') {
+      if (!finite(s.axis) || !Number.isFinite(s.halfAngle)) return Infinity;
+      var apex = s.apex || s.origin;
+      if (!finite(apex)) return Infinity;
+      var dc = sub(p, apex), ac = dot(dc, unit(s.axis));
+      return Math.abs(Math.sqrt(Math.max(0, dot(dc,dc) - ac*ac)) - Math.abs(ac)*Math.tan(s.halfAngle));
+    }
+    if (s.kind === 'sphere') {
+      return finite(s.center) && s.radius > 0 ? Math.abs(length(sub(p, s.center)) - s.radius) : Infinity;
+    }
+    return Infinity;
+  }
+  function boundaryCurve(element, curves) {
+    if (typeof element === 'string') {
+      var m = /^c:(\d+)$/.exec(element);
+      return m ? curves[Number(m[1])] : null;
+    }
+    return element && typeof element === 'object' ? element : null;
+  }
+  function boundaryElementKind(element) {
+    if (typeof element === 'string') {
+      if (/^c:\d+$/.test(element)) return 'curve';
+      if (/^e:\d+_\d+$/.test(element)) return 'edge';
+      return 'unknown';
+    }
+    return element && typeof element === 'object' ? 'section' : 'unknown';
+  }
+  function boundarySourceIds(element, curves) {
+    var c = boundaryCurve(element, curves);
+    return c && Array.isArray(c.sourceIds) ? c.sourceIds.slice() : [];
+  }
+  function boundaryCurveValid(c) {
+    if (!validCurve(c)) return false;
+    if (c.startAngle !== undefined && !Number.isFinite(c.startAngle)) return false;
+    if (c.sweepAngle !== undefined && (!Number.isFinite(c.sweepAngle) || c.sweepAngle <= 0)) return false;
+    return true;
+  }
+  function sampleBoundaryCurve(c, count) {
+    var start = Number.isFinite(c.startAngle) ? c.startAngle : 0;
+    var sweep = Number.isFinite(c.sweepAngle) ? c.sweepAngle : TAU;
+    var points = [];
+    for (var i=0;i<=count;i++) points.push(curvePoint(c, start + sweep*i/count));
+    return points;
+  }
+
+  function certify(model, geometry) {
+    if (!model || !Array.isArray(model.surfaces)) return null;
+    var curves = geometry && geometry.curves || [];
+    var vertices = geometry && geometry.vertices || [];
+    var issues = [];
+    var counters = {checks:0, exactChecks:0, numericChecks:0};
+    var sectionIds = new Map();
+
+    function unique(values) {
+      var out = [];
+      (values || []).forEach(function(v) { if (out.indexOf(v) === -1) out.push(v); });
+      return out;
+    }
+    function elementId(element) {
+      if (typeof element === 'string') return element;
+      if (element && typeof element === 'object') {
+        if (!sectionIds.has(element)) sectionIds.set(element, 'section:' + sectionIds.size);
+        return sectionIds.get(element);
+      }
+      return 'invalid-element';
+    }
+    function issue(code, message, detail) {
+      detail = detail || {};
+      var record = {id:'issue:' + issues.length, code:code,
+        severity:detail.severity || 'error', message:message,
+        sourceIds:unique(detail.sourceIds || [])};
+      ['surfaceId','boundaryId','check','arithmetic'].forEach(function (key) {
+        if (detail[key] !== undefined) record[key] = detail[key];
+      });
+      ['surfaceIds','boundaryIds'].forEach(function (key) {
+        if (detail[key] !== undefined) record[key] = unique(detail[key]);
+      });
+      ['residual','tolerance'].forEach(function (key) {
+        if (detail[key] !== undefined && Number.isFinite(detail[key])) record[key] = detail[key];
+      });
+      issues.push(record);
+      return record;
+    }
+    function check(owner, surface, name, spec) {
+      spec = spec || {};
+      spec.id = owner.id + '/check:' + name;
+      spec.check = name;
+      spec.status = spec.status || 'ok';
+      spec.arithmetic = spec.arithmetic || 'numeric';
+      spec.method = spec.method || (spec.arithmetic.indexOf('exact') === 0 ? 'exact' : 'numeric');
+      if (spec.residual !== undefined && !Number.isFinite(spec.residual)) delete spec.residual;
+      owner.checks.push(spec);
+      counters.checks++;
+      if (spec.arithmetic.indexOf('exact') === 0) counters.exactChecks++;
+      else counters.numericChecks++;
+      if (spec.status === 'failed') {
+        issue(spec.issue || 'certificate-check-failed',
+          spec.message || ('Check "' + name + '" failed for ' + surface.id + '.'),
+          {surfaceId:surface.id, check:name, arithmetic:spec.arithmetic,
+            residual:spec.residual, tolerance:spec.tolerance,
+            sourceIds:spec.sourceIds || owner.sourceIds});
+      }
+      return spec;
+    }
+    function checkLabel(name, suffix) {
+      return name.replace(new RegExp('-' + suffix + '$'), '').replace(/^(plane|cylinder|cone|sphere)-/, '');
+    }
+    function finiteVector(owner, surface, name, value, issueCode) {
+      var ok = !!finite(value);
+      check(owner, surface, name, {status:ok?'ok':'failed', arithmetic:'exact-decimal-rational',
+        method:'exact-finiteness', issue:issueCode,
+        message:surface.id + ' has no finite ' + checkLabel(name, 'finite') + '.'});
+      return ok;
+    }
+    function positiveExact(owner, surface, name, value, issueCode) {
+      var ok = exactPositive(value);
+      check(owner, surface, name, {status:ok?'ok':'failed', arithmetic:'exact-decimal-rational',
+        method:'exact-rational', issue:issueCode,
+        message:surface.id + ' needs an exactly positive ' + checkLabel(name, 'positive') + '.'});
+      return ok;
+    }
+    function unitVector(owner, surface, name, value, issueCode, tolerance) {
+      var ok = !!finite(value), residual = ok ? Math.abs(length(value) - 1) : Infinity;
+      tolerance = tolerance || EPS;
+      check(owner, surface, name, {status:ok && residual <= tolerance ? 'ok':'failed',
+        arithmetic:'numeric', method:'numeric-direction', residual:residual, tolerance:tolerance,
+        issue:issueCode, message:surface.id + ' has a non-unit ' + checkLabel(name, 'unit') + '.'});
+      return ok && residual <= tolerance;
+    }
+
+    (model.diagnostics || []).forEach(function (d) {
+      issue(d.code || 'certificate-model-diagnostic', d.message || 'The surface model reported a diagnostic.',
+        {sourceIds:d.sourceIds || []});
+    });
+
+    var idCounts = new Map();
+    model.surfaces.forEach(function (s) {
+      var key = s && s.id;
+      idCounts.set(key, (idCounts.get(key) || 0) + 1);
+    });
+
+    // Pass 1: assign deterministic boundary IDs and count every use. Section
+    // objects keep reference identity, so two separately built but equal
+    // sections do not become shared merely because their numbers match.
+    var uses = new Map();
+    model.surfaces.forEach(function (s, si) {
+      (s.loops || []).forEach(function (loop, li) {
+        loopElements(loop).forEach(function (element) {
+          var id = elementId(element);
+          if (!uses.has(id)) uses.set(id, {id:id, element:element, kind:boundaryElementKind(element),
+            useCount:0, surfaceIds:[], loopRefs:[]});
+          var use = uses.get(id);
+          use.useCount++;
+          if (use.surfaceIds.indexOf(s.id) === -1) use.surfaceIds.push(s.id);
+          use.loopRefs.push({surfaceIndex:si, surfaceId:s.id, loopIndex:li});
+        });
+      });
+    });
+
+    function loopIncidence(loop) {
+      var ids = loopElements(loop).map(elementId);
+      var elements = ids.map(function (id) {
+        var use = uses.get(id);
+        return {id:id, useCount:use ? use.useCount : 0, surfaces:use ? use.surfaceIds.slice() : []};
+      });
+      return {elements:elements,
+        shared:elements.length > 0 && elements.every(function (e) { return e.useCount === 2 && e.surfaces.length === 2; }),
+        open:elements.some(function (e) { return e.useCount === 1; }),
+        nonmanifold:elements.some(function (e) { return e.useCount > 2 || (e.useCount === 2 && e.surfaces.length !== 2); }),
+        selfShared:elements.some(function (e) { return e.useCount === 2 && e.surfaces.length === 1; })};
+    }
+
+    // Pass 2: certify each surface, its loops, and its type-specific parameters.
+    var surfaceRecords = model.surfaces.map(function (s, si) {
+      var id = s && typeof s.id === 'string' ? s.id : 'surface-index:' + si;
+      var surface = s || {};
+      var rec = {id:id, kind:surface.kind || 'unknown', closed:surface.closed === true,
+        sourceIds:unique(surface.sourceIds || []),
+        displayFaceIndices:(surface.displayFaceIndices || []).slice(),
+        parameters:surfaceParameters(surface), loops:[], checks:[], status:'ok'};
+      var known = ['plane','cylinder','cone','sphere'].indexOf(rec.kind) !== -1;
+
+      check(rec, rec, 'surface-id-present', {status:typeof surface.id === 'string' && surface.id !== '' ? 'ok':'failed',
+        arithmetic:'exact-combinatorial', method:'combinatorial', issue:'certificate-surface-id-missing',
+        message:'A surface record has no stable id.'});
+      check(rec, rec, 'surface-id-unique', {status:(idCounts.get(surface.id) || 0) <= 1 ? 'ok':'failed',
+        arithmetic:'exact-combinatorial', method:'combinatorial', issue:'certificate-surface-id-duplicate',
+        message:'Several surface records reuse the id ' + id + '.'});
+      check(rec, rec, 'surface-kind-supported', {status:known ? 'ok':'failed',
+        arithmetic:'exact-combinatorial', method:'combinatorial', issue:'certificate-surface-kind-unsupported',
+        message:'The surface kind "' + rec.kind + '" has no analytic certificate.'});
+
+      var hasLoops = (surface.loops || []).length > 0;
+      check(rec, rec, 'surface-bounded', {status:hasLoops || rec.closed ? 'ok':'failed',
+        arithmetic:'exact-combinatorial', method:'combinatorial', issue:'certificate-surface-unbounded',
+        message:'A surface with no boundary loop is not marked closed.'});
+      check(rec, rec, 'surface-closed-consistency',
+        {status:!(rec.closed && hasLoops) ? 'ok':'failed', arithmetic:'exact-combinatorial',
+          method:'combinatorial', issue:'certificate-surface-closed-with-boundaries',
+          message:'A surface marked closed still carries boundary loops.'});
+
+      if (rec.kind === 'plane') {
+        finiteVector(rec, rec, 'plane-origin-finite', surface.origin, 'certificate-plane-origin-invalid');
+        if (finite(surface.normal)) {
+          var nr = Math.abs(length(surface.normal) - 1);
+          check(rec, rec, 'plane-normal-unit', {status:nr <= EPS ? 'ok':'failed', arithmetic:'numeric',
+            method:'numeric-direction', residual:nr, tolerance:EPS,
+            issue:'certificate-plane-normal-invalid', message:rec.id + ' has a non-unit normal.'});
+        } else {
+          check(rec, rec, 'plane-normal-unit', {status:'failed', arithmetic:'numeric',
+            method:'numeric-direction', issue:'certificate-plane-normal-invalid',
+            message:rec.id + ' has no finite normal.'});
+        }
+        if (finite(surface.u) && finite(surface.v) && finite(surface.normal)) {
+          var fr = Math.max(Math.abs(length(surface.u)-1), Math.abs(length(surface.v)-1),
+            Math.abs(dot(surface.u, surface.v)), Math.abs(dot(surface.u, surface.normal)),
+            Math.abs(dot(surface.v, surface.normal)));
+          check(rec, rec, 'plane-frame-orthonormal', {status:fr <= EPS ? 'ok':'failed', arithmetic:'numeric',
+            method:'numeric-direction', residual:fr, tolerance:EPS,
+            issue:'certificate-plane-frame-invalid', message:rec.id + ' has a non-orthonormal plane frame.'});
+        } else {
+          check(rec, rec, 'plane-frame-orthonormal', {status:'failed', arithmetic:'numeric',
+            method:'numeric-direction', issue:'certificate-plane-frame-invalid',
+            message:rec.id + ' has no finite plane frame.'});
+        }
+      } else if (rec.kind === 'cylinder') {
+        finiteVector(rec, rec, 'cylinder-origin-finite', surface.origin, 'certificate-cylinder-origin-invalid');
+        positiveExact(rec, rec, 'cylinder-radius-positive', surface.radius, 'certificate-cylinder-radius-invalid');
+        unitVector(rec, rec, 'cylinder-axis-unit', surface.axis, 'certificate-cylinder-axis-invalid');
+      } else if (rec.kind === 'cone') {
+        finiteVector(rec, rec, 'cone-origin-finite', surface.origin, 'certificate-cone-origin-invalid');
+        positiveExact(rec, rec, 'cone-radius-positive', surface.radius, 'certificate-cone-radius-invalid');
+        unitVector(rec, rec, 'cone-axis-unit', surface.axis, 'certificate-cone-axis-invalid');
+        finiteVector(rec, rec, 'cone-apex-finite', surface.apex, 'certificate-cone-apex-invalid');
+        if (Number.isFinite(surface.halfAngle)) {
+          var hpos = exactPositive(surface.halfAngle), hrange = hpos && surface.halfAngle < Math.PI/2;
+          check(rec, rec, 'cone-half-angle-range', {status:hrange ? 'ok':'failed', arithmetic:'numeric',
+            method:'numeric-range', issue:'certificate-cone-half-angle-invalid',
+            message:rec.id + ' needs 0 < halfAngle < pi/2.'});
+        } else {
+          check(rec, rec, 'cone-half-angle-range', {status:'failed', arithmetic:'numeric',
+            method:'numeric-range', issue:'certificate-cone-half-angle-invalid',
+            message:rec.id + ' has no finite halfAngle.'});
+        }
+        if (finite(surface.axis) && finite(surface.apex) && finite(surface.origin)) {
+          var ad = sub(surface.apex, surface.origin), aa = dot(ad, unit(surface.axis));
+          var ar = Math.sqrt(Math.max(0, dot(ad,ad) - aa*aa));
+          check(rec, rec, 'cone-apex-on-axis', {status:ar <= surfaceTolerance(surface) ? 'ok':'failed',
+            arithmetic:'numeric', method:'numeric-direction', residual:ar, tolerance:surfaceTolerance(surface),
+            issue:'certificate-cone-apex-off-axis', message:rec.id + ' has an apex off its own axis.'});
+          var axial = Math.abs(aa);
+          var expected = axial * Math.tan(surface.halfAngle);
+          var hr = Math.abs(expected - surface.radius);
+          check(rec, rec, 'cone-half-angle-radius', {status:hr <= surfaceTolerance(surface) ? 'ok':'failed',
+            arithmetic:'numeric', method:'numeric-relation', residual:hr, tolerance:surfaceTolerance(surface),
+            issue:'certificate-cone-radius-mismatch',
+            message:rec.id + ' has a half-angle that does not reproduce its base radius.'});
+        } else {
+          check(rec, rec, 'cone-apex-on-axis', {status:'failed', arithmetic:'numeric',
+            method:'numeric-direction', issue:'certificate-cone-apex-off-axis',
+            message:rec.id + ' cannot place its apex on an axis.'});
+          check(rec, rec, 'cone-half-angle-radius', {status:'failed', arithmetic:'numeric',
+            method:'numeric-relation', issue:'certificate-cone-radius-mismatch',
+            message:rec.id + ' cannot relate its half-angle to a base radius.'});
+        }
+      } else if (rec.kind === 'sphere') {
+        finiteVector(rec, rec, 'sphere-center-finite', surface.center, 'certificate-sphere-center-invalid');
+        positiveExact(rec, rec, 'sphere-radius-positive', surface.radius, 'certificate-sphere-radius-invalid');
+      }
+
+      // Plane vertex loops have an exact coplanarity predicate on the stored
+      // decimals. Curved loops use sampled numeric residuals below.
+      if (rec.kind === 'plane') {
+        var planePoints = [];
+        (surface.loops || []).forEach(function (loop) {
+          (loop.vertices || []).forEach(function (i) { if (finite(vertices[i])) planePoints.push(vertices[i]); });
+        });
+        if (planePoints.length) {
+          var exact = exactCoplanar(planePoints);
+          if (exact.ok) {
+            check(rec, rec, 'plane-boundary-coplanar', {status:'ok', arithmetic:'exact-decimal-rational',
+              method:'exact-rational', issue:'certificate-plane-boundary-not-coplanar'});
+          } else {
+            var pr = 0;
+            planePoints.forEach(function (p) { pr = Math.max(pr, surfaceResidual(surface, p)); });
+            var ptol = surfaceTolerance(surface);
+            var degenerate = exact.reason === 'collinear' || exact.reason === 'coincident' || exact.reason === 'fewer-than-three';
+            check(rec, rec, 'plane-boundary-coplanar', {status:!degenerate && pr <= ptol ? 'ok':'failed',
+              arithmetic:'numeric', method:'numeric-fallback', residual:pr, tolerance:ptol,
+              exactPass:false, exactReason:exact.reason,
+              issue:degenerate ? 'certificate-plane-boundary-degenerate' : 'certificate-plane-boundary-not-coplanar',
+              message:degenerate ? rec.id + ' has a degenerate plane boundary.' :
+                rec.id + ' boundary vertices are not exactly coplanar.'});
+          }
+        }
+      }
+
+      (surface.loops || []).forEach(function (loop, li) {
+        var elements = loopElements(loop).map(elementId);
+        var sourceIds = [];
+        elements.forEach(function (element) {
+          var use = uses.get(element);
+          if (use) sourceIds = sourceIds.concat(boundarySourceIds(use.element, curves));
+        });
+        var loopRec = {id:rec.id + '/loop:' + li, kind:loop.kind || 'outer',
+          elements:elements, checks:[], sourceIds:unique(sourceIds), status:'ok'};
+        if (loop.vertices) loopRec.vertices = loop.vertices.slice();
+        if (loop.curves) loopRec.curves = loop.curves.slice();
+        if (loop.section) loopRec.section = elementId(loop.section);
+        loopRec.incidence = loopIncidence(loop);
+        if (!elements.length) {
+          loopRec.status = 'issues';
+          issue('certificate-boundary-empty-loop', rec.id + ' has a boundary loop with no elements.',
+            {surfaceId:rec.id, sourceIds:rec.sourceIds});
+        }
+
+        var tol = surfaceTolerance(surface);
+        var maxResidual = 0, samples = 0, missing = false, invalidCurve = false, undefinedResidual = false;
+        (loop.vertices || []).forEach(function (i) {
+          var p = vertices[i];
+          if (!finite(p)) { missing = true; return; }
+          var r = surfaceResidual(surface, p);
+          if (!Number.isFinite(r)) undefinedResidual = true;
+          else maxResidual = Math.max(maxResidual, r);
+          samples++;
+        });
+        loopCurves(loop, curves).forEach(function (c) {
+          if (!boundaryCurveValid(c)) { invalidCurve = true; return; }
+          sampleBoundaryCurve(c, 32).forEach(function (p) {
+            var r = surfaceResidual(surface, p);
+            if (!Number.isFinite(r)) undefinedResidual = true;
+            else maxResidual = Math.max(maxResidual, r);
+            samples++;
+          });
+        });
+        if (missing) {
+          loopRec.status = 'issues';
+          issue('certificate-boundary-missing-vertex', rec.id + ' references a missing boundary vertex.',
+            {surfaceId:rec.id, boundaryId:loopRec.id, sourceIds:rec.sourceIds});
+        }
+        if (invalidCurve) {
+          loopRec.status = 'issues';
+          issue('certificate-boundary-invalid-curve', rec.id + ' references an invalid analytic boundary.',
+            {surfaceId:rec.id, boundaryId:loopRec.id, sourceIds:loopRec.sourceIds.length ? loopRec.sourceIds : rec.sourceIds});
+        }
+        if (undefinedResidual) {
+          loopRec.status = 'issues';
+          check(loopRec, rec, 'boundary-on-surface', {status:'failed', arithmetic:'numeric',
+            method:'numeric-sampled', issue:'certificate-boundary-unchecked',
+            message:'The surface parameters do not define a finite residual for this boundary.',
+            sourceIds:loopRec.sourceIds.length ? loopRec.sourceIds : rec.sourceIds});
+        } else if (!missing && !invalidCurve && samples) {
+          check(loopRec, rec, 'boundary-on-surface', {status:maxResidual <= tol ? 'ok':'failed',
+            arithmetic:'numeric', method:'numeric-sampled', residual:maxResidual,
+            tolerance:tol, samples:samples, issue:'certificate-boundary-off-surface',
+            message:'A boundary element does not lie on ' + rec.id + '.',
+            sourceIds:loopRec.sourceIds.length ? loopRec.sourceIds : rec.sourceIds});
+        }
+
+        // Cylinder boundaries are analytic plane sections. This is the
+        // strongest type-specific test: the section must reproduce the drawn
+        // centre and both radii, not merely sample points on the surface.
+        if (rec.kind === 'cylinder') {
+          loopCurves(loop, curves).forEach(function (c) {
+            if (!boundaryCurveValid(c)) return;
+            var minor = c.kind === 'circle' ? c.radius : Math.min(radii(c).u, radii(c).v);
+            if (Number.isFinite(minor)) {
+              var exactRadius = exactNumbersEqual(minor, surface.radius);
+              var rr = Math.abs(minor - surface.radius);
+              check(loopRec, rec, 'cylinder-boundary-radius', {status:exactRadius || rr <= tol ? 'ok':'failed',
+                arithmetic:exactRadius ? 'exact-decimal-rational' : 'numeric',
+                method:exactRadius ? 'exact-rational' : 'numeric', residual:rr, tolerance:tol,
+                exactPass:exactRadius, issue:'certificate-cylinder-radius-mismatch',
+                message:'A cylinder boundary radius does not match ' + rec.id + '.',
+                sourceIds:boundarySourceIds(c, curves)});
+            }
+            var cut;
+            try { cut = section(surface, {origin:c.center, normal:curveNormal(c)}); }
+            catch (err) { cut = null; }
+            if (!cut || (cut.kind !== 'circle' && cut.kind !== 'ellipse')) {
+              check(loopRec, rec, 'cylinder-boundary-section', {status:'failed', arithmetic:'numeric',
+                method:'numeric-section', issue:'certificate-cylinder-section-mismatch',
+                message:'The boundary plane does not section ' + rec.id + ' in its drawn boundary.',
+                sourceIds:boundarySourceIds(c, curves)});
+            } else {
+              var cr = radii(c), sr = radii(cut);
+              var ccr = [cr.u, cr.v].sort(function (a,b) { return a-b; });
+              var scr = [sr.u, sr.v].sort(function (a,b) { return a-b; });
+              var secResidual = Math.max(length(sub(cut.center, c.center)),
+                Math.abs(ccr[0]-scr[0]), Math.abs(ccr[1]-scr[1]));
+              check(loopRec, rec, 'cylinder-boundary-section', {status:secResidual <= tol ? 'ok':'failed',
+                arithmetic:'numeric', method:'numeric-section', residual:secResidual, tolerance:tol,
+                issue:'certificate-cylinder-section-mismatch',
+                message:'The section through ' + rec.id + ' does not match its drawn boundary.',
+                sourceIds:boundarySourceIds(c, curves)});
+            }
+            var cd = sub(c.center, surface.origin), axial = dot(cd, unit(surface.axis));
+            var radial = Math.sqrt(Math.max(0, dot(cd,cd) - axial*axial));
+            check(loopRec, rec, 'cylinder-boundary-axis', {status:radial <= tol ? 'ok':'failed',
+              arithmetic:'numeric', method:'numeric-direction', residual:radial, tolerance:tol,
+              issue:'certificate-cylinder-boundary-axis', message:'A cylinder boundary is not centred on its axis.',
+              sourceIds:boundarySourceIds(c, curves)});
+          });
+        } else if (rec.kind === 'cone') {
+          loopCurves(loop, curves).forEach(function (c) {
+            if (!boundaryCurveValid(c) || !finite(surface.axis)) return;
+            var cd = sub(c.center, surface.origin), axial = dot(cd, unit(surface.axis));
+            var radial = Math.sqrt(Math.max(0, dot(cd,cd) - axial*axial));
+            check(loopRec, rec, 'cone-boundary-axis', {status:radial <= tol ? 'ok':'failed',
+              arithmetic:'numeric', method:'numeric-direction', residual:radial, tolerance:tol,
+              issue:'certificate-cone-boundary-axis', message:'A cone boundary is not centred on its axis.',
+              sourceIds:boundarySourceIds(c, curves)});
+          });
+        }
+
+        if (loopRec.checks.some(function (c) { return c.status === 'failed'; }) ||
+            loopRec.incidence.nonmanifold || loopRec.incidence.open ||
+            !elements.length || missing || invalidCurve || undefinedResidual) {
+          if (loopRec.status !== 'issues')
+            loopRec.status = loopRec.incidence.nonmanifold ? 'issues' : 'partial';
+        }
+        rec.loops.push(loopRec);
+      });
+
+      var failed = rec.checks.some(function (c) { return c.status === 'failed'; }) ||
+        rec.loops.some(function (l) { return l.status === 'issues'; });
+      var open = rec.loops.some(function (l) { return l.status === 'partial'; });
+      rec.status = failed ? 'issues' : open ? 'partial' : 'ok';
+      return rec;
+    });
+
+    // Boundary records are per element, not per loop, so a seam appears once
+    // with both incident surfaces. Section identity is preserved by elementId.
+    var boundaryRecords = [];
+    uses.forEach(function (use) {
+      var status = use.useCount > 2 ? 'nonmanifold' :
+        use.useCount === 2 ? (use.surfaceIds.length === 2 ? 'shared' : 'self-shared') :
+        use.useCount === 1 ? 'open' : 'invalid';
+      var rec = {id:use.id, kind:use.kind, sourceIds:unique(boundarySourceIds(use.element, curves)),
+        useCount:use.useCount, surfaces:use.surfaceIds.slice(), status:status};
+      if (use.kind === 'curve') {
+        var m = /^c:(\d+)$/.exec(use.id); rec.curveIndex = m ? Number(m[1]) : null;
+      } else if (use.kind === 'edge') {
+        var e = /^e:(\d+)_(\d+)$/.exec(use.id);
+        rec.vertices = e ? [Number(e[1]), Number(e[2])] : [];
+      } else if (use.kind === 'section') {
+        rec.sectionType = use.element && (use.element.sectionType || use.element.kind) || null;
+      }
+      if (status === 'nonmanifold') {
+        issue('certificate-boundary-nonmanifold', 'A boundary is shared by more than two surfaces.',
+          {boundaryId:use.id, sourceIds:rec.sourceIds});
+      } else if (status === 'self-shared') {
+        issue('certificate-boundary-self-shared', 'A surface uses the same boundary element twice.',
+          {boundaryId:use.id, sourceIds:rec.sourceIds, surfaceIds:use.surfaceIds});
+      }
+      boundaryRecords.push(rec);
+    });
+
+    // Shells follow shared boundary elements exactly as validate() does, but
+    // additionally record which surfaces and boundaries form each component.
+    var parent = model.surfaces.map(function (_, i) { return i; });
+    function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
+    function union(a, b) { a = find(a); b = find(b); if (a !== b) parent[b] = a; }
+    uses.forEach(function (use) {
+      for (var i=1;i<use.loopRefs.length;i++) union(use.loopRefs[0].surfaceIndex, use.loopRefs[i].surfaceIndex);
+    });
+    var groups = new Map();
+    model.surfaces.forEach(function (_, i) {
+      var root = find(i);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root).push(i);
+    });
+    var shellRecords = [];
+    groups.forEach(function (members) {
+      var surfaceIds = members.map(function (i) { return surfaceRecords[i].id; });
+      var boundaryIds = [];
+      members.forEach(function (i) {
+        (model.surfaces[i].loops || []).forEach(function (loop) {
+          loopElements(loop).forEach(function (element) {
+            var id = elementId(element);
+            if (boundaryIds.indexOf(id) === -1) boundaryIds.push(id);
+          });
+        });
+      });
+      var recs = boundaryIds.map(function (id) { return uses.get(id); }).filter(Boolean);
+      var nonmanifold = recs.some(function (r) {
+        return r.useCount > 2 || (r.useCount === 2 && r.surfaceIds.length !== 2);
+      });
+      var openIds = recs.filter(function (r) { return r.useCount === 1; }).map(function (r) { return r.id; });
+      var unbounded = members.some(function (i) {
+        return (model.surfaces[i].loops || []).length === 0 && model.surfaces[i].closed !== true;
+      });
+      var surfaced = members.every(function (i) { return surfaceRecords[i].status !== 'issues'; });
+      var closed = !nonmanifold && !openIds.length && !unbounded && surfaced;
+      var shell = {id:'shell:' + shellRecords.length, surfaces:unique(surfaceIds),
+        boundaryIds:boundaryIds, boundaryCount:boundaryIds.length,
+        openBoundaryIds:openIds, closed:closed,
+        status:!closed && (nonmanifold || unbounded || !surfaced) ? 'issues' : closed ? 'ok' : 'partial',
+        sourceIds:unique(members.reduce(function (all, i) {
+          return all.concat(model.surfaces[i].sourceIds || []);
+        }, []))};
+      if (!closed && nonmanifold) {
+        issue('certificate-shell-nonmanifold', 'A shell has a non-manifold boundary.',
+          {severity:'error', surfaceIds:shell.surfaces, boundaryIds:boundaryIds,
+            sourceIds:shell.sourceIds});
+      } else if (!closed && unbounded) {
+        issue('certificate-surface-unbounded', 'A shell contains an unbounded surface.',
+          {severity:'error', surfaceIds:shell.surfaces, boundaryIds:boundaryIds,
+            sourceIds:shell.sourceIds});
+      } else if (!closed && openIds.length) {
+        issue('certificate-open-component',
+          'A shell is open; its boundary is not shared by exactly two surfaces.',
+          {severity:'warning', surfaceIds:shell.surfaces, boundaryIds:openIds,
+            sourceIds:shell.sourceIds});
+      }
+      shellRecords.push(shell);
+    });
+
+    var counts = {
+      surfaces:surfaceRecords.length,
+      boundaryLoops:surfaceRecords.reduce(function (n, s) { return n + s.loops.length; }, 0),
+      boundaries:boundaryRecords.length,
+      sharedBoundaries:boundaryRecords.filter(function (b) { return b.status === 'shared'; }).length,
+      openBoundaries:boundaryRecords.filter(function (b) { return b.status === 'open'; }).length,
+      nonmanifoldBoundaries:boundaryRecords.filter(function (b) { return b.status === 'nonmanifold'; }).length,
+      selfSharedBoundaries:boundaryRecords.filter(function (b) { return b.status === 'self-shared'; }).length,
+      closedShells:shellRecords.filter(function (s) { return s.closed; }).length,
+      openComponents:shellRecords.filter(function (s) { return !s.closed; }).length,
+      checks:counters.checks,
+      exactChecks:counters.exactChecks,
+      numericChecks:counters.numericChecks,
+      errors:issues.filter(function (i) { return i.severity === 'error'; }).length,
+      warnings:issues.filter(function (i) { return i.severity === 'warning'; }).length,
+      issues:issues.length
+    };
+    var status = counts.errors ? 'issues' : surfaceRecords.length && shellRecords.every(function (s) { return s.closed; }) ? 'ok' : 'partial';
+    if (!surfaceRecords.length) {
+      issue('certificate-empty-model', 'There are no analytic surfaces to certify.',
+        {severity:'warning'});
+      counts.warnings++;
+      counts.issues++;
+      if (status !== 'issues') status = 'partial';
+    }
+    return {contract:'analytic-surface-certificate-v1', modelContract:model.contract || 'analytic-surface-v1',
+      arithmetic:'mixed-exact-rational-and-numeric', status:status,
+      surfaceCount:counts.surfaces, boundaryCount:counts.boundaries,
+      counts:counts, surfaces:surfaceRecords, boundaries:boundaryRecords,
+      shells:shellRecords, issues:issues};
+  }
+
   function summarize(model) {
     var byKind = {}, loops = 0;
     (model.surfaces || []).forEach(function (s) {
@@ -678,6 +1332,7 @@
   return {
     build:build,
     validate:validate,
+    certify:certify,
     summarize:summarize,
     section:section,
     intersect:intersect,

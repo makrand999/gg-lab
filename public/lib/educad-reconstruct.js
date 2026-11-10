@@ -2682,6 +2682,7 @@
       });
       g.profileMap=resolved.profile;g.topologyStatus=diagnostics.length?'partial':'inferred';
       var model=Surfaces.build(g);g.surfaces=model.surfaces;g.surfaceModel=model.summary;g.analyticSurfaceValidation=Surfaces.validate(model,g);
+      g.analyticCertificate=Surfaces.certify(model,g);
       g.surfaceModel.status=g.analyticSurfaceValidation.status;
     }
     return {status:g?'ok':'unavailable',reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
@@ -2737,6 +2738,7 @@
         g.surfaces = model.surfaces;
         g.surfaceModel = model.summary;
         g.analyticSurfaceValidation = Surfaces.validate(model, g);
+        g.analyticCertificate = Surfaces.certify(model, g);
         if (g.analyticSurfaceValidation) g.surfaceModel.status = g.analyticSurfaceValidation.status;
       }
       return g;
@@ -2936,6 +2938,7 @@
         result.geometry.surfaces = model.surfaces;
         result.geometry.surfaceModel = model.summary;
         result.geometry.analyticSurfaceValidation = Surfaces.validate(model, result.geometry);
+        result.geometry.analyticCertificate = Surfaces.certify(model, result.geometry);
         if (result.geometry.analyticSurfaceValidation)
           result.geometry.surfaceModel.status = result.geometry.analyticSurfaceValidation.status;
       }

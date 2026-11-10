@@ -1,6 +1,6 @@
 # The inclined trace covers only part of the circular boundary. That is an
 # unsupported inclined arc, not a guessed elliptical level.
-# expect: 24V 24E 1F curves=1 surfaces=1 surfaceKinds=plane surfaceOpen=1 surfaceModel=partial diagnostics=curve-inclined-arc-unsupported,point-correspondence-missing,unresolved-edge unresolved=6 status=partial
+# expect: 24V 24E 1F curves=1 surfaces=1 surfaceKinds=plane surfaceOpen=1 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component diagnostics=curve-inclined-arc-unsupported,point-correspondence-missing,unresolved-edge unresolved=6 status=partial
 /datum -30 80
 /point o 20 -30 plan
 /circle o 20 A plan

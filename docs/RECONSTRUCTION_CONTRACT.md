@@ -284,11 +284,30 @@ representation, assumptions, limits, and `.edu` verification commands.
 Major's UI and script runner now call `EduCADReconstruct.reconstruct`. It uses
 explicit identities as constraints and reconstructs supported curves through
 the same primitive pipeline for linked and plain-label drawings. Its inferred
-curve/surface results carry no exact-surface certificate. Inferred patches also
-produce a bounded analytic surface model (`geometry.surfaces`) whose planes,
-cylinders, cones and spheres have explicit loops and validated boundaries; this
-model is inferred and separate from the exact declared-triangle certificate. The
-low-level strict kernel and compatibility wrapper described above retain their
-narrower contract. See [Primitive reconstruction](PRIMITIVE_RECONSTRUCTION.md)
+curve/surface results carry no exact declared-surface certificate.
+
+Inferred patches produce a bounded analytic surface model
+(`geometry.surfaces`) whose planes, cylinders, cones and spheres have explicit
+loops and validated boundaries. `Surfaces.certify(model, geometry)` attaches
+`geometry.analyticCertificate` (`analytic-surface-certificate-v1`), a
+deterministic record of analytic parameters, boundary-loop incidence,
+boundary-on-surface evidence, type-specific constraints, shared-boundary
+incidence and closed-shell closure. It uses exact decimal-rational checks where
+the predicate permits and explicitly marked numeric tolerance checks elsewhere.
+The certificate does not upgrade inferred geometry to declared geometry.
+
+Three certificates remain distinct:
+
+- `educad-explicit-v1` certifies declared vertices, edges and triangles exactly,
+  including closed solid boundaries and exact volume.
+- `inferred-triangle-v1` (`geometry.surfaceValidation`) certifies only the
+  inferred display triangulation, and may be `skipped` for a triangle budget.
+- `analytic-surface-certificate-v1` (`geometry.analyticCertificate`) certifies
+  consistency of the bounded analytic surface model, never the display mesh.
+  Its numeric checks are tolerance checks, not rigorous interval enclosures.
+
+The low-level strict kernel and compatibility wrapper described above retain
+their narrower contract. See [Primitive reconstruction](PRIMITIVE_RECONSTRUCTION.md)
 and [Bounded analytic surface model](SURFACE_MODEL.md) for the implemented
-geometry families, partial-result diagnostics, and remaining limitations.
+geometry families, certificate schema, partial-result diagnostics, and
+remaining limitations.

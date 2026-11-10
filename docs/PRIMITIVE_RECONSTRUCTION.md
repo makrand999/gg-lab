@@ -84,9 +84,39 @@ The accepted patch is the cap `{p : |p-O| = R, (p-M).n <= 0}` with
 `a^2 + (q.n)^2 = R^2`, where `q = O - M`. An edge-on mouth stroke adds a
 coplanar closure sharing the mouth loop; without it the cap is retained open.
 The result is recorded in `geometry.recesses` and as a bounded `sphere` patch
-with one outer loop. This is a spherical recess only: cylindrical/torus
-fillets, elliptical mouths, partial mouth arcs and PROFILE mouths remain
-unsupported. See [Bounded analytic surface model](SURFACE_MODEL.md).
+with one outer loop. This is a spherical recess only: elliptical mouths,
+partial mouth arcs and PROFILE mouths remain unsupported. See [Bounded
+analytic surface model](SURFACE_MODEL.md).
+
+A full circular mouth in one principal view, a straight four-sided frame
+around it (the mouth is an opening in a drawn face), and in the paired view a
+covering face edge, two edge-on depth strokes at the mouth diameter, and an
+exact bottom edge determine a **cylindrical recess**. The mouth circle fixes
+the axis and radius `a`; the depth strokes and bottom edge fix the signed depth
+`d`. With mouth-to-bottom unit direction `u` and bottom centre `B = M + d u`,
+the accepted surface is
+
+```text
+{ p : radial_distance(p, line M + t u) = a,  0 <= (p - M) . u <= d }
+```
+
+The bottom circle is the mouth circle translated by `d`, and the planar bottom
+cap shares it. A single exact mouth stroke spanning the mouth diameter adds a
+closure sharing the mouth loop; without one (a longer face edge, or a face edge
+split around the mouth) the cavity is retained open and
+`recess-mouth-unclosed` is reported. The inference requires the mouth to be
+framed as an opening in a drawn face, so a bare cylinder with two circular end
+faces stays with the existing ruled-surface path. Missing depth reports
+`recess-depth-missing`; a bottom edge at the wrong station, an incomplete
+bottom edge, or a partial edge at an end reports `recess-depth-conflict`;
+several depth-stroke spans report `recess-depth-ambiguous`. Only PLAN/ELEVATION
+mouths, circular mouths, and flat bottoms are supported. The result is a
+bounded `cylinder` patch with mouth and bottom loops plus a planar bottom cap,
+recorded in `geometry.recesses` as `kind:'cylindrical'`. It is not Boolean
+subtraction and does not merge the mouth into the surrounding face's inner
+loop. Conical drill points, counterbores/stepped holes, torus fillets, and
+cylindrical fillets between planar faces remain unsupported. See [Bounded
+analytic surface model](SURFACE_MODEL.md).
 
 A circle in a general plane projects as an ellipse. `educad-oblique-kernel.js`
 groups closed elliptical loops, fits their centres/axes, recovers each plane
@@ -276,6 +306,11 @@ node tools/edc.js tools/scripts/spherical-recess-shallow.edu
 node tools/edc.js tools/scripts/spherical-recess-elevation-mouth.edu
 node tools/edc.js tools/scripts/spherical-recess-open.edu
 node tools/edc.js tools/scripts/spherical-recess-conflict.edu
+node tools/edc.js tools/scripts/cylindrical-recess.edu
+node tools/edc.js tools/scripts/cylindrical-recess-shallow-open.edu
+node tools/edc.js tools/scripts/cylindrical-recess-elevation-mouth.edu
+node tools/edc.js tools/scripts/cylindrical-recess-missing-depth.edu
+node tools/edc.js tools/scripts/cylindrical-recess-conflict.edu
 node tools/edc.js tools/scripts/oblique-circle.edu
 node tools/edc.js tools/scripts/oblique-line-circle.edu
 node tools/edc.js tools/scripts/oblique-line-elevation-plan.edu
@@ -350,6 +385,7 @@ In addition to existing topology expectations, scripts can assert `curves`,
 
 `unresolved` counts reported diagnostics. A missing-view script may deliberately
 expect an unavailable result. No separate unit-test files or suites are added.
+`recesses` counts both spherical and cylindrical recess records.
 `obliqueReprojection=ok` checks source segment endpoints against the analytic
 circle projected into each source view, independently of display tessellation.
 `obliquePoints` counts retained point constraints; `obliquePointFit=ok` checks
@@ -369,16 +405,16 @@ confirms the curve was rebuilt from it rather than keeping stale control points.
 
 This starts the agreed pipeline; it is not complete reconstruction for every
 geometric solid. Full-circle inclined traces, closed and open ellipse/edge-on
-This starts the agreed pipeline; it is not complete reconstruction for every
-geometric solid. Full-circle inclined traces, closed and open ellipse/edge-on
-line pairs, inclined circular cone bases with tangent generators, spherical
-recesses, exact analytic surface–surface intersections for the supported plane,
-sphere, parallel-cylinder and axis-through-centre sphere–cylinder families, and
-a first bounded plane/cylinder/cone/sphere model are implemented. Important
-next capabilities are oblique cones and non-circular elliptical bases,
-cylindrical and torus fillets, merging a recess mouth into a surrounding face's
-inner loop, broader skew-axis surface intersections, and certification of the
-analytic surfaces rather than only their display triangles. Spheres, spherical
+line pairs, inclined circular cone bases with tangent generators, spherical and
+cylindrical recesses, exact analytic surface–surface intersections for the
+supported plane, sphere, parallel-cylinder and axis-through-centre
+sphere–cylinder families, and a first bounded plane/cylinder/cone/sphere model
+are implemented. Important next capabilities are oblique cones and non-circular
+elliptical bases, cylindrical and torus fillets, conical drill points and
+counterbores, merging a recess mouth into a surrounding face's inner loop,
+Boolean subtraction of a cavity from the surrounding display faces, broader
+skew-axis surface intersections, and certification of the analytic surfaces
+rather than only their display triangles. Spheres, spherical and cylindrical
 recesses, two-view oblique circles, elliptical arc chains, arc/line pairs, and
 interpolated station curves with cross-view consistency checks are supported;
 other curved families are not. Profile frames are inferred when necessary, and

@@ -11,6 +11,7 @@ direction, not a claim that every operation below is implemented.
 |---|---|---|---|
 | Inclined cone | circle in 3D + two tangent generators | `cone` + planar base cap sharing one loop | projection tangency and apex solve |
 | Spherical recess | circular mouth + rim-to-rim silhouette arc | partial `sphere` with one mouth loop | cap/sphere fitting and closure |
+| Cylindrical recess | circular mouth + face frame + edge-on depth strokes and bottom edge | bounded `cylinder` + bottom cap + optional mouth closure | depth solve and shared-loop closure |
 | Surface intersections | two analytic supports | curves/points, not clipped to loops | `Surfaces.intersect` |
 | Boundary algebra | one surface + plane, or an existing curve | two patches sharing a section loop / one promoted curve | `Surfaces.split`, `attachBoundary`, `shareBoundary`, `intersectionCurves` |
 | Analytic certificate | an existing bounded model | read-only certificate | `Surfaces.certify` |
@@ -126,8 +127,8 @@ The features become predicates over the complex rather than separate readers:
 
 - **cone**: a `cone` surface whose boundary loop is shared with a cap, with a
   solved apex on the base normal;
-- **recess**: a `sphere` surface with one mouth loop, optionally shared with a
-  planar closure;
+- **recess**: a `sphere` with one mouth loop, or a bounded `cylinder` with
+  mouth/bottom loops and an optional planar mouth closure;
 - **fillet** (future): a partial `cylinder` surface with two loops shared with
   adjacent faces;
 - **intersection**: an analytic curve that may become a new boundary element
@@ -149,8 +150,9 @@ Implemented now:
   `intersectionCurves`;
 - cone-over-inclined-circle inference;
 - spherical-recess inference;
-- 131 drawing scripts (123 `.edu` sheets and 8 `.edc` scripts) covering
-  positive, open, conflict, split, attachment and cross-feature cases.
+- cylindrical-recess inference with flat bottom and optional mouth closure;
+- 141 drawing scripts covering positive, open, conflict, split, attachment and
+  cross-feature cases.
 
 Not yet unified:
 

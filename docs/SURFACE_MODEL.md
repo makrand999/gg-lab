@@ -529,6 +529,74 @@ Examples:
 # expect: recesses=0 surfaces=1 surfaceKinds=plane surfaceLoops=1 surfaceOpen=1 surfaceModel=partial diagnostics=curve-projection-missing,recess-evidence-conflict status=partial
 ```
 
+## End-to-end case: cylindrical recess
+
+`cylindrical-recess.edu` is the second curved recess capability: a bounded
+blind cylindrical hole, not a solid/feature-name reader and not Boolean
+geometry. The drawing supplies:
+
+1. a full circular mouth in one principal view (PLAN or ELEVATION);
+2. a straight four-sided frame around the mouth in that view, so the mouth is
+   an opening in a drawn face rather than a bare circular end;
+3. in the paired view, a face edge covering the mouth projection, two edge-on
+   depth strokes at the mouth's lateral extremes, and an exact bottom edge
+   spanning the mouth diameter.
+
+Let the mouth have centre `M`, radius `a`, and let the paired view put the
+bottom edge at signed depth `d`. With mouth-to-bottom unit direction `u` and
+bottom centre `B = M + d u`, the inferred patch is
+
+```text
+{ p : radial_distance(p, line M + t u) = a,  0 <= (p - M) . u <= d }
+```
+
+The two depth strokes must join the mouth and bottom stations at both lateral
+extremes; the bottom edge must be exactly the mouth diameter. The bottom loop
+is the mouth circle translated by `d`, so it is analytic even when the drawing
+only shows it edge-on. A planar bottom cap shares that loop. A single exact
+mouth stroke spanning the mouth diameter shares the mouth loop and closes the
+cavity; if only a longer face edge covers the mouth (or a face edge is split
+around it), the cavity is retained open and `recess-mouth-unclosed` is
+reported. The surrounding plate face is not merged or Boolean-subtracted.
+
+`geometry.recesses` gains:
+
+```text
+{kind:'cylindrical',
+ mouth:{center, normal, radius}, axis, depth,
+ bottom:{center, radius}, closure:'plane'|'open',
+ bottomClosure:'plane', sourceIds}
+```
+
+`mouth.normal` points out of the cavity; `axis` points from the mouth to the
+bottom. The public expectation remains `recesses`. The cylinder side is
+analytic; its 24-facet side mesh and one bottom-cap face are display geometry
+only.
+
+```sh
+node tools/edc.js tools/scripts/cylindrical-recess.edu
+node tools/edc.js tools/scripts/cylindrical-recess-shallow-open.edu
+node tools/edc.js tools/scripts/cylindrical-recess-elevation-mouth.edu
+node tools/edc.js tools/scripts/cylindrical-recess-missing-depth.edu
+node tools/edc.js tools/scripts/cylindrical-recess-conflict.edu
+```
+
+Examples:
+
+```text
+# expect: 56V 84E 31F recesses=1 surfaces=9 surfaceKinds=cylinder,plane surfaceLoops=10 surfaceShells=2 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok
+# expect: 56V 84E 31F recesses=1 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=9 surfaceShells=1 surfaceOpen=1 surfaceBoundary=1 surfaceModel=partial surfaceCertificate=partial diagnostics=recess-mouth-unclosed status=partial
+# expect: 8V 12E 6F recesses=0 surfaces=6 surfaceKinds=plane surfaceLoops=6 surfaceShells=1 surfaceModel=ok diagnostics=curve-projection-missing,recess-depth-missing status=partial
+# expect: 8V 12E 6F recesses=0 surfaces=6 surfaceKinds=plane surfaceLoops=6 surfaceShells=1 surfaceModel=ok diagnostics=curve-projection-missing,point-correspondence-missing,recess-depth-conflict,unresolved-edge status=partial
+```
+
+The successful sheet reports `surfaceValidation=issues` because the
+surrounding plate's display face still covers the mouth (the cavity is not
+subtracted), so the separate triangle certificate sees the expected rim
+overlap. The analytic certificate is `ok`: the cavity shell is closed and its
+mouth/bottom loops are shared. The open sheet's analytic certificate is
+`partial` with `certificate-open-component`.
+
 ## Limits
 
 - Principal/oblique circles, inclined full-circle traces, and oblique arcs
@@ -539,20 +607,38 @@ Examples:
   boundary with no agreeing tangent-pair evidence stays planar. Cones over a
   non-circular 3D ellipse, and frusta between two independently inclined
   boundaries, are not modelled.
-- The only curved recess implemented is the spherical recess described above.
-  It needs a full circular mouth in PLAN or ELEVATION and a rim-to-rim
-  silhouette arc in the other of those two views. Elliptical mouths, partial
-  mouth arcs, partial silhouette arcs, full-circle silhouettes (which remain
-  sphere or ambiguity candidates), PROFILE mouths, and cylindrical/torus
-  fillets are not inferred.
+- Two curved recesses are implemented: the spherical recess and the
+  cylindrical blind recess described above. The spherical recess needs a full
+  circular mouth in PLAN or ELEVATION and a rim-to-rim silhouette arc in the
+  other of those two views. The cylindrical recess needs a full circular mouth
+  in PLAN or ELEVATION, a four-sided straight frame around it in that view,
+  two edge-on depth strokes at the mouth diameter, and an exact bottom edge in
+  the paired view. Elliptical mouths, partial mouth arcs, partial silhouette
+  arcs, full-circle silhouettes (which remain sphere or ambiguity candidates),
+  PROFILE mouths, conical drill points, counterbores/stepped holes, torus
+  fillets, and cylindrical fillets between planar faces are not inferred.
 - The spherical recess is a single cap. It does not subtract material from an
   independently reconstructed surrounding face, and it does not merge the
   mouth circle into an inner loop of a drawn planar face. When no face is
   available the model closes the cavity with a plane closure, or leaves it
   open if no edge-on mouth stroke is drawn.
-- The recess display mesh is an inward-facing tessellation for viewing the
-  bowl. The analytic patch is the sphere with its mouth loop; the mesh is not
-  the source of truth.
+- The cylindrical recess is one flat-bottomed cylinder. It does not add a
+  drill-point cone, a countersink/counterbore, or a mouth/bottom fillet. The
+  bottom circle is derived from the mouth circle and the drawn depth; a
+  separately drawn coaxial bottom circle is not needed, and a non-circular or
+  non-flat bottom is unsupported. The inference does not check that the drawn
+  depth fits inside the plate thickness.
+- A cylindrical recess is inferred only when the mouth is framed by straight
+  geometry in its own view, which reads as an opening in a drawn face. A bare
+  cylinder with two circular end faces is left to the existing ruled-surface
+  path. The operation does not distinguish a blind hole from a same-diameter
+  boss, does not check material side, and does not subtract the cavity from the
+  surrounding plate's display faces. That display overlap is why the
+  successful plate sheets report `surfaceValidation=issues` while the
+  analytic certificate is `ok`.
+- The recess display meshes are inward-facing tessellations for viewing the
+  cavity. The analytic patches are the sphere cap and the bounded cylinder;
+  the meshes are not the source of truth.
 - Cone sections are classified but not yet returned as trimmed ellipse/hyperbola
   boundary curves.
 - Skew or intersecting-axis cylinder–cylinder intersections and

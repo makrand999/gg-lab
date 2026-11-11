@@ -351,6 +351,26 @@ edge shared by two faces is one edge with orientation `+1/-1`. The v1 surfaces
 remain authoritative; topology is a derived shadow used by clipping and later
 feature recognition.
 
+### General planar-region Boolean
+
+`public/lib/educad-planar.js` is a dependency-free arrangement for straight
+loops. It splits every segment at pairwise intersections (including collinear
+overlap), builds the planar graph, traces faces, attaches nested negative
+cycles as holes, classifies one representative point per cell, and merges the
+selected cells' boundary. It supports `union`, `intersect`, `difference` and
+`xor`.
+
+`Surfaces.planarBoolean(faceA, faceB, operation, geometry)` projects two
+coplanar planar faces to that plane's basis, runs the region Boolean, and
+projects the result loops back to 3D. It refuses non-coplanar faces, unbounded
+faces and curved boundary loops with `planar-faces-not-parallel`,
+`planar-face-unbounded` or `planar-loop-unsupported`; circles and ellipses
+stay on the contained-loop fast path or the later curved arrangement.
+
+The result carries `area`, `loops` (`outer` positive area, `inner` negative
+area), per-cell `insideA`/`insideB` flags, and diagnostics. It is polygonal:
+curved boundaries are neither tessellated nor silently simplified.
+
 ## Intersections and trimming
 
 `Surfaces.section(surface, plane)` returns analytic section geometry:

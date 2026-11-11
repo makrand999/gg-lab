@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
-  else root.EduCADSurfaces = factory();
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-planar.js'));
+  else root.EduCADSurfaces = factory(root.EduCADPlanar);
+})(typeof window !== 'undefined' ? window : globalThis, function (Planar) {
   'use strict';
 
   // Bounded analytic surfaces. This is the bridge between the inferred display
@@ -157,6 +157,68 @@
   }
   function lineLength(l) {
     return validLine(l) ? length(sub(l.end, l.start)) : 0;
+  }
+
+  // Boolean between two coplanar planar faces with straight loops. Curved
+  // boundaries are refused rather than tessellated; the analytic contained-
+  // loop fast path handles the circular case.
+  function planarBoolean(faceA, faceB, operation, geometry) {
+    function refuse(code, message) {
+      return {ok:false, contract:'planar-boolean-v1', operation:operation,
+        loops:[], area:0, cells:[], diagnostics:[{code:code, severity:'warning', message:message}]};
+    }
+    if (!Planar || typeof Planar.booleanRegion !== 'function')
+      return refuse('planar-module-missing', 'Load educad-planar.js before educad-surfaces.js.');
+    if (!faceA || !faceB || faceA.kind !== 'plane' || faceB.kind !== 'plane')
+      return refuse('planar-face-kind', 'Both operands must be planar faces.');
+    var normalA = unit(faceA.normal), normalB = unit(faceB.normal);
+    if (length(cross(normalA, normalB)) > 1e-7)
+      return refuse('planar-faces-not-parallel', 'Both faces must be coplanar.');
+    var tolerance = Math.max(surfaceTolerance(faceA), surfaceTolerance(faceB));
+    var frame = planeBasis(faceA);
+    var origin = faceA.origin;
+    function project(p) {
+      var d = sub(p, origin);
+      return {x:dot(d, frame.u), y:dot(d, frame.v)};
+    }
+    function unproject(p) {
+      return add(origin, add(mul(frame.u, p.x), mul(frame.v, p.y)));
+    }
+    function regionOf(face) {
+      var loops = [];
+      var items = face.loops || [];
+      if (!items.length) return {error:'planar-face-unbounded'};
+      for (var i=0;i<items.length;i++) {
+        var polygon = loopPolygon(items[i], geometry && geometry.curves || [],
+          geometry && geometry.vertices || [], tolerance);
+        if (!polygon) return null;
+        for (var k=0;k<polygon.length;k++) {
+          if (Math.abs(dot(sub(polygon[k], origin), normalA)) > tolerance * 4)
+            return {error:'planar-faces-not-coplanar'};
+        }
+        loops.push({role:items[i].kind === 'inner' ? 'inner' : 'outer',
+          points:polygon.map(project)});
+      }
+      return {loops:loops};
+    }
+    var regionA = regionOf(faceA), regionB = regionOf(faceB);
+    if (!regionA || regionA.error) return refuse(regionA && regionA.error || 'planar-loop-unsupported',
+      'A face boundary is not a closed straight loop on the plane.');
+    if (!regionB || regionB.error) return refuse(regionB && regionB.error || 'planar-loop-unsupported',
+      'A face boundary is not a closed straight loop on the plane.');
+    var result;
+    try { result = Planar.booleanRegion(regionA, regionB, operation); }
+    catch (err) { return refuse('planar-boolean-failed', err && err.message || String(err)); }
+    return {ok:result.ok, contract:'planar-boolean-v1', operation:operation,
+      loops:result.loops.map(function (loop) {
+        return {role:loop.role, area:loop.area, points:loop.points.map(unproject)};
+      }),
+      area:result.area, cells:result.cells.map(function (cell) {
+        return {area:cell.area, selected:cell.selected, insideA:cell.insideA,
+          insideB:cell.insideB, points:cell.points.map(unproject),
+          holes:(cell.holes || []).map(function (hole) { return hole.map(unproject); })};
+      }),
+      tolerance:result.tolerance, diagnostics:result.diagnostics};
   }
 
   // Planar Boolean fast path as a public operation: subtract one wholly
@@ -3642,6 +3704,7 @@
     intersectionCurves:intersectionCurves,
     intersectBounded:intersectBounded,
     classifyPoint:classifyPoint,
+    planarBoolean:planarBoolean,
     subtractContainedLoop:subtractContainedLoop,
     planeSpec:planeSpec,
     point:curvePoint,

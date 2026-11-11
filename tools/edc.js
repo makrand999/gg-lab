@@ -304,6 +304,12 @@ function runScript(text, options) {
         var topoSurfaces = request.surfaces ?
           topoRefs.map(pick).filter(Boolean) : topoRefs;
         result = Surfaces.topology(modelOf(topoSurfaces), g);
+      } else if (request.operation === 'planar-boolean') {
+        var planarA = request.a && request.a.kind ? request.a : pick(request.a);
+        var planarB = request.b && request.b.kind ? request.b : pick(request.b);
+        if (!planarA || !planarB) throw new Error('Missing planar face');
+        result = Surfaces.planarBoolean(planarA, planarB,
+          request.boolean || request.op || 'union', g);
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

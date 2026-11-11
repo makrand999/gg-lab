@@ -6,7 +6,7 @@
 # boundaries with the wall and floor plane strips. The ends and the outer face
 # edges remain open: this is a bounded feature patch, not a Boolean-subtracted
 # plate. The display mesh is a consistent open cylinder-plus-strips complex.
-# expect: 18V 25E 8F fillets=1 curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=3 surfaceShells=0 surfaceOpen=1 surfaceBoundary=8 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component surfaceCertificateChecks=39 surfaceLineBoundaries=8 surfaceSharedLineBoundaries=2 surfaceCurveBoundaries=2 surfaceValidation=ok diagnostics=none unresolved=0 status=inferred
+# expect: 18V 27E 11F fillets=1 curves=2 surfaces=6 surfaceKinds=cylinder,plane surfaceLoops=6 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceCertificateChecks=72 surfaceLineBoundaries=10 surfaceSharedLineBoundaries=10 surfaceCurveBoundaries=2 surfaceValidation=partial diagnostics=none unresolved=0 status=inferred
 /datum -100 400
 # Elevation: true-shape quarter fillet arc r=10, centre (10,10), from the wall
 # tangent (0,10) to the floor tangent (10,0). The two face edges are tangent
@@ -37,4 +37,4 @@
 # surface-query: {"operation":"attach","surfaces":[0,1],"line":{"kind":"line","start":{"x":0,"y":10,"z":10},"end":{"x":0,"y":10,"z":30}},"expect":{"boundary":{"useCount":2},"validation":{"status":"partial"},"certificate":{"status":"partial"}}}
 # A one-loop fillet has no second end loop to bound a crossing cut.
 # surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":10,"y":10,"z":20},"normal":{"x":0,"y":0,"z":1}},"expect":{"refused":true,"diagnostic":{"code":"split-patch-topology-unsupported"}}}
-# surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":3,"edges":10,"smooth":2,"open":8,"fillets":1},"features":[{"type":"fillet","family":"cylindrical","closure":"open","faces":["surface:0","surface:1","surface:2"]}]}}
+# surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":6,"edges":12,"convex":2,"concave":8,"smooth":2,"open":0,"unknown":0,"fillets":1},"features":[{"type":"fillet","family":"cylindrical","closure":"closed","faces":["surface:0","surface:1","surface:2","surface:3","surface:4","surface:5"]}]}}

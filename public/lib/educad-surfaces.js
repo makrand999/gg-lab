@@ -1186,6 +1186,10 @@
       (record.adjacentSurfaces || []).forEach(function (i) {
         if (surfaceIndex.has(i)) faces.push(surfaceIndex.get(i).id);
       });
+      (record.closureSurfaces || []).forEach(function (i) {
+        if (surfaceIndex.has(i) && faces.indexOf(surfaceIndex.get(i).id) === -1)
+          faces.push(surfaceIndex.get(i).id);
+      });
       features.push({id:'feature:fillet:' + index, type:'fillet',
         family:record.kind || 'cylindrical', faces:faces, closure:record.closure || 'open',
         tangentLines:(record.tangentLines || []).map(function (line) { return line.id || null; }),

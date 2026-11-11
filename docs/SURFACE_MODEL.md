@@ -962,22 +962,24 @@ loop = {kind:'outer', curves:[lowArc, highArc],
 
 The generator lines are the tangent boundaries shared with the adjacent planar
 faces. Two bounded plane strips are emitted for those faces, each a rectangle
-whose inner edge is the same line object. Thus `lineStart` and `lineEnd` have
-incidence 2, while the two end arcs and the strips' outer edges remain open.
+whose inner edge is the same line object. A back plane and two cross-section
+end caps then close the corner bar: the caps reuse the low/high end arcs, the
+back plane reuses the strips' outer lines, and two new cross-section lines join
+wall to floor at each end. All twelve edges have incidence 2.
 `geometry.fillets` records:
 
 ```text
 {kind:'cylindrical', center, axis, radius, startAngle, sweepAngle, length,
  tangentLines:[lineStart, lineEnd], endArcs:[lowCurve, highCurve],
- closure:'open', surface, adjacentSurfaces:[wall, floor], sourceIds}
+ closure:'closed', surface, adjacentSurfaces:[wall, floor],
+ closureSurfaces:[back, startCap, endCap], sourceIds}
 ```
 
-The analytic certificate is `partial` with only `certificate-open-component`:
-all finite/length/on-surface/radius/section/axis checks pass, the two generator
-lines are shared, and no error is reported. The display triangle certificate is
-`ok`; the display mesh is an open, consistently oriented cylinder strip with
-two planar face strips. The feature is deliberately not a closed solid: the
-fillet ends and the outer face-strip edges need the surrounding part.
+The analytic certificate is `ok`: all finite/length/on-surface/radius/section/
+axis checks pass and the shell is closed. The display triangle certificate
+remains `partial` because the added closure faces are not part of the original
+drawn face set. The feature graph reports six faces and twelve shared edges,
+with the two tangent generator seams `smooth`.
 
 ```sh
 node tools/edc.js tools/scripts/fillet-line-boundary.edu
@@ -985,7 +987,7 @@ node tools/edc.js tools/scripts/surface-line-boundary.edu
 ```
 
 ```text
-# expect: 18V 25E 8F fillets=1 curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=3 surfaceShells=0 surfaceOpen=1 surfaceBoundary=8 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component surfaceCertificateChecks=39 surfaceLineBoundaries=8 surfaceSharedLineBoundaries=2 surfaceCurveBoundaries=2 surfaceValidation=ok diagnostics=none unresolved=0 status=inferred
+# expect: 18V 27E 11F fillets=1 curves=2 surfaces=6 surfaceKinds=cylinder,plane surfaceLoops=6 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceCertificateChecks=72 surfaceLineBoundaries=10 surfaceSharedLineBoundaries=10 surfaceCurveBoundaries=2 surfaceValidation=partial diagnostics=none unresolved=0 status=inferred
 ```
 
 `surface-line-boundary.edu` attaches a generator line to the truncated-cylinder

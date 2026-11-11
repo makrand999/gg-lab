@@ -1162,12 +1162,42 @@
       normal:normalEnd,u:floorFrame.u,v:floorFrame.v,
       loops:[{kind:'outer',lines:[lineEnd,floorEndLow,floorOuter,floorEndHigh]}],
       faceIndices:[floorFace],sourceIds:cylinderSource.slice(),filletAdjacent:true});
+    // Close the corner bar: one back plane and two cross-section end caps.
+    var backStart={kind:'line',start:{x:geometry.vertices[W0].x,y:geometry.vertices[W0].y,z:geometry.vertices[W0].z},
+      end:{x:geometry.vertices[F0].x,y:geometry.vertices[F0].y,z:geometry.vertices[F0].z},
+      id:'fillet-line:' + filletNumber + ':back-start', sourceIds:cylinderSource.slice()};
+    var backEnd={kind:'line',start:{x:geometry.vertices[W1].x,y:geometry.vertices[W1].y,z:geometry.vertices[W1].z},
+      end:{x:geometry.vertices[F1].x,y:geometry.vertices[F1].y,z:geometry.vertices[F1].z},
+      id:'fillet-line:' + filletNumber + ':back-end', sourceIds:cylinderSource.slice()};
+    ensureEdge(W0,F0); ensureEdge(W1,F1);
+    var backFace=addFace([W1,W0,F0,F1],false);
+    var startFace=addFace([A0,B0,F0,W0],false);
+    var endFace=addFace([A1,F1,B1,W1],false);
+    function loopNormal(points) {
+      return cvUnit(cross(sub(points[1],points[0]),sub(points[2],points[0])));
+    }
+    var pW0=geometry.vertices[W0],pW1=geometry.vertices[W1],pF0=geometry.vertices[F0],pF1=geometry.vertices[F1];
+    var pA0=geometry.vertices[A0],pB0=geometry.vertices[B0];
+    var pA1=geometry.vertices[A1],pB1=geometry.vertices[B1];
+    var backNormal=loopNormal([pW1,pW0,pF0]), startNormal=loopNormal([pA0,pB0,pF0]),
+      endNormal=loopNormal([pA1,pF1,pB1]);
+    if(backNormal) { var backIndex=geometry.surfacePatches.length; geometry.surfacePatches.push({kind:'plane',origin:pW0,normal:backNormal,
+      u:cvUnit(cross(backNormal,axis)),v:cvUnit(cross(backNormal,cvUnit(cross(backNormal,axis)))),
+      loops:[{kind:'outer',lines:[wallOuter,backStart,floorOuter,backEnd]}],
+      faceIndices:[backFace],sourceIds:cylinderSource.slice(),filletClosure:true}); }
+    if(startNormal) { var startIndex=geometry.surfacePatches.length; geometry.surfacePatches.push({kind:'plane',origin:pA0,normal:startNormal,
+      loops:[{kind:'outer',curves:[candidate.lowIndex],lines:[floorEndLow,backStart,wallEndLow]}],
+      faceIndices:[startFace],sourceIds:cylinderSource.slice(),filletClosure:true}); }
+    if(endNormal) { var endIndex=geometry.surfacePatches.length; geometry.surfacePatches.push({kind:'plane',origin:pA1,normal:endNormal,
+      loops:[{kind:'outer',curves:[candidate.highIndex],lines:[floorEndHigh,backEnd,wallEndHigh]}],
+      faceIndices:[endFace],sourceIds:cylinderSource.slice(),filletClosure:true}); }
     if (!geometry.fillets) geometry.fillets=[];
     var record = {kind:'cylindrical',center:{x:low.center.x,y:low.center.y,z:low.center.z},
       axis:{x:axis.x,y:axis.y,z:axis.z},radius:low.radius,
       startAngle:candidate.startAngle,sweepAngle:candidate.sweepAngle,length:candidate.length,
       tangentLines:[lineStart,lineEnd],endArcs:[candidate.lowIndex,candidate.highIndex],
-      closure:'open',sourceIds:cylinderSource.slice(),surface:cylinderIndex,
+      closure:'closed',sourceIds:cylinderSource.slice(),surface:cylinderIndex,
+      closureSurfaces:[backIndex,startIndex,endIndex].filter(function (i) { return i !== undefined; }),
       adjacentSurfaces:[wallIndex,floorIndex]};
     geometry.fillets.push(record);
     return record;

@@ -301,6 +301,17 @@ algebra and clips its branches to both bounded patches.
 decimals. It distinguishes a full loop (`full` count) from a half loop
 (`sweepRatio:1`) without asserting a numerically exact angle.
 
+### Planar face minus a contained loop
+
+`Surfaces.build` applies one planar-Boolean fast path without an arrangement:
+a recess-mouth plane whose full boundary circle lies strictly inside a host
+planar face is removed, and the host face receives the same curve as an inner
+loop. The host and cavity then share the mouth boundary, and the coincident
+mouth-closure surface is no longer part of the model. This is the path that
+closes `cylindrical-recess.edu` analytically. Partial overlap, multiple
+contained loops and non-circular boundaries still need the general 2D
+arrangement.
+
 ## Intersections and trimming
 
 `Surfaces.section(surface, plane)` returns analytic section geometry:
@@ -723,18 +734,20 @@ bottom centre `B = M + d u`, the inferred patch is
 The two depth strokes must join the mouth and bottom stations at both lateral
 extremes; the bottom edge must be exactly the mouth diameter. The bottom loop
 is the mouth circle translated by `d`, so it is analytic even when the drawing
-only shows it edge-on. A planar bottom cap shares that loop. A single exact
-mouth stroke spanning the mouth diameter shares the mouth loop and closes the
-cavity; if only a longer face edge covers the mouth (or a face edge is split
-around it), the cavity is retained open and `recess-mouth-unclosed` is
-reported. The surrounding plate face is not merged or Boolean-subtracted.
+only shows it edge-on. A planar bottom cap shares that loop. When the mouth
+lies wholly inside a host plate face, the builder subtracts it as an inner
+loop and removes the separate coincident mouth closure; the host face and the
+cylinder then share the mouth curve. Otherwise a single exact mouth stroke
+spanning the mouth diameter shares the mouth loop and closes the cavity; if
+only a longer face edge covers the mouth (or a face edge is split around it),
+the cavity is retained open and `recess-mouth-unclosed` is reported.
 
 `geometry.recesses` gains:
 
 ```text
 {kind:'cylindrical',
  mouth:{center, normal, radius}, axis, depth,
- bottom:{center, radius}, closure:'plane'|'open',
+ bottom:{center, radius}, closure:'host'|'plane'|'open',
  bottomClosure:'plane', sourceIds}
 ```
 
@@ -754,18 +767,18 @@ node tools/edc.js tools/scripts/cylindrical-recess-conflict.edu
 Examples:
 
 ```text
-# expect: 56V 84E 31F recesses=1 surfaces=9 surfaceKinds=cylinder,plane surfaceLoops=10 surfaceShells=2 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok
+# expect: 56V 84E 31F recesses=1 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=10 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok
 # expect: 56V 84E 31F recesses=1 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=9 surfaceShells=1 surfaceOpen=1 surfaceBoundary=1 surfaceModel=partial surfaceCertificate=partial diagnostics=recess-mouth-unclosed status=partial
 # expect: 8V 12E 6F recesses=0 surfaces=6 surfaceKinds=plane surfaceLoops=6 surfaceShells=1 surfaceModel=ok diagnostics=curve-projection-missing,recess-depth-missing status=partial
 # expect: 8V 12E 6F recesses=0 surfaces=6 surfaceKinds=plane surfaceLoops=6 surfaceShells=1 surfaceModel=ok diagnostics=curve-projection-missing,point-correspondence-missing,recess-depth-conflict,unresolved-edge status=partial
 ```
 
-The successful sheet reports `surfaceValidation=issues` because the
-surrounding plate's display face still covers the mouth (the cavity is not
-subtracted), so the separate triangle certificate sees the expected rim
-overlap. The analytic certificate is `ok`: the cavity shell is closed and its
-mouth/bottom loops are shared. The open sheet's analytic certificate is
-`partial` with `certificate-open-component`.
+The successful sheet reports `surfaceValidation=issues` because the display
+triangles still overlap at the rim; display faces are not cut. The analytic
+model is closed: the host plate face carries the mouth curve as an inner loop,
+the cylinder shares it, and the certificate is `ok`. The open sheet has no
+host subtraction and its analytic certificate is `partial` with
+`certificate-open-component`.
 
 ## End-to-end case: cylindrical fillet between two planar faces
 

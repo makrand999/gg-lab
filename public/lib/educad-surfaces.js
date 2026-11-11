@@ -155,6 +155,65 @@
     return validLine(l) ? length(sub(l.end, l.start)) : 0;
   }
 
+  // Planar-Boolean fast path: a recess mouth wholly inside a host plane is
+  // subtracted by adding one inner analytic loop. The separate mouth-closure
+  // patch is then removed; the host face and the cavity share the mouth curve,
+  // so no arrangement or coincident face is needed.
+  function mergeContainedMouths(model, geometry) {
+    var removed = new Set();
+    var hosts = (model.surfaces || []).filter(function (s) {
+      return s.kind === 'plane' && !s.recessMouth && !s.recessBottom &&
+        !s.closed && (s.loops || []).length;
+    });
+    (model.surfaces || []).forEach(function (mouth) {
+      if (mouth.kind !== 'plane' || !mouth.recessMouth) return;
+      var curve = null;
+      (mouth.loops || []).some(function (loop) {
+        var candidate = loop.section;
+        if (!candidate && loop.curves && loop.curves.length)
+          candidate = typeof loop.curves[0] === 'object' ? loop.curves[0]
+            : (geometry.curves || [])[loop.curves[0]];
+        if (candidate && validCurve(candidate) &&
+            curveSweep(candidate) >= TAU - 1e-9) { curve = candidate; return true; }
+        return false;
+      });
+      if (!curve) return;
+      for (var i = 0; i < hosts.length; i++) {
+        var host = hosts[i];
+        var contained = true;
+        for (var k = 0; k < 24; k++) {
+          var state = classifyPoint(host, curvePoint(curve, TAU * k / 24), geometry);
+          if (state.status !== 'inside') { contained = false; break; }
+        }
+        if (!contained) continue;
+        var already = (host.loops || []).some(function (loop) {
+          return loop.section === curve ||
+            (loop.curves || []).some(function (c) {
+              return (typeof c === 'object' ? c : (geometry.curves || [])[c]) === curve;
+            });
+        });
+        if (!already) {
+          var curveIndex = (geometry.curves || []).indexOf(curve);
+          if (curveIndex >= 0) host.loops.push({kind:'inner', curves:[curveIndex]});
+          else host.loops.push({kind:'inner', section:curve});
+        }
+        (geometry.recesses || []).forEach(function (record) {
+          if (record && record.mouthCurve === (geometry.curves || []).indexOf(curve)) {
+            record.closure = 'host';
+            record.hostMouth = true;
+          }
+        });
+        host.bounded = true;
+        removed.add(mouth);
+        mouth.mergedInto = host.id;
+        return;
+      }
+    });
+    if (removed.size)
+      model.surfaces = model.surfaces.filter(function (s) { return !removed.has(s); });
+    return {merged:removed.size};
+  }
+
   function build(geometry, options) {
     if (!geometry) return null;
     var model = {version:1, contract:'analytic-surface-v1', surfaces:[], diagnostics:[]};
@@ -431,6 +490,7 @@
       }
       addSurface(surface);
     });
+    mergeContainedMouths(model, geometry);
     model.summary = summarize(model);
     stampModelIdentity(model);
     if (model.diagnostics.length) model.summary.status = 'issues';

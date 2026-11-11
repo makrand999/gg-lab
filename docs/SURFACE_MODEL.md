@@ -332,6 +332,25 @@ is no longer part of the model. This is the path that closes
 `cylindrical-recess.edu` analytically. Partial overlap, multiple contained
 loops and non-circular boundaries still need the general 2D arrangement.
 
+## Analytic topology shadow model
+
+`Surfaces.topology(model, geometry)` derives a Face/Edge/EdgeUse/Vertex graph
+from the v1 loops without changing the model. Persisted boundary ids are the
+bridge:
+
+- one `Edge` per boundary id, with `useCount`, `status`
+  (`open | shared | nonmanifold`) and the incident faces;
+- one `Face` per surface, with ordered loops and `edgeUses` carrying
+  orientation;
+- one `Vertex` per rounded endpoint, listing incident edges and faces;
+- `summary` counts faces, edges, vertices, loops and open/shared/nonmanifold
+  edges, with `status:'closed'` only when every edge has exactly two uses.
+
+Straight polygon edges are canonicalized by unordered endpoint pair, so a box
+edge shared by two faces is one edge with orientation `+1/-1`. The v1 surfaces
+remain authoritative; topology is a derived shadow used by clipping and later
+feature recognition.
+
 ## Intersections and trimming
 
 `Surfaces.section(surface, plane)` returns analytic section geometry:

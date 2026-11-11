@@ -667,6 +667,152 @@
     return {uses:uses, bySurface:bySurface, elementId:elementId};
   }
 
+  // Analytic topology shadow model. Faces, edges, edge uses and vertices are
+  // derived from the v1 surface loops without changing them; the persisted
+  // boundary ids are the bridge, so a shared seam is one Edge with two uses.
+  function topology(model, geometry) {
+    model = model || {surfaces:[]};
+    stampModelIdentity(model);
+    var curves = geometry && geometry.curves || [];
+    var displayVertices = geometry && geometry.vertices || [];
+    var edges = new Map(), vertices = new Map(), faces = [];
+
+    function vertexKey(p) {
+      var scale = 1e-9;
+      return [Math.round(p.x/scale), Math.round(p.y/scale), Math.round(p.z/scale)].join(',');
+    }
+    function addVertex(p, surfaceId, edgeId) {
+      var key = vertexKey(p);
+      if (!vertices.has(key)) vertices.set(key, {id:'vertex:' + vertices.size,
+        point:{x:p.x, y:p.y, z:p.z}, edges:[], faces:[]});
+      var vertex = vertices.get(key);
+      if (vertex.edges.indexOf(edgeId) === -1) vertex.edges.push(edgeId);
+      if (surfaceId && vertex.faces.indexOf(surfaceId) === -1) vertex.faces.push(surfaceId);
+      return vertex;
+    }
+    function addEdge(id, kind, data, surfaceId, loopIndex, role, orientation) {
+      if (!edges.has(id)) {
+        var edge = {id:id, kind:kind, closed:!!data.closed, uses:[],
+          faces:[], sourceIds:(data.sourceIds || []).slice()};
+        if (data.curve) edge.curveId = data.curve.id || null;
+        if (data.curve) edge.curveKind = data.curve.kind || null;
+        if (data.start) edge.start = {x:data.start.x, y:data.start.y, z:data.start.z};
+        if (data.end) edge.end = {x:data.end.x, y:data.end.y, z:data.end.z};
+        edges.set(id, edge);
+      }
+      var edge = edges.get(id);
+      if (surfaceId && edge.faces.indexOf(surfaceId) === -1) edge.faces.push(surfaceId);
+      edge.uses.push({surfaceId:surfaceId === undefined ? null : surfaceId,
+        loopIndex:loopIndex, role:role || 'outer', orientation:orientation === -1 ? -1 : 1});
+      if (data.start) addVertex(data.start, surfaceId, id);
+      if (data.end && (!data.start || vertexKey(data.start) !== vertexKey(data.end)))
+        addVertex(data.end, surfaceId, id);
+      return edge;
+    }
+    function addCurveElement(element, surfaceId, loopIndex, role, explicitId) {
+      var curve = boundaryCurve(element, curves);
+      if (!curve || !validCurve(curve)) return null;
+      var id = explicitId || (element && typeof element === 'object' && element.id ?
+        'boundary:' + element.id : 'boundary:' + (curve.id || 'curve'));
+      var start = curvePoint(curve, curveStart(curve));
+      var closed = curveSweep(curve) >= TAU - 1e-9;
+      var end = closed ? start : curvePoint(curve, curveStart(curve) + curveSweep(curve));
+      addEdge(id, 'curve', {curve:curve, start:start, end:end, closed:closed,
+        sourceIds:curve.sourceIds || []}, surfaceId, loopIndex, role);
+      return id;
+    }
+    function addLineElement(line, surfaceId, loopIndex, role) {
+      if (!validLine(line)) return false;
+      var id = line.id ? 'boundary:' + line.id : 'line:' + pointKey(line.start) + '_' + pointKey(line.end);
+      addEdge(id, 'line', {start:line.start, end:line.end,
+        sourceIds:line.sourceIds || []}, surfaceId, loopIndex, role);
+      return true;
+    }
+    function segmentId(a, b) {
+      var first = pointKey(a), second = pointKey(b);
+      return 'edge:' + (first < second ? first + '_' + second : second + '_' + first);
+    }
+    function addPolyline(points, surfaceId, loopIndex, role) {
+      for (var i=0;i<points.length;i++) {
+        var a = points[i], b = points[(i+1)%points.length];
+        if (!finite(a) || !finite(b) || pointDistance(a,b) <= EPS) continue;
+        var id = segmentId(a, b);
+        var existing = edges.get(id);
+        var orientation = existing && existing.start &&
+          vertexKey(existing.start) === vertexKey(b) &&
+          vertexKey(existing.end) === vertexKey(a) ? -1 : 1;
+        addEdge(id, 'line', {start:a, end:b}, surfaceId, loopIndex, role, orientation);
+      }
+    }
+    function loopItems(loop, surfaceId, loopIndex, role, edgeUses) {
+      function use(id) { edgeUses.push({edgeId:id, orientation:1}); }
+      (loop.elements || []).forEach(function (element) {
+        if (!element) return;
+        if (element.kind === 'curve') {
+          var elementId = addCurveElement(element.curve, surfaceId, loopIndex, role);
+          if (elementId) use(elementId);
+        } else if (element.kind === 'polyline') {
+          addPolyline(element.points || [], surfaceId, loopIndex, role);
+        }
+      });
+      if (loop.section) {
+        var sectionId = addCurveElement(loop.section, surfaceId, loopIndex, role);
+        if (sectionId) use(sectionId);
+      }
+      (loop.lines || []).forEach(function (line) {
+        if (addLineElement(line, surfaceId, loopIndex, role))
+          use(line.id ? 'boundary:' + line.id : 'line:' + pointKey(line.start) + '_' + pointKey(line.end));
+      });
+      (loop.curves || []).forEach(function (item) {
+        var curve = typeof item === 'object' ? item : curves[item];
+        var curveId = addCurveElement(curve, surfaceId, loopIndex, role,
+          typeof item === 'number' ? 'c:' + item : null);
+        if (curveId && !edgeUses.some(function (u) { return u.edgeId === curveId; }))
+          use(curveId);
+      });
+      var points = [];
+      (loop.vertices || []).forEach(function (i) {
+        if (displayVertices[i]) points.push(displayVertices[i]);
+      });
+      (loop.points || []).forEach(function (p) { points.push(p); });
+      if (points.length) {
+        addPolyline(points, surfaceId, loopIndex, role);
+        for (var i=0;i<points.length;i++) {
+          var a = points[i], b = points[(i+1)%points.length];
+          if (finite(a) && finite(b) && pointDistance(a,b) > EPS)
+            use(segmentId(a,b));
+        }
+      }
+    }
+    (model.surfaces || []).forEach(function (surface) {
+      var face = {id:'face:' + faces.length, surfaceId:surface.id,
+        kind:surface.kind, closed:!!surface.closed, loops:[]};
+      (surface.loops || []).forEach(function (loop, loopIndex) {
+        var edgeUses = [];
+        loopItems(loop, surface.id, loopIndex, loop.kind || 'outer', edgeUses);
+        face.loops.push({id:surface.id + '/loop:' + loopIndex,
+          role:loop.kind || 'outer', edgeUses:edgeUses});
+      });
+      faces.push(face);
+    });
+    var edgeList = Array.from(edges.values()).map(function (edge) {
+      edge.useCount = edge.uses.length;
+      edge.status = edge.useCount === 1 ? 'open' :
+        edge.useCount === 2 ? 'shared' : 'nonmanifold';
+      return edge;
+    });
+    var vertexList = Array.from(vertices.values());
+    var openEdges = edgeList.filter(function (e) { return e.status === 'open'; }).length;
+    var sharedEdges = edgeList.filter(function (e) { return e.status === 'shared'; }).length;
+    var nonmanifoldEdges = edgeList.filter(function (e) { return e.status === 'nonmanifold'; }).length;
+    return {contract:'analytic-topology-v1', modelContract:model.contract || 'analytic-surface-v1',
+      faces:faces, edges:edgeList, vertices:vertexList,
+      summary:{faces:faces.length, edges:edgeList.length, vertices:vertexList.length,
+        loops:faces.reduce(function (n, f) { return n + f.loops.length; }, 0),
+        openEdges:openEdges, sharedEdges:sharedEdges, nonmanifoldEdges:nonmanifoldEdges,
+        status:openEdges || nonmanifoldEdges ? 'partial' : 'closed'}};
+  }
+
   function analyze(model) {
     var graph = incidence(model), usage = new Map();
     graph.uses.forEach(function (use, id) { usage.set(id, use.surfaceUses.slice()); });
@@ -3484,6 +3630,7 @@
     validate:validate,
     certify:certify,
     incidence:incidence,
+    topology:topology,
     summarize:summarize,
     section:section,
     intersect:intersect,

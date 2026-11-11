@@ -299,6 +299,11 @@ function runScript(text, options) {
         if (!subtractFace) throw new Error('Missing planar face');
         var subtractLoop = request.curve !== undefined ? pickCurve(request.curve) : request.loop;
         result = Surfaces.subtractContainedLoop(subtractFace, subtractLoop, g);
+      } else if (request.operation === 'topology') {
+        var topoRefs = request.surfaces || (g && g.surfaces) || [];
+        var topoSurfaces = request.surfaces ?
+          topoRefs.map(pick).filter(Boolean) : topoRefs;
+        result = Surfaces.topology(modelOf(topoSurfaces), g);
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

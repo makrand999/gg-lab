@@ -311,14 +311,26 @@ decimals. It distinguishes a full loop (`full` count) from a half loop
 
 ### Planar face minus a contained loop
 
-`Surfaces.build` applies one planar-Boolean fast path without an arrangement:
-a recess-mouth plane whose full boundary circle lies strictly inside a host
-planar face is removed, and the host face receives the same curve as an inner
-loop. The host and cavity then share the mouth boundary, and the coincident
-mouth-closure surface is no longer part of the model. This is the path that
-closes `cylindrical-recess.edu` analytically. Partial overlap, multiple
-contained loops and non-circular boundaries still need the general 2D
-arrangement.
+`Surfaces.subtractContainedLoop(face, loop, geometry)` is the public form of
+the fast path. The loop must be one full analytic circle or ellipse and every
+sample must classify `inside` the planar face. The result is:
+
+```text
+{ok:true, surface:<clone with one inner loop>, innerLoop, diagnostics:[]}
+```
+
+A duplicate loop, an unknown classification, a loop on the face boundary, or a
+loop that is not wholly contained returns `ok:false` with
+`planar-loop-duplicate`, `planar-loop-unknown`, `planar-loop-on-boundary` or
+`planar-loop-not-contained`. No partial overlap is guessed.
+
+`Surfaces.build` uses the same rule for recess mouths: a mouth-closure plane
+whose full boundary circle lies strictly inside a host planar face is removed,
+and the host face receives the same curve as an inner loop. The host and
+cavity then share the mouth boundary, and the coincident mouth-closure surface
+is no longer part of the model. This is the path that closes
+`cylindrical-recess.edu` analytically. Partial overlap, multiple contained
+loops and non-circular boundaries still need the general 2D arrangement.
 
 ## Intersections and trimming
 

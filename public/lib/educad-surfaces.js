@@ -159,6 +159,51 @@
     return validLine(l) ? length(sub(l.end, l.start)) : 0;
   }
 
+  // Planar Boolean fast path as a public operation: subtract one wholly
+  // contained closed analytic loop from a planar face. This is region
+  // subtraction without an arrangement; a straddling or tangent loop is
+  // refused instead of guessed.
+  function subtractContainedLoop(surface, loop, geometry) {
+    function refuse(code, message) {
+      return {ok:false, surface:null, innerLoop:null,
+        diagnostics:[{code:code, severity:'warning', message:message}]};
+    }
+    if (!surface || surface.kind !== 'plane')
+      return refuse('planar-face-kind', 'subtractContainedLoop needs a planar face.');
+    var curve = loop && loop.kind === 'curve' && loop.curve ? loop.curve : loop;
+    if (!curve || !validCurve(curve) || curveSweep(curve) < TAU - 1e-9)
+      return refuse('planar-loop-not-closed',
+        'The subtracted boundary must be one full analytic circle or ellipse.');
+    var loops = surface.loops || [];
+    var already = loops.some(function (item) {
+      return item.section === curve || (item.curves || []).some(function (c) {
+        return (typeof c === 'object' ? c : (geometry && geometry.curves || [])[c]) === curve;
+      });
+    });
+    if (already) return refuse('planar-loop-duplicate',
+      'The face already uses this boundary curve.');
+    for (var i = 0; i < 24; i++) {
+      var state = classifyPoint(surface, curvePoint(curve, TAU * i / 24), geometry || {});
+      if (state.status === 'unknown')
+        return refuse('planar-loop-unknown', 'The face could not classify the subtracted loop.');
+      if (state.status === 'boundary')
+        return refuse('planar-loop-on-boundary',
+          'The subtracted loop lies on the face boundary.');
+      if (state.status !== 'inside')
+        return refuse('planar-loop-not-contained',
+          'The subtracted loop is not wholly inside the face.');
+    }
+    var out = copyFields(surface);
+    out.id = (surface.id || 'plane') + '/subtract';
+    out.loops = loops.slice();
+    var curveIndex = geometry && geometry.curves ? geometry.curves.indexOf(curve) : -1;
+    var inner = curveIndex >= 0 ? {kind:'inner', curves:[curveIndex]} : {kind:'inner', section:curve};
+    out.loops.push(inner);
+    out.closed = false;
+    out.subtractedBy = curve.id || null;
+    return {ok:true, surface:out, innerLoop:inner, diagnostics:[]};
+  }
+
   // Planar-Boolean fast path: a recess mouth wholly inside a host plane is
   // subtracted by adding one inner analytic loop. The separate mouth-closure
   // patch is then removed; the host face and the cavity share the mouth curve,
@@ -3450,6 +3495,7 @@
     intersectionCurves:intersectionCurves,
     intersectBounded:intersectBounded,
     classifyPoint:classifyPoint,
+    subtractContainedLoop:subtractContainedLoop,
     planeSpec:planeSpec,
     point:curvePoint,
     radii:radii,

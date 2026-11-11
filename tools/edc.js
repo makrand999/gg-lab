@@ -294,6 +294,11 @@ function runScript(text, options) {
         result = Surfaces.intersectBounded(boundedFirst, boundedSecond, g, request.options);
       } else if (request.operation === 'intersect-bounded-spec') {
         result = Surfaces.intersectBounded(request.a, request.b, g, request.options);
+      } else if (request.operation === 'planar-subtract') {
+        var subtractFace = request.face !== undefined ? request.face : pick(request.surface);
+        if (!subtractFace) throw new Error('Missing planar face');
+        var subtractLoop = request.curve !== undefined ? pickCurve(request.curve) : request.loop;
+        result = Surfaces.subtractContainedLoop(subtractFace, subtractLoop, g);
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

@@ -286,10 +286,20 @@ distance `hypot(radial - R, axial) - r`. Supported sections are:
 - a plane through the axis: two circles of radius `r` at `center ± radial*R`;
 - general oblique planes remain unsupported rather than approximated.
 
-A closed torus classifies points with `closed-torus`; a bounded torus patch
-with loops returns `unknown` until torus parameter-domain classification is
-implemented. Torus–quadric intersections are not yet implemented. The
-certificate checks centre, radii, axis and boundary on-surface residuals.
+A closed torus classifies points with `closed-torus`. A bounded torus patch can
+carry an explicit periodic parameter domain:
+
+```text
+domain = {u:[u0,u1], v:[v0,v1]}   // each interval at most one turn
+```
+
+`Surfaces.torusParameters(surface, point)` maps a 3D point to `(u,v)`, and
+`classifyPoint` returns `inside`, `boundary` or `outside` with method
+`torus-domain`, including wrap-around intervals. A patch with boundary loops
+but no domain still returns `unknown` with `torus-loops-unsupported`: loops
+alone do not select the material side of a torus band. Torus–quadric
+intersections are not yet implemented. The certificate checks centre, radii,
+axis, domain and boundary on-surface residuals.
 
 Torus silhouettes are analytic in all orthographic views:
 
@@ -304,8 +314,9 @@ Torus silhouettes are analytic in all orthographic views:
   `W(u) = A*cos(u) + B*sin(u)`. The parameterisation is analytic; only HLR
   sampling introduces display points (`confidence:'analytic-parameterization'`).
 
-Bounded torus patches report `torus-patch-clipping-unsupported` until their
-parameter-domain classification lands.
+Bounded torus patches with an explicit `u`/`v` domain support point
+classification and silhouette clipping; a loop-bounded torus without a domain
+reports `torus-patch-clipping-unsupported` rather than guessing a side.
 
 ## Bounded intersection
 

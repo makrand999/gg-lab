@@ -464,6 +464,13 @@
             loops:torusLoops, closed:torusLoops.length === 0 && patch.closed !== false,
             sourceIds:sourceIds,
             displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+          if (patch.domain) {
+            if (validTorusDomain(patch.domain))
+              surface.domain = {u:patch.domain.u.slice(), v:patch.domain.v.slice()};
+            else diag('surface-invalid-torus-domain',
+              'A torus parameter domain needs finite increasing u and v intervals no longer than one turn.',
+              sourceIds);
+          }
         } else if (patch.kind === 'plane') {
           if (requested.loops) {
             var origin = patch.origin, normal = patch.normal, u = patch.u, v = patch.v;
@@ -1131,17 +1138,29 @@
         var torusAxis = unit(surface.axis), torusViewDot = dot(torusAxis, direction);
         var torusFrame = basis(torusAxis), torusR = surface.majorRadius, torusr = surface.minorRadius;
         if (!(torusR > 0) || !(torusr > 0)) return;
-        if ((surface.loops || []).length && surface.closed !== true) {
+        var torusBounded = surface.closed !== true &&
+          ((surface.loops || []).length > 0 || !!surface.domain);
+        if (torusBounded && !validTorusDomain(surface.domain)) {
           diagnostics.push({code:'torus-patch-clipping-unsupported', severity:'info',
             surfaceId:surface.id,
-            message:'A bounded torus patch cannot be clipped until torus parameter-domain classification is implemented.'});
+            message:'A bounded torus patch needs a u/v parameter domain before its silhouettes can be clipped.'});
           return;
         }
         function addTorusCurve(curve) {
           curve.silhouette = 'torus';
           curve.surfaceId = surface.id;
           if (!curve.confidence) curve.confidence = 'analytic-silhouette';
-          curves.push(curve);
+          if (torusBounded) {
+            var clipped = clipCurveToSurface(surface, curve, geometry || {});
+            clipped.forEach(function (piece) {
+              piece.silhouette = 'torus';
+              piece.surfaceId = surface.id;
+              piece.contourClass = curve.contourClass;
+              if (curve.confidence === 'analytic-parameterization')
+                piece.confidence = 'analytic-parameterization-clipped';
+            });
+            curves = curves.concat(clipped);
+          } else curves.push(curve);
         }
         if (Math.abs(Math.abs(torusViewDot) - 1) <= 1e-7) {
           var torusRadii = [torusR + torusr];
@@ -1272,9 +1291,11 @@
           pointDistance(curve.start, curve.end) : 1;
         return {from:0, to:length, closed:false};
       }
-      if (curve.kind === 'arc')
-        return {from:curveStart(curve), to:curveStart(curve) + curveSweep(curve),
-          closed:false};
+      if (curve.kind === 'arc' || curve.kind === 'torusContour') {
+        var sweep = curveSweep(curve);
+        return {from:curveStart(curve), to:curveStart(curve) + sweep,
+          closed:sweep >= TAU - 1e-9};
+      }
       return {from:0, to:TAU, closed:true};
     }
     var strokes = [];
@@ -1402,8 +1423,10 @@
     var closedShells = 0, openSurfaces = 0;
     groups.forEach(function (surfaces) {
       var closed = surfaces.every(function (s) {
-        return (s.loops || []).length === 0 ? s.closed === true :
-          (surfKeys.get(s.id) || []).length > 0 && (surfKeys.get(s.id) || []).every(function (k) { return (usage.get(k) || []).length === 2; });
+        if (!(s.loops || []).length)
+          return s.closed === true || (s.kind === 'torus' && validTorusDomain(s.domain));
+        return (surfKeys.get(s.id) || []).length > 0 &&
+          (surfKeys.get(s.id) || []).every(function (k) { return (usage.get(k) || []).length === 2; });
       });
       if (closed) closedShells++; else openSurfaces++;
     });
@@ -1616,9 +1639,39 @@
       radius:s.radius, apex:copyPoint(s.apex), halfAngle:s.halfAngle};
     if (s.kind === 'sphere') return {center:copyPoint(s.center), radius:s.radius};
     if (s.kind === 'torus') return {center:copyPoint(s.center), axis:copyPoint(s.axis),
-      majorRadius:s.majorRadius, minorRadius:s.minorRadius};
+      majorRadius:s.majorRadius, minorRadius:s.minorRadius,
+      domain:s.domain ? {u:s.domain.u.slice(), v:s.domain.v.slice()} : null};
     return {};
   }
+  function torusParameters(surface, p) {
+    if (!surface || surface.kind !== 'torus' || !finite(p)) return null;
+    var axis = unit(surface.axis), frame = basis(axis);
+    var q = sub(p, surface.center);
+    var axial = dot(q, axis);
+    var radial = sub(q, mul(axis, axial));
+    var rho = length(radial);
+    if (rho <= EPS) return null;
+    return {u:Math.atan2(dot(radial, frame.v), dot(radial, frame.u)),
+      v:Math.atan2(axial, rho - surface.majorRadius), rho:rho, axial:axial};
+  }
+  function validTorusDomain(domain) {
+    if (!domain) return false;
+    function interval(pair) {
+      return Array.isArray(pair) && pair.length === 2 &&
+        Number.isFinite(pair[0]) && Number.isFinite(pair[1]) &&
+        pair[1] - pair[0] > EPS && pair[1] - pair[0] <= TAU + EPS;
+    }
+    return interval(domain.u) && interval(domain.v);
+  }
+  function angleWithin(value, start, end, tolerance) {
+    var span = end - start;
+    if (span >= TAU - 1e-9) return {inside:true, distance:0, boundary:false};
+    var d = ((value - start) % TAU + TAU) % TAU;
+    if (d > span + tolerance) return {inside:false, distance:Math.min(d - span, TAU - d), boundary:false};
+    var edge = Math.min(d, span - d);
+    return {inside:true, distance:edge, boundary:edge <= tolerance};
+  }
+
   function surfaceTolerance(s) {
     var radius = Math.abs((s && s.radius) || 0);
     if (s && Number.isFinite(s.majorRadius))
@@ -1820,7 +1873,8 @@
         message:'The surface kind "' + rec.kind + '" has no analytic certificate.'});
 
       var hasLoops = (surface.loops || []).length > 0;
-      check(rec, rec, 'surface-bounded', {status:hasLoops || rec.closed ? 'ok':'failed',
+      var domainBounded = rec.kind === 'torus' && validTorusDomain(surface.domain);
+      check(rec, rec, 'surface-bounded', {status:hasLoops || rec.closed || domainBounded ? 'ok':'failed',
         arithmetic:'exact-combinatorial', method:'combinatorial', issue:'certificate-surface-unbounded',
         message:'A surface with no boundary loop is not marked closed.'});
       check(rec, rec, 'surface-closed-consistency',
@@ -1900,6 +1954,12 @@
         positiveExact(rec, rec, 'torus-major-positive', surface.majorRadius, 'certificate-torus-major-invalid');
         positiveExact(rec, rec, 'torus-minor-positive', surface.minorRadius, 'certificate-torus-minor-invalid');
         unitVector(rec, rec, 'torus-axis-unit', surface.axis, 'certificate-torus-axis-invalid');
+        if (surface.domain) {
+          check(rec, rec, 'torus-domain-valid', {status:validTorusDomain(surface.domain) ? 'ok' : 'failed',
+            arithmetic:'numeric', method:'periodic-interval',
+            issue:'certificate-torus-domain-invalid',
+            message:rec.id + ' has an invalid torus parameter domain.'});
+        }
       }
 
       // Plane vertex loops have an exact coplanarity predicate on the stored
@@ -2167,7 +2227,9 @@
       });
       var openIds = recs.filter(function (r) { return r.useCount === 1; }).map(function (r) { return r.id; });
       var unbounded = members.some(function (i) {
-        return (model.surfaces[i].loops || []).length === 0 && model.surfaces[i].closed !== true;
+        var s = model.surfaces[i];
+        return (s.loops || []).length === 0 && s.closed !== true &&
+          !(s.kind === 'torus' && validTorusDomain(s.domain));
       });
       var surfaced = members.every(function (i) { return surfaceRecords[i].status !== 'issues'; });
       var closed = !nonmanifold && !openIds.length && !unbounded && surfaced;
@@ -2761,7 +2823,7 @@
   function subArc(c, t0, t1) {
     boundaryElementId(c, c.kind === 'line' ? 'line' : 'curve');
     var out = copyFields(c);
-    out.kind = 'arc';
+    out.kind = c.kind === 'torusContour' ? 'torusContour' : 'arc';
     // Deterministic child id: the same parent station pair names the same
     // shared seam after a JSON round-trip and across repeated splits.
     out.id = c.id + '/arc:' + Number(t0).toFixed(9) + ':' + Number(t1).toFixed(9);
@@ -3302,6 +3364,23 @@
     if (surface.kind === 'sphere' && surface.closed === true && !surface.cap)
       return {status:'inside', method:'closed-sphere', residual:residual, tolerance:tol};
     if (surface.kind === 'torus') {
+      if (validTorusDomain(surface.domain)) {
+        var params = torusParameters(surface, p);
+        if (!params)
+          return {status:'unknown', reason:'torus-parameter-undefined',
+            residual:residual, tolerance:tol};
+        var angleTol = tol / Math.max(surface.minorRadius, EPS);
+        var uCheck = angleWithin(params.u, surface.domain.u[0], surface.domain.u[1], angleTol);
+        var vCheck = angleWithin(params.v, surface.domain.v[0], surface.domain.v[1], angleTol);
+        if (!uCheck.inside || !vCheck.inside)
+          return {status:'outside', method:'torus-domain', residual:residual,
+            tolerance:tol, parameters:params};
+        if (uCheck.boundary || vCheck.boundary)
+          return {status:'boundary', method:'torus-domain', residual:residual,
+            tolerance:tol, parameters:params};
+        return {status:'inside', method:'torus-domain', residual:residual,
+          tolerance:tol, parameters:params};
+      }
       if (surface.closed === true)
         return {status:'inside', method:'closed-torus', residual:residual, tolerance:tol};
       return {status:'unknown', reason:'torus-loops-unsupported',
@@ -4286,6 +4365,7 @@
     subtractContainedLoop:subtractContainedLoop,
     planeSpec:planeSpec,
     point:curvePoint,
+    torusParameters:torusParameters,
     radii:radii,
     curveNormal:curveNormal,
     tolerancePolicy:tolerancePolicy,

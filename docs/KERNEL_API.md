@@ -47,10 +47,11 @@ package version; CI runs it after the corpus.
 ## Capability boundaries
 
 Supported surface kinds: plane, cylinder, cone, sphere, torus. Torus plane
-sections and silhouettes include axis-aligned and oblique orthographic views.
-General oblique torus sections, torus/quadric intersections, bounded torus
-patch classification, variable-radius fillets and general solid Booleans are
-outside this API version.
+sections and silhouettes include axis-aligned and oblique orthographic views;
+bounded torus patches support explicit u/v parameter domains. General oblique
+torus sections, torus/quadric intersections, loop-bounded torus patches without
+a domain, variable-radius fillets and general solid Booleans are outside this
+API version.
 
 Kernel modules are deterministic and DOM-free. The app shell owns rendering,
 input, saves and passwords.

@@ -2,7 +2,7 @@
   "apiVersion": "1.0.0",
   "version": "0.1.0",
   "modules": {
-    "Surfaces": ["build", "validate", "certify", "incidence", "topology", "featureGraph", "section", "intersect", "intersectBounded", "split", "trim", "attachBoundary", "shareBoundary", "intersectionCurves", "classifyPoint", "planarBoolean", "subtractContainedLoop", "silhouettes", "silhouetteHLR"],
+    "Surfaces": ["build", "validate", "certify", "incidence", "topology", "featureGraph", "section", "intersect", "intersectBounded", "split", "trim", "attachBoundary", "shareBoundary", "intersectionCurves", "classifyPoint", "torusParameters", "planarBoolean", "subtractContainedLoop", "silhouettes", "silhouetteHLR"],
     "Predicates": ["orient2d", "orient3d", "coplanar", "pointOnPlane"],
     "Planar": ["arrangement", "booleanRegion", "pointInRegion"],
     "Correspondence": ["analyze"],

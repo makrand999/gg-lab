@@ -293,6 +293,8 @@ function runScript(text, options) {
           diagnostics:specModel.diagnostics,
           validation:Surfaces.validate(specModel, {vertices:[],curves:request.curves || [],faces:[]}),
           certificate:Surfaces.certify(specModel, {vertices:[],curves:request.curves || [],faces:[]})};
+      } else if (request.operation === 'torus-parameters') {
+        result = Surfaces.torusParameters(request.surface, request.point) || {};
       } else if (request.operation === 'intersect-bounded') {
         var boundedRefs = request.surfaces || [
           request.from !== undefined ? request.from : request.surface,

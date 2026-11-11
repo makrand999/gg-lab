@@ -131,7 +131,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <li>A circle in an inclined plane plus two tangent generator strokes can define a right cone whose apex lies on the base circle's plane normal.</li>
 <li>A full circular mouth in one principal view and a rim-to-rim silhouette arc in the other can define a spherical recess.</li>
 <li>A circular mouth plus a four-sided face frame and edge-on depth strokes can define a flat-bottomed cylindrical recess.</li>
-<li>A true-shape tangent arc plus matching generator/end strokes can define a partial cylindrical fillet. Its straight tangent boundaries are shared with adjacent planar strips; the feature is open, not a Boolean-union solid.</li>
+<li>A true-shape tangent arc plus matching generator/end strokes can define a cylindrical fillet. Its straight tangent boundaries are shared with adjacent planar strips, and a back plane plus two end caps close the shell. It is a closed analytic feature, not a Boolean union with a surrounding solid.</li>
 </ul>
 <p>Surface records carry analytic parameters, ordered loops, source IDs, and display faces. The surface model validates boundary incidence and closed shells, and it can certify the stored analytic parameters separately from the display triangles.</p>
 <h2 id="7-verification-with-educad-script">7. Verification with EduCAD Script</h2>
@@ -178,7 +178,9 @@ node tools/edc.js --strict tools/scripts/ruled-chain.edu</code></pre>
 <li>Arbitrary curved-surface intersection and Boolean subtraction are not implemented. Known special cases are exact; unsupported pairs return <code>null</code>.</li>
 <li>A curved analytic surface is not certified by its display mesh.</li>
 <li>A recess does not Boolean-subtract an independently drawn surrounding solid.</li>
-<li>The cylindrical fillet is a single partial-cylinder feature. Its ends and the adjacent strips' outer edges remain open; there is no Boolean union with a surrounding solid. Fillet chains, variable radius, and torus blends are not supported.</li>
+<li>The cylindrical fillet is a single quarter-cylinder feature closed by a back plane and two end caps. There is no Boolean union with a surrounding solid. Fillet chains, variable radius, and torus blends are not supported.</li>
+<li>Torus surfaces support axis-aligned and oblique plane sections, silhouettes, explicit parameter-domain classification, perpendicular/axis-plane splits, and torus–sphere intersections. Torus–cylinder/cone intersections and oblique torus splits are not implemented.</li>
+<li>General solid Booleans are not implemented. Coplanar planar-face Booleans handle straight loops; a contained full circle uses the subtraction fast path.</li>
 <li>Straight line boundary elements are finite segments. A loop made from them is not split by a cutting plane yet.</li>
 <li>Analytic curved surfaces can be split by a plane even when a boundary loop crosses it; each side receives the matching section sub-arcs. Planar faces still do not support this split representation.</li>
 <li>Profile mouths and elliptical recess mouths are not inferred.</li>

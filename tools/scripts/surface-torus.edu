@@ -1,7 +1,7 @@
 # Analytic torus foundation: perpendicular and axis-containing plane
 # sections, point classification on a closed torus, and build/certificate.
 # General oblique torus-plane sections remain unsupported.
-# expect: surfaceChecks=36 surfaceQueries=ok
+# expect: surfaceChecks=37 surfaceQueries=ok
 /datum -100 100
 /point a 0 0 plan
 /point "a'" 0 20 elevation
@@ -42,3 +42,4 @@
 # surface-query: {"operation":"intersect-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"b":{"kind":"sphere","id":"s","center":{"x":0,"y":0,"z":0},"radius":10},"expect":{"kind":"torusSphere","loops":[{"closed":true,"full":true},{"closed":true,"full":true}],"branches":[{"branch":1,"closed":true,"uStart":0,"uEnd":6.283185307179586},{"branch":-1,"closed":true}],"parameters":{"N0":-9}}}
 # surface-query: {"operation":"intersect-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"b":{"kind":"sphere","id":"s","center":{"x":10,"y":0,"z":0},"radius":3},"expect":{"kind":"circle","radius":3,"center":{"x":10,"y":0,"z":0},"relation":"tangent","sectionType":"torus-sphere-tube-circle"}}
 # surface-query: {"operation":"intersect-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"b":{"kind":"sphere","id":"s","center":{"x":20,"y":0,"z":0},"radius":2},"expect":{"kind":"none"}}
+# surface-query: {"operation":"trim","surface":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"plane":{"origin":{"x":0,"y":0,"z":0},"normal":{"x":0,"y":0,"z":1}},"keepPositive":true,"expect":{"surface":{"kind":"torus","closed":false,"domain":{"u":[0,6.283185307179586],"v":[0,3.141592653589793]},"trimmedBy":{"keepPositive":true}},"identity":{"after":{"boundaries":2,"open":2}}}}

@@ -348,6 +348,9 @@ Tangential and oblique planes are refused with `split-torus-tangent` and
 `split-torus-plane-oblique`; both pieces share the same section circle objects,
 so identity reports boundaries 2 / shared 2 and the certificate stays `ok`.
 An already bounded torus patch is refused with `split-torus-patch-unsupported`.
+`Surfaces.trim` returns the selected half of the same split with a `/trim` id
+and `trimmedBy` record; its section circles are open until shared with the
+complementary piece.
 
 ## Bounded intersection
 

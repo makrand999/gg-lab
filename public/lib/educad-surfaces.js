@@ -3002,6 +3002,18 @@
   // Loops that cross the cutting plane are reported unsupported instead of guessed.
   function trim(surface, plane, keepPositive, geometry) {
     if (!surface || surface.kind === 'plane') return null;
+    if (surface.kind === 'torus') {
+      var torusPlan = torusSplitPlan(surface, plane, geometry);
+      if (!torusPlan.ok) return null;
+      var keptPiece = keepPositive === false ? torusPlan.result.negative : torusPlan.result.positive;
+      var trimmed = {};
+      Object.keys(keptPiece).forEach(function (k) { trimmed[k] = keptPiece[k]; });
+      trimmed.id = (surface.id || 'surface') + '/trim';
+      trimmed.cut = torusPlan.result.section;
+      trimmed.trimmedBy = {plane:{origin:copyPoint(torusPlan.result.plane.origin),
+        normal:copyPoint(torusPlan.result.plane.normal)}, keepPositive:keepPositive !== false};
+      return trimmed;
+    }
     var spec = planeSpec(plane);
     if (!spec) return null;
     var cut = section(surface, spec);

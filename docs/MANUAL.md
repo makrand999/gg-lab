@@ -129,8 +129,9 @@ inferred when the supplied boundaries and side surfaces close it.
 - A circular mouth plus a four-sided face frame and edge-on depth strokes can
   define a flat-bottomed cylindrical recess.
 - A true-shape tangent arc plus matching generator/end strokes can define a
-  partial cylindrical fillet. Its straight tangent boundaries are shared with
-  adjacent planar strips; the feature is open, not a Boolean-union solid.
+  cylindrical fillet. Its straight tangent boundaries are shared with adjacent
+  planar strips, and a back plane plus two end caps close the shell. It is a
+  closed analytic feature, not a Boolean union with a surrounding solid.
 
 Surface records carry analytic parameters, ordered loops, source IDs, and
 display faces. The surface model validates boundary incidence and closed shells,
@@ -206,10 +207,16 @@ entities are named.
   implemented. Known special cases are exact; unsupported pairs return `null`.
 - A curved analytic surface is not certified by its display mesh.
 - A recess does not Boolean-subtract an independently drawn surrounding solid.
-- The cylindrical fillet is a single partial-cylinder feature. Its ends and the
-  adjacent strips' outer edges remain open; there is no Boolean union with a
-  surrounding solid. Fillet chains, variable radius, and torus blends are not
-  supported.
+- The cylindrical fillet is a single quarter-cylinder feature closed by a back
+  plane and two end caps. There is no Boolean union with a surrounding solid.
+  Fillet chains, variable radius, and torus blends are not supported.
+- Torus surfaces support axis-aligned and oblique plane sections, silhouettes,
+  explicit parameter-domain classification, perpendicular/axis-plane splits,
+  and torus–sphere intersections. Torus–cylinder/cone intersections and
+  oblique torus splits are not implemented.
+- General solid Booleans are not implemented. Coplanar planar-face Booleans
+  handle straight loops; a contained full circle uses the subtraction fast
+  path.
 - Straight line boundary elements are finite segments. A loop made from them is
   not split by a cutting plane yet.
 - Analytic curved surfaces can be split by a plane even when a boundary loop

@@ -312,6 +312,9 @@ function runScript(text, options) {
           request.boolean || request.op || 'union', g);
       } else if (request.operation === 'feature-graph') {
         result = Surfaces.featureGraph(modelOf((g && g.surfaces) || []), g);
+      } else if (request.operation === 'silhouettes') {
+        result = Surfaces.silhouettes(modelOf((g && g.surfaces) || []),
+          request.view || request.direction || 'front', g);
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

@@ -371,6 +371,26 @@ The result carries `area`, `loops` (`outer` positive area, `inner` negative
 area), per-cell `insideA`/`insideB` flags, and diagnostics. It is polygonal:
 curved boundaries are neither tessellated nor silently simplified.
 
+## Analytic silhouettes
+
+`Surfaces.silhouettes(model, view, geometry)` returns exact analytic
+silhouette support for orthographic views:
+
+- sphere: the great circle through the centre perpendicular to the view
+  direction (clipped to a bounded spherical cap when one is present);
+- cylinder: the two tangent generator lines, clipped to the patch loops;
+- cone: the two tangent generators solved from
+  `dot(normal, viewDirection) = 0`, clipped to the patch loops;
+- planes contribute no interior silhouette curve; their boundary edges are
+  already in the display/HLR path.
+
+`view` is `front | top | left | right` or a finite direction vector. A
+cylinder/cone viewed along its axis reports `silhouette-view-along-axis`.
+Clipped silhouettes use `confidence:'analytic-silhouette'` and bisection only
+for the patch-boundary station; the support curve itself is analytic. This is
+the silhouette source for interval HLR; it does not yet replace the mesh
+occlusion path.
+
 ## Feature graph v1
 
 `Surfaces.featureGraph(model, geometry)` builds on the topology shadow:

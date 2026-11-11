@@ -936,6 +936,224 @@
     return {convexity:side > 0 ? 'convex' : 'concave', angle:angle,
       tangent:tangent, normals:[one, two]};
   }
+  function viewDirection(view) {
+    if (view && finite(view.direction || view)) {
+      var direction = view.direction || view;
+      return length(direction) > EPS ? unit(direction) : null;
+    }
+    if (view === 'front' || view === 'elevation') return {x:0,y:0,z:1};
+    if (view === 'top' || view === 'plan') return {x:0,y:1,z:0};
+    if (view === 'left') return {x:-1,y:0,z:0};
+    if (view === 'right') return {x:1,y:0,z:0};
+    return null;
+  }
+  function geometryExtent(geometry, surface) {
+    var extent = 1;
+    ((geometry && geometry.vertices) || []).forEach(function (v) {
+      if (finite(v)) extent = Math.max(extent, Math.abs(v.x), Math.abs(v.y), Math.abs(v.z));
+    });
+    [surface].forEach(function (s) {
+      if (!s) return;
+      if (finite(s.origin)) extent = Math.max(extent, length(s.origin));
+      if (finite(s.center)) extent = Math.max(extent, length(s.center));
+      if (finite(s.apex)) extent = Math.max(extent, length(s.apex));
+      if (Number.isFinite(s.radius)) extent += Math.abs(s.radius);
+    });
+    return extent;
+  }
+  function clipPredicateRuns(samples, pointAt, insideAt, stationAt) {
+    var count = samples.length, runs = [];
+    if (samples.every(Boolean)) return {runs:[], allInside:true, none:false};
+    if (!samples.some(Boolean)) return {runs:[], allInside:false, none:true};
+    var entering = -1;
+    for (var i=0;i<count;i++) {
+      if (!samples[i] && samples[(i+1)%count]) { entering = (i+1)%count; break; }
+    }
+    if (entering === -1) return {runs:[], allInside:false, none:true};
+    var index = entering, guard = 0;
+    while (guard++ <= count) {
+      if (!samples[index]) break;
+      var startIndex = index, endIndex = index, steps = 0;
+      while (samples[endIndex] && steps++ <= count) endIndex = (endIndex+1)%count;
+      var start = stationAt(startIndex, (startIndex-1+count)%count);
+      var end = stationAt((endIndex-1+count)%count, endIndex);
+      if (start.t > end.t) end.t += TAU;
+      if (end.t - start.t > 1e-12) runs.push({start:start, end:end});
+      index = endIndex;
+      while (!samples[index] && guard++ <= count) index = (index+1)%count;
+      if (index === entering) break;
+    }
+    return {runs:runs, allInside:false, none:false};
+  }
+  function clipCurveToSurface(surface, curve, geometry, options) {
+    var count = Math.max(32, options && options.samples || 128);
+    var inside = [], parameters = [];
+    for (var i=0;i<count;i++) {
+      var t = (i + 0.5) * TAU / count;
+      parameters.push(t);
+      inside.push(boundedInside(classifyPoint(surface, curvePoint(curve, t), geometry)));
+    }
+    function stationBetween(tInside, tOutside) {
+      var a = tInside, b = tOutside;
+      if (Math.abs(b - a) > Math.PI) { if (b > a) b -= TAU; else b += TAU; }
+      for (var k=0;k<64;k++) {
+        var mid = 0.5*(a+b);
+        if (boundedInside(classifyPoint(surface, curvePoint(curve, mid), geometry))) a = mid;
+        else b = mid;
+        if (Math.abs(b-a) <= 1e-12 * Math.max(1, Math.abs(mid))) break;
+      }
+      var t = 0.5*(a+b);
+      return {t:t, point:curvePoint(curve, t), method:'bisection', confidence:'numeric'};
+    }
+    var runs = clipPredicateRuns(inside, null, null, function (tInside, tOutside) {
+      return stationBetween(parameters[tInside], parameters[tOutside]);
+    });
+    if (runs.allInside) {
+      var full = copyFields(curve);
+      full.bounded = true;
+      full.confidence = 'analytic-silhouette';
+      return [full];
+    }
+    return runs.runs.map(function (run) {
+      var t0 = ((run.start.t % TAU) + TAU) % TAU;
+      var t1 = ((run.end.t % TAU) + TAU) % TAU;
+      if (t1 <= t0 + 1e-12) t1 += TAU;
+      var arc = subArc(curve, t0, t1);
+      arc.bounded = true;
+      arc.closed = false;
+      arc.confidence = 'analytic-silhouette';
+      arc.startStation = Object.assign({}, run.start, {t:t0});
+      arc.endStation = Object.assign({}, run.end, {t:t1});
+      return arc;
+    });
+  }
+  function clipLineToSurface(surface, origin, direction, geometry) {
+    var extent = geometryExtent(geometry, surface) * 4 + 10;
+    var count = 192, samples = [], parameters = [];
+    function at(t) { return add(origin, mul(direction, t)); }
+    for (var i=0;i<count;i++) {
+      var t = -extent + (i + 0.5) * (2 * extent) / count;
+      parameters.push(t);
+      samples.push(boundedInside(classifyPoint(surface, at(t), geometry)));
+    }
+    function stationBetween(tInside, tOutside) {
+      var a = tInside, b = tOutside;
+      for (var k=0;k<64;k++) {
+        var mid = 0.5*(a+b);
+        if (boundedInside(classifyPoint(surface, at(mid), geometry))) a = mid;
+        else b = mid;
+        if (Math.abs(b-a) <= 1e-12 * Math.max(1, Math.abs(mid))) break;
+      }
+      var t = 0.5*(a+b);
+      return {t:t, point:at(t), method:'bisection', confidence:'numeric'};
+    }
+    var runs = [];
+    if (samples.some(Boolean)) {
+      var start = -1;
+      for (var j=0;j<count;j++) {
+        if (samples[j] && start === -1) start = j;
+        if (start !== -1 && (!samples[j] || j === count-1)) {
+          var endSample = samples[j] ? j : j-1;
+          var startStation = start === 0 ? {t:parameters[0], point:at(parameters[0]),
+            method:'sample', confidence:'numeric'} :
+            stationBetween(parameters[start], parameters[start-1]);
+          var endStation = endSample === count-1 ? {t:parameters[count-1],
+            point:at(parameters[count-1]), method:'sample', confidence:'numeric'} :
+            stationBetween(parameters[endSample], parameters[endSample+1]);
+          runs.push({start:startStation, end:endStation});
+          start = -1;
+        }
+      }
+    }
+    return runs.map(function (run) {
+      return {kind:'line', start:run.start.point, end:run.end.point,
+        direction:direction, bounded:true, confidence:'analytic-silhouette',
+        startStation:run.start, endStation:run.end};
+    });
+  }
+  function silhouettes(model, view, geometry) {
+    model = model || {surfaces:[]};
+    var direction = viewDirection(view);
+    if (!direction)
+      return {contract:'analytic-silhouette-v1', status:'unsupported', curves:[],
+        diagnostics:[{code:'silhouette-view-invalid', severity:'error',
+          message:'Use front, top, left, right or a finite direction vector.'}]};
+    var curves = [], diagnostics = [];
+    (model.surfaces || []).forEach(function (surface) {
+      if (surface.kind === 'sphere') {
+        var frame = basis(direction);
+        var circle = {kind:'circle', center:surface.center, u:frame.u, v:frame.v,
+          radius:surface.radius, startAngle:0, sweepAngle:TAU,
+          sourceIds:(surface.sourceIds || []).slice(), surfaceId:surface.id,
+          silhouette:'sphere'};
+        if (surface.closed === true && !surface.cap) curves.push(circle);
+        else curves = curves.concat(clipCurveToSurface(surface, circle, geometry || {}));
+      } else if (surface.kind === 'cylinder') {
+        var axis = unit(surface.axis);
+        var across = cross(axis, direction);
+        if (length(across) <= EPS) {
+          diagnostics.push({code:'silhouette-view-along-axis', severity:'info',
+            surfaceId:surface.id,
+            message:'A cylinder viewed along its axis has no side silhouette lines.'});
+          return;
+        }
+        var radial = unit(across);
+        [1,-1].forEach(function (sign) {
+          var line = {kind:'line', origin:add(surface.origin, mul(radial, sign*surface.radius)),
+            direction:axis, surfaceId:surface.id, silhouette:'cylinder'};
+          if ((surface.loops || []).length) {
+            var clippedCylinder = clipLineToSurface(surface, line.origin, line.direction, geometry || {});
+            clippedCylinder.forEach(function (piece) {
+              piece.surfaceId = surface.id;
+              piece.silhouette = 'cylinder';
+            });
+            curves = curves.concat(clippedCylinder);
+          } else curves.push(line);
+        });
+      } else if (surface.kind === 'cone') {
+        if (!Number.isFinite(surface.halfAngle)) return;
+        var axisCone = unit(surface.axis), alpha = surface.halfAngle;
+        var frame2 = basis(axisCone);
+        var A = dot(frame2.u, direction), B = dot(frame2.v, direction);
+        var amplitude = Math.hypot(A, B);
+        if (amplitude <= EPS) {
+          diagnostics.push({code:'silhouette-view-along-axis', severity:'info',
+            surfaceId:surface.id,
+            message:'A cone viewed along its axis has no generator silhouette lines.'});
+          return;
+        }
+        var ratio = Math.tan(alpha) * dot(axisCone, direction) / amplitude;
+        if (ratio < -1 - 1e-9 || ratio > 1 + 1e-9) return;
+        ratio = Math.max(-1, Math.min(1, ratio));
+        var base = Math.atan2(B, A), delta = Math.acos(ratio);
+        var apex = finite(surface.apex) ? surface.apex : surface.origin;
+        [base+delta, base-delta].forEach(function (theta) {
+          var radialCone = add(mul(frame2.u, Math.cos(theta)), mul(frame2.v, Math.sin(theta)));
+          var generator = unit(add(mul(axisCone, Math.cos(alpha)),
+            mul(radialCone, Math.sin(alpha))));
+          var line = {kind:'line', origin:apex, direction:generator,
+            surfaceId:surface.id, silhouette:'cone'};
+          if ((surface.loops || []).length) {
+            var clippedCone = clipLineToSurface(surface, line.origin, line.direction, geometry || {});
+            clippedCone.forEach(function (piece) {
+              piece.surfaceId = surface.id;
+              piece.silhouette = 'cone';
+            });
+            curves = curves.concat(clippedCone);
+          } else curves.push(line);
+        });
+      }
+    });
+    var byKind = {};
+    curves.forEach(function (curve) {
+      var kind = curve.silhouette || curve.kind;
+      byKind[kind] = (byKind[kind] || 0) + 1;
+    });
+    return {contract:'analytic-silhouette-v1', status:curves.length ? 'ok' : 'none',
+      view:typeof view === 'string' ? view : null, direction:direction,
+      curves:curves, byKind:byKind, diagnostics:diagnostics};
+  }
+
   function featureGraph(model, geometry) {
     model = model || {surfaces:[]};
     var graph = topology(model, geometry);
@@ -3803,6 +4021,7 @@
     incidence:incidence,
     topology:topology,
     featureGraph:featureGraph,
+    silhouettes:silhouettes,
     summarize:summarize,
     section:section,
     intersect:intersect,

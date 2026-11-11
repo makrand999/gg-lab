@@ -10,7 +10,7 @@
 /line b' c' A elevation
 /line c' a' A elevation
 
-# expect: surfaceChecks=8 surfaceQueries=ok
+# expect: surfaceChecks=9 surfaceQueries=ok
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":0,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":20,"center":{"x":20,"y":0,"z":30}}}
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":25,"z":30},"normal":{"x":0,"y":-1,"z":0}},"expect":{"kind":"circle","radius":10,"center":{"x":20,"y":25,"z":30}}}
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":50,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"point","point":{"x":20,"y":50,"z":30}}}
@@ -19,3 +19,4 @@
 # surface-query: {"operation":"trim","surface":0,"plane":{"origin":{"x":0,"y":10,"z":0},"normal":{"x":1,"y":1,"z":0}},"expect":null}
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","relation":"transverse","radius":20,"center":{"x":20,"y":0,"z":30},"surfaceIds":["surface:0","surface:1"],"surfaceKinds":["cone","plane"]}}
 # surface-query: {"operation":"intersect","surfaces":[1,1],"expect":{"kind":"plane-overlap","relation":"coincident","surfaceIds":["surface:1","surface:1"]}}
+# surface-query: {"operation":"silhouettes","view":"front","expect":{"status":"ok","byKind":{"cone":2},"curves":[{"kind":"line","silhouette":"cone","surfaceId":"surface:0"}]}}

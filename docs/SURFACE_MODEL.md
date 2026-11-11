@@ -275,6 +275,32 @@ The result carries `method`, `residual` and `tolerance`. This is the
 classification primitive used by bounded intersection and clipping; it does
 not build a Boolean result on its own.
 
+## Bounded intersection
+
+`Surfaces.intersectBounded(a, b, geometry, options)` keeps the exact support
+algebra and clips its branches to both bounded patches.
+
+- Inputs must each have a boundary loop or closed compact support; otherwise the
+  result is `status:'unbounded'`.
+- Supported support kinds are `circle`, `ellipse`, `circles`, `line` and
+  `lines`. `point` is tested against both patches. `plane-overlap` and
+  `coincident` return `status:'coincident'` because bounded overlap topology is
+  not implemented.
+- Each branch is sampled, every sample is classified by `classifyPoint` against
+  both patches, and inside/outside transitions are bisected to a station.
+- Components keep the analytic support definition: partial results are
+  sub-arcs of the source circle/ellipse; full results keep the support curve.
+- Every station is labelled `confidence:'numeric'` and
+  `method:'sampled-stations'`. This layer does not claim exact cut stations;
+  exact station algebra remains a later replacement.
+- The result is `{contract:'bounded-intersection-v1', status, support,
+  components, summary, diagnostics, confidence}` with
+  `status` in `ok | none | unbounded | coincident | unsupported`.
+
+`summary.sweepRatio` is the total arc sweep divided by π, rounded to four
+decimals. It distinguishes a full loop (`full` count) from a half loop
+(`sweepRatio:1`) without asserting a numerically exact angle.
+
 ## Intersections and trimming
 
 `Surfaces.section(surface, plane)` returns analytic section geometry:

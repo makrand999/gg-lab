@@ -2288,10 +2288,13 @@
     }
     return false;
   }
-  function appendPolygonCurve(out, c) {
+  function appendPolygonCurve(out, c, chordTol) {
     if (!validCurve(c)) return false;
     var start = curveStart(c), sweep = curveSweep(c);
-    var count = Math.max(16, Math.ceil(64 * sweep / TAU));
+    var r = Math.max(radii(c).u, radii(c).v);
+    var ratio = Math.max(-1, Math.min(1, 1 - (chordTol || EPS) / r));
+    var step = 2 * Math.acos(ratio);
+    var count = Math.max(16, Math.min(4096, Math.ceil(sweep / step)));
     var closed = sweep >= TAU - 1e-9;
     for (var i=0;i<(closed?count:count+1);i++)
       out.push(curvePoint(c, start + sweep*i/count));
@@ -2299,7 +2302,7 @@
   }
   // Ordered polygon approximation of one loop, used only for point
   // classification. Mixed curve/line order is refused rather than guessed.
-  function loopPolygon(loop, curves, vertices) {
+  function loopPolygon(loop, curves, vertices, chordTol) {
     var out = [];
     function add(p) {
       if (!finite(p)) return false;
@@ -2311,18 +2314,18 @@
         var el = loop.elements[e];
         if (!el) return null;
         if (el.kind === 'curve') {
-          if (!appendPolygonCurve(out, el.curve)) return null;
+          if (!appendPolygonCurve(out, el.curve, chordTol)) return null;
         } else if (el.kind === 'polyline') {
           (el.points || []).forEach(function (p) { add(p); });
         } else return null;
       }
     } else if (loop.section) {
-      if (!appendPolygonCurve(out, loop.section)) return null;
+      if (!appendPolygonCurve(out, loop.section, chordTol)) return null;
     } else if (loop.curves && loop.curves.length) {
       if (loop.lines && loop.lines.length) return null;
       for (var c=0;c<loop.curves.length;c++) {
         var curve = typeof loop.curves[c] === 'object' ? loop.curves[c] : curves[loop.curves[c]];
-        if (!appendPolygonCurve(out, curve)) return null;
+        if (!appendPolygonCurve(out, curve, chordTol)) return null;
       }
     } else if (loop.lines && loop.lines.length) {
       for (var l=0;l<loop.lines.length;l++) {
@@ -2341,6 +2344,16 @@
     return out.length >= 3 ? out : null;
   }
 
+  function fullCircleCurve(loop, curves) {
+    var curve = null;
+    if (loop.section) curve = loop.section;
+    else if (loop.curves && loop.curves.length === 1 &&
+        !(loop.lines && loop.lines.length) && !(loop.elements && loop.elements.length))
+      curve = typeof loop.curves[0] === 'object' ? loop.curves[0] : curves[loop.curves[0]];
+    if (!curve || !validCurve(curve)) return null;
+    return curveSweep(curve) >= TAU - 1e-9 ? curve : null;
+  }
+
   function classifyPlanePoint(surface, p, geometry) {
     var loops = surface.loops || [];
     if (!loops.length) return {status:'inside', method:'plane-unbounded', residual:0};
@@ -2349,26 +2362,41 @@
     var v = finite(surface.v) ? unit(surface.v) : frame.v;
     var origin = surface.origin;
     var tol = surfaceTolerance(surface);
+    var curves = geometry && geometry.curves || [];
+    var vertices = geometry && geometry.vertices || [];
     function project(point) {
       var d = sub(point, origin);
       return {x:dot(d, u), y:dot(d, v)};
     }
     var q = project(p);
-    var outers = [], holes = [];
+    var outerInside = false, holeInside = false, onBoundary = false;
     for (var i=0;i<loops.length;i++) {
-      var polygon = loopPolygon(loops[i], geometry && geometry.curves || [],
-        geometry && geometry.vertices || []);
-      if (!polygon) return {status:'unknown', reason:'loop-unsupported', loopIndex:i, residual:0};
-      var flat = polygon.map(project);
-      if (loops[i].kind === 'inner') holes.push(flat); else outers.push(flat);
+      var loop = loops[i], state;
+      var circle = fullCircleCurve(loop, curves);
+      if (circle) {
+        var r = radii(circle), rel = sub(p, circle.center);
+        var a = dot(rel, circle.u) / r.u, b = dot(rel, circle.v) / r.v;
+        var radialTol = tol / Math.min(r.u, r.v);
+        var rho = Math.hypot(a, b);
+        state = Math.abs(rho - 1) <= radialTol ? 'boundary' :
+          rho < 1 ? 'inside' : 'outside';
+      } else {
+        var polygon = loopPolygon(loop, curves, vertices, tol);
+        if (!polygon)
+          return {status:'unknown', reason:'loop-unsupported', loopIndex:i, residual:0};
+        var flat = polygon.map(project);
+        if (pointOnPolygon2(q, flat, tol)) state = 'boundary';
+        else state = pointInPolygon2(q, flat) ? 'inside' : 'outside';
+      }
+      if (state === 'boundary') onBoundary = true;
+      else if (loop.kind === 'inner') { if (state === 'inside') holeInside = true; }
+      else if (state === 'inside') outerInside = true;
     }
-    if (!outers.length) return {status:'unknown', reason:'no-outer-loop', residual:0};
-    if (outers.some(function (poly) { return pointOnPolygon2(q, poly, tol); }) ||
-        holes.some(function (poly) { return pointOnPolygon2(q, poly, tol); }))
+    if (onBoundary)
       return {status:'boundary', method:'plane-loops', residual:0, tolerance:tol};
-    var inOuter = outers.some(function (poly) { return pointInPolygon2(q, poly); });
-    var inHole = holes.some(function (poly) { return pointInPolygon2(q, poly); });
-    return {status:inOuter && !inHole ? 'inside' : 'outside',
+    if (!loops.some(function (loop) { return loop.kind !== 'inner'; }))
+      return {status:'unknown', reason:'no-outer-loop', residual:0};
+    return {status:outerInside && !holeInside ? 'inside' : 'outside',
       method:'plane-loops', residual:0, tolerance:tol};
   }
 
@@ -2396,6 +2424,222 @@
     return {status:contained.inside ? 'inside' : 'outside',
       method:surface.kind === 'sphere' ? 'sphere-cap' : 'loop-stations',
       residual:residual, tolerance:tol};
+  }
+
+  function boundedInside(state) {
+    return !!(state && (state.status === 'inside' || state.status === 'boundary'));
+  }
+  function patchBounded(surface) {
+    return !!((surface.loops && surface.loops.length) || surface.closed === true);
+  }
+  function branchPointAt(branch, t) {
+    if (branch.kind === 'line') {
+      var direction = unit(branch.direction);
+      return add(branch.origin, mul(direction, t));
+    }
+    return curvePoint(branch, t);
+  }
+  function boundedTolerance(a, b) {
+    return Math.max(surfaceTolerance(a), surfaceTolerance(b), EPS);
+  }
+  function sampleStates(a, b, branch, t, geometry) {
+    var point = branchPointAt(branch, t);
+    var first = classifyPoint(a, point, geometry);
+    var second = classifyPoint(b, point, geometry);
+    return {t:t, point:point, first:first, second:second,
+      inside:boundedInside(first) && boundedInside(second)};
+  }
+  function findBoundedStation(a, b, branch, tInside, tOutside, geometry, tolerance) {
+    var inside = tInside, outside = tOutside;
+    // A closed branch crossing the parameter seam must be bisected across the
+    // short arc, not the long way around the circle.
+    if (branch.kind !== 'line' && Math.abs(outside - inside) > Math.PI) {
+      if (outside > inside) outside -= TAU; else outside += TAU;
+    }
+    for (var i = 0; i < 64; i++) {
+      var mid = 0.5 * (inside + outside);
+      var state = sampleStates(a, b, branch, mid, geometry);
+      if (state.inside) inside = mid; else outside = mid;
+      if (Math.abs(outside - inside) <= 1e-12 * Math.max(1, Math.abs(mid))) break;
+    }
+    var t = 0.5 * (inside + outside);
+    return {t:t, point:branchPointAt(branch, t),
+      method:'bisection', confidence:'numeric',
+      parameterTolerance:Math.abs(outside - inside)};
+  }
+  function boundedRuns(samples, a, b, branch, geometry, tolerance, diagnostics) {
+    var count = samples.length, runs = [];
+    var allInside = samples.every(function (sample) { return sample.inside; });
+    if (allInside) return {runs:[], allInside:true};
+    if (!samples.some(function (sample) { return sample.inside; }))
+      return {runs:[], allInside:false, none:true};
+    var entering = -1;
+    for (var i = 0; i < count; i++) {
+      var next = (i + 1) % count;
+      if (!samples[i].inside && samples[next].inside) { entering = next; break; }
+    }
+    if (entering === -1) {
+      diagnostics.push({code:'bounded-station-missing', severity:'warning',
+        message:'No inside-to-outside transition was found on an intersection branch.'});
+      return {runs:[], allInside:false};
+    }
+    var index = entering, guard = 0;
+    while (guard++ <= count) {
+      if (!samples[index].inside) break;
+      var startIndex = index, endIndex = index;
+      var steps = 0;
+      while (samples[endIndex].inside && steps++ <= count) endIndex = (endIndex + 1) % count;
+      var start = findBoundedStation(a, b, branch,
+        samples[startIndex].t, samples[(startIndex - 1 + count) % count].t,
+        geometry, tolerance);
+      var end = findBoundedStation(a, b, branch,
+        samples[(endIndex - 1 + count) % count].t, samples[endIndex].t,
+        geometry, tolerance);
+      if (start.t > end.t) end.t += TAU;
+      if (end.t - start.t > 1e-12) runs.push({start:start, end:end});
+      index = endIndex;
+      while (!samples[index].inside && guard++ <= count) index = (index + 1) % count;
+      if (index === entering) break;
+    }
+    return {runs:runs, allInside:false};
+  }
+  function clipPeriodicBranch(a, b, branch, geometry, options, diagnostics) {
+    var count = Math.max(32, options.samples || 128);
+    var samples = [];
+    for (var i = 0; i < count; i++) {
+      samples.push(sampleStates(a, b, branch, (i + 0.5) * TAU / count, geometry));
+    }
+    var tolerance = boundedTolerance(a, b);
+    var split = boundedRuns(samples, a, b, branch, geometry, tolerance, diagnostics);
+    if (split.allInside) {
+      var full = copyFields(branch);
+      full.id = branch.id || undefined;
+      full.bounded = true;
+      full.closed = true;
+      full.confidence = 'numeric';
+      full.method = 'sampled-stations';
+      return [full];
+    }
+    return split.runs.map(function (run) {
+      var t0 = ((run.start.t % TAU) + TAU) % TAU;
+      var t1 = ((run.end.t % TAU) + TAU) % TAU;
+      if (t1 <= t0 + 1e-12) t1 += TAU;
+      var arc = subArc(branch, t0, t1);
+      arc.bounded = true;
+      arc.closed = false;
+      arc.confidence = 'numeric';
+      arc.method = 'sampled-stations';
+      arc.startStation = Object.assign({}, run.start, {t:t0});
+      arc.endStation = Object.assign({}, run.end, {t:t1});
+      arc.surfaceIds = [a.id === undefined ? null : a.id,
+        b.id === undefined ? null : b.id];
+      return arc;
+    });
+  }
+  function clipLineBranch(a, b, branch, geometry, options, diagnostics) {
+    var direction = unit(branch.direction), origin = branch.origin;
+    var extent = 1;
+    ((geometry && geometry.vertices) || []).forEach(function (v) {
+      if (finite(v)) extent = Math.max(extent, Math.abs(v.x), Math.abs(v.y), Math.abs(v.z));
+    });
+    [a, b].forEach(function (s) {
+      if (finite(s.origin)) extent = Math.max(extent, length(s.origin));
+      if (finite(s.center)) extent = Math.max(extent, length(s.center));
+      if (Number.isFinite(s.radius)) extent += Math.abs(s.radius);
+    });
+    var limit = extent * 4 + 10;
+    var count = Math.max(64, options.samples || 192);
+    var samples = [];
+    for (var i = 0; i < count; i++) {
+      var t = -limit + (i + 0.5) * (2 * limit) / count;
+      samples.push(sampleStates(a, b, {kind:'line', origin:origin, direction:direction}, t, geometry));
+    }
+    var tolerance = boundedTolerance(a, b);
+    var split = boundedRuns(samples, a, b, {kind:'line', origin:origin, direction:direction},
+      geometry, tolerance, diagnostics);
+    if (split.allInside) return [];
+    return split.runs.map(function (run) {
+      return {kind:'line', start:run.start.point, end:run.end.point,
+        direction:direction, bounded:true, confidence:'numeric',
+        method:'sampled-stations', startStation:run.start, endStation:run.end,
+        surfaceIds:[a.id === undefined ? null : a.id, b.id === undefined ? null : b.id]};
+    });
+  }
+  // Bounded intersection: keep the exact support algebra, clip its branches
+  // to both patches with explicit classification. Station parameters are
+  // computed by sampled bisection, so every component is labelled numeric;
+  // this layer never claims an exact cut station.
+  function intersectBounded(a, b, geometry, options) {
+    options = options || {};
+    var diagnostics = [];
+    var contract = 'bounded-intersection-v1';
+    var support = intersect(a, b);
+    if (!support) {
+      return {contract:contract, kind:'bounded', status:'unsupported',
+        support:null, components:[],
+        diagnostics:[{code:'bounded-support-unsupported', severity:'error',
+          message:'The support intersection is not implemented for this surface pair.'}]};
+    }
+    if (!patchBounded(a) || !patchBounded(b)) {
+      return {contract:contract, kind:'bounded', status:'unbounded',
+        support:support, components:[],
+        diagnostics:[{code:'bounded-patch-unbounded', severity:'warning',
+          message:'Both input patches need a boundary loop or closed compact support.'}]};
+    }
+    if (support.kind === 'none') {
+      return {contract:contract, kind:'bounded', status:'none', support:support,
+        components:[], diagnostics:diagnostics};
+    }
+    if (support.kind === 'point') {
+      var pointState = sampleStates(a, b, {kind:'line', origin:support.point,
+        direction:{x:0,y:0,z:1}}, 0, geometry);
+      return {contract:contract, kind:'bounded', status:'ok', support:support,
+        components:pointState.inside ? [{kind:'point', point:support.point,
+          bounded:true, confidence:'numeric'}] : [],
+        diagnostics:diagnostics};
+    }
+    if (support.kind === 'plane-overlap' || support.kind === 'coincident') {
+      return {contract:contract, kind:'bounded', status:'coincident',
+        support:support, components:[],
+        diagnostics:[{code:'bounded-overlap-unsupported', severity:'warning',
+          message:'Bounded overlap topology is not implemented.'}]};
+    }
+    if (support.kind === 'unsupported') {
+      return {contract:contract, kind:'bounded', status:'unsupported',
+        support:support, components:[], diagnostics:diagnostics};
+    }
+    var branches = [];
+    if (support.kind === 'circle' || support.kind === 'ellipse') branches = [support];
+    else if (support.kind === 'circles') branches = support.circles || [];
+    else if (support.kind === 'line') branches = [support];
+    else if (support.kind === 'lines') branches = support.lines || [];
+    else {
+      return {contract:contract, kind:'bounded', status:'unsupported',
+        support:support, components:[],
+        diagnostics:[{code:'bounded-support-kind', severity:'error',
+          message:'Bounded clipping does not handle support kind ' + support.kind + '.'}]};
+    }
+    var components = [];
+    branches.forEach(function (branch) {
+      if (!branch.kind && finite(branch.center)) branch.kind = 'circle';
+      if (branch.kind === 'line' || !branch.kind && branch.direction) {
+        components = components.concat(clipLineBranch(a, b, branch, geometry, options, diagnostics));
+      } else {
+        components = components.concat(clipPeriodicBranch(a, b, branch, geometry, options, diagnostics));
+      }
+    });
+    var totalSweep = components.reduce(function (sum, component) {
+      return sum + (Number.isFinite(component.sweepAngle) ? component.sweepAngle : 0);
+    }, 0);
+    return {contract:contract, kind:'bounded',
+      status:components.length ? 'ok' : 'none',
+      support:support, components:components, diagnostics:diagnostics,
+      summary:{components:components.length,
+        arcs:components.filter(function (c) { return c.kind === 'arc'; }).length,
+        full:components.filter(function (c) { return c.closed === true; }).length,
+        sweepRatio:Math.round(totalSweep / Math.PI * 1e4) / 1e4},
+      method:'sampled-stations', confidence:'numeric',
+      tolerance:boundedTolerance(a, b)};
   }
 
   function splitSectionForCrossing(surface, spec, cut, crossingPoints, geometry) {
@@ -2898,6 +3142,7 @@
     attachBoundary:attachBoundary,
     shareBoundary:shareBoundary,
     intersectionCurves:intersectionCurves,
+    intersectBounded:intersectBounded,
     classifyPoint:classifyPoint,
     planeSpec:planeSpec,
     point:curvePoint,

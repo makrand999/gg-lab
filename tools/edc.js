@@ -284,6 +284,16 @@ function runScript(text, options) {
         var classifySurface = pick(request.surface);
         if (!classifySurface) throw new Error('Missing reconstructed surface');
         result = Surfaces.classifyPoint(classifySurface, request.point, g);
+      } else if (request.operation === 'intersect-bounded') {
+        var boundedRefs = request.surfaces || [
+          request.from !== undefined ? request.from : request.surface,
+          request.with !== undefined ? request.with : request.other
+        ];
+        var boundedFirst = pick(boundedRefs[0]), boundedSecond = pick(boundedRefs[1]);
+        if (!boundedFirst || !boundedSecond) throw new Error('Missing reconstructed surface');
+        result = Surfaces.intersectBounded(boundedFirst, boundedSecond, g, request.options);
+      } else if (request.operation === 'intersect-bounded-spec') {
+        result = Surfaces.intersectBounded(request.a, request.b, g, request.options);
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

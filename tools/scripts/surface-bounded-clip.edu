@@ -1,0 +1,22 @@
+# Bounded clipping keeps the exact support branch and trims it to both
+# patches. The truncated cylinder's caps meet the side along its end loops,
+# so the bounded result is a full circle/ellipse. A raw sphere and a half
+# plane patch cut the equatorial circle to one numeric half-arc.
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceModel=ok status=inferred
+/datum -30 80
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 0 0 elevation
+/point b 40 0 elevation
+/point c 40 50 elevation
+/point d 0 10 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+
+# expect: surfaceChecks=4 surfaceQueries=ok
+# surface-query: {"operation":"intersect-bounded","surfaces":[0,1],"expect":{"status":"ok","support":{"kind":"circle","radius":20},"components":[{"kind":"circle","radius":20,"bounded":true,"confidence":"numeric"}],"summary":{"components":1,"full":1}}}
+# surface-query: {"operation":"intersect-bounded","surfaces":[0,2],"expect":{"status":"ok","support":{"kind":"ellipse","radiusV":20},"components":[{"kind":"ellipse","radiusV":20,"bounded":true}],"summary":{"components":1,"full":1}}}
+# surface-query: {"operation":"intersect-bounded","surfaces":[1,2],"expect":{"status":"none","components":[],"summary":{"components":0}}}
+# surface-query: {"operation":"intersect-bounded-spec","a":{"kind":"sphere","id":"s","center":{"x":0,"y":0,"z":0},"radius":5,"closed":true,"loops":[]},"b":{"kind":"plane","id":"p","origin":{"x":0,"y":0,"z":0},"normal":{"x":0,"y":0,"z":1},"u":{"x":1,"y":0,"z":0},"v":{"x":0,"y":1,"z":0},"closed":false,"loops":[{"kind":"outer","points":[{"x":-5,"y":-5,"z":0},{"x":0,"y":-5,"z":0},{"x":0,"y":5,"z":0},{"x":-5,"y":5,"z":0}]}]},"expect":{"status":"ok","components":[{"kind":"arc","closed":false,"confidence":"numeric","method":"sampled-stations"}],"summary":{"components":1,"arcs":1,"full":0,"sweepRatio":1}}}

@@ -4204,10 +4204,22 @@
             var list = handle.table.list();
             // One pipeline: identities constrain correspondence; geometry
             // families and surface inference are shared across all sheets.
-            var res = EduCADReconstruct.reconstruct(list);
+            var res = EduCADReconstruct.reconstruct(list, {deferValidation:true});
             builtRevision = revision;
             builtResult = res;
             handle.reconstruction = res;
+            if (res.geometry && res.geometry.analyticSurfaceValidation &&
+                res.geometry.analyticSurfaceValidation.deferred) {
+              var pendingGeometry = res.geometry;
+              var pendingRevision = revision;
+              var validate = function () {
+                if (handle.table.revision() !== pendingRevision) return;
+                try { EduCADReconstruct.validateSurfaces(pendingGeometry); } catch (err) {}
+              };
+              if (typeof window.requestIdleCallback === 'function')
+                window.requestIdleCallback(validate, {timeout:500});
+              else window.setTimeout(validate, 0);
+            }
             if (res.status === 'ok') {
               handle.solidMm = res.geometry;
               EduCADSolid.setGeometry(solid3d, res.geometry);

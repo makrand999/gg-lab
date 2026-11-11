@@ -2776,9 +2776,11 @@
         g.curves.push(c);
       });
       g.profileMap=resolved.profile;g.topologyStatus=diagnostics.length?'partial':'inferred';
-      var model=Surfaces.build(g);g.surfaces=model.surfaces;g.surfaceModel=model.summary;g.analyticSurfaceValidation=Surfaces.validate(model,g);
-      g.analyticCertificate=Surfaces.certify(model,g);
-      g.surfaceModel.status=g.analyticSurfaceValidation.status;
+      var model=Surfaces.build(g);g.surfaces=model.surfaces;g.surfaceModel=model.summary;
+      if(opts.deferValidation){g.analyticSurfaceValidation={status:'pending',deferred:true,contract:'analytic-surface-v1'};
+        g.analyticCertificate={status:'pending',deferred:true,contract:'analytic-surface-certificate-v1'};}
+      else{g.analyticSurfaceValidation=Surfaces.validate(model,g);g.analyticCertificate=Surfaces.certify(model,g);
+        g.surfaceModel.status=g.analyticSurfaceValidation.status;}
     }
     return {status:g?'ok':'unavailable',reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
       label:diagnostics.length?diagnostics[0].message:'Parametric curves reconstructed',geometry:g,
@@ -2786,6 +2788,19 @@
       pipeline:{version:1,input:'vertices-edges-curves',identity:opts.identity==='explicit'?'explicit':'inferred',stage:'surface-inference',diagnostics:diagnostics}};
   }
 
+  function validateSurfaces(geometry) {
+    if (!geometry || !Surfaces) return null;
+    var model = Surfaces.build(geometry);
+    if (!model) return null;
+    geometry.surfaces = model.surfaces;
+    geometry.surfaceModel = model.summary;
+    geometry.analyticSurfaceValidation = Surfaces.validate(model, geometry);
+    geometry.analyticCertificate = Surfaces.certify(model, geometry);
+    if (geometry.analyticSurfaceValidation)
+      geometry.surfaceModel.status = geometry.analyticSurfaceValidation.status;
+    return {model:model, validation:geometry.analyticSurfaceValidation,
+      certificate:geometry.analyticCertificate};
+  }
   function auditCorrespondence(entities, profileFrame) {
     try {
       var moduleRef = (typeof require === 'function' && typeof module !== 'undefined') ?
@@ -2867,6 +2882,13 @@
       if (model) {
         g.surfaces = model.surfaces;
         g.surfaceModel = model.summary;
+        if (opts.deferValidation) {
+          g.analyticSurfaceValidation = {status:'pending', deferred:true,
+            contract:'analytic-surface-v1'};
+          g.analyticCertificate = {status:'pending', deferred:true,
+            contract:'analytic-surface-certificate-v1'};
+          return g;
+        }
         g.analyticSurfaceValidation = Surfaces.validate(model, g);
         g.analyticCertificate = Surfaces.certify(model, g);
         if (g.analyticSurfaceValidation) g.surfaceModel.status = g.analyticSurfaceValidation.status;
@@ -3043,8 +3065,12 @@
     // Bounded analytic surface model: patch inference stays the source of the
     // display, while each patch exposes its analytic family and ordered loops.
     attachSurfaceModel(geometry);
-    var inferredValidation = validateInferredSurfaces(geometry);
-    if (inferredValidation) geometry.surfaceValidation = inferredValidation;
+    if (opts.deferValidation) {
+      geometry.surfaceValidation = {status:'pending', deferred:true};
+    } else {
+      var inferredValidation = validateInferredSurfaces(geometry);
+      if (inferredValidation) geometry.surfaceValidation = inferredValidation;
+    }
     geometry.topologyStatus = diagnostics.length ? 'partial' : 'inferred';
     return finish({status:'ok',reason:null,label:'',determination:diagnostics.length?'partial':'inferred',
       geometry:geometry,issues:diagnostics,stats:{paired:geometry.vertices.length,edges:geometry.edges.length,curves:(geometry.curves || []).length}},
@@ -3076,10 +3102,17 @@
       if (model) {
         result.geometry.surfaces = model.surfaces;
         result.geometry.surfaceModel = model.summary;
-        result.geometry.analyticSurfaceValidation = Surfaces.validate(model, result.geometry);
-        result.geometry.analyticCertificate = Surfaces.certify(model, result.geometry);
-        if (result.geometry.analyticSurfaceValidation)
-          result.geometry.surfaceModel.status = result.geometry.analyticSurfaceValidation.status;
+        if (opts && opts.deferValidation) {
+          result.geometry.analyticSurfaceValidation = {status:'pending', deferred:true,
+            contract:'analytic-surface-v1'};
+          result.geometry.analyticCertificate = {status:'pending', deferred:true,
+            contract:'analytic-surface-certificate-v1'};
+        } else {
+          result.geometry.analyticSurfaceValidation = Surfaces.validate(model, result.geometry);
+          result.geometry.analyticCertificate = Surfaces.certify(model, result.geometry);
+          if (result.geometry.analyticSurfaceValidation)
+            result.geometry.surfaceModel.status = result.geometry.analyticSurfaceValidation.status;
+        }
       }
     }
     return result;
@@ -3859,6 +3892,7 @@
     inferClosedFaces: inferClosedFaces,
     reconstruct: reconstruct,
     reconstructStrict: reconstructStrict,
-    reconstructLive: reconstructLive
+    reconstructLive: reconstructLive,
+    validateSurfaces: validateSurfaces
   };
 });

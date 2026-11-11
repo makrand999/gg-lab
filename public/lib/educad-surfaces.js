@@ -2945,6 +2945,43 @@
         majorRadius:R, minorRadius:r}};
   }
 
+  // Coaxial torus/cylinder: the cylinder radius fixes the tube station
+  // (rho - R), so the intersection is one or two circles perpendicular to the
+  // shared axis. Offset and skew axes need a quartic and stay unsupported.
+  function torusCylinder(torus, cylinder) {
+    if (!finite(torus.center) || !finite(torus.axis) ||
+        !finite(cylinder.origin) || !finite(cylinder.axis) ||
+        !(cylinder.radius > 0)) return null;
+    var axis = unit(torus.axis), cylinderAxis = unit(cylinder.axis);
+    var policy = tolerancePolicy([torus.majorRadius, torus.minorRadius, cylinder.radius]);
+    if (length(cross(axis, cylinderAxis)) > policy.angle)
+      return {kind:'unsupported', relation:'skew', reason:'torus-cylinder-skew-unsupported',
+        guarantee:'numeric'};
+    var delta = sub(cylinder.origin, torus.center);
+    var offset = sub(delta, mul(axis, dot(delta, axis)));
+    if (length(offset) > policy.length)
+      return {kind:'unsupported', relation:'offset', reason:'torus-cylinder-offset-unsupported',
+        gap:length(offset), tolerance:policy.length, guarantee:'numeric'};
+    var rho = cylinder.radius, R = torus.majorRadius, r = torus.minorRadius;
+    var gap = r*r - (rho - R)*(rho - R);
+    if (gap < -policy.length) return none('separate');
+    var dz = Math.sqrt(Math.max(0, gap));
+    var frame = basis(axis);
+    function circleAt(height) {
+      return {kind:'circle', center:add(torus.center, mul(axis, height)),
+        u:frame.u, v:frame.v, radius:rho, surfaceId:torus.id,
+        sourceIds:(torus.sourceIds || []).slice()};
+    }
+    if (dz <= policy.length) {
+      var tangent = circleAt(0);
+      tangent.sectionType = 'torus-cylinder-tangent';
+      tangent.relation = 'tangent';
+      return tangent;
+    }
+    return {kind:'circles', relation:'transverse', sectionType:'torus-cylinder-coaxial',
+      circles:[circleAt(dz), circleAt(-dz)]};
+  }
+
   function intersect(a, b) {
     if (!a || !b || !a.kind || !b.kind) return null;
     var result;
@@ -2957,6 +2994,8 @@
     else if (a.kind === 'cylinder' && b.kind === 'sphere') result = sphereCylinder(b, a);
     else if (a.kind === 'torus' && b.kind === 'sphere') result = torusSphere(a, b);
     else if (a.kind === 'sphere' && b.kind === 'torus') result = torusSphere(b, a);
+    else if (a.kind === 'torus' && b.kind === 'cylinder') result = torusCylinder(a, b);
+    else if (a.kind === 'cylinder' && b.kind === 'torus') result = torusCylinder(b, a);
     else return null;
     return result && tagged(result, a, b);
   }

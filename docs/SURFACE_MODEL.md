@@ -315,9 +315,10 @@ P-C = (R + r cos v) e(u) + r sin v a,   W = d_perp . e(u)
 The validity condition is again a quadratic in `W`, so each loop has two
 analytic branches with exact major-angle endpoints. Coaxial spheres yield
 circles (two loops, or one when tangent); a sphere centred on the tube
-centerline with the tube radius returns the shared tube circle. Torus–cylinder,
-torus–cone and torus–torus intersections are not yet implemented. The
-certificate checks centre, radii, axis, domain and boundary on-surface
+centerline with the tube radius returns the shared tube circle. Coaxial
+torus–cylinder intersections are circles at `z = ±sqrt(r² - (rho - R)²)`;
+offset or skew cylinder axes and torus–cone/torus pairs are not implemented.
+The certificate checks centre, radii, axis, domain and boundary on-surface
 residuals.
 
 Torus silhouettes are analytic in all orthographic views:

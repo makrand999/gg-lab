@@ -1,5 +1,6 @@
 # RULE-A: elevation a' and plan a lift one 3D point by base name + x.
 # No projector lines are drawn; projection lines are decoration only.
+# expect: 4V 4E 1F status=inferred unresolved=0
 /datum -30 30
 /point "b',a'" 0 40 elevation
 /point "c',d'" 0 0 elevation

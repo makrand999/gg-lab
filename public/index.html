@@ -648,6 +648,7 @@
   <script src="lib/educad-vec3.js"></script>
   <script src="lib/educad-curve-reconstruct.js"></script>
   <script src="lib/educad-oblique-kernel.js"></script>
+  <script src="lib/educad-predicates.js"></script>
   <script src="lib/educad-surfaces.js"></script>
   <script src="lib/educad-parametric-reconstruct.js"></script>
   <script src="lib/educad-reconstruct.js?v=quiet-20261006-2"></script>
@@ -4189,15 +4190,20 @@
         (function () {
           var solid3d = handle.solid;
           var rebuildQueued = false;
+          var builtRevision = -1, builtResult = null;
           function rebuildSolid() {
             rebuildQueued = false;
             // Pose mode owns the widget: the table cannot change under
             // it, and rebuilds must not wipe the live pose.
             if (EduCADMeasure.isPose(handle.measure)) return;
+            var revision = handle.table.revision();
+            if (revision === builtRevision && builtResult) return;
             var list = handle.table.list();
             // One pipeline: identities constrain correspondence; geometry
             // families and surface inference are shared across all sheets.
             var res = EduCADReconstruct.reconstruct(list);
+            builtRevision = revision;
+            builtResult = res;
             handle.reconstruction = res;
             if (res.status === 'ok') {
               handle.solidMm = res.geometry;
@@ -5352,6 +5358,9 @@
           return 0;
         }
         var count = window.educadReplaceSheet(data);
+        if (typeof window.educadNoteDrawing === 'function') {
+          window.educadNoteDrawing(null, '');
+        }
         deselectAll();
         status(what + ' (' + count + ' entities) ' + stamp());
         return count;
@@ -6193,6 +6202,9 @@
           return -1;
         }
         var count = window.educadReplaceSheet(data);
+        if (typeof window.educadNoteDrawing === 'function') {
+          window.educadNoteDrawing(null, '');
+        }
         var h = window.educadHandle;
         if (h && h.sel && window.EduCADCanvas &&
             typeof window.EduCADCanvas.deselect === 'function') {

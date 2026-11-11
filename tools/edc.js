@@ -267,6 +267,19 @@ function runScript(text, options) {
         result = {surfaces:rebuilt.surfaces, summary:rebuilt.summary,
           diagnostics:rebuilt.diagnostics,
           identity:identitySummary(rebuilt.surfaces)};
+      } else if (request.operation === 'intersect-spec') {
+        result = Surfaces.intersect(request.a, request.b);
+      } else if (request.operation === 'predicate') {
+        var Predicates = require('../public/lib/educad-predicates.js');
+        var pts = (request.points || []).map(function (p) {
+          return {x:p.x, y:p.y, z:p.z};
+        });
+        if (request.predicate === 'orient3d') result = Predicates.orient3d(pts[0],pts[1],pts[2],pts[3]);
+        else if (request.predicate === 'orient2d') result = Predicates.orient2d(pts[0],pts[1],pts[2]);
+        else if (request.predicate === 'coplanar') result = Predicates.coplanar(pts[0],pts[1],pts[2],pts[3]);
+        else if (request.predicate === 'pointOnPlane') {
+          result = Predicates.pointOnPlane(Predicates.point(pts[0]), Predicates.plane(pts[1], pts[2]));
+        } else throw new Error('Unknown predicate');
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');
@@ -485,11 +498,38 @@ function report(file, res) {
 }
 
 function main(argv) {
-  var args = argv.slice(2).filter(function (a) { return a !== '--solid' && a !== '--strict'; });
-  var wantSolid = argv.indexOf('--solid') !== -1;
-  var file = args[0];
+  var flags = {solid:false, strict:false, corpus:false, json:false,
+    junit:false, requireExpect:false};
+  var positional = [], corpusDir = null;
+  for (var i = 2; i < argv.length; i++) {
+    var arg = argv[i];
+    if (arg === '--solid') flags.solid = true;
+    else if (arg === '--strict') flags.strict = true;
+    else if (arg === '--corpus') {
+      flags.corpus = true;
+      if (argv[i + 1] && argv[i + 1].charAt(0) !== '-') {
+        corpusDir = argv[++i];
+      }
+    } else if (arg === '--json') flags.json = true;
+    else if (arg === '--junit') flags.junit = true;
+    else if (arg === '--require-expect') flags.requireExpect = true;
+    else if (arg.charAt(0) === '-') {
+      console.error('edc: unknown option ' + arg);
+      return 2;
+    } else positional.push(arg);
+  }
+  if (flags.corpus) {
+    var dir = corpusDir || positional[0] || path.join(__dirname, 'scripts');
+    var corpus = runCorpus(dir, {strict:flags.strict, requireExpect:flags.requireExpect});
+    if (flags.json) console.log(JSON.stringify(corpus, null, 2));
+    else if (flags.junit) console.log(junitReport(corpus));
+    else console.log(corpusReport(corpus));
+    return corpus.ok ? 0 : 1;
+  }
+  var file = positional[0];
   if (!file) {
     console.error('Usage: node tools/edc.js [--solid] [--strict] <file.edc|file.edu>');
+    console.error('       node tools/edc.js --corpus [dir] [--json|--junit] [--require-expect]');
     return 2;
   }
   var text;
@@ -499,10 +539,97 @@ function main(argv) {
     console.error('edc: cannot read ' + file);
     return 2;
   }
-  var res = runScript(text, { strict: argv.indexOf('--strict') !== -1 });
+  var res = runScript(text, { strict: flags.strict });
   console.log(report(file, res));
-  if (wantSolid) console.log(JSON.stringify(res.solid));
+  if (flags.solid) console.log(JSON.stringify(res.solid));
   return res.ok ? 0 : 1;
+}
+
+// Machine-checkable directive count for --require-expect.
+function expectationCount(text) {
+  return String(text).split(/\r?\n/).filter(function (line) {
+    return /^\s*#\s*(expect|surface-query|reject|pose-check):/i.test(line);
+  }).length;
+}
+
+function runCorpus(dir, options) {
+  options = options || {};
+  var started = Date.now();
+  var files;
+  try {
+    files = fs.readdirSync(dir).filter(function (f) {
+      return /\.(edu|edc)$/.test(f);
+    }).sort();
+  } catch (err) {
+    return {ok:false, error:'cannot read corpus ' + dir, scripts:[], total:0,
+      passed:0, failed:1, durationMs:0};
+  }
+  var scripts = files.map(function (file) {
+    var res, error = null, ms = 0;
+    try {
+      var text = fs.readFileSync(path.join(dir, file), 'utf8');
+      var t0 = process.hrtime.bigint();
+      res = runScript(text, { strict:options.strict });
+      ms = Number(process.hrtime.bigint() - t0) / 1e6;
+      var expectations = expectationCount(text);
+      res.properties.expectations = expectations;
+      if (options.requireExpect && expectations === 0) {
+        res.ok = false;
+        res.errors.push({n:0, line:'', message:'No expectation directive (# expect, # surface-query, # reject or # pose-check).'});
+      }
+    } catch (err) {
+      error = err && err.message ? err.message : String(err);
+      res = {ok:false, errors:[{n:0,line:'',message:error}], properties:{},
+        steps:[], summary:{count:0}};
+    }
+    return {file:file, ok:!!res.ok, ms:Number(ms.toFixed(1)),
+      steps:(res.steps || []).length, entities:res.summary ? res.summary.count : 0,
+      expectations:res.properties ? res.properties.expectations || 0 : 0,
+      errors:(res.errors || []).map(function (e) {
+        return {line:e.n || 0, message:e.message};
+      })};
+  });
+  var failed = scripts.filter(function (s) { return !s.ok; }).length;
+  return {ok:failed === 0, total:scripts.length, passed:scripts.length - failed,
+    failed:failed, durationMs:Date.now() - started, scripts:scripts};
+}
+
+function corpusReport(corpus) {
+  var out = [];
+  corpus.scripts.forEach(function (s) {
+    if (s.ok) return;
+    out.push('FAIL ' + s.file);
+    s.errors.forEach(function (e) {
+      out.push('  line ' + (e.line || '-') + ': ' + e.message);
+    });
+  });
+  out.push('edc corpus: ' + corpus.passed + '/' + corpus.total + ' clean' +
+    (corpus.failed ? ' — ' + corpus.failed + ' FAILED' : '') +
+    ' in ' + corpus.durationMs + ' ms');
+  return out.join('\n');
+}
+
+function junitEscape(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function junitReport(corpus) {
+  var out = ['<?xml version="1.0" encoding="UTF-8"?>',
+    '<testsuite name="educad" tests="' + corpus.total + '" failures="' +
+      corpus.failed + '" time="' + (corpus.durationMs / 1000).toFixed(3) + '">'];
+  corpus.scripts.forEach(function (s) {
+    out.push('  <testcase classname="educad" name="' + junitEscape(s.file) +
+      '" time="' + (s.ms / 1000).toFixed(3) + '">');
+    if (!s.ok) {
+      out.push('    <failure message="' +
+        junitEscape(s.errors.map(function (e) { return e.message; }).join('; ')) +
+        '"/>');
+    }
+    out.push('  </testcase>');
+  });
+  out.push('</testsuite>');
+  return out.join('\n');
 }
 
 if (require.main === module) process.exit(main(process.argv));
@@ -511,5 +638,9 @@ module.exports = {
   runScript: runScript,
   checkProjectors: checkProjectors,
   summarize: summarize,
-  report: report
+  report: report,
+  runCorpus: runCorpus,
+  corpusReport: corpusReport,
+  junitReport: junitReport,
+  expectationCount: expectationCount
 };

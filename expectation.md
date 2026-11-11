@@ -137,7 +137,7 @@ Expected result:
 ```text
 edc tools/scripts/rule-a.edc: 7 steps, 7 entities — CLEAN
   entities: DATUM_AXIS 1, POINT 4, SEGMENT 2
-  solid: ok — 4V 4E 2F
+  solid: ok — 4V 4E 1F
 ```
 
 The solid dump must contain:
@@ -295,7 +295,7 @@ Expected:
 ```text
 edge-both-views.edc    2V 1E 0F
 edge-missing-plan.edc  2V 0E 0F
-flat-square.edc        4V 4E 2F
+flat-square.edc        4V 4E 1F
 wedge.edc              6V 9E 5F
 ```
 

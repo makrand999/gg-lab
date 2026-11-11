@@ -34,14 +34,13 @@ A **line boundary element** is a finite straight segment on the surface:
 ```
 
 It is stored inline on a loop as `loop.lines` and is the model's straight
-counterpart of an inline `section`. The element object is its identity: two
-loops share a line only when they reference the same object, exactly like an
-inline section. An optional string `id` provides a stable identity across JSON
-serialization (the fillet inference sets one); two distinct line objects with
-the same explicit `id` are treated as one boundary element, so a producer must
-keep explicit ids unique. Without an `id`, incidence falls back to object
-identity. This is the representation used by a cylindrical fillet's two
-tangent generator boundaries.
+counterpart of an inline `section`. Every boundary element (section, curve,
+line and generated sub-arc) carries a persisted string `id`; `Surfaces.build`
+and `split` stamp one when the producer did not. Incidence uses the explicit
+id first and only falls back to object identity for unstamped legacy records.
+Two elements with the same `id` are one boundary element, so a producer must
+keep explicit ids unique. This is the representation used by a cylindrical
+fillet's two tangent generator boundaries and by split section arcs.
 
 A plane may carry both vertex loops and analytic inner loops; the recess mouth
 closure uses an analytic outer loop. A sphere may carry one analytic boundary
@@ -80,12 +79,14 @@ The model is built from the same patches used by the preview:
   share those lines with the cylinder.
 
 A patch may instead supply `loops` directly. This is the unified input schema:
-`{kind:'outer'|'inner', vertices?, curves?, lines?, section?}` with drawing
-curve indices and inline line/section objects. The legacy `outer`, `holes`,
-`boundaryCurves`, `innerCurves` and `curveLoops` fields remain supported. A
-plane patch using explicit loops must also supply `origin` and `normal` (and
-optionally `u`/`v`); a ruled patch must supply `origin`, `axis` and `radius`
-unless its curve loops provide them.
+`{kind:'outer'|'inner', vertices?, curves?, lines?, section?, elements?, points?}`
+with drawing curve indices, inline line/section objects, or an ordered
+`elements` list of `{kind:'curve', curve}` and `{kind:'polyline', points}`.
+This lets a split result build back into a model without a display mesh. The
+legacy `outer`, `holes`, `boundaryCurves`, `innerCurves` and `curveLoops`
+fields remain supported. A plane patch using explicit loops must also supply
+`origin` and `normal` (and optionally `u`/`v`); a ruled patch must supply
+`origin`, `axis` and `radius` unless its curve loops provide them.
 
 The straight-wire adapters expose `faceRegions` rather than `surfacePatches`;
 the builder accepts either form. The app, saved previews and the `.edu` runner
@@ -222,6 +223,37 @@ Typical issue codes are `certificate-plane-normal-invalid`,
 `certificate-boundary-self-shared`, `certificate-open-component` and
 `certificate-empty-model`. Warnings (open components, empty models) produce
 `partial`; all other listed codes produce `issues`.
+
+## Tolerance policy and near-degeneracy
+
+`Surfaces.tolerancePolicy(values)` is the single `edu-tolerance-v1` policy.
+It derives a length tolerance from the largest coordinate or radius:
+
+- absolute floor `1e-7`;
+- relative factor `1e-6`;
+- `exactLength` noise floor: `max(32 * Number.EPSILON * scale, 1e-9 * scale)`;
+- numeric angle acceptance `1e-9` rad;
+- near-parallel window `1e-6` rad.
+
+A non-zero gap below `exactLength` is treated as exact. A gap between
+`exactLength` and `length` is **near-degenerate**, not exact. Supported pairs
+report:
+
+- `relation:'tangent'` for an exact tangent contact;
+- `relation:'near-tangent'` with `gap`, `tolerance`, `guarantee:'numeric'` and
+  `nearDegenerate:true` for a positive gap inside the window;
+- `relation:'near-coincident'` for coincident supports with a small offset;
+- `relation:'near-parallel'` with `kind:'unsupported'` for axes or normals
+  inside the near-parallel window but not exactly parallel.
+
+A positive gap larger than the policy remains `kind:'none'` (`separate`,
+`contained` or `no-section`). Exact tangency is never inferred from a
+tolerance test: the gap is compared to the noise floor first.
+
+`public/lib/educad-predicates.js` provides exact orientation, coplanarity and
+point-on-plane predicates. A floating-point filter handles ordinary inputs;
+near-zero determinants and residuals fall back to exact decimal rationals
+derived from the stored numbers, returning `guarantee:'exact-decimal'`.
 
 ## Intersections and trimming
 

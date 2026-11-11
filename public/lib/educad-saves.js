@@ -9,7 +9,8 @@
   // EduCAD drawing saves + progress client. DOM-free: the browser UI lives
   // in index.html; this module only snapshots/restores entity tables and
   // speaks the /api/* JSON endpoints. Guests never touch the server.
-  var SAVE_VERSION = 1;
+  var SAVE_VERSION = 2;
+  var SAVE_FORMAT = 'educad-save-v2';
   var SESSION_KEY = 'educad_session';
 
   function defaultStorage() {
@@ -57,8 +58,33 @@
     if (!table || typeof table.list !== 'function') {
       throw new Error('saves: snapshot needs an entity table');
     }
-    var snap = { version: SAVE_VERSION, savedAt: Date.now(), entities: table.list() };
+    var snap = { version: SAVE_VERSION, format: SAVE_FORMAT,
+      savedAt: Date.now(), entities: table.list() };
     return JSON.parse(JSON.stringify(snap));
+  }
+
+  // Read older snapshots without mutating the stored payload. Version 1
+  // stored the same entity array without a format tag; unknown additive
+  // fields are preserved. A newer version is refused before any live state
+  // changes.
+  function migrateSnapshot(data) {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.entities)) {
+      throw new Error('saves: snapshot needs an entities array');
+    }
+    var version = data.version === undefined ? 1 : data.version;
+    if (!Number.isInteger(version) || version < 1) {
+      throw new Error('saves: invalid snapshot version ' + String(data.version));
+    }
+    if (version > SAVE_VERSION) {
+      throw new Error('saves: snapshot version ' + version +
+        ' is newer than supported version ' + SAVE_VERSION);
+    }
+    var out = {};
+    Object.keys(data).forEach(function (key) { out[key] = data[key]; });
+    out.version = SAVE_VERSION;
+    out.format = SAVE_FORMAT;
+    out.migratedFrom = version < SAVE_VERSION ? version : data.migratedFrom;
+    return out;
   }
 
   // Atomically replace the table with a snapshot: every entity is built
@@ -68,14 +94,13 @@
     if (!E || typeof E.createEntity !== 'function' || !Array.isArray(E.ENTITY_TYPES)) {
       throw new Error('saves: restore needs the entities module');
     }
-    if (!table || typeof table.clear !== 'function' || typeof table.add !== 'function') {
+    if (!table || (typeof table.replace !== 'function' &&
+        (typeof table.clear !== 'function' || typeof table.add !== 'function'))) {
       throw new Error('saves: restore needs an entity table');
     }
-    if (!data || typeof data !== 'object' || !Array.isArray(data.entities)) {
-      throw new Error('saves: snapshot needs an entities array');
-    }
+    var snapshot = migrateSnapshot(data);
     var seen = Object.create(null);
-    var built = data.entities.map(function (raw, i) {
+    var built = snapshot.entities.map(function (raw, i) {
       if (!raw || typeof raw !== 'object' || typeof raw.type !== 'string') {
         throw new Error('saves: entity ' + i + ' is malformed');
       }
@@ -91,8 +116,12 @@
     // forward references, without changing the caller's saved payload.
     built.forEach(function (e) { e.meta = E.normalizeMeta(built, e); });
     E.validateIdentityGraph(built);
-    table.clear();
-    built.forEach(function (e) { table.add(e); });
+    if (typeof table.replace === 'function') {
+      table.replace(built);
+    } else {
+      table.clear();
+      built.forEach(function (e) { table.add(e); });
+    }
     return built.length;
   }
 
@@ -272,9 +301,10 @@
   }
 
   return {
-    SAVE_VERSION: SAVE_VERSION, SESSION_KEY: SESSION_KEY,
+    SAVE_VERSION: SAVE_VERSION, SAVE_FORMAT: SAVE_FORMAT, SESSION_KEY: SESSION_KEY,
     currentSession: currentSession, isGuest: isGuest,
-    snapshotTable: snapshotTable, restoreTable: restoreTable,
+    snapshotTable: snapshotTable, migrateSnapshot: migrateSnapshot,
+    restoreTable: restoreTable,
     apiRequest: apiRequest,
     listDrawings: listDrawings, createDrawing: createDrawing,
     getDrawing: getDrawing, updateDrawing: updateDrawing,

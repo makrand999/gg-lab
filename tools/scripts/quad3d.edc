@@ -1,4 +1,5 @@
 # QUAD-3D (EduCAD Script): a lamina drawn in both views.
+# expect: 4V 4E 1F status=inferred unresolved=0
 # FV rect + TV rect share x-stations; the four Type G projectors
 # pair the corners, so the sheet reconstructs to 4V 4E headlessly.
 /datum -60 60

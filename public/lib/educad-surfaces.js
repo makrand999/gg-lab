@@ -10,6 +10,42 @@
   // Intersections and trims use those definitions; display tessellation is
   // never the source of truth.
   var EPS = 1e-7, TAU = 2 * Math.PI;
+  var TOLERANCE_CONTRACT = 'edu-tolerance-v1';
+  var TOLERANCE = {absLength:1e-7, relLength:1e-6, numericAngle:1e-9,
+    nearParallelAngle:1e-6, exactRelLength:1e-9};
+
+  function scaleOf(values) {
+    var scale = 1;
+    (values || []).forEach(function (v) {
+      if (Number.isFinite(v)) scale = Math.max(scale, Math.abs(v));
+    });
+    return scale;
+  }
+  // One tolerance policy for the whole kernel. `length` is the product
+  // tolerance; `exactLength` is the noise floor below which a computed gap is
+  // treated as exact. A gap between the two is near-degenerate, never exact.
+  function tolerancePolicy(values) {
+    var scale = scaleOf(values);
+    return {contract:TOLERANCE_CONTRACT, scale:scale,
+      length:Math.max(TOLERANCE.absLength, TOLERANCE.relLength*scale),
+      exactLength:Math.max(Number.EPSILON*32*scale, TOLERANCE.exactRelLength*scale),
+      angle:TOLERANCE.numericAngle, nearParallel:TOLERANCE.nearParallelAngle};
+  }
+  function gapClass(gap, policy) {
+    var g = Math.abs(gap);
+    if (g <= policy.exactLength) return {status:'exact', gap:0, signedGap:0};
+    if (g <= policy.length) return {status:'near', gap:g, signedGap:gap};
+    return {status:'separate', gap:g, signedGap:gap};
+  }
+  function nearResult(result, cls, policy, relation) {
+    result.relation = relation;
+    result.gap = cls.gap;
+    result.signedGap = cls.signedGap;
+    result.tolerance = policy.length;
+    result.guarantee = 'numeric';
+    result.nearDegenerate = true;
+    return result;
+  }
 
   function dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
   function cross(a, b) { return {x:a.y*b.z-a.z*b.y, y:a.z*b.x-a.x*b.z, z:a.x*b.y-a.y*b.x}; }
@@ -1449,11 +1485,7 @@
   // result; `kind:'none'` means the supporting surfaces miss. An unsupported
   // pair returns null rather than a sampled or approximate curve.
   function tolerance(values) {
-    var scale = 1;
-    values.forEach(function (v) {
-      if (Number.isFinite(v)) scale = Math.max(scale, Math.abs(v));
-    });
-    return 1e-6 * scale;
+    return tolerancePolicy(values).length;
   }
   function copyFields(source) {
     var out = {};
@@ -1476,12 +1508,22 @@
     var pa = planeSpec(a), pb = planeSpec(b);
     if (!pa || !pb) return null;
     var direction = cross(pa.normal, pb.normal);
-    var tol = tolerance([length(pa.origin), length(pb.origin)]);
-    if (length(direction) <= EPS) {
+    var policy = tolerancePolicy([length(pa.origin), length(pb.origin)]);
+    var sinAngle = length(direction);
+    if (sinAngle <= policy.angle) {
       var distance = Math.abs(dot(pa.normal, sub(pb.origin, pa.origin)));
-      if (distance <= tol) return {kind:'plane-overlap', relation:'coincident',
-        plane:{origin:pa.origin, normal:pa.normal}};
-      return none('parallel', {distance:distance});
+      var cls = gapClass(distance, policy);
+      if (cls.status === 'exact')
+        return {kind:'plane-overlap', relation:'coincident',
+          plane:{origin:pa.origin, normal:pa.normal}, tolerance:policy.length};
+      if (cls.status === 'near')
+        return nearResult({kind:'plane-overlap'}, cls, policy, 'near-coincident');
+      return none('parallel', {distance:distance, tolerance:policy.length});
+    }
+    if (sinAngle <= policy.nearParallel) {
+      return {kind:'unsupported', relation:'near-parallel', reason:'near-parallel',
+        angle:Math.asin(Math.min(1, sinAngle)), tolerance:policy.nearParallel,
+        guarantee:'numeric'};
     }
     var cut = section(a, b);
     return {kind:'line', relation:'transverse', origin:cut.origin, direction:cut.direction};
@@ -1490,6 +1532,31 @@
   // A plane section is already the exact intersection of one plane with one
   // quadric. Reuse it, adding the pair identity and the relation.
   function planeQuadric(plane, surface) {
+    var spec = planeSpec(plane);
+    var policy = tolerancePolicy([surface.radius, surface.origin && length(surface.origin),
+      surface.center && length(surface.center), length(spec && spec.origin)]);
+    if (spec && surface.kind === 'sphere') {
+      var d = dot(sub(surface.center, spec.origin), spec.normal);
+      var sphereGap = Math.abs(d) - surface.radius;
+      var sphereClass = gapClass(sphereGap, policy);
+      if (sphereGap > 0 && sphereClass.status === 'near')
+        return nearResult({kind:'none', reason:'near-tangent'}, sphereClass, policy, 'near-tangent');
+      if (sphereGap > 0 && sphereClass.status === 'separate')
+        return none('separate', {gap:sphereGap, tolerance:policy.length});
+    }
+    if (spec && surface.kind === 'cylinder') {
+      var axis = unit(surface.axis), ca = dot(spec.normal, axis);
+      if (Math.abs(ca) <= policy.angle) {
+        var radial = unit(sub(spec.normal, mul(axis, ca)));
+        var offset = Math.abs(dot(sub(spec.origin, surface.origin), radial));
+        var cylinderGap = offset - surface.radius;
+        var cylinderClass = gapClass(cylinderGap, policy);
+        if (cylinderGap > 0 && cylinderClass.status === 'near')
+          return nearResult({kind:'none', reason:'near-tangent'}, cylinderClass, policy, 'near-tangent');
+        if (cylinderGap > 0 && cylinderClass.status === 'separate')
+          return none('separate', {gap:cylinderGap, tolerance:policy.length});
+      }
+    }
     var cut = section(surface, plane);
     if (!cut) return none('no-section');
     var result = copyFields(cut);
@@ -1502,60 +1569,115 @@
   function sphereSphere(a, b) {
     var delta = sub(b.center, a.center), d = length(delta);
     var r1 = a.radius, r2 = b.radius;
-    var tol = tolerance([r1, r2, d]);
-    if (d <= tol) {
-      if (Math.abs(r1 - r2) <= tol) return {kind:'coincident', relation:'coincident',
-        center:a.center, radius:r1};
-      return none('concentric', {distance:d});
+    var policy = tolerancePolicy([r1, r2, d]);
+    if (d <= policy.length) {
+      var drift = Math.abs(r1 - r2);
+      var concurrent = gapClass(Math.max(d, drift), policy);
+      if (drift <= policy.length && concurrent.status !== 'separate') {
+        if (concurrent.status === 'exact')
+          return {kind:'coincident', relation:'coincident', center:a.center, radius:r1,
+            tolerance:policy.length};
+        return nearResult({kind:'coincident', center:a.center, radius:r1},
+          concurrent, policy, 'near-coincident');
+      }
+      return none('concentric', {distance:d, tolerance:policy.length});
     }
     var e = mul(delta, 1/d);
-    if (d > r1 + r2 + tol) return none('separate', {distance:d, gap:d - r1 - r2});
-    if (d < Math.abs(r1 - r2) - tol) return none('contained', {distance:d});
+    var external = d - r1 - r2;
+    var internal = d - Math.abs(r1 - r2);
+    if (Math.abs(external) <= policy.exactLength)
+      return {kind:'point', relation:'tangent', tangent:'external',
+        point:add(a.center, mul(e, r1)), tolerance:policy.length};
+    if (Math.abs(internal) <= policy.exactLength) {
+      var exactPoint = add(a.center, mul(e, r1 >= r2 ? r1 : -r1));
+      return {kind:'point', relation:'tangent', tangent:'internal', point:exactPoint,
+        tolerance:policy.length};
+    }
+    if (external > 0) {
+      var externalClass = gapClass(external, policy);
+      if (externalClass.status === 'near')
+        return nearResult({kind:'point', tangent:'external',
+          point:add(a.center, mul(e, r1))}, externalClass, policy, 'near-tangent');
+      return none('separate', {distance:d, gap:external, tolerance:policy.length});
+    }
+    if (internal < 0) {
+      var internalClass = gapClass(-internal, policy);
+      if (internalClass.status === 'near')
+        return nearResult({kind:'point', tangent:'internal',
+          point:add(a.center, mul(e, r1 >= r2 ? r1 : -r1))},
+          internalClass, policy, 'near-tangent');
+      return none('contained', {distance:d, tolerance:policy.length});
+    }
     var h = (d*d + r1*r1 - r2*r2) / (2*d);
     var rho2 = r1*r1 - h*h;
-    if (rho2 <= tol*tol) {
-      // External tangency touches between the centres; internal tangency
-      // touches on the far side of the smaller sphere.
-      var point;
-      if (Math.abs(d - r1 - r2) <= Math.abs(d - Math.abs(r1 - r2))) {
-        point = add(a.center, mul(e, r1));
-        return {kind:'point', relation:'tangent', tangent:'external', point:point};
-      }
-      point = add(a.center, mul(e, r1 >= r2 ? r1 : -r1));
-      return {kind:'point', relation:'tangent', tangent:'internal', point:point};
-    }
     var b2 = basis(e);
     return {kind:'circle', relation:'transverse', center:add(a.center, mul(e, h)),
-      u:b2.u, v:b2.v, radius:Math.sqrt(rho2)};
+      u:b2.u, v:b2.v, radius:Math.sqrt(Math.max(0, rho2))};
   }
 
   // Parallel/coaxial cylinders intersect in zero, one or two lines. Skew and
   // intersecting-axis cylinders (a quartic curve) are not approximated.
   function cylinderCylinder(a, b) {
     var axis = unit(a.axis), otherAxis = unit(b.axis);
-    if (length(cross(axis, otherAxis)) > 1e-7) return null;
+    var policy = tolerancePolicy([a.radius, b.radius]);
+    var sinAngle = length(cross(axis, otherAxis));
+    if (sinAngle > policy.angle) {
+      if (sinAngle <= policy.nearParallel)
+        return {kind:'unsupported', relation:'near-parallel', reason:'near-parallel',
+          angle:Math.asin(Math.min(1, sinAngle)), tolerance:policy.nearParallel,
+          guarantee:'numeric'};
+      return null;
+    }
     var delta = sub(b.origin, a.origin);
     var perp = sub(delta, mul(axis, dot(delta, axis)));
     var p = length(perp);
     var r1 = a.radius, r2 = b.radius;
-    var tol = tolerance([r1, r2, p]);
-    if (p <= tol) {
-      if (Math.abs(r1 - r2) <= tol) return {kind:'coincident', relation:'coincident',
-        origin:a.origin, axis:axis, radius:r1};
-      return none('coaxial', {distance:p});
+    policy = tolerancePolicy([r1, r2, p]);
+    if (p <= policy.length) {
+      var drift = Math.abs(r1 - r2);
+      var coaxial = gapClass(Math.max(p, drift), policy);
+      if (drift <= policy.length && coaxial.status !== 'separate') {
+        if (coaxial.status === 'exact')
+          return {kind:'coincident', relation:'coincident', origin:a.origin, axis:axis,
+            radius:r1, tolerance:policy.length};
+        return nearResult({kind:'coincident', origin:a.origin, axis:axis, radius:r1},
+          coaxial, policy, 'near-coincident');
+      }
+      return none('coaxial', {distance:p, tolerance:policy.length});
     }
-    if (p > r1 + r2 + tol) return none('separate', {distance:p, gap:p - r1 - r2});
-    if (p < Math.abs(r1 - r2) - tol) return none('contained', {distance:p});
     var e = mul(perp, 1/p);
+    var external = p - r1 - r2;
+    var internal = p - Math.abs(r1 - r2);
+    if (Math.abs(external) <= policy.exactLength) {
+      var externalOrigin = add(a.origin, mul(e, r1));
+      return {kind:'line', relation:'tangent', tangent:'external',
+        origin:externalOrigin, direction:axis, tolerance:policy.length};
+    }
+    if (Math.abs(internal) <= policy.exactLength) {
+      var internalOrigin = add(a.origin, mul(e, (p*p + r1*r1 - r2*r2)/(2*p)));
+      return {kind:'line', relation:'tangent', tangent:'internal',
+        origin:internalOrigin, direction:axis, tolerance:policy.length};
+    }
+    if (external > 0) {
+      var externalClass = gapClass(external, policy);
+      if (externalClass.status === 'near')
+        return nearResult({kind:'line', tangent:'external',
+          origin:add(a.origin, mul(e, r1)), direction:axis},
+          externalClass, policy, 'near-tangent');
+      return none('separate', {distance:p, gap:external, tolerance:policy.length});
+    }
+    if (internal < 0) {
+      var internalClass = gapClass(-internal, policy);
+      if (internalClass.status === 'near')
+        return nearResult({kind:'line', tangent:'internal',
+          origin:add(a.origin, mul(e, (p*p + r1*r1 - r2*r2)/(2*p))), direction:axis},
+          internalClass, policy, 'near-tangent');
+      return none('contained', {distance:p, tolerance:policy.length});
+    }
     var h = (p*p + r1*r1 - r2*r2) / (2*p);
     var s2 = r1*r1 - h*h;
     var origin = add(a.origin, mul(e, h));
-    if (s2 <= tol*tol) {
-      return {kind:'line', relation:'tangent',
-        tangent:p >= r1 + r2 - tol ? 'external' : 'internal',
-        origin:origin, direction:axis};
-    }
-    var s = Math.sqrt(s2), w = unit(cross(axis, e));
+    var s = Math.sqrt(Math.max(0, s2)), w = unit(cross(axis, e));
     return {kind:'lines', relation:'transverse', lines:[
       {origin:add(origin, mul(w, s)), direction:axis},
       {origin:add(origin, mul(w, -s)), direction:axis}
@@ -2636,6 +2758,8 @@
     planeSpec:planeSpec,
     point:curvePoint,
     radii:radii,
-    curveNormal:curveNormal
+    curveNormal:curveNormal,
+    tolerancePolicy:tolerancePolicy,
+    toleranceContract:TOLERANCE_CONTRACT
   };
 });

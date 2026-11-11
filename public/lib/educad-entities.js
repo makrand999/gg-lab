@@ -475,6 +475,36 @@
     return built;
   };
 
+  // Replace the whole table in one transaction. Every row is validated
+  // before the live map is touched, and subscribers see one `replace` event
+  // (one revision bump), never a clear followed by N adds.
+  CadEntityTable.prototype.replace = function (entities) {
+    this._assertWritable();
+    if (!Array.isArray(entities)) throw new Error('replace needs an entity array');
+    var seen = Object.create(null);
+    var prepared = entities.map(function (entity, i) {
+      if (!entity || typeof entity !== 'object' ||
+          typeof entity.id !== 'string' || entity.id === '')
+        throw new Error('replace: entity ' + i + ' has no id');
+      if (!isValidType(entity.type))
+        throw new Error('replace: entity ' + i + ' has unknown type ' + String(entity.type));
+      if (seen[entity.id]) throw new Error('replace: duplicate entity id ' + entity.id);
+      seen[entity.id] = true;
+      assertTwoPoints(entity.type, entity.x, entity.y, entity.x2, entity.y2);
+      validateMembers(entity);
+      return entity;
+    });
+    validateIdentityGraph(prepared);
+    this._map = Object.create(null);
+    this._order = [];
+    for (var i = 0; i < prepared.length; i++) {
+      this._map[prepared[i].id] = prepared[i];
+      this._order.push(prepared[i].id);
+    }
+    this._emit('replace', null);
+    return prepared;
+  };
+
   CadEntityTable.prototype.get = function (id) {
     return this._map[id] === undefined ? null : this._map[id];
   };

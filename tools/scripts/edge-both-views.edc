@@ -1,5 +1,6 @@
 # EDGE-BOTH: the same edge is drawn in plan and elevation.
 # Expected: 2 vertices, 1 edge.
+# expect: 2V 1E 0F status=wire unresolved=0
 /datum -30 30
 /point "a'" 0 40 elevation
 /point "b'" 40 40 elevation

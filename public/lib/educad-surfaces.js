@@ -1692,24 +1692,35 @@
     var delta = sub(sphere.center, cylinder.origin);
     var axial = dot(delta, axis);
     var offset = length(sub(delta, mul(axis, axial)));
-    var tol = tolerance([sphere.radius, cylinder.radius, offset]);
-    if (offset > tol) {
+    var policy = tolerancePolicy([sphere.radius, cylinder.radius, offset]);
+    if (offset > policy.length) {
       // An offset axis is a quartic curve, but the clearly disjoint cases are
       // still decidable from the radial distance range of the sphere.
       var gap = offset - cylinder.radius - sphere.radius;
-      if (gap > tol) return none('separate', {distance:offset, gap:gap});
-      if (offset + sphere.radius < cylinder.radius - tol) return none('contained', {distance:offset});
+      if (gap > 0) {
+        var gapInfo = gapClass(gap, policy);
+        if (gapInfo.status === 'near')
+          return nearResult({kind:'unsupported', reason:'near-tangent'},
+            gapInfo, policy, 'near-tangent');
+        return none('separate', {distance:offset, gap:gap, tolerance:policy.length});
+      }
+      if (offset + sphere.radius < cylinder.radius - policy.length)
+        return none('contained', {distance:offset, tolerance:policy.length});
       return null;
     }
     var center = add(cylinder.origin, mul(axis, axial));
-    var h2 = sphere.radius*sphere.radius - cylinder.radius*cylinder.radius;
-    if (h2 < -tol*tol) return none('contained', {distance:offset});
+    var radiusGap = Math.abs(sphere.radius - cylinder.radius);
+    var radiusClass = gapClass(radiusGap, policy);
     var b = basis(axis);
-    if (Math.abs(h2) <= tol*tol) {
+    if (radiusClass.status === 'exact')
       return {kind:'circle', relation:'tangent', center:center,
-        u:b.u, v:b.v, radius:cylinder.radius};
-    }
-    var h = Math.sqrt(h2);
+        u:b.u, v:b.v, radius:cylinder.radius, tolerance:policy.length};
+    if (radiusClass.status === 'near')
+      return nearResult({kind:'circle', center:center, u:b.u, v:b.v,
+        radius:cylinder.radius}, radiusClass, policy, 'near-tangent');
+    if (sphere.radius < cylinder.radius)
+      return none('contained', {distance:offset, tolerance:policy.length});
+    var h = Math.sqrt(sphere.radius*sphere.radius - cylinder.radius*cylinder.radius);
     return {kind:'circles', relation:'transverse', circles:[
       {center:add(center, mul(axis, h)), u:b.u, v:b.v, radius:cylinder.radius},
       {center:add(center, mul(axis, -h)), u:b.u, v:b.v, radius:cylinder.radius}

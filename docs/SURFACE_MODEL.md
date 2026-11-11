@@ -290,6 +290,9 @@ algebra and clips its branches to both bounded patches.
   closed support, the plane crossings are solved analytically from the branch
   circle/ellipse and the patch's line segments. Those stations are labelled
   `confidence:'analytic-stations'` and `method:'analytic-plane-stations'`.
+- When both patches are planar with straight loop elements, a line branch is
+  clipped by exact line–polygon intervals and labelled
+  `method:'analytic-line-stations'`.
 - Otherwise each branch is sampled, every sample is classified by
   `classifyPoint` against both patches, and inside/outside transitions are
   bisected to a station labelled `confidence:'numeric'` and

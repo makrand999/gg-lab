@@ -2687,8 +2687,16 @@
     branches.forEach(function (branch) {
       if (!branch.kind && finite(branch.center)) branch.kind = 'circle';
       if (branch.kind === 'line' || !branch.kind && branch.direction) {
-        components = components.concat(clipLineBranch(a, b, branch, geometry, options, diagnostics));
-        usedNumeric = true;
+        var analyticLine = null;
+        if (a.kind === 'plane' && b.kind === 'plane')
+          analyticLine = clipLinePlanarAnalytic(a, b, branch, geometry);
+        if (analyticLine !== null) {
+          components = components.concat(analyticLine);
+          usedAnalytic = true;
+        } else {
+          components = components.concat(clipLineBranch(a, b, branch, geometry, options, diagnostics));
+          usedNumeric = true;
+        }
       } else {
         var analytic = null;
         if (a.kind === 'plane' && b.closed === true)
@@ -2858,6 +2866,85 @@
         components.shift();
       }
     }
+    return components;
+  }
+
+  function planeBasis(surface) {
+    var normal = unit(surface.normal);
+    var frame = basis(normal);
+    return {normal:normal,
+      u:finite(surface.u) ? unit(surface.u) : frame.u,
+      v:finite(surface.v) ? unit(surface.v) : frame.v};
+  }
+  function linePolygonIntervals(surface, origin, direction, geometry, tolerance) {
+    if (!surface || surface.kind !== 'plane') return null;
+    var segments = planePolygonSegments(surface, geometry);
+    if (!segments) return null;
+    var frame = planeBasis(surface);
+    function project(p) {
+      var d = sub(p, surface.origin);
+      return {x:dot(d, frame.u), y:dot(d, frame.v)};
+    }
+    var o = project(origin), dirEnd = project(add(origin, direction));
+    var d2 = {x:dirEnd.x - o.x, y:dirEnd.y - o.y};
+    var length2 = d2.x*d2.x + d2.y*d2.y;
+    if (length2 <= EPS*EPS) return null;
+    var stations = [];
+    function addStation(s) {
+      if (!Number.isFinite(s)) return;
+      if (!stations.some(function (u) { return Math.abs(u - s) <= 1e-9; }))
+        stations.push(s);
+    }
+    segments.forEach(function (segment) {
+      var a = project(segment.start), b = project(segment.end);
+      var e = {x:b.x - a.x, y:b.y - a.y};
+      var q = {x:a.x - o.x, y:a.y - o.y};
+      var den = d2.x*e.y - d2.y*e.x;
+      if (Math.abs(den) <= 1e-12) {
+        var distance = Math.abs(q.x*d2.y - q.y*d2.x) / Math.sqrt(length2);
+        if (distance <= tolerance) {
+          addStation((q.x*d2.x + q.y*d2.y) / length2);
+          addStation(((b.x-o.x)*d2.x + (b.y-o.y)*d2.y) / length2);
+        }
+        return;
+      }
+      var t = (q.x*d2.y - q.y*d2.x) / den;
+      if (t < -1e-7 || t > 1 + 1e-7) return;
+      addStation((q.x*e.y - q.y*e.x) / den);
+    });
+    if (!stations.length) return null;
+    stations.sort(function (a, b) { return a - b; });
+    var intervals = [];
+    for (var i = 0; i + 1 < stations.length; i++) {
+      var t0 = stations[i], t1 = stations[i+1];
+      if (t1 - t0 <= 1e-12) continue;
+      var mid = 0.5 * (t0 + t1);
+      var point = add(origin, mul(unit(direction), mid));
+      var state = classifyPoint(surface, point, geometry);
+      if (boundedInside(state)) intervals.push({start:t0, end:t1});
+    }
+    return intervals;
+  }
+  function clipLinePlanarAnalytic(a, b, branch, geometry) {
+    var direction = unit(branch.direction);
+    var tolerance = boundedTolerance(a, b);
+    var first = linePolygonIntervals(a, branch.origin, direction, geometry, tolerance);
+    var second = linePolygonIntervals(b, branch.origin, direction, geometry, tolerance);
+    if (first === null || second === null) return null;
+    var components = [];
+    first.forEach(function (one) {
+      second.forEach(function (two) {
+        var t0 = Math.max(one.start, two.start);
+        var t1 = Math.min(one.end, two.end);
+        if (t1 - t0 <= 1e-12) return;
+        components.push({kind:'line',
+          start:add(branch.origin, mul(direction, t0)),
+          end:add(branch.origin, mul(direction, t1)),
+          direction:direction, bounded:true, confidence:'analytic-stations',
+          method:'analytic-line-stations',
+          surfaceIds:[a.id === undefined ? null : a.id, b.id === undefined ? null : b.id]});
+      });
+    });
     return components;
   }
 

@@ -68,7 +68,7 @@ h1{font-size:25px}h2{font-size:20px}table{font-size:13px}th,td{padding:5px 8px}}
 <li><strong>profile</strong> — an optional side view. Its frame is declared with <code>/profile &lt;xRef&gt; &lt;dRef&gt; [s]</code>, or inferred from the drawing.</li>
 </ul>
 <p>First-angle projection is the default. An optional profile frame maps model depth <code>d</code> to sheet x as <code>xRef + s * (d - dRef)</code>.</p>
-<p>Points that share a base name and satisfy the projection equations name one 3D station. <code>a</code> (plan), <code>a'</code> (elevation), and <code>a''</code> (profile) are the same corner. Hidden verdicts in parentheses, such as <code>(a')</code>, do not change identity.</p>
+<p>Points that share a base name and satisfy the projection equations name one 3D station. <code>a</code> (plan), <code>a'</code> (elevation), and <code>a''</code> (profile) are the same corner. Profile stations join plan/elevation stations only when the side frame is known and the depths/heights agree; contradictory stations stay separate. Hidden verdicts in parentheses, such as <code>(a')</code>, do not change identity.</p>
 <h2 id="3-drawing-commands">3. Drawing commands</h2>
 <p>Commands are case-insensitive. Coordinates and distances are millimetres; angles are degrees.</p>
 <table>
@@ -178,7 +178,7 @@ node tools/edc.js --strict tools/scripts/ruled-chain.edu</code></pre>
 <li>A curved analytic surface is not certified by its display mesh.</li>
 <li>A recess does not Boolean-subtract an independently drawn surrounding solid.</li>
 <li>A cylindrical fillet between two planar faces is not yet supported because curved-surface loops do not accept straight boundary elements.</li>
-<li>A loop crossing a cutting plane is not split; the cut is refused.</li>
+<li>Analytic curved surfaces can be split by a plane even when a boundary loop crosses it; each side receives the matching section sub-arcs. Planar faces still do not support this split representation.</li>
 <li>Profile mouths and elliptical recess mouths are not inferred.</li>
 <li>Numeric tolerances are millimetre-scale; extreme coordinate ranges still need robustness work.</li>
 </ul>

@@ -37,7 +37,9 @@ depth `d` to sheet x as `xRef + s * (d - dRef)`.
 
 Points that share a base name and satisfy the projection equations name one
 3D station. `a` (plan), `a'` (elevation), and `a''` (profile) are the same
-corner. Hidden verdicts in parentheses, such as `(a')`, do not change identity.
+corner. Profile stations join plan/elevation stations only when the side frame
+is known and the depths/heights agree; contradictory stations stay separate.
+Hidden verdicts in parentheses, such as `(a')`, do not change identity.
 
 ## 3. Drawing commands
 
@@ -203,7 +205,9 @@ entities are named.
 - A recess does not Boolean-subtract an independently drawn surrounding solid.
 - A cylindrical fillet between two planar faces is not yet supported because
   curved-surface loops do not accept straight boundary elements.
-- A loop crossing a cutting plane is not split; the cut is refused.
+- Analytic curved surfaces can be split by a plane even when a boundary loop
+  crosses it; each side receives the matching section sub-arcs. Planar faces
+  still do not support this split representation.
 - Profile mouths and elliptical recess mouths are not inferred.
 - Numeric tolerances are millimetre-scale; extreme coordinate ranges still need
   robustness work.

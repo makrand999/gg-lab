@@ -21,6 +21,35 @@
     if (p.y < 0) return 'plan';
     return '';
   }
+  function viewState(entities, options) {
+    options = options || {};
+    var list = Array.isArray(entities) ? entities : [];
+    var counts = {plan:0, elev:0, profile:0};
+    list.forEach(function (entity) {
+      if (!entity || ['POINT', 'SEGMENT', 'LINE', 'RAY', 'CIRCLE', 'CIRCULAR_ARC', 'CURVE'].indexOf(entity.type) === -1) return;
+      var side = sideOf(entity);
+      if (counts[side] !== undefined) counts[side]++;
+    });
+    var present = Object.keys(counts).filter(function (side) { return counts[side] > 0; });
+    var expected = options.expectedViews || ['plan', 'elev'];
+    var missing = expected.filter(function (side) { return counts[side] === 0; });
+    var hiddenLines = options.hiddenLines || 'unknown';
+    if (['complete', 'omitted', 'unknown'].indexOf(hiddenLines) === -1)
+      hiddenLines = 'unknown';
+    return {contract:'view-state-v1',
+      views:{plan:{present:counts.plan > 0, observations:counts.plan},
+        elev:{present:counts.elev > 0, observations:counts.elev},
+        profile:{present:counts.profile > 0, observations:counts.profile}},
+      presentViews:present, missingViews:missing, hiddenLines:hiddenLines,
+      visibility:hiddenLines === 'complete' ? 'hard-constraint' : 'soft-constraint',
+      canvasSynthesis:false,
+      status:missing.length ? 'underdetermined' : 'complete',
+      diagnostics:missing.map(function (side) {
+        return {code:'view-missing', severity:'info', view:side,
+          message:'No ink is supplied for the ' + side + ' view; strokes are not synthesized.'};
+      })};
+  }
+
   function analyze(entities, options) {
     options = options || {};
     var frame = options.profileFrame || null;
@@ -92,7 +121,9 @@
       summary.dof += group.dof;
     });
     return {contract:'constraint-report-v1', status:diagnostics.length ? 'partial' : 'ok',
-      groups:groups, summary:summary, diagnostics:diagnostics};
+      groups:groups, summary:summary, diagnostics:diagnostics,
+      views:viewState(list, options)};
   }
-  return {contract:'constraint-report-v1', analyze:analyze, names:names, sideOf:sideOf};
+  return {contract:'constraint-report-v1', analyze:analyze, viewState:viewState,
+    names:names, sideOf:sideOf};
 });

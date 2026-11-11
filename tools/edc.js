@@ -330,6 +330,10 @@ function runScript(text, options) {
         var ConstraintsSpec = require('../public/lib/educad-constraints.js');
         result = ConstraintsSpec.analyze(request.entities || [],
           {profileFrame:request.profileFrame || null});
+      } else if (request.operation === 'view-state') {
+        var ViewState = require('../public/lib/educad-constraints.js');
+        result = ViewState.viewState(request.entities || table.list(),
+          {hiddenLines:request.hiddenLines, expectedViews:request.expectedViews});
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

@@ -399,6 +399,17 @@ constraint report, not a nonlinear solve:
 It reports what the drawing fixes and where it is underdetermined; it does not
 average stations or invent a value.
 
+`viewState(entities, options)` reports which principal views are present,
+which are missing, and the visibility contract:
+
+- `hiddenLines: complete | omitted | unknown`;
+- `visibility: hard-constraint` only for `complete`, otherwise
+  `soft-constraint`;
+- `canvasSynthesis: false`: a missing view is never synthesized; its strokes
+  stay set-valued.
+
+The optional `expectedViews` list defaults to plan and elevation.
+
 ## Analytic silhouettes
 
 `Surfaces.silhouettes(model, view, geometry)` returns exact analytic

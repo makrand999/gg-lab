@@ -7,9 +7,10 @@
 /circle 20 -30 20 A plan
 /circle 20 30 20 A elevation
 
-# expect: surfaceChecks=5 surfaceQueries=ok
+# expect: surfaceChecks=6 surfaceQueries=ok
 # surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"save":{"positive":"north","negative":"south"},"expect":{"refused":false,"identity":{"before":{"boundaries":1,"shared":1,"open":0,"nonmanifold":0},"after":{"boundaries":1,"shared":1,"open":0,"nonmanifold":0}}}}
 # surface-query: {"operation":"rebuild","surfaces":["north","south"],"expect":{"surfaces":[{"kind":"sphere"},{"kind":"sphere"}],"identity":{"before":{"boundaries":1,"shared":1,"open":0,"nonmanifold":0},"after":{"boundaries":1,"shared":1,"open":0,"nonmanifold":0}},"summary":{"total":2,"openBoundaries":0}}}
 # surface-query: {"operation":"classify","surface":0,"point":{"x":20,"y":30,"z":50},"expect":{"status":"inside","method":"closed-sphere"}}
 # surface-query: {"operation":"classify","surface":0,"point":{"x":20,"y":30,"z":30},"expect":{"status":"outside","reason":"off-surface","residual":20}}
 # surface-query: {"operation":"silhouettes","view":"top","expect":{"contract":"analytic-silhouette-v1","status":"ok","byKind":{"sphere":1},"curves":[{"kind":"circle","radius":20,"center":{"x":20,"y":30,"z":30},"surfaceId":"surface:0","silhouette":"sphere"}]}}
+# surface-query: {"operation":"silhouette-hlr","view":"top","expect":{"contract":"silhouette-hlr-v1","summary":{"strokes":1,"visible":1,"partiallyHidden":0,"fullyHidden":0},"strokes":[{"curveId":"sphere","intervals":[{"hidden":false}],"hiddenIntervals":[]}]}}

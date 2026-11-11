@@ -430,6 +430,14 @@ for the patch-boundary station; the support curve itself is analytic. This is
 the silhouette source for interval HLR; it does not yet replace the mesh
 occlusion path.
 
+`Surfaces.silhouetteHLR(model, view, geometry, hidden, options)` samples each
+silhouette in its natural parameter range, projects it, calls an optional
+`hidden(point)` predicate, and merges runs with the same visibility. The
+result (`silhouette-hlr-v1`) carries per-stroke samples, `intervals`,
+`visibleIntervals`, `hiddenIntervals` and a visible/partial/fully-hidden
+summary. The predicate is injected so the core stays independent of the
+display mesh; `tools/edc.js` supplies `EduCADProject.pointHidden`.
+
 ## Feature graph v1
 
 `Surfaces.featureGraph(model, geometry)` builds on the topology shadow:

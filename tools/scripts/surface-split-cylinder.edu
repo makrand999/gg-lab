@@ -14,9 +14,10 @@
 /line c d A elevation
 /line d a A elevation
 
-# expect: surfaceChecks=5 surfaceQueries=ok
+# expect: surfaceChecks=6 surfaceQueries=ok
 # surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":5,"z":30},"normal":{"x":0,"y":1,"z":0}},"save":{"positive":"upper","negative":"lower"},"expect":{"refused":false,"section":{"kind":"circle","radius":20,"center":{"x":20,"y":5,"z":30}},"surfaces":[{"kind":"cylinder","closed":false},{"kind":"cylinder","closed":false}],"validation":{"status":"partial","openBoundaries":2,"closedShells":0},"certificate":{"status":"partial","counts":{"sharedBoundaries":1,"openBoundaries":2,"closedShells":0}}}}
 # surface-query: {"operation":"split","from":"lower","plane":{"origin":{"x":20,"y":20,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-patch-unbounded","side":"positive"}}}
 # surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":5,"z":30},"normal":{"x":0,"y":1,"z":0.1}},"expect":{"refused":false,"section":{"kind":"ellipse","radiusV":20},"surfaces":[{"kind":"cylinder","closed":false},{"kind":"cylinder","closed":false}],"certificate":{"counts":{"sharedBoundaries":1}}}}
 # surface-query: {"operation":"silhouettes","view":"front","expect":{"status":"ok","byKind":{"cylinder":2},"curves":[{"kind":"line","silhouette":"cylinder","surfaceId":"surface:0"}]}}
 # surface-query: {"operation":"silhouettes","view":"top","expect":{"status":"none","curves":[],"diagnostics":[{"code":"silhouette-view-along-axis"}]}}
+# surface-query: {"operation":"silhouette-hlr","view":"front","expect":{"summary":{"strokes":2,"visible":2,"partiallyHidden":0,"fullyHidden":0},"strokes":[{"curveId":"cylinder"},{"curveId":"cylinder"}]}}

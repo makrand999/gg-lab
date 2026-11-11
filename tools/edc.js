@@ -315,6 +315,11 @@ function runScript(text, options) {
       } else if (request.operation === 'silhouettes') {
         result = Surfaces.silhouettes(modelOf((g && g.surfaces) || []),
           request.view || request.direction || 'front', g);
+      } else if (request.operation === 'silhouette-hlr') {
+        var hlrView = request.view || 'front';
+        result = Surfaces.silhouetteHLR(modelOf((g && g.surfaces) || []),
+          hlrView, g, function (point) { return P.pointHidden(g, point, hlrView); },
+          request.options);
       } else if (request.operation === 'correspondence') {
         var Correspondence = require('../public/lib/educad-correspondence.js');
         result = Correspondence.analyze(table.list(),

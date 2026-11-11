@@ -1154,6 +1154,88 @@
       curves:curves, byKind:byKind, diagnostics:diagnostics};
   }
 
+  function projectViewPoint(p, view) {
+    if (view === 'top' || view === 'plan') return {x:p.x, y:-p.z};
+    if (view === 'front' || view === 'elevation') return {x:p.x, y:p.y};
+    if (view === 'left') return {x:-p.z, y:p.y};
+    if (view === 'right') return {x:p.z, y:p.y};
+    return null;
+  }
+  function silhouetteHLR(model, view, geometry, hidden, options) {
+    var silhouettesResult = silhouettes(model, view, geometry);
+    var count = Math.max(16, options && options.samples || 64);
+    function curvePointAt(curve, t) {
+      if (curve.kind === 'line') {
+        if (finite(curve.start) && finite(curve.end))
+          return add(curve.start, mul(unit(sub(curve.end, curve.start)), t));
+        return add(curve.origin, mul(unit(curve.direction), t));
+      }
+      return curvePoint(curve, t);
+    }
+    function parameterRange(curve) {
+      if (curve.kind === 'line') {
+        var length = finite(curve.start) && finite(curve.end) ?
+          pointDistance(curve.start, curve.end) : 1;
+        return {from:0, to:length, closed:false};
+      }
+      if (curve.kind === 'arc')
+        return {from:curveStart(curve), to:curveStart(curve) + curveSweep(curve),
+          closed:false};
+      return {from:0, to:TAU, closed:true};
+    }
+    var strokes = [];
+    (silhouettesResult.curves || []).forEach(function (curve) {
+      var range = parameterRange(curve);
+      var samples = [];
+      var sampleCount = range.closed ? count : Math.max(2, count);
+      for (var i=0;i<sampleCount;i++) {
+        var fraction = range.closed ? i / sampleCount : i / (sampleCount - 1);
+        var t = range.from + (range.to - range.from) * fraction;
+        var point = curvePointAt(curve, t);
+        var projected = projectViewPoint(point, view);
+        if (!projected) return;
+        var verdict = false;
+        if (typeof hidden === 'function') {
+          try { verdict = !!hidden(point); } catch (err) { verdict = false; }
+        }
+        samples.push({t:t, point:projected, hidden:verdict});
+      }
+      if (samples.length < 2) return;
+      var intervals = [];
+      var start = 0;
+      for (var j=1;j<samples.length;j++) {
+        if (samples[j].hidden !== samples[j-1].hidden) {
+          intervals.push({t0:samples[start].t, t1:samples[j-1].t,
+            hidden:samples[start].hidden});
+          start = j;
+        }
+      }
+      intervals.push({t0:samples[start].t, t1:samples[samples.length-1].t,
+        hidden:samples[start].hidden});
+      if (range.closed && intervals.length > 1) {
+        var first = intervals[0], last = intervals[intervals.length-1];
+        if (first.hidden === last.hidden) {
+          last.t1 = first.t1 + TAU;
+          intervals.shift();
+        }
+      }
+      strokes.push({curveId:curve.silhouette || curve.kind,
+        surfaceId:curve.surfaceId || null, samples:samples, intervals:intervals,
+        visibleIntervals:intervals.filter(function (i) { return !i.hidden; }),
+        hiddenIntervals:intervals.filter(function (i) { return i.hidden; })});
+    });
+    return {contract:'silhouette-hlr-v1', view:typeof view === 'string' ? view : null,
+      strokes:strokes, summary:{strokes:strokes.length,
+        visible:strokes.filter(function (s) { return s.hiddenIntervals.length === 0; }).length,
+        partiallyHidden:strokes.filter(function (s) {
+          return s.hiddenIntervals.length > 0 && s.visibleIntervals.length > 0;
+        }).length,
+        fullyHidden:strokes.filter(function (s) {
+          return s.hiddenIntervals.length > 0 && s.visibleIntervals.length === 0;
+        }).length},
+      diagnostics:(silhouettesResult.diagnostics || []).slice()};
+  }
+
   function featureGraph(model, geometry) {
     model = model || {surfaces:[]};
     var graph = topology(model, geometry);
@@ -4026,6 +4108,7 @@
     topology:topology,
     featureGraph:featureGraph,
     silhouettes:silhouettes,
+    silhouetteHLR:silhouetteHLR,
     summarize:summarize,
     section:section,
     intersect:intersect,

@@ -1,0 +1,12 @@
+# Plan and profile stations lift a 3D point through the side frame.
+# The plan supplies x/depth and the profile supplies depth/height; no
+# elevation view is present. The edge is drawn in both contributing views.
+# expect: 2V 1E 0F unresolved=0 diagnostics=none status=ok
+/datum -30 180
+/profile 100 0 1
+/point a 10 -20 plan
+/point b 60 -20 plan
+/point a'' 120 40 profile
+/point b'' 120 60 profile
+/line a b A plan
+/line a'' b'' A profile

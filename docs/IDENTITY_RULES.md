@@ -106,6 +106,28 @@ adapter. Save format version 1 already preserves arbitrary metadata, so it does
 not need a destructive format conversion. Existing corrupt captions cannot be
 recovered automatically; restart a tutorial or reassign its members explicitly.
 
+### Name-based compatibility fallback
+
+The reconstruction adapter's name-based fallback is not an explicit identity
+operation. It links auto-labelled stations that share a base name when their
+projection equations agree:
+
+```text
+plan + elevation:    same x
+plan + profile:      same depth, with profile x = xRef + s * (depth - dRef)
+elevation + profile: same height
+all three:           every shared equation agrees
+```
+
+Pairing is one-to-one at the shared station. A profile link requires a declared
+side frame (`meta.draftingLayout` or `options.profile`); the strict path never
+infers a frame from drawing bounds. Candidates with contradictory coordinates,
+or several equally valid candidates, stay separate and are reported as missing
+correspondences. The fallback never averages, snaps, or changes an observed
+coordinate, and it never overrides explicit member IDs or `membersDeclared`.
+It only supplies shared IDs that the strict adapter needs; explicit identities
+remain authoritative.
+
 The reconstruction reader consumes canonical member IDs through an adapter;
 lesson checking consumes declared member names and hidden verdicts. Display-only
 renames cannot change either input. The tutorial's historical `rename` script
@@ -122,8 +144,13 @@ headlessly:
 
 ```sh
 node tools/edc.js --solid tools/scripts/rule-a.edc
+node tools/edc.js --solid tools/scripts/profile-plan-station.edu
+node tools/edc.js --solid tools/scripts/profile-elevation-station.edu
+node tools/edc.js --solid tools/scripts/profile-station-conflict.edu
 ```
 
 The script draws the stations, the runner reports per-line errors and projector
-alignment, and the `--solid` dump shows the lifted 3D result. Use the same
-pattern for linked rename, detach or station-assignment cases.
+alignment, and the `--solid` dump shows the lifted 3D result. The plan/profile
+and elevation/profile sheets check the base-name compatibility links; the
+conflict sheet must stay unlinked and report the missing coordinates. Use the
+same pattern for linked rename, detach or station-assignment cases.

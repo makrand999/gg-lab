@@ -2,6 +2,8 @@
 
 Status: implemented for the live engine and the strict bridge's auto labels.
 The edge gate now requires evidence in both plan and elevation.
+The strict bridge's compatibility labels also link plan+profile, elevation+profile,
+and consistent three-view stations through a declared side frame.
 Scope: **Major** (the original interface) only. Major2 is out of scope.
 
 ## Core rule
@@ -154,7 +156,10 @@ Adding or removing a Type G projector line must not change the result.
 
 - Pairing logic lives in `public/lib/educad-reconstruct.js`: live Pass A
   pairs by base + x; `autoMembersForStrict` prepares table-created auto
-  labels for the strict bridge.
+  labels for the strict bridge, including plan/profile, elevation/profile,
+  and consistent three-view links through the resolved side frame.
+- The profile compatibility rule needs `{xRef, s, dRef}`. The strict path
+  uses only an explicitly declared frame; it never infers one.
 - Base-name parsing is shared with `public/lib/educad-entities.js`
   (`parseMembers`, `memberCaption`).
 - The tolerance constant is `1e-6 mm`; the comparison is inclusive.
@@ -169,7 +174,9 @@ Adding or removing a Type G projector line must not change the result.
   or should an explicit member ID disambiguate?
 - If explicit member IDs disagree with name + `x`, which wins? Proposed: member
   ID wins for explicit claims; name + `x` is the fallback/minimal engine rule.
-- Should profile `a''` join the same rule later using the side mapping?
+- Profile `a''` now joins the same compatibility rule through the declared side
+  frame; it does not bypass explicit member IDs or resolve ambiguous/contradictory
+  coordinates.
 - Is the `1e-6 mm` bound inclusive? Proposed: yes.
 
 ## Edges: evidence and overlap

@@ -22,6 +22,16 @@ are rejected, including in drawings containing curves. Curved silhouette
 stations and curve centres are observations; they need not each have a second
 point station when their missing coordinates are established by curve evidence.
 
+The strict compatibility adapter also links auto-labelled stations by base name
+when their projection equations agree. Plan and elevation must share `x`; plan
+and profile must share depth through the declared side frame
+`side(d) = xRef + s * (d - dRef)`; elevation and profile must share height. All
+three link only when every shared equation agrees. A profile link requires a
+declared frame; the exact path never infers one. Contradictory or ambiguous
+candidates stay separate and are reported as missing correspondence. Coordinates
+are never averaged, snapped, or rewritten, and explicit member IDs or
+`membersDeclared` stations are never changed by this fallback.
+
 `reconstructLive` and `reconstructStrict` remain compatibility APIs, including
 the older named-shape readers. New application code should use `reconstruct`.
 The exact kernel's explicit topology/certificate contract is unchanged. Inferred
@@ -300,6 +310,9 @@ node tools/edc.js --solid tools/scripts/mixed-curved-plate.edu
 node tools/edc.js tools/scripts/overlapping-curve-projections.edu
 node tools/edc.js tools/scripts/partial-hidden-edge.edu
 node tools/edc.js tools/scripts/inferred-profile-frame.edu
+node tools/edc.js --solid tools/scripts/profile-plan-station.edu
+node tools/edc.js --solid tools/scripts/profile-elevation-station.edu
+node tools/edc.js --solid tools/scripts/profile-station-conflict.edu
 node tools/edc.js tools/scripts/sphere.edu
 node tools/edc.js tools/scripts/spherical-recess.edu
 node tools/edc.js tools/scripts/spherical-recess-shallow.edu
@@ -358,6 +371,12 @@ node tools/edc.js tools/scripts/spline-multiple-conflict.edu
 node tools/edc.js tools/scripts/circle-through.edu
 node tools/edc.js tools/scripts/arc-through.edu
 ```
+
+`profile-plan-station.edu` lifts two stations from plan and profile alone and
+emits their edge (`2V 1E 0F`). `profile-elevation-station.edu` lifts two stations
+from elevation and profile alone (`2V 0E 0F`). `profile-station-conflict.edu`
+has a base-name match but contradictory depths: it stays unlinked and reports
+`coordinates-missing` instead of producing a vertex.
 
 `--strict` now selects explicit correspondence constraints in the shared pipeline;
 it does not switch to a different surface-family reader. Existing declared
@@ -420,7 +439,10 @@ interpolated station curves with cross-view consistency checks are supported;
 other curved families are not. Profile frames are inferred when necessary, and
 overlapping projections are resolved when a declared view selects one
 interpretation; contours that remain genuinely ambiguous between the available
-views stay unresolved. The current planar/ruled surface choices are stated
+views stay unresolved. The name-based compatibility fallback links plan/profile
+and elevation/profile stations through a declared side frame, but it does not
+choose between ambiguous stations or reconcile contradictory coordinates.
+The current planar/ruled surface choices are stated
 inference conventions, not a proof of uniqueness. Analytic curve rendering and
 the solid widget's interval drawing still use tessellation, and numeric
 robustness at extreme scales remains work to do.

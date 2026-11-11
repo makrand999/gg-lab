@@ -1,0 +1,9 @@
+# Elevation and profile stations lift a 3D point without a plan view.
+# The elevation supplies x/height and the profile supplies depth/height.
+# expect: 2V 0E 0F unresolved=0 diagnostics=none status=ok
+/datum -30 180
+/profile 100 0 1
+/point a' 10 40 elevation
+/point b' 60 60 elevation
+/point a'' 120 40 profile
+/point b'' 120 60 profile

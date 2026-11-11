@@ -2550,9 +2550,14 @@
   // Strict reconstruction expects shared member IDs. Table-created points
   // start with one auto member per station (`point:<id>:<i>`), so `a` and
   // `a'` would otherwise never meet. Pair only those auto members by the
-  // live rule — same base name at the same x-station — and leave explicit
-  // member declarations (membersDeclared) untouched.
-  function autoMembersForStrict(entities) {
+  // compatibility rule — same base name plus agreeing projection equations —
+  // and leave explicit member declarations (membersDeclared) untouched.
+  // Plan and elevation agree on x. A profile station agrees with plan on
+  // depth and with elevation on height through the resolved side frame
+  // {xRef, s, dRef}: side(d) = xRef + s*(d - dRef). Without that frame the
+  // profile station keeps its own member. Contradictory or ambiguous
+  // candidates stay separate; no averaging or snapping is allowed.
+  function autoMembersForStrict(entities, profileFrame) {
     if (!Array.isArray(entities)) return entities;
     var AUTO_EPS = 1e-6;
     var out = [], i;
@@ -2585,42 +2590,132 @@
       if (p.y < 0) return 'plan';
       return '';
     }
+    function near(a, b) { return Math.abs(a - b) <= AUTO_EPS; }
+    function observation(p, side) {
+      if (side === 'plan') return { x: p.x, depth: -p.y };
+      if (side === 'elev') return { x: p.x, height: p.y };
+      if (side === 'profile' && profileFrame) {
+        return { depth: profileFrame.dRef + profileFrame.s * (p.x - profileFrame.xRef), height: p.y };
+      }
+      return null;
+    }
     var entries = [];
     for (i = 0; i < out.length; i++) {
       var p = out[i];
       if (!p || p.type !== 'POINT' || !isAuto(p)) continue;
       var specs = Entities.parseMembers(p.caption || p.name);
       if (!specs.length) continue;
-      entries.push({ p: p, specs: specs, side: sideOf(p) });
+      var pside = sideOf(p);
+      entries.push({ p: p, specs: specs, side: pside, obs: observation(p, pside) });
     }
     var byBase = Object.create(null);
     entries.forEach(function (ent) {
       ent.specs.forEach(function (spec, idx) {
-        var rec = { ent: ent, idx: idx, name: spec.name };
+        var rec = { ent: ent, idx: idx, name: spec.name, side: ent.side, obs: ent.obs };
         (byBase[spec.name] || (byBase[spec.name] = [])).push(rec);
       });
     });
-    Object.keys(byBase).forEach(function (base) {
-      var list = byBase[base], elev = [], plan = [];
-      list.forEach(function (rec) {
-        if (rec.ent.side === 'elev') elev.push(rec);
-        else if (rec.ent.side === 'plan') plan.push(rec);
+    function sharedAxis(a, b) {
+      if ((a === 'plan' && b === 'elev') || (a === 'elev' && b === 'plan')) return 'x';
+      if ((a === 'plan' && b === 'profile') || (a === 'profile' && b === 'plan')) return 'depth';
+      if ((a === 'elev' && b === 'profile') || (a === 'profile' && b === 'elev')) return 'height';
+      return null;
+    }
+    function compatible(a, b) {
+      if (!a.obs || !b.obs || a.side === b.side) return false;
+      var axis = sharedAxis(a.side, b.side);
+      return !!axis && near(a.obs[axis], b.obs[axis]);
+    }
+    // One-to-one at the shared station, mirroring the live plan/elevation
+    // rule: a candidate only links when it is the only match in its view and
+    // the only match back from the other view.
+    function uniqueMatch(rec, sameView, otherView) {
+      var matches = otherView.filter(function (other) { return compatible(rec, other); });
+      if (matches.length !== 1) return null;
+      var mate = matches[0];
+      var back = sameView.filter(function (other) { return compatible(other, mate); });
+      return back.length === 1 ? mate : null;
+    }
+    function groupId(base, members) {
+      var values = { x: null, height: null, depth: null }, conflict = false;
+      members.forEach(function (rec) {
+        Object.keys(values).forEach(function (axis) {
+          if (!rec.obs || rec.obs[axis] === undefined) return;
+          if (values[axis] !== null && !near(values[axis], rec.obs[axis])) conflict = true;
+          else if (values[axis] === null) values[axis] = rec.obs[axis];
+        });
       });
-      for (var a = 0; a < elev.length; a++) {
-        var er = elev[a], matches = [];
-        for (var b = 0; b < plan.length; b++) {
-          if (Math.abs(er.ent.p.x - plan[b].ent.p.x) <= AUTO_EPS) matches.push(plan[b]);
-        }
-        if (matches.length !== 1) continue;
-        var pr = matches[0], back = 0;
-        for (var c = 0; c < elev.length; c++) {
-          if (Math.abs(elev[c].ent.p.x - pr.ent.p.x) <= AUTO_EPS) back++;
-        }
-        if (back !== 1) continue;
-        var id = 'auto:' + base + ':' + Math.round(er.ent.p.x / AUTO_EPS);
-        er.ent.specs[er.idx].id = id;
-        pr.ent.specs[pr.idx].id = id;
+      if (conflict || values.x === null || values.height === null || values.depth === null) return null;
+      function key(value) { return Math.round(value / AUTO_EPS); }
+      // Keep the historical plan/elevation ID shape. Profile-linked groups
+      // include the full coordinate so distinct depths/heights at one x
+      // cannot collide.
+      if (!members.some(function (rec) { return rec.side === 'profile'; })) {
+        return 'auto:' + base + ':' + key(values.x);
       }
+      return 'auto:' + base + ':' + key(values.x) + ':' + key(values.height) + ':' + key(values.depth);
+    }
+    function assignGroup(base, members) {
+      var id = groupId(base, members);
+      if (!id) return;
+      members.forEach(function (rec) { rec.ent.specs[rec.idx].id = id; });
+    }
+    Object.keys(byBase).forEach(function (base) {
+      var list = byBase[base], bySide = { plan: [], elev: [], profile: [] };
+      list.forEach(function (rec) { if (rec.obs && bySide[rec.side]) bySide[rec.side].push(rec); });
+      var parent = list.map(function (_, idx) { return idx; });
+      function rootOf(idx) {
+        while (parent[idx] !== idx) { parent[idx] = parent[parent[idx]]; idx = parent[idx]; }
+        return idx;
+      }
+      function join(a, b) {
+        var ra = rootOf(list.indexOf(a)), rb = rootOf(list.indexOf(b));
+        if (ra !== rb) parent[rb] = ra;
+      }
+      // First establish the historical plan/elevation pairs. These are the
+      // established compatibility pairs and must survive an unrelated
+      // profile ambiguity.
+      bySide.plan.forEach(function (rec) {
+        var mate = uniqueMatch(rec, bySide.plan, bySide.elev);
+        if (mate) join(rec, mate);
+      });
+      var byRoot = Object.create(null), groups = [];
+      list.forEach(function (rec, idx) {
+        if (!rec.obs) return;
+        var root = rootOf(idx);
+        if (!byRoot[root]) { byRoot[root] = []; groups.push(byRoot[root]); }
+        byRoot[root].push(rec);
+      });
+      var profileGroups = groups.map(function (group) {
+        return group.some(function (rec) { return rec.side === 'plan' || rec.side === 'elev'; });
+      });
+      // A profile station may join one group only when it is the single
+      // profile candidate for that group and that group is its single
+      // candidate. Otherwise the stations stay separate.
+      var candidates = groups.map(function (group, gi) {
+        if (!profileGroups[gi]) return [];
+        return bySide.profile.filter(function (rec) {
+          return group.every(function (mate) { return compatible(rec, mate); });
+        });
+      });
+      var groupCount = bySide.profile.map(function (rec) {
+        return groups.reduce(function (n, group, gi) {
+          return n + (profileGroups[gi] && group.every(function (mate) { return compatible(rec, mate); }) ? 1 : 0);
+        }, 0);
+      });
+      var attached = Object.create(null);
+      groups.forEach(function (group, gi) {
+        var profileCandidates = candidates[gi];
+        if (!profileCandidates || profileCandidates.length !== 1) return;
+        var profile = profileCandidates[0];
+        if (groupCount[bySide.profile.indexOf(profile)] !== 1) return;
+        assignGroup(base, group.concat([profile]));
+        attached[gi] = true;
+      });
+      groups.forEach(function (group, gi) {
+        if (attached[gi] || group.length < 2) return;
+        assignGroup(base, group);
+      });
     });
     var oldToNew = Object.create(null);
     entries.forEach(function (ent) {
@@ -2665,7 +2760,7 @@
     var rest=list.filter(function(e){return e.type!=='CURVE'&&!(e.type==='POINT'&&refs.has(e.id)&&!needed.has(e.id));});
     var hasRest=rest.some(function(e){return ['POINT','SEGMENT','LINE','RAY','CIRCLE','CIRCULAR_ARC'].indexOf(e.type)!==-1;});
     var base=hasRest?reconstruct(rest,opts):{geometry:null,issues:[]}, resolved=Curves.resolveProfileFrame(list,opts);
-    var lifted=ParametricReconstruct.reconstruct(autoMembersForStrict(list),resolved.profile);
+    var lifted=ParametricReconstruct.reconstruct(autoMembersForStrict(list,resolved.profile),resolved.profile);
     var diagnostics=((base.pipeline||{}).diagnostics||base.issues||[]).concat(lifted.issues);
     if(resolved.issue)diagnostics.push(resolved.issue);
     var g=base.geometry;
@@ -2703,8 +2798,33 @@
       var meta = e.meta || {};
       return Curves.isCurve(e) && meta.reconstructionRole !== 'construction' && !DROP_META[meta.kind];
     });
-    var normalized = autoMembersForStrict(list);
     var resolvedFrame = Curves.resolveProfileFrame(list,opts), frame=resolvedFrame.profile;
+    var normalized = autoMembersForStrict(list, frame);
+    // A straight drawing whose side-view stations name the same bases as
+    // another principal view is a compatibility case, not live plan/elevation
+    // ink. Let the strict adapter's shared auto members supply the profile
+    // lift; contradictory coordinates stay separate and are reported there.
+    function hasNamedProfileStations() {
+      if (!frame) return false;
+      var views = Object.create(null);
+      list.forEach(function (ent) {
+        if (!ent || ent.type !== 'POINT') return;
+        var meta = ent.meta || {};
+        if (meta.reconstructionRole === 'construction' || DROP_META[meta.kind]) return;
+        var side = ent.viewRole === 'PROFILE' ? 'profile' :
+          ent.viewRole === 'PLAN' ? 'plan' :
+          ent.viewRole === 'ELEVATION' ? 'elev' : '';
+        if (!side) return;
+        Entities.parseMembers(ent.caption || ent.name).forEach(function (spec) {
+          var rec = views[spec.name] || (views[spec.name] = { plan: false, elev: false, profile: false });
+          rec[side] = true;
+        });
+      });
+      return Object.keys(views).some(function (name) {
+        return views[name].profile && (views[name].plan || views[name].elev);
+      });
+    }
+    var profileBridge = !declared && frame && !resolvedFrame.inferred && hasNamedProfileStations();
     function visibilityProvider(curveIds) {
       var excluded=new Set(curveIds), pending=true, occluder=null;
       return function classify(point,role) {
@@ -2768,7 +2888,7 @@
     }
     if (topology) return finish(reconstructStrict(list,opts), 'declared-topology');
     if (!curveInk.length && !oblique.curves.length) {
-      var straight = declared ? reconstructStrict(list,opts) : liveCore(list,opts.eps === undefined ? MATCH_EPS_MM : opts.eps);
+      var straight = declared || profileBridge ? reconstructStrict(list,opts) : liveCore(list,opts.eps === undefined ? MATCH_EPS_MM : opts.eps);
       var missing=unmatchedPoints(straight.geometry).concat(oblique.issues);
       if(missing.length && straight.geometry) {straight.determination='partial';straight.geometry.topologyStatus='partial';}
       if(oblique.issues.length && !straight.geometry && straight.determination!=='inconsistent') {
@@ -2920,7 +3040,13 @@
 
   function reconstructStrict(entities, opts) {
     if (!Strict) throw new Error('Load educad-strict.js before educad-reconstruct.js for explicit reconstruction.');
-    var result = Strict.reconstruct(autoMembersForStrict(entities), opts);
+    // The exact path only accepts an explicitly declared side frame. Auto
+    // profile linking is a compatibility fallback, so an inferred frame is
+    // never fed into it here.
+    var resolvedFrame = Array.isArray(entities) && Curves && Curves.resolveProfileFrame ?
+      Curves.resolveProfileFrame(entities, opts || {}) : null;
+    var profileFrame = resolvedFrame && resolvedFrame.profile && !resolvedFrame.inferred ? resolvedFrame.profile : null;
+    var result = Strict.reconstruct(autoMembersForStrict(entities, profileFrame), opts);
     var declaredTopology = opts && opts.topology || Array.isArray(entities) && entities.some(function(e) {
       return e && e.meta && e.meta.reconstructionTopology;
     });

@@ -1,0 +1,21 @@
+# Missing-evidence fillet: the elevation arc and both end strokes are drawn, but
+# the plan omits the floor-side tangent generator line (x=10). The two end arcs
+# still lift, so the cross-section and length are known; the straight boundary
+# shared with the floor face has no paired-view edge. The fillet is refused and
+# the arcs remain ordinary open curves.
+# expect: 14V 12E 0F fillets=0 curves=2 surfaces=0 surfaceKinds=none surfaceLoops=0 surfaceShells=0 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=partial surfaceCertificateIssues=certificate-empty-model surfaceLineBoundaries=0 surfaceSharedLineBoundaries=0 surfaceValidation=none diagnostics=fillet-boundary-missing,point-correspondence-missing,unresolved-edge unresolved=6 status=partial
+/datum -100 400
+/point w0 0 10 elevation
+/point w1 0 40 elevation
+/line w0 w1 A elevation
+/point f0 10 0 elevation
+/point f1 40 0 elevation
+/line f0 f1 A elevation
+/arc 10 10 10 180 270 A elevation
+/point a 0 0 plan
+/point b 0 -40 plan
+/point c 10 0 plan
+/point d 10 -40 plan
+/line a b A plan
+/line a c A plan
+/line b d A plan

@@ -72,6 +72,24 @@
       Math.abs(length(c.u)-1) <= EPS && Math.abs(length(c.v)-1) <= EPS && Math.abs(dot(c.u,c.v)) <= EPS;
   }
 
+  // A straight boundary element is a finite line segment on the surface. It
+  // is stored inline on a loop as {kind:'line', start, end, sourceIds}. The
+  // object itself is the identity used by incidence, exactly like an inline
+  // section, so two loops share a line only by referencing the same object.
+  function validLine(l) {
+    return l && l.kind === 'line' && finite(l.start) && finite(l.end) &&
+      length(sub(l.end, l.start)) > EPS;
+  }
+  function finiteLine(l) {
+    return !!(l && l.kind === 'line' && finite(l.start) && finite(l.end));
+  }
+  function linePoint(l, t) {
+    return add(l.start, mul(sub(l.end, l.start), t));
+  }
+  function lineLength(l) {
+    return validLine(l) ? length(sub(l.end, l.start)) : 0;
+  }
+
   function build(geometry, options) {
     if (!geometry) return null;
     var model = {version:1, contract:'analytic-surface-v1', surfaces:[], diagnostics:[]};
@@ -86,6 +104,49 @@
       surface.closed = !!surface.closed;
       model.surfaces.push(surface);
     }
+    function unique(list) {
+      var out = [];
+      (list || []).forEach(function (v) { if (out.indexOf(v) === -1) out.push(v); });
+      return out;
+    }
+    function copyLoopInput(loop) {
+      if (!loop || typeof loop !== 'object') return null;
+      var out = {kind:loop.kind || 'outer'};
+      if (Array.isArray(loop.vertices)) out.vertices = loop.vertices.slice();
+      if (Array.isArray(loop.curves)) out.curves = loop.curves.slice();
+      if (Array.isArray(loop.lines)) out.lines = loop.lines.slice();
+      if (loop.section) out.section = loop.section;
+      return out;
+    }
+    function loopInputValid(loop) {
+      if (!loop || (!loop.vertices && !loop.curves && !loop.lines && !loop.section)) return false;
+      if (loop.vertices && loop.vertices.length < 2) return false;
+      var okay = true;
+      (loop.curves || []).forEach(function (i) { if (!validCurve(curves[i])) okay = false; });
+      (loop.lines || []).forEach(function (l) { if (!validLine(l)) okay = false; });
+      if (loop.section && !validCurve(loop.section)) okay = false;
+      return okay;
+    }
+    // Patches may supply their ordered loops directly. This is the common
+    // schema used for straight boundary elements: a loop can carry vertex
+    // indices, drawing curve indices, inline sections and inline lines.
+    // Returns {loops:null} when the legacy fields should be used instead.
+    function patchLoops(patch, sourceIds) {
+      if (!patch.loops || !patch.loops.length) return {loops:null, ok:true};
+      var loops = patch.loops.map(copyLoopInput);
+      if (loops.some(function (l) { return !loopInputValid(l); })) {
+        diag('surface-invalid-boundary', 'A patch references a missing, degenerate or invalid loop element.', sourceIds);
+        return {loops:null, ok:false};
+      }
+      return {loops:loops, ok:true};
+    }
+    function loopCurveIndices(loops) {
+      var out = [];
+      (loops || []).forEach(function (l) {
+        (l.curves || []).forEach(function (i) { if (out.indexOf(i) === -1) out.push(i); });
+      });
+      return out;
+    }
     var patches = (geometry.surfacePatches || []).slice();
     // Legacy wire adapters expose logical planar regions directly, without
     // the primitive pipeline's surfacePatches array.
@@ -94,6 +155,8 @@
     });
     patches.forEach(function (patch, pi) {
       var sourceIds = (patch.sourceIds || []).slice(), surface = null;
+      var requested = patchLoops(patch, sourceIds);
+      if (!requested.ok) return;
       try {
         if (patch.kind === 'sphere') {
           if (!finite(patch.center) || !(patch.radius > 0)) {
@@ -103,7 +166,10 @@
           // (for example a recess cap) keeps its analytic boundary loop.
           var sphereBoundary = (patch.boundaryCurves || []).slice();
           var sphereLoops = [];
-          if (patch.curveLoops && patch.curveLoops.length) {
+          if (requested.loops) {
+            sphereLoops = requested.loops;
+            sphereBoundary = loopCurveIndices(sphereLoops);
+          } else if (patch.curveLoops && patch.curveLoops.length) {
             sphereLoops = patch.curveLoops.map(function (l) {
               return {kind:l.kind || 'outer', curves:(l.curves || []).slice()};
             });
@@ -122,7 +188,49 @@
           if (patch.cap) surface.cap = patch.cap;
           if (patch.recess) surface.recess = true;
         } else if (patch.kind === 'plane') {
-          if (patch.outer && patch.outer.length >= 3) {
+          if (requested.loops) {
+            var origin = patch.origin, normal = patch.normal, u = patch.u, v = patch.v;
+            if ((!finite(origin) || !finite(normal)) && patch.outer && patch.outer.length >= 3) {
+              var explicitPts = patch.outer.map(function (i) { return vertices[i]; });
+              if (explicitPts.some(function (p) { return !finite(p); })) {
+                diag('surface-invalid-boundary', 'A planar boundary references a missing vertex.', sourceIds); return;
+              }
+              origin = explicitPts[0];
+              normal = newell(explicitPts);
+              if (!normal) { diag('surface-degenerate-plane', 'A planar boundary has no area.', sourceIds); return; }
+              var explicitBasis = basis(normal);
+              u = explicitBasis.u; v = explicitBasis.v;
+            }
+            if (!finite(origin) || !finite(normal)) {
+              var firstPlaneCurve = null;
+              requested.loops.some(function (l) {
+                (l.curves || []).some(function (i) {
+                  if (validCurve(curves[i])) { firstPlaneCurve = curves[i]; return true; }
+                  return false;
+                });
+                return !!firstPlaneCurve;
+              });
+              if (firstPlaneCurve) {
+                origin = firstPlaneCurve.center;
+                normal = curveNormal(firstPlaneCurve);
+                u = firstPlaneCurve.u; v = firstPlaneCurve.v;
+              }
+            }
+            if (!finite(origin) || !finite(normal)) {
+              diag('surface-unbounded-plane', 'A planar patch with explicit loops needs an origin and normal.', sourceIds); return;
+            }
+            normal = unit(normal);
+            if (!finite(u) || !finite(v)) {
+              var derivedBasis = basis(normal);
+              u = derivedBasis.u; v = derivedBasis.v;
+            }
+            var planeBoundaryCurves = loopCurveIndices(requested.loops);
+            surface = {kind:'plane', origin:origin, normal:normal, u:u, v:v,
+              loops:requested.loops, boundaryCurves:planeBoundaryCurves, closed:false,
+              sourceIds:sourceIds, displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+            if (patch.closure) surface.closure = patch.closure;
+            if (patch.recessMouth) surface.recessMouth = true;
+          } else if (patch.outer && patch.outer.length >= 3) {
             var pts = patch.outer.map(function (i) { return vertices[i]; });
             if (pts.some(function (p) { return !finite(p); })) {
               diag('surface-invalid-boundary', 'A planar boundary references a missing vertex.', sourceIds); return;
@@ -164,32 +272,78 @@
             diag('surface-unbounded-plane', 'A planar patch has no boundary loop.', sourceIds); return;
           }
         } else if (patch.kind === 'cylinder' || patch.kind === 'cone' || patch.kind === 'ruled') {
-          var bcs = (patch.boundaryCurves || []).slice();
-          if (!bcs.length) { diag('surface-unbounded-ruled', 'A ruled patch has no boundary curve.', sourceIds); return; }
-          var first = curves[bcs[0]], second = bcs.length > 1 ? curves[bcs[1]] : null;
-          if (!validCurve(first) || second && !validCurve(second)) {
-            diag('surface-invalid-boundary', 'A ruled patch references a missing analytic boundary.', sourceIds); return;
-          }
-          var axis = patch.axis && finite(patch.axis) ? unit(patch.axis) :
-            second && length(sub(second.center, first.center)) > EPS ? unit(sub(second.center, first.center)) : curveNormal(first);
-          var kind = patch.analyticKind || patch.kind;
-          if (kind === 'ruled') kind = second && Math.abs(first.radius - second.radius) <= EPS ? 'cylinder' : 'cone';
-          var loops2 = bcs.map(function (i) { return {kind:'outer', curves:[i]}; });
-          var surface2 = {kind:kind, origin:first.center, axis:axis, radius:first.radius,
-            loops:loops2, boundaryCurves:bcs, closed:false, sourceIds:sourceIds,
-            displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
-          if (patch.apex) surface2.apex = patch.apex;
-          if (Number.isFinite(patch.halfAngle)) surface2.halfAngle = patch.halfAngle;
-          if (kind === 'cone' && !surface2.apex && second) {
-            var r1 = first.radius, r2 = second.radius;
-            if (Math.abs(r1 - r2) > EPS) {
-              var delta = sub(second.center, first.center);
-              var axial = dot(delta, axis);
-              surface2.apex = add(first.center, mul(axis, axial * r1 / (r1 - r2)));
-              surface2.halfAngle = Math.atan2(Math.abs(r1 - r2), Math.abs(axial));
+          if (requested.loops) {
+            var explicitCurves = loopCurveIndices(requested.loops);
+            var explicitFirst = explicitCurves.length ? curves[explicitCurves[0]] : null;
+            var explicitSecond = explicitCurves.length > 1 ? curves[explicitCurves[1]] : null;
+            if (explicitCurves.some(function (i) { return !validCurve(curves[i]); })) {
+              diag('surface-invalid-boundary', 'A ruled patch references a missing analytic boundary.', sourceIds); return;
             }
+            var explicitKind = patch.analyticKind || patch.kind;
+            if (explicitKind === 'ruled') {
+              if (!explicitFirst || !explicitSecond) {
+                diag('surface-invalid-boundary', 'A ruled patch with explicit loops needs two analytic boundaries or an explicit analyticKind.', sourceIds); return;
+              }
+              explicitKind = Math.abs(explicitFirst.radius - explicitSecond.radius) <= EPS ? 'cylinder' : 'cone';
+            }
+            var explicitOrigin = finite(patch.origin) ? patch.origin :
+              explicitFirst ? explicitFirst.center : null;
+            var explicitRadius = Number.isFinite(patch.radius) ? patch.radius :
+              explicitFirst ? explicitFirst.radius : null;
+            if (!finite(explicitOrigin) || !(explicitRadius > 0)) {
+              diag('surface-unbounded-ruled', 'A ruled patch with explicit loops needs a finite origin and positive radius.', sourceIds); return;
+            }
+            var explicitAxis = patch.axis && finite(patch.axis) ? unit(patch.axis) :
+              explicitSecond && length(sub(explicitSecond.center, explicitFirst.center)) > EPS ?
+                unit(sub(explicitSecond.center, explicitFirst.center)) :
+                explicitFirst ? curveNormal(explicitFirst) : null;
+            if (!finite(explicitAxis)) {
+              diag('surface-invalid-axis', 'A ruled patch with explicit loops needs a finite axis.', sourceIds); return;
+            }
+            var explicitSurface = {kind:explicitKind, origin:explicitOrigin, axis:explicitAxis,
+              radius:explicitRadius, loops:requested.loops, boundaryCurves:explicitCurves,
+              closed:false, sourceIds:sourceIds,
+              displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+            if (patch.apex) explicitSurface.apex = patch.apex;
+            if (Number.isFinite(patch.halfAngle)) explicitSurface.halfAngle = patch.halfAngle;
+            if (explicitKind === 'cone' && !explicitSurface.apex && explicitFirst && explicitSecond) {
+              var er1 = explicitFirst.radius, er2 = explicitSecond.radius;
+              if (Math.abs(er1 - er2) > EPS) {
+                var edelta = sub(explicitSecond.center, explicitFirst.center);
+                var eaxial = dot(edelta, explicitAxis);
+                explicitSurface.apex = add(explicitFirst.center, mul(explicitAxis, eaxial * er1 / (er1 - er2)));
+                explicitSurface.halfAngle = Math.atan2(Math.abs(er1 - er2), Math.abs(eaxial));
+              }
+            }
+            surface = explicitSurface;
+          } else {
+            var bcs = (patch.boundaryCurves || []).slice();
+            if (!bcs.length) { diag('surface-unbounded-ruled', 'A ruled patch has no boundary curve.', sourceIds); return; }
+            var first = curves[bcs[0]], second = bcs.length > 1 ? curves[bcs[1]] : null;
+            if (!validCurve(first) || second && !validCurve(second)) {
+              diag('surface-invalid-boundary', 'A ruled patch references a missing analytic boundary.', sourceIds); return;
+            }
+            var axis = patch.axis && finite(patch.axis) ? unit(patch.axis) :
+              second && length(sub(second.center, first.center)) > EPS ? unit(sub(second.center, first.center)) : curveNormal(first);
+            var kind = patch.analyticKind || patch.kind;
+            if (kind === 'ruled') kind = second && Math.abs(first.radius - second.radius) <= EPS ? 'cylinder' : 'cone';
+            var loops2 = bcs.map(function (i) { return {kind:'outer', curves:[i]}; });
+            var surface2 = {kind:kind, origin:first.center, axis:axis, radius:first.radius,
+              loops:loops2, boundaryCurves:bcs, closed:false, sourceIds:sourceIds,
+              displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+            if (patch.apex) surface2.apex = patch.apex;
+            if (Number.isFinite(patch.halfAngle)) surface2.halfAngle = patch.halfAngle;
+            if (kind === 'cone' && !surface2.apex && second) {
+              var r1 = first.radius, r2 = second.radius;
+              if (Math.abs(r1 - r2) > EPS) {
+                var delta = sub(second.center, first.center);
+                var axial = dot(delta, axis);
+                surface2.apex = add(first.center, mul(axis, axial * r1 / (r1 - r2)));
+                surface2.halfAngle = Math.atan2(Math.abs(r1 - r2), Math.abs(axial));
+              }
+            }
+            surface = surface2;
           }
-          surface = surface2;
         } else {
           diag('surface-kind-unsupported', 'The surface patch kind "' + patch.kind + '" has no analytic model.', sourceIds);
           return;
@@ -271,6 +425,7 @@
       }
     });
     if (loop && loop.section) keys.push(loop.section);
+    if (loop && loop.lines) loop.lines.forEach(function (line) { keys.push(line); });
     if (loop && loop.curves) loop.curves.forEach(function (i) {
       keys.push(typeof i === 'object' && i ? i : 'c:' + i);
     });
@@ -291,10 +446,15 @@
   // validation summary and the detailed certificate consume this graph, so a
   // shared seam cannot be counted differently by the two checks.
   function incidence(model) {
-    var sectionIds = new Map(), uses = new Map(), bySurface = new Map();
+    var sectionIds = new Map(), lineIds = new Map(), uses = new Map(), bySurface = new Map();
     function elementId(element) {
       if (typeof element === 'string') return element;
       if (element && typeof element === 'object') {
+        if (element.kind === 'line') {
+          if (typeof element.id === 'string' && element.id !== '') return 'line:id:' + element.id;
+          if (!lineIds.has(element)) lineIds.set(element, 'line:' + lineIds.size);
+          return lineIds.get(element);
+        }
         if (!sectionIds.has(element)) sectionIds.set(element, 'section:' + sectionIds.size);
         return sectionIds.get(element);
       }
@@ -388,7 +548,10 @@
         }
       }
       var tol = 1e-5 * Math.max(1, s.radius || 1);
-      // Boundary curves must lie on their analytic surface.
+      // Boundary curves and finite line elements must lie on their analytic
+      // surface. A line is sampled at its endpoints and midpoint; its straight
+      // span is exact, so those samples are sufficient for every supported
+      // surface family.
       (s.loops || []).forEach(function (loop) {
         if (loop.vertices && s.kind === 'plane') loop.vertices.forEach(function (i) {
           var p = geometry && geometry.vertices && geometry.vertices[i];
@@ -398,6 +561,17 @@
         loopInlinePoints(loop).forEach(function (p) {
           if (!finite(p) || surfaceResidual(s, p) > tol)
             add('surface-boundary-off-surface', 'An inline boundary point is off ' + s.id + '.', s.sourceIds);
+        });
+        (loop.lines || []).forEach(function (l) {
+          if (!validLine(l)) {
+            add('surface-boundary-missing', 'Surface ' + s.id + ' references a missing or degenerate line boundary.', s.sourceIds);
+            return;
+          }
+          [l.start, linePoint(l, 0.5), l.end].forEach(function (p) {
+            var residual = surfaceResidual(s, p);
+            if (!(residual <= tol))
+              add('surface-boundary-off-surface', 'A line boundary does not lie on ' + s.id + '.', s.sourceIds);
+          });
         });
         loopCurves(loop, curves).forEach(function (c) {
           if (!validCurve(c)) { add('surface-boundary-missing', 'Surface ' + s.id + ' references a missing boundary curve.', s.sourceIds); return; }
@@ -563,7 +737,7 @@
       var m = /^c:(\d+)$/.exec(element);
       return m ? curves[Number(m[1])] : null;
     }
-    return element && typeof element === 'object' ? element : null;
+    return element && typeof element === 'object' && element.kind !== 'line' ? element : null;
   }
   function boundaryElementKind(element) {
     if (typeof element === 'string') {
@@ -572,9 +746,12 @@
       if (/^p:/.test(element)) return 'edge';
       return 'unknown';
     }
-    return element && typeof element === 'object' ? 'section' : 'unknown';
+    if (element && typeof element === 'object') return element.kind === 'line' ? 'line' : 'section';
+    return 'unknown';
   }
   function boundarySourceIds(element, curves) {
+    if (element && typeof element === 'object' && element.kind === 'line')
+      return Array.isArray(element.sourceIds) ? element.sourceIds.slice() : [];
     var c = boundaryCurve(element, curves);
     return c && Array.isArray(c.sourceIds) ? c.sourceIds.slice() : [];
   }
@@ -841,6 +1018,7 @@
           return el && el.kind === 'curve' ? {kind:'curve', curve:elementId(el.curve)} :
             el && el.kind === 'polyline' ? {kind:'polyline', points:(el.points || []).length} : {kind:'unknown'};
         });
+        if (loop.lines) loopRec.lines = loop.lines.map(elementId);
         if (loop.section) loopRec.section = elementId(loop.section);
         loopRec.incidence = loopIncidence(loop);
         if (!elements.length) {
@@ -850,7 +1028,8 @@
         }
 
         var tol = surfaceTolerance(surface);
-        var maxResidual = 0, samples = 0, missing = false, invalidCurve = false, undefinedResidual = false;
+        var maxResidual = 0, samples = 0, missing = false, invalidCurve = false,
+          invalidLine = false, lineCount = 0, lineMinimum = Infinity, undefinedResidual = false;
         (loop.vertices || []).forEach(function (i) {
           var p = vertices[i];
           if (!finite(p)) { missing = true; return; }
@@ -875,6 +1054,31 @@
             samples++;
           });
         });
+        (loop.lines || []).forEach(function (l) {
+          lineCount++;
+          if (!finiteLine(l)) { invalidLine = true; return; }
+          lineMinimum = Math.min(lineMinimum, length(sub(l.end, l.start)));
+          [l.start, linePoint(l, 0.5), l.end].forEach(function (p) {
+            var r = surfaceResidual(surface, p);
+            if (!Number.isFinite(r)) undefinedResidual = true;
+            else maxResidual = Math.max(maxResidual, r);
+            samples++;
+          });
+        });
+        if (lineCount) {
+          check(loopRec, rec, 'boundary-lines-finite', {
+            status:invalidLine ? 'failed' : 'ok', arithmetic:'exact-decimal-rational',
+            method:'exact-finiteness', issue:'certificate-line-boundary-invalid',
+            message:'A loop line boundary is not a finite line element.',
+            sourceIds:loopRec.sourceIds.length ? loopRec.sourceIds : rec.sourceIds});
+          if (!invalidLine) check(loopRec, rec, 'boundary-line-length', {
+            status:lineMinimum > tol ? 'ok' : 'failed', arithmetic:'numeric',
+            method:'numeric-length-lower-bound',
+            residual:Number.isFinite(lineMinimum) ? lineMinimum : undefined, tolerance:tol,
+            issue:'certificate-line-boundary-degenerate',
+            message:'A line boundary is shorter than the surface tolerance.',
+            sourceIds:loopRec.sourceIds.length ? loopRec.sourceIds : rec.sourceIds});
+        }
         if (missing) {
           loopRec.status = 'issues';
           issue('certificate-boundary-missing-vertex', rec.id + ' references a missing boundary vertex.',
@@ -957,7 +1161,7 @@
 
         if (loopRec.checks.some(function (c) { return c.status === 'failed'; }) ||
             loopRec.incidence.nonmanifold || loopRec.incidence.open ||
-            !elements.length || missing || invalidCurve || undefinedResidual) {
+            !elements.length || missing || invalidCurve || invalidLine || undefinedResidual) {
           if (loopRec.status !== 'issues')
             loopRec.status = loopRec.incidence.nonmanifold ? 'issues' : 'partial';
         }
@@ -987,6 +1191,11 @@
         rec.vertices = e ? [Number(e[1]), Number(e[2])] : [];
       } else if (use.kind === 'section') {
         rec.sectionType = use.element && (use.element.sectionType || use.element.kind) || null;
+      } else if (use.kind === 'line') {
+        rec.lineType = 'segment';
+        rec.start = copyPoint(use.element && use.element.start);
+        rec.end = copyPoint(use.element && use.element.end);
+        rec.length = lineLength(use.element);
       }
       if (status === 'nonmanifold') {
         issue('certificate-boundary-nonmanifold', 'A boundary is shared by more than two surfaces.',
@@ -1382,6 +1591,12 @@
       });
       angles.forEach(function(t) { distances.push(distance(curvePoint(c,t))); });
     });
+    (loop.lines || []).forEach(function(l) {
+      if (!validLine(l)) { invalid = true; return; }
+      // A straight element has a linear signed distance, so its endpoints
+      // decide the side of the cutting plane.
+      distances.push(distance(l.start), distance(l.end));
+    });
     if (invalid || !distances.length) return 2;
     var pos = distances.some(function(d) { return d > EPS; });
     var neg = distances.some(function(d) { return d < -EPS; });
@@ -1436,6 +1651,7 @@
       } else ok = false;
     });
     (loop.points || []).forEach(function (p) { if (!finite(p)) ok = false; });
+    (loop.lines || []).forEach(function (l) { if (!validLine(l)) ok = false; });
     if (loop.section && !validCurve(loop.section)) ok = false;
     if (loop.vertices && loop.vertices.length < 2) ok = false;
     (loop.vertices || []).forEach(function (i) {
@@ -2237,6 +2453,7 @@
   function loopReferencesCurve(loop, boundary, curves) {
     if (loop.section === boundary) return true;
     if ((loop.elements || []).some(function (el) { return el && el.curve === boundary; })) return true;
+    if ((loop.lines || []).indexOf(boundary) !== -1) return true;
     return (loop.curves || []).some(function (i) {
       return (typeof i === 'object' && i ? i : curves[i]) === boundary;
     });
@@ -2245,7 +2462,9 @@
   // Clone a surface with one more analytic loop. The exact same boundary
   // object is stored, so attaching it to a second surface raises its incidence
   // from 1 to 2. This is the promotion step for a future trim/intersection
-  // chain; it does not clip the surface or create new geometry.
+  // chain; it does not clip the surface or create new geometry. A line
+  // boundary is accepted as a structural element; a single open line is not a
+  // closed patch, so the clone remains open.
   function attachBoundary(surface, boundary, geometry, diagnostics) {
     function fail(code, message) {
       if (Array.isArray(diagnostics)) diagnostics.push({code:code, message:message});
@@ -2253,12 +2472,14 @@
     }
     if (!surface || !surface.kind) return fail('attach-surface-missing',
       'attachBoundary needs a surface record.');
-    if (!boundary || typeof boundary !== 'object' || !validCurve(boundary))
+    var isLine = !!boundary && typeof boundary === 'object' && boundary.kind === 'line';
+    if (isLine ? !validLine(boundary) : !boundary || typeof boundary !== 'object' || !validCurve(boundary))
       return fail('attach-boundary-invalid',
-        'attachBoundary needs a finite analytic circle or ellipse.');
-    var start = Number.isFinite(boundary.startAngle) ? boundary.startAngle : 0;
-    var sweep = Number.isFinite(boundary.sweepAngle) ? boundary.sweepAngle : TAU;
-    if (sweep < TAU - 1e-9) return fail('attach-boundary-open',
+        isLine ? 'attachBoundary needs a finite nonzero line segment.' :
+          'attachBoundary needs a finite analytic circle or ellipse.');
+    var start = isLine ? 0 : Number.isFinite(boundary.startAngle) ? boundary.startAngle : 0;
+    var sweep = isLine ? 0 : Number.isFinite(boundary.sweepAngle) ? boundary.sweepAngle : TAU;
+    if (!isLine && sweep < TAU - 1e-9) return fail('attach-boundary-open',
       'attachBoundary needs a full closed curve, not an arc.');
     var curves = geometry && geometry.curves || [];
     var loops = surface.loops || [];
@@ -2266,24 +2487,34 @@
       return fail('attach-boundary-duplicate',
         'The surface already uses this boundary object.');
     var tol = surfaceTolerance(surface);
-    for (var k = 0; k <= 16; k++) {
-      var point = curvePoint(boundary, start + sweep*k/16);
-      var residual = surfaceResidual(surface, point);
-      if (!Number.isFinite(residual) || residual > tol)
-        return fail('attach-boundary-off-surface',
-          'The boundary curve does not lie on ' + surface.id + '.');
+    if (isLine) {
+      var offSurface = false;
+      [boundary.start, linePoint(boundary, 0.5), boundary.end].forEach(function (p) {
+        var residual = surfaceResidual(surface, p);
+        if (!Number.isFinite(residual) || residual > tol) offSurface = true;
+      });
+      if (offSurface) return fail('attach-boundary-off-surface',
+        'The line boundary does not lie on ' + surface.id + '.');
+    } else {
+      for (var k = 0; k <= 16; k++) {
+        var point = curvePoint(boundary, start + sweep*k/16);
+        var residual = surfaceResidual(surface, point);
+        if (!Number.isFinite(residual) || residual > tol)
+          return fail('attach-boundary-off-surface',
+            'The boundary curve does not lie on ' + surface.id + '.');
+      }
     }
     var out = {};
     Object.keys(surface).forEach(function (key) { out[key] = surface[key]; });
     out.id = (surface.id || 'surface') + '/attach:' + loops.length;
     out.loops = loops.slice();
-    out.loops.push({kind:'outer', section:boundary});
+    out.loops.push(isLine ? {kind:'outer', lines:[boundary]} : {kind:'outer', section:boundary});
     out.closed = false;
     // A spherical cap has exactly one mouth loop; an attached loop invalidates
     // that claim, so the cap record is not carried onto the clone.
     delete out.cap;
     out.parentSurfaceId = surface.id === undefined ? null : surface.id;
-    out.attachedBoundary = {kind:boundary.kind || 'curve', closed:true,
+    out.attachedBoundary = {kind:isLine ? 'line' : (boundary.kind || 'curve'), closed:!isLine,
       loopIndex:out.loops.length - 1};
     out.sourceIds = Array.from(new Set((surface.sourceIds || []).concat(boundary.sourceIds || [])));
     return out;

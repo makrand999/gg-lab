@@ -941,6 +941,331 @@
     });
     return {records:records,issues:issues};
   }
+  // --- Cylindrical fillet between two planar faces -------------------------
+  // A fillet is a partial cylinder tangent to two planar faces. In the view
+  // where its cross-section is true (PLAN or ELEVATION) it is a circular arc
+  // whose endpoints are tangent to two straight face edges. The paired view
+  // shows the two tangent generator lines (the straight boundaries shared
+  // with the faces) spanning the fillet length; the same view's end strokes
+  // already fix the two coaxial end arcs. No solid or feature name is read.
+  var FILLET_VIEWS = ['PLAN','ELEVATION','PROFILE'];
+  function filletTolerance(arc) {
+    return Math.max(1e-4, 1e-6 * Math.max(1, arc.radius));
+  }
+  function angleDistance(a, b) {
+    var d = Math.abs(((a - b) % TAU + TAU) % TAU);
+    return Math.min(d, TAU - d);
+  }
+  function pointOnSegment2D(p, s, tol) {
+    var dx = s.x2 - s.x, dy = s.y2 - s.y, len2 = dx*dx + dy*dy;
+    if (len2 < EPS*EPS) return false;
+    var t = ((p.x - s.x)*dx + (p.y - s.y)*dy) / len2;
+    if (t < -1e-6 || t > 1 + 1e-6) return false;
+    return Math.hypot(p.x - (s.x + t*dx), p.y - (s.y + t*dy)) <= tol;
+  }
+  function filletArcEndpoint(arc, theta) {
+    var radial = add(mul(arc.u, Math.cos(theta)), mul(arc.v, Math.sin(theta)));
+    return add(arc.center, mul(radial, arc.radius));
+  }
+  function filletTangentDirection(arc, theta) {
+    return add(mul(arc.u, -Math.sin(theta)), mul(arc.v, Math.cos(theta)));
+  }
+  // Find one straight stroke tangent to the projected cross-section arc at
+  // each endpoint. The stroke must contain the tangency point and must extend
+  // along the face, away from the arc's angular span. The extent it draws
+  // becomes the adjacent planar patch's width.
+  function filletTangentEvidence(arc, role, profile, ink, used, tol) {
+    var conic = projectedConic(arc, role, profile);
+    if (!conic) return {conflict:'The fillet cross-section cannot be projected into its own view.'};
+    var start = angle(arc.startAngle || 0), sweep = arc.sweepAngle === undefined ? TAU : arc.sweepAngle;
+    var end = angle(start + sweep), angleTol = tol / Math.max(1, arc.radius);
+    var candidates = {start:[], end:[]};
+    ink.forEach(function (segment) {
+      if (!segment || segment.type !== 'SEGMENT' || viewOf(segment) !== role || used.has(segment.id) || helper(segment)) return;
+      var tangent = segmentTangency(conic, segment, tol);
+      if (!tangent) return;
+      var theta = angle(tangent.t);
+      var which = angleDistance(theta, start) <= angleTol ? 'start' :
+        angleDistance(theta, end) <= angleTol ? 'end' : null;
+      if (!which) return;
+      var tangentPoint = filletArcEndpoint(arc, theta);
+      var projected = sheetPoint(tangentPoint, role, profile);
+      if (!projected || !pointOnSegment2D(projected, segment, tol)) return;
+      var viewDirection = which === 'start' ? mul(filletTangentDirection(arc, theta), -1) :
+        filletTangentDirection(arc, theta);
+      var projectedDirection = sheetVector(viewDirection, role, profile);
+      var length = Math.hypot(projectedDirection.x, projectedDirection.y);
+      if (length < EPS) return;
+      var dx = projectedDirection.x/length, dy = projectedDirection.y/length;
+      var reachA = (segment.x - projected.x)*dx + (segment.y - projected.y)*dy;
+      var reachB = (segment.x2 - projected.x)*dx + (segment.y2 - projected.y)*dy;
+      var extent = Math.max(reachA, reachB);
+      if (extent <= tol)
+        return candidates[which].push({conflict:true, segment:segment, theta:theta,
+          message:'The face edge at an arc endpoint extends into the fillet instead of away from it.'});
+      candidates[which].push({segment:segment, theta:theta, extent:extent,
+        point:tangentPoint, direction:{x:viewDirection.x,y:viewDirection.y,z:viewDirection.z},
+        viewDirection:{x:dx,y:dy}});
+    });
+    function best(list) {
+      var conflicts = list.filter(function (c) { return c.conflict; });
+      var valid = list.filter(function (c) { return !c.conflict; });
+      if (valid.length) {
+        valid.sort(function (a, b) {
+          return b.extent - a.extent || String(a.segment.id).localeCompare(String(b.segment.id));
+        });
+        return valid[0];
+      }
+      return conflicts[0] || null;
+    }
+    var first = best(candidates.start), second = best(candidates.end);
+    if (!first && !second) return {missing:'both'};
+    if (!first || !second) return {missing:first ? 'end' : 'start'};
+    if (first.conflict || second.conflict) return {conflict:first.conflict ? first.message : second.message};
+    var d1 = {x:first.segment.x2-first.segment.x, y:first.segment.y2-first.segment.y};
+    var d2 = {x:second.segment.x2-second.segment.x, y:second.segment.y2-second.segment.y};
+    var cross2 = Math.abs(d1.x*d2.y - d1.y*d2.x);
+    var l1 = Math.hypot(d1.x,d1.y), l2 = Math.hypot(d2.x,d2.y);
+    if (l1 < EPS || l2 < EPS || cross2 <= 1e-6*l1*l2)
+      return {conflict:'The two tangent face edges are parallel and do not form a fillet corner.'};
+    return {start:first, end:second};
+  }
+  // The tangent generator at each arc endpoint is a straight boundary shared
+  // with a planar face. It is visible as a line in a view perpendicular to the
+  // arc plane; that drawn line is the paired-view evidence.
+  function filletBoundaryCoverage(line, arcRole, profile, ink, used, tol) {
+    for (var i=0;i<FILLET_VIEWS.length;i++) {
+      var role = FILLET_VIEWS[i];
+      if (role === arcRole || (role === 'PROFILE' && !profile)) continue;
+      var p1 = sheetPoint(line.start, role, profile), p2 = sheetPoint(line.end, role, profile);
+      if (!p1 || !p2) continue;
+      var len = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+      if (len <= tol) continue;
+      var dx = (p2.x-p1.x)/len, dy = (p2.y-p1.y)/len, slack = tol/len, intervals = [];
+      ink.forEach(function (segment) {
+        if (!segment || segment.type !== 'SEGMENT' || viewOf(segment) !== role || used.has(segment.id) || helper(segment)) return;
+        if (Math.abs((segment.x-p1.x)*dy - (segment.y-p1.y)*dx) > tol) return;
+        if (Math.abs((segment.x2-p1.x)*dy - (segment.y2-p1.y)*dx) > tol) return;
+        var a = ((segment.x-p1.x)*dx + (segment.y-p1.y)*dy)/len;
+        var b = ((segment.x2-p1.x)*dx + (segment.y2-p1.y)*dy)/len;
+        intervals.push({a:Math.min(a,b), b:Math.max(a,b), id:segment.id});
+      });
+      if (!intervals.length) continue;
+      intervals.sort(function (a,b) { return a.a - b.a || a.b - b.b; });
+      var reach = 0, ids = [];
+      intervals.forEach(function (interval) {
+        if (interval.a > reach + slack) return;
+        reach = Math.max(reach, interval.b);
+        if (interval.a >= -slack && interval.b <= 1 + slack) ids.push(interval.id);
+      });
+      if (reach >= 1 - slack) return {ok:true, role:role, ids:Array.from(new Set(ids))};
+    }
+    return {ok:false};
+  }
+  function addCylindricalFillet(geometry, candidate) {
+    var low = candidate.low, high = candidate.high;
+    if (!geometry || !Array.isArray(geometry.vertices) || !Array.isArray(geometry.edges) || !Array.isArray(geometry.faces)) return null;
+    geometry.surfacePatches = geometry.surfacePatches || [];
+    geometry.faces = geometry.faces || [];
+    geometry.edges = geometry.edges || [];
+    geometry.smoothSideFaces = geometry.smoothSideFaces || [];
+    var lowDV = low.displayVertices || [], highDV = high.displayVertices || [];
+    if (lowDV.length < 2 || lowDV.length !== highDV.length) return null;
+    var n = lowDV.length - 1;
+    var edgeKeys = new Set();
+    geometry.edges.forEach(function (e) { edgeKeys.add(Math.min(e[0],e[1])+'_'+Math.max(e[0],e[1])); });
+    function ensureEdge(a, b) {
+      var key = Math.min(a,b)+'_'+Math.max(a,b);
+      if (edgeKeys.has(key)) return;
+      edgeKeys.add(key);
+      geometry.edges.push([a,b]);
+    }
+    function addFace(loop, smooth) {
+      var index = geometry.faces.length;
+      geometry.faces.push(loop);
+      if (smooth) geometry.smoothSideFaces.push(index);
+      return index;
+    }
+    var cylinderFaces = [];
+    for (var i=0;i<n;i++) {
+      // The quad follows the arc tessellation and its z translation. Adjacent
+      // quads share the existing arc display edges and a new generator edge.
+      cylinderFaces.push(addFace([lowDV[i], lowDV[i+1], highDV[i+1], highDV[i]], true));
+      ensureEdge(lowDV[i], highDV[i]);
+    }
+    ensureEdge(lowDV[n], highDV[n]);
+    var vo = geometry.vertices.length;
+    var A0 = lowDV[0], A1 = highDV[0], B0 = lowDV[n], B1 = highDV[n];
+    var wallDirection = candidate.start.direction, floorDirection = candidate.end.direction;
+    var wallExtent = candidate.start.extent, floorExtent = candidate.end.extent;
+    var W0 = vo, W1 = vo+1, F0 = vo+2, F1 = vo+3;
+    function offsetVertex(index, direction, extent) {
+      var p = geometry.vertices[index];
+      return {x:p.x + direction.x*extent, y:p.y + direction.y*extent, z:p.z + direction.z*extent};
+    }
+    geometry.vertices.push(offsetVertex(A0, wallDirection, wallExtent));
+    geometry.vertices.push(offsetVertex(A1, wallDirection, wallExtent));
+    geometry.vertices.push(offsetVertex(B0, floorDirection, floorExtent));
+    geometry.vertices.push(offsetVertex(B1, floorDirection, floorExtent));
+    // Planar face strips. The shared generator lines are traversed in the
+    // opposite direction from the cylinder side, so the display complex stays
+    // consistently oriented.
+    var wallFace = addFace([A0, A1, W1, W0], false);
+    var floorFace = addFace([B0, F0, F1, B1], false);
+    ensureEdge(A1, W1); ensureEdge(W1, W0); ensureEdge(W0, A0);
+    ensureEdge(B0, F0); ensureEdge(F0, F1); ensureEdge(F1, B1);
+    var u = candidate.u, v = candidate.v, axis = candidate.axis;
+    var normalStart = unit(add(mul(u, Math.cos(candidate.startAngle)), mul(v, Math.sin(candidate.startAngle))));
+    var normalEnd = unit(add(mul(u, Math.cos(candidate.endAngle)), mul(v, Math.sin(candidate.endAngle))));
+    function planeFrame(normal) {
+      var frameU = axis;
+      var frameV = cvUnit(cross(normal, axis));
+      return {u:frameU, v:frameV};
+    }
+    var wallFrame = planeFrame(normalStart), floorFrame = planeFrame(normalEnd);
+    var lineStart = candidate.lineStart, lineEnd = candidate.lineEnd;
+    var filletNumber = (geometry.fillets || []).length;
+    lineStart.id = 'fillet-line:' + filletNumber + ':start';
+    lineEnd.id = 'fillet-line:' + filletNumber + ':end';
+    var wallOuter = {kind:'line', start:{x:geometry.vertices[W1].x,y:geometry.vertices[W1].y,z:geometry.vertices[W1].z},
+      end:{x:geometry.vertices[W0].x,y:geometry.vertices[W0].y,z:geometry.vertices[W0].z},
+      id:'fillet-line:' + filletNumber + ':wall-outer', sourceIds:lineStart.sourceIds.slice()};
+    var wallEndHigh = {kind:'line', start:{x:geometry.vertices[A1].x,y:geometry.vertices[A1].y,z:geometry.vertices[A1].z},
+      end:{x:geometry.vertices[W1].x,y:geometry.vertices[W1].y,z:geometry.vertices[W1].z},
+      id:'fillet-line:' + filletNumber + ':wall-end-high', sourceIds:lineStart.sourceIds.slice()};
+    var wallEndLow = {kind:'line', start:{x:geometry.vertices[W0].x,y:geometry.vertices[W0].y,z:geometry.vertices[W0].z},
+      end:{x:geometry.vertices[A0].x,y:geometry.vertices[A0].y,z:geometry.vertices[A0].z},
+      id:'fillet-line:' + filletNumber + ':wall-end-low', sourceIds:lineStart.sourceIds.slice()};
+    var floorOuter = {kind:'line', start:{x:geometry.vertices[F0].x,y:geometry.vertices[F0].y,z:geometry.vertices[F0].z},
+      end:{x:geometry.vertices[F1].x,y:geometry.vertices[F1].y,z:geometry.vertices[F1].z},
+      id:'fillet-line:' + filletNumber + ':floor-outer', sourceIds:lineEnd.sourceIds.slice()};
+    var floorEndLow = {kind:'line', start:{x:geometry.vertices[B0].x,y:geometry.vertices[B0].y,z:geometry.vertices[B0].z},
+      end:{x:geometry.vertices[F0].x,y:geometry.vertices[F0].y,z:geometry.vertices[F0].z},
+      id:'fillet-line:' + filletNumber + ':floor-end-low', sourceIds:lineEnd.sourceIds.slice()};
+    var floorEndHigh = {kind:'line', start:{x:geometry.vertices[F1].x,y:geometry.vertices[F1].y,z:geometry.vertices[F1].z},
+      end:{x:geometry.vertices[B1].x,y:geometry.vertices[B1].y,z:geometry.vertices[B1].z},
+      id:'fillet-line:' + filletNumber + ':floor-end-high', sourceIds:lineEnd.sourceIds.slice()};
+    var cylinderIndex = geometry.surfacePatches.length;
+    var cylinderSource = candidate.sourceIds.slice();
+    geometry.surfacePatches.push({kind:'cylinder',analyticKind:'cylinder',origin:low.center,
+      axis:axis,radius:low.radius,
+      loops:[{kind:'outer',curves:[candidate.lowIndex,candidate.highIndex],
+        lines:[lineStart,lineEnd]}],
+      faceIndices:cylinderFaces,sourceIds:cylinderSource,fillet:true});
+    var wallIndex = geometry.surfacePatches.length;
+    geometry.surfacePatches.push({kind:'plane',origin:{x:lineStart.start.x,y:lineStart.start.y,z:lineStart.start.z},
+      normal:normalStart,u:wallFrame.u,v:wallFrame.v,
+      loops:[{kind:'outer',lines:[lineStart,wallEndHigh,wallOuter,wallEndLow]}],
+      faceIndices:[wallFace],sourceIds:cylinderSource.slice(),filletAdjacent:true});
+    var floorIndex = geometry.surfacePatches.length;
+    geometry.surfacePatches.push({kind:'plane',origin:{x:lineEnd.end.x,y:lineEnd.end.y,z:lineEnd.end.z},
+      normal:normalEnd,u:floorFrame.u,v:floorFrame.v,
+      loops:[{kind:'outer',lines:[lineEnd,floorEndLow,floorOuter,floorEndHigh]}],
+      faceIndices:[floorFace],sourceIds:cylinderSource.slice(),filletAdjacent:true});
+    if (!geometry.fillets) geometry.fillets=[];
+    var record = {kind:'cylindrical',center:{x:low.center.x,y:low.center.y,z:low.center.z},
+      axis:{x:axis.x,y:axis.y,z:axis.z},radius:low.radius,
+      startAngle:candidate.startAngle,sweepAngle:candidate.sweepAngle,length:candidate.length,
+      tangentLines:[lineStart,lineEnd],endArcs:[candidate.lowIndex,candidate.highIndex],
+      closure:'open',sourceIds:cylinderSource.slice(),surface:cylinderIndex,
+      adjacentSurfaces:[wallIndex,floorIndex]};
+    geometry.fillets.push(record);
+    return record;
+  }
+  function filletPair(upper, lower) {
+    var a = upper.c, b = lower.c, tol = filletTolerance(a);
+    if (a.sourceView !== b.sourceView || !a.sourceView) return null;
+    if (Math.abs(a.radius - b.radius) > tol) return null;
+    if (Math.abs(a.startAngle - b.startAngle) > 1e-7 || Math.abs(a.sweepAngle - b.sweepAngle) > 1e-7) return null;
+    if (dot(a.u, b.u) < 1 - 1e-9 || dot(a.v, b.v) < 1 - 1e-9 ||
+        Math.abs(dot(a.u, b.v)) > 1e-7 || Math.abs(dot(a.v, b.u)) > 1e-7) return null;
+    var n = cvNormal(a);
+    if (!n) return null;
+    var delta = sub(b.center, a.center), axial = dot(delta, n);
+    if (Math.abs(axial) <= tol) return null;
+    if (Vec3.length(sub(delta, mul(n, axial))) > tol) return null;
+    if (!(a.sweepAngle > EPS) || !(a.sweepAngle < Math.PI - EPS)) return null;
+    if (axial > 0) return {low:upper, high:lower, lowIndex:upper.index, highIndex:lower.index};
+    return {low:lower, high:upper, lowIndex:lower.index, highIndex:upper.index};
+  }
+  function inferCylindricalFillets(geometry,ink,used,profile) {
+    var issues=[],records=[],consumed=new Set();
+    if(!geometry||!Array.isArray(geometry.curves)) return {records:records,issues:issues,consumedIds:[]};
+    var bound=new Set();
+    (geometry.surfacePatches||[]).forEach(function(p) {
+      (p.boundaryCurves||[]).forEach(function(i) {bound.add(i);});
+    });
+    var arcs=[];
+    geometry.curves.forEach(function(c,index) {
+      if(c.kind!=='circular-arc'||bound.has(index)) return;
+      if(['PLAN','ELEVATION'].indexOf(c.sourceView)===-1&&!(c.sourceView==='PROFILE'&&profile)) return;
+      arcs.push({c:c,index:index});
+    });
+    var claimed=new Set(),pairs=[];
+    for(var i=0;i<arcs.length;i++) for(var j=i+1;j<arcs.length;j++) {
+      var pair=filletPair(arcs[i],arcs[j]);
+      if(pair) pairs.push(pair);
+    }
+    var pairCounts=new Map(),ambiguousReported=new Set();
+    pairs.forEach(function(pair) {
+      pairCounts.set(pair.lowIndex,(pairCounts.get(pair.lowIndex)||0)+1);
+      pairCounts.set(pair.highIndex,(pairCounts.get(pair.highIndex)||0)+1);
+    });
+    pairs.forEach(function(pair) {
+      if(claimed.has(pair.lowIndex)||claimed.has(pair.highIndex)) return;
+      var ambiguous=pairCounts.get(pair.lowIndex)>1||pairCounts.get(pair.highIndex)>1;
+      if(ambiguous) {
+        [pair.lowIndex,pair.highIndex].forEach(function(index) {
+          if(ambiguousReported.has(index)) return;
+          ambiguousReported.add(index);
+          issues.push({code:'fillet-ambiguous',entityId:(arcs[index].c.sourceIds||[])[0],
+            message:'Several coaxial arc pairs fit this cross-section; the fillet length is unresolved.'});
+        });
+        return;
+      }
+      var low=pair.low.c,high=pair.high.c,role=low.sourceView,tol=filletTolerance(low);
+      var evidence=filletTangentEvidence(low,role,profile,ink,used,tol);
+      var entityId=(low.sourceIds||[])[0];
+      function report(code,message) {issues.push({code:code,entityId:entityId,message:message});}
+      if(evidence.missing) {
+        if(evidence.missing!=='both') report('fillet-tangent-missing',
+          'One tangent face edge at the fillet arc endpoints is missing; the fillet is unresolved.');
+        return;
+      }
+      if(evidence.conflict) {report('fillet-tangent-conflict',evidence.conflict);return;}
+      var start=angle(low.startAngle||0),end=angle(start+low.sweepAngle);
+      var lineStart={kind:'line',start:filletArcEndpoint(low,start),end:filletArcEndpoint(high,start),
+        sourceIds:Array.from(new Set([].concat(low.sourceIds||[],high.sourceIds||[],evidence.start.segment.id)))};
+      var lineEnd={kind:'line',start:filletArcEndpoint(high,end),end:filletArcEndpoint(low,end),
+        sourceIds:Array.from(new Set([].concat(low.sourceIds||[],high.sourceIds||[],evidence.end.segment.id)))};
+      var coverStart=filletBoundaryCoverage(lineStart,role,profile,ink,used,tol);
+      var coverEnd=filletBoundaryCoverage(lineEnd,role,profile,ink,used,tol);
+      if(!coverStart.ok||!coverEnd.ok) {
+        report('fillet-boundary-missing','The tangent generator boundary has no matching straight edge in the paired view; the fillet is unresolved.');
+        return;
+      }
+      var sourceIds=Array.from(new Set([].concat(low.sourceIds||[],high.sourceIds||[],
+        evidence.start.segment.id,evidence.end.segment.id,coverStart.ids,coverEnd.ids)));
+      lineStart.sourceIds=sourceIds.slice();lineEnd.sourceIds=sourceIds.slice();
+      var candidate={low:low,high:high,lowIndex:pair.lowIndex,highIndex:pair.highIndex,
+        u:low.u,v:low.v,axis:cvUnit(sub(high.center,low.center)),
+        startAngle:low.startAngle,sweepAngle:low.sweepAngle,
+        endAngle:low.startAngle+low.sweepAngle,
+        length:Vec3.length(sub(high.center,low.center)),
+        start:evidence.start,end:evidence.end,lineStart:lineStart,lineEnd:lineEnd,
+        sourceIds:sourceIds};
+      if(addCylindricalFillet(geometry,candidate)) {
+        claimed.add(pair.lowIndex);claimed.add(pair.highIndex);
+        [evidence.start.segment.id,evidence.end.segment.id].concat(coverStart.ids,coverEnd.ids).forEach(function(id) {
+          if(id) {used.add(id);consumed.add(id);}
+        });
+        records.push({kind:'cylindrical',radius:low.radius,axis:candidate.axis,
+          center:low.center,startAngle:low.startAngle,sweepAngle:low.sweepAngle,
+          length:candidate.length,closure:'open',sourceIds:sourceIds.slice()});
+      }
+    });
+    return {records:records,issues:issues,consumedIds:Array.from(consumed)};
+  }
   // Share frame validation and inference with the oblique primitive stage.
   function resolveProfileFrame(entities, options) {
     options = options || {};
@@ -1157,6 +1482,11 @@
         });
       });
     });
+    // A cylindrical fillet needs two coaxial cross-section arcs, a tangent
+    // face edge at each arc endpoint and matching generator edges in the paired
+    // view. This runs after curve lifting, so the end arcs already exist.
+    var fillets=inferCylindricalFillets(geometry,ink,used,profile);
+    fillets.issues.forEach(function(issue) {selectedIssues.push(issue);});
     var issues=selectedIssues.slice();
     if(frameIssue) issues.push(frameIssue);
     if(!profile && ink.some(function(e) {return e.viewRole==='PROFILE';}) && !frameIssue) {

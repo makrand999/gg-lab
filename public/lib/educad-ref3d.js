@@ -93,7 +93,7 @@
           vertices: verts, edges: edges, faces: faces,
           curves: g.curves || [], surfacePatches: g.surfacePatches || [],
           surfaces: g.surfaces || [], surfaceModel: g.surfaceModel || null,
-          recesses: g.recesses || [],
+          recesses: g.recesses || [], fillets: g.fillets || [],
           analyticSurfaceValidation: g.analyticSurfaceValidation || null,
           analyticCertificate: g.analyticCertificate || null,
           smoothSideFaces: g.smoothSideFaces, topologyStatus: g.topologyStatus,
@@ -142,7 +142,26 @@
       }
       if (g.smoothSideFaces !== undefined && !indices(g.smoothSideFaces,g.faces.length)) return false;
       if (g.surfaces !== undefined && !Array.isArray(g.surfaces)) return false;
+      if (g.surfaces !== undefined) {
+        for (var si=0;si<g.surfaces.length;si++) {
+          var surface=g.surfaces[si];
+          if (!surface || !Array.isArray(surface.loops)) return false;
+          for (var li=0;li<surface.loops.length;li++) {
+            var lines=(surface.loops[li] || {}).lines;
+            if (lines === undefined) continue;
+            if (!Array.isArray(lines)) return false;
+            for (var lj=0;lj<lines.length;lj++) {
+              var line=lines[lj], dx, dy, dz;
+              if (!line || line.kind !== 'line') return false;
+              copyVertex(line.start); copyVertex(line.end);
+              dx=line.end.x-line.start.x; dy=line.end.y-line.start.y; dz=line.end.z-line.start.z;
+              if (dx*dx+dy*dy+dz*dz <= 1e-14) return false;
+            }
+          }
+        }
+      }
       if (g.recesses !== undefined && !Array.isArray(g.recesses)) return false;
+      if (g.fillets !== undefined && !Array.isArray(g.fillets)) return false;
       if (g.surfaceModel !== undefined && g.surfaceModel !== null && typeof g.surfaceModel !== 'object') return false;
       if (g.analyticSurfaceValidation !== undefined && g.analyticSurfaceValidation !== null &&
           typeof g.analyticSurfaceValidation !== 'object') return false;

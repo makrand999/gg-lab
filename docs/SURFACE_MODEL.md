@@ -20,11 +20,28 @@ operations share the same boundary vocabulary.
 - `loops`: ordered boundary loops. A loop is either
   `{kind:'outer'|'inner', vertices:[...]}` for a planar face,
   `{kind:'outer'|'inner', curves:[...]}` for an analytic boundary, or
-  `{kind:'outer', section:{...}}` after an analytic trim.
+  `{kind:'outer', section:{...}}` after an analytic trim. A loop may also carry
+  `lines:[...]` and combine vertex, curve, section and line elements.
 - `sourceIds`: drawing entities that produced the surface.
 - `displayFaceIndices`: the display faces that approximate it.
 - `closed`: true only for a surface with no boundary, such as a complete sphere.
   A spherical patch with a boundary loop (a recess cap) is not closed.
+
+A **line boundary element** is a finite straight segment on the surface:
+
+```js
+{kind:'line', start:{x,y,z}, end:{x,y,z}, sourceIds:[...], id?:'optional-name'}
+```
+
+It is stored inline on a loop as `loop.lines` and is the model's straight
+counterpart of an inline `section`. The element object is its identity: two
+loops share a line only when they reference the same object, exactly like an
+inline section. An optional string `id` provides a stable identity across JSON
+serialization (the fillet inference sets one); two distinct line objects with
+the same explicit `id` are treated as one boundary element, so a producer must
+keep explicit ids unique. Without an `id`, incidence falls back to object
+identity. This is the representation used by a cylindrical fillet's two
+tangent generator boundaries.
 
 A plane may carry both vertex loops and analytic inner loops; the recess mouth
 closure uses an analytic outer loop. A sphere may carry one analytic boundary
@@ -58,6 +75,17 @@ The model is built from the same patches used by the preview:
 - a spherical recess becomes an open `sphere` with the mouth circle as its
   outer loop; an edge-on mouth stroke adds a coplanar closure sharing that
   loop.
+- a cylindrical fillet becomes a bounded `cylinder` whose single loop carries
+  two end arcs and two straight tangent generator lines; two planar strips
+  share those lines with the cylinder.
+
+A patch may instead supply `loops` directly. This is the unified input schema:
+`{kind:'outer'|'inner', vertices?, curves?, lines?, section?}` with drawing
+curve indices and inline line/section objects. The legacy `outer`, `holes`,
+`boundaryCurves`, `innerCurves` and `curveLoops` fields remain supported. A
+plane patch using explicit loops must also supply `origin` and `normal` (and
+optionally `u`/`v`); a ruled patch must supply `origin`, `axis` and `radius`
+unless its curve loops provide them.
 
 The straight-wire adapters expose `faceRegions` rather than `surfacePatches`;
 the builder accepts either form. The app, saved previews and the `.edu` runner
@@ -70,7 +98,9 @@ previews and accepts the new `ellipse` analytic curve kind.
 `Surfaces.validate(model, geometry)` is the lightweight consistency check:
 
 - finite analytic parameters and positive radii;
-- sampled boundary points lie on their claimed surface;
+- sampled boundary points lie on their claimed surface, including line
+  endpoints and midpoint;
+- line boundaries are finite nonzero segments;
 - a cylinder boundary's own plane sections the cylinder back to that boundary;
 - plane boundaries lie in their plane;
 - a spherical cap's pole, angle and mouth plane agree with its boundary loop
@@ -112,6 +142,7 @@ The certificate shape is:
     id, kind, closed, sourceIds, displayFaceIndices, parameters,
     loops: [{
       id, kind, elements, sourceIds,
+      vertices, curves, lines, section,
       incidence: {
         elements: [{id, useCount, surfaces}],
         shared, open, nonmanifold, selfShared
@@ -126,7 +157,8 @@ The certificate shape is:
   }],
   boundaries: [{
     id, kind, sourceIds, useCount, surfaces, status,
-    curveIndex, vertices, sectionType
+    curveIndex, vertices, sectionType,
+    lineType, start, end, length
   }],
   shells: [{
     id, surfaces, boundaryIds, boundaryCount, openBoundaryIds, closed,
@@ -154,7 +186,7 @@ of the stored JavaScript numbers:
 
 - stable ids, kind, boundedness, closed-flag consistency and boundary
   incidence/closure counts;
-- finiteness;
+- finiteness, including line start/end points;
 - exactly positive radii and half-angle positivity;
 - plane vertex coplanarity, using a homogeneous determinant rather than a
   normalized normal;
@@ -164,7 +196,11 @@ of the stored JavaScript numbers:
 Numeric checks carry an explicit `tolerance` and usually a `residual`:
 
 - unit normals, axes and plane frames;
-- sampled boundary-on-surface residuals (33 samples per analytic curve);
+- sampled boundary-on-surface residuals (33 samples per analytic curve; line
+  start/midpoint/end);
+- a line boundary's minimum length is above the surface tolerance. The check
+  is a lower bound, so its `residual` is the minimum line length rather than a
+  difference;
 - cylinder boundary section reproduction (centre and both radii);
 - boundary-centre offsets from a cylinder or cone axis;
 - cone apex-on-axis and half-angle/base-radius relations.
@@ -181,7 +217,8 @@ Typical issue codes are `certificate-plane-normal-invalid`,
 `certificate-cylinder-axis-invalid`, `certificate-cylinder-radius-mismatch`,
 `certificate-cylinder-section-mismatch`, `certificate-cone-apex-off-axis`,
 `certificate-cone-half-angle-invalid`, `certificate-sphere-radius-invalid`,
-`certificate-boundary-off-surface`, `certificate-boundary-nonmanifold`,
+`certificate-boundary-off-surface`, `certificate-line-boundary-invalid`,
+`certificate-line-boundary-degenerate`, `certificate-boundary-nonmanifold`,
 `certificate-boundary-self-shared`, `certificate-open-component` and
 `certificate-empty-model`. Warnings (open components, empty models) produce
 `partial`; all other listed codes produce `issues`.
@@ -307,6 +344,9 @@ The operation remains deliberately conservative:
   refused. In particular, the current cone classifier returns `conic` for every
   oblique plane, so a cone base crossed by an oblique cutting plane is still
   refused rather than approximated;
+- crossing cuts are supported for circle/ellipse/arc and inline polyline
+  boundary elements. A loop built from the newer straight line boundary
+  elements is not split and is refused with `split-loop-crosses-plane`;
 - a crossing cut needs a closed, single-valued patch boundary. A cylinder needs
   both end loops; a cone needs two loops or one loop plus its apex; a sphere
   patch needs recess `cap` metadata. Other crossing topologies return
@@ -335,13 +375,16 @@ can get the reason in one traversal. Refusal codes include
 `Surfaces.attachBoundary(surface, boundary, geometry, diagnostics)` clones a
 surface with one additional loop of the form `{kind:'outer', section:boundary}`.
 The exact boundary object is preserved, so calling it on two surfaces promotes
-that boundary from one use to two. `Surfaces.shareBoundary(a, b, boundary,
-geometry)` is the two-surface convenience form and returns
+that boundary from one use to two. A **line element** may be attached in the
+same way; its loop is `{kind:'outer', lines:[boundary]}` and the clone remains
+open because one line is not a closed patch. `Surfaces.shareBoundary(a, b,
+boundary, geometry)` is the two-surface convenience form and returns
 `{boundary, surfaces:[a', b']}`. Attachment is a structural promotion, not a
 clip:
 
 - `boundary` must be a valid analytic circle or ellipse with a full closed
-  sweep (an arc is refused with `attach-boundary-open`);
+  sweep (an arc is refused with `attach-boundary-open`), or a finite nonzero
+  line element;
 - its sampled points must lie on the target surface within
   `surfaceTolerance` (otherwise `attach-boundary-off-surface`);
 - a surface cannot use the same boundary object twice
@@ -488,8 +531,10 @@ node tools/edc.js tools/scripts/truncated-cylinder-ambiguous.edu
 
 The `.edu` properties are `surfaces`, `surfaceKinds`, `surfaceLoops`,
 `surfaceShells`, `surfaceOpen`, `surfaceBoundary`, `surfaceModel`,
-`surfaceCertificate`, `surfaceCertificateIssues`, and
-`surfaceCertificateChecks`. For example:
+`surfaceCertificate`, `surfaceCertificateIssues`,
+`surfaceCertificateChecks`, `surfaceLineBoundaries`,
+`surfaceSharedLineBoundaries`, `surfaceCurveBoundaries`, `fillets`, and
+`recesses`. For example:
 
 ```text
 # expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
@@ -644,6 +689,95 @@ overlap. The analytic certificate is `ok`: the cavity shell is closed and its
 mouth/bottom loops are shared. The open sheet's analytic certificate is
 `partial` with `certificate-open-component`.
 
+## End-to-end case: cylindrical fillet between two planar faces
+
+`fillet-line-boundary.edu` is the first fillet capability and the first use of
+straight boundary elements on a curved surface. It is a bounded partial
+cylinder tangent to two planar faces, not a solid/feature-name reader and not
+Boolean geometry. The drawing supplies:
+
+1. in one principal view (here ELEVATION), a true-shape circular arc whose two
+   endpoints are tangent to two straight face edges;
+2. in the paired view (here PLAN), two straight generator lines at the arc's
+   endpoint stations, spanning the fillet length;
+3. two end strokes spanning the arc's projected width at the ends of that
+   length.
+
+The paired end strokes already lift the elevation arc into two coaxial arcs at
+the two end stations. The fillet inference then checks, analytically:
+
+- the two arcs have the same radius, basis, start angle and sweep, and their
+  centres differ only along the arc-plane normal;
+- the sweep is strictly between zero and pi, so the two tangent planes form a
+  corner rather than parallel faces;
+- each arc endpoint has a drawn straight edge tangent to the projected arc at
+  that endpoint, containing the tangency point and extending along the face
+  away from the fillet;
+- the two tangent edges are not parallel;
+- each derived generator boundary is covered by a straight edge in a view
+  where that generator is not edge-on.
+
+The accepted patch is
+
+```text
+{ p : |radial(p - C)| = r,  theta0 <= angle(p - C) <= theta0 + sweep,
+  0 <= (p - C) . axis <= length }
+```
+
+with axis along the two arc centres and `C` the low end arc centre. Its single
+outer loop combines the two end arcs and the two generator lines:
+
+```text
+loop = {kind:'outer', curves:[lowArc, highArc],
+        lines:[lineStart, lineEnd]}
+```
+
+The generator lines are the tangent boundaries shared with the adjacent planar
+faces. Two bounded plane strips are emitted for those faces, each a rectangle
+whose inner edge is the same line object. Thus `lineStart` and `lineEnd` have
+incidence 2, while the two end arcs and the strips' outer edges remain open.
+`geometry.fillets` records:
+
+```text
+{kind:'cylindrical', center, axis, radius, startAngle, sweepAngle, length,
+ tangentLines:[lineStart, lineEnd], endArcs:[lowCurve, highCurve],
+ closure:'open', surface, adjacentSurfaces:[wall, floor], sourceIds}
+```
+
+The analytic certificate is `partial` with only `certificate-open-component`:
+all finite/length/on-surface/radius/section/axis checks pass, the two generator
+lines are shared, and no error is reported. The display triangle certificate is
+`ok`; the display mesh is an open, consistently oriented cylinder strip with
+two planar face strips. The feature is deliberately not a closed solid: the
+fillet ends and the outer face-strip edges need the surrounding part.
+
+```sh
+node tools/edc.js tools/scripts/fillet-line-boundary.edu
+node tools/edc.js tools/scripts/surface-line-boundary.edu
+```
+
+```text
+# expect: 18V 25E 8F fillets=1 curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=3 surfaceShells=0 surfaceOpen=1 surfaceBoundary=8 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component surfaceCertificateChecks=39 surfaceLineBoundaries=8 surfaceSharedLineBoundaries=2 surfaceCurveBoundaries=2 surfaceValidation=ok diagnostics=none unresolved=0 status=inferred
+```
+
+`surface-line-boundary.edu` attaches a generator line to the truncated-cylinder
+side with `Surfaces.attachBoundary`; the clone certificate contains one line
+boundary and reports `partial` because a single open line is not a closed
+patch. The fillet sheet also exercises `section`, tangent `intersect`,
+`attach` on two surfaces (`lineStart` useCount 2) and `split`; the split query
+is refused with `split-loop-crosses-plane` because the cutting plane crosses
+the loop's straight elements.
+
+`fillet-line-boundary-missing.edu` omits the floor-side generator line; the two
+end arcs still lift, but the fillet is refused with `fillet-boundary-missing`.
+`fillet-line-boundary-conflict.edu` draws the floor edge into the fillet
+instead of away from it; the fillet is refused with
+`fillet-tangent-conflict`. Other refusal codes are `fillet-tangent-missing`
+when only one of the two tangent face edges is present, and `fillet-ambiguous`
+when several coaxial arc pairs fit one cross-section. In every case the arcs
+and strokes are retained and the shortfall is reported rather than
+approximated.
+
 ## Limits
 
 - Principal/oblique circles, inclined full-circle traces, and oblique arcs
@@ -654,16 +788,19 @@ mouth/bottom loops are shared. The open sheet's analytic certificate is
   boundary with no agreeing tangent-pair evidence stays planar. Cones over a
   non-circular 3D ellipse, and frusta between two independently inclined
   boundaries, are not modelled.
-- Two curved recesses are implemented: the spherical recess and the
-  cylindrical blind recess described above. The spherical recess needs a full
-  circular mouth in PLAN or ELEVATION and a rim-to-rim silhouette arc in the
-  other of those two views. The cylindrical recess needs a full circular mouth
-  in PLAN or ELEVATION, a four-sided straight frame around it in that view,
-  two edge-on depth strokes at the mouth diameter, and an exact bottom edge in
-  the paired view. Elliptical mouths, partial mouth arcs, partial silhouette
-  arcs, full-circle silhouettes (which remain sphere or ambiguity candidates),
-  PROFILE mouths, conical drill points, counterbores/stepped holes, torus
-  fillets, and cylindrical fillets between planar faces are not inferred.
+- Two curved recesses and one fillet are implemented: the spherical recess,
+  the cylindrical blind recess, and the cylindrical fillet described above.
+  The spherical recess needs a full circular mouth in PLAN or ELEVATION and a
+  rim-to-rim silhouette arc in the other of those two views. The cylindrical
+  recess needs a full circular mouth in PLAN or ELEVATION, a four-sided
+  straight frame around it in that view, two edge-on depth strokes at the mouth
+  diameter, and an exact bottom edge in the paired view. The fillet needs a
+  true-shape tangent arc in one principal view, a tangent face edge at each arc
+  endpoint, two coaxial end arcs, and matching generator lines in the paired
+  view. Elliptical mouths, partial mouth arcs, partial silhouette arcs,
+  full-circle silhouettes (which remain sphere or ambiguity candidates),
+  PROFILE mouths, conical drill points, counterbores/stepped holes, and torus
+  fillets are not inferred.
 - The spherical recess is a single cap. It does not subtract material from an
   independently reconstructed surrounding face, and it does not merge the
   mouth circle into an inner loop of a drawn planar face. When no face is
@@ -686,6 +823,29 @@ mouth/bottom loops are shared. The open sheet's analytic certificate is
 - The recess display meshes are inward-facing tessellations for viewing the
   cavity. The analytic patches are the sphere cap and the bounded cylinder;
   the meshes are not the source of truth.
+- The fillet is one partial cylinder tangent to two planar faces. It is
+  bounded by two straight tangent generator lines and two end arcs. The two
+  adjacent planar strips share the generator lines, but the fillet ends and
+  the strips' outer edges are open, so the analytic certificate is `partial`
+  with `certificate-open-component`; the feature is not a closed solid and is
+  not Boolean-subtracted from or unioned with a surrounding part. The strips
+  are feature faces, not the whole wall/floor.
+- A fillet arc must have a sweep strictly below pi. A half-cylinder between
+  parallel faces, a full round, a variable-radius fillet, a torus fillet, a
+  fillet chain, and a fillet inferred from a single arc without paired
+  generator/end evidence are not implemented. The inference does not check
+  material side or concave versus convex use; it checks tangency and boundary
+  incidence. The arc view is normally PLAN or ELEVATION; PROFILE arcs and
+  generators need a declared side-view frame.
+- A line boundary element is a finite straight segment. It is not a polyline,
+  a geodesic on a curved surface, or an analytic curve of a new family. A loop
+  crossing a cutting plane is still refused rather than split into analytic
+  sub-elements, including when the crossing element is a line.
+- A mixed loop stores `lines`, `curves` and `vertices` in separate ordered
+  arrays; it does not store one interleaved signed cycle. Adjacency is by
+  coincident endpoints on the surface, and the display faces carry the rendered
+  order. The fillet loop uses this convention: its two line endpoints coincide
+  with the two end-arc endpoints.
 - Cone sections are classified but not yet returned as trimmed ellipse/hyperbola
   boundary curves.
 - Skew or intersecting-axis cylinder–cylinder intersections and
@@ -726,7 +886,9 @@ mouth/bottom loops are shared. The open sheet's analytic certificate is
   inside the patch. It does not return the outside-patch section arcs.
 - `attachBoundary`/`shareBoundary` only promote an existing boundary object
   into another loop. They do not clip either surface, orient material, merge
-  coincident loops or remove an outer loop that the new loop should replace.
+  coincident loops or remove an outer loop that the new loop should replace. A
+  single attached line is a structural loop with one open element, so it does
+  not bound a patch.
 - The model is inferred. The analytic certificate checks consistency of the
   stored decimal parameters and sampled boundaries; it does not prove that an
   inferred radius, axis or apex equals the author's intended exact geometry,
@@ -738,7 +900,9 @@ mouth/bottom loops are shared. The open sheet's analytic certificate is
   uses the mesh as evidence.
 - Boundary incidence follows the ordered `loops`. A `surface.boundaryCurves`
   entry that is not part of a loop is advisory patch metadata and is not counted
-  as a boundary element.
+  as a boundary element. Line elements participate in incidence by explicit
+  `id` when present, otherwise by object identity; loop order is canonical for
+  element records, not a signed cycle orientation.
 
 ## Drawing-script surface queries
 
@@ -772,10 +936,11 @@ Query result shapes:
   end loops and one shared section, and a crossing band reports the number of
   shared section sub-arcs.
 - **attach** names one or more surfaces with `surfaces:[...]` (or one with
-  `surface`/`from`) and a promoted curve with `curve`. It returns
-  `{surfaces, boundary, validation, certificate}`, where `boundary` is the
-  incidence record of the attached curve (`useCount`, `surfaceIds`). Attaching
-  the same curve to two surfaces reports `useCount:2`.
+  `surface`/`from`) and a promoted boundary with `curve` or an inline line
+  element with `line`. It returns `{surfaces, boundary, validation,
+  certificate}`, where `boundary` is the incidence record of the attached
+  element (`useCount`, `surfaceIds`). Attaching the same curve or line to two
+  surfaces reports `useCount:2`.
 - **intersectionCurves** promotes a circle/ellipse intersection and returns
   `{curves, count}` or `null`.
 
@@ -815,6 +980,14 @@ New sheets exercise the split and promotion API:
   `boundary.useCount:2`.
 - `cone.edu` also splits a cone between its apex and base, producing a tip patch
   and a frustum band that share the new circle.
+- `surface-line-boundary.edu` attaches a straight generator line to the
+  truncated-cylinder side and certifies the resulting line boundary.
+- `fillet-line-boundary.edu` exercises line boundaries in a reconstructed
+  fillet, including `section`, tangent `intersect`, shared-line `attach` and a
+  refused `split` across the line loop.
+- `fillet-line-boundary-missing.edu` and `fillet-line-boundary-conflict.edu`
+  retain the drawing primitives and report the missing or conflicting fillet
+  evidence.
 
 The other intersection sheets are `surface-intersect-planes.edu`,
 `surface-intersect-spheres.edu`, `surface-intersect-sphere-plane.edu`,

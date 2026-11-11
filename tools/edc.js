@@ -213,8 +213,8 @@ function runScript(text, options) {
       } else if (request.operation === 'attach') {
         var attachRefs = request.surfaces || [request.from !== undefined ? request.from : request.surface];
         if (!Array.isArray(attachRefs)) attachRefs = [attachRefs];
-        var boundary = pickCurve(request.curve);
-        if (!boundary) throw new Error('Missing analytic boundary curve');
+        var boundary = request.curve !== undefined ? pickCurve(request.curve) : request.line;
+        if (!boundary) throw new Error('Missing analytic boundary curve or line');
         var attached = [], attachDiagnostics = [];
         attachRefs.forEach(function(ref) {
           var source = pick(ref);
@@ -359,7 +359,7 @@ function checkObliqueVisibility(solid,entities) {
 // F counts logical regions, not the duplicated front/back display loops.
 function topologyProperties(solid) {
   var g = solid && solid.geometry;
-  if (!g) return { V: 0, E: 0, F: 0, holes: 0, components: 0, closed: 0, open: 0, boundary: 0, curves: 0, minRadius: 0, maxRadius: 0, surfaces: 0, surfaceKinds: 'none', surfaceLoops: 0, surfaceShells: 0, surfaceOpen: 0, surfaceBoundary: 0, surfaceModel: 'none', surfaceCertificate: 'none', surfaceCertificateIssues: 'none', surfaceCertificateChecks: 0, recesses: 0, unresolved: (solid && solid.issues || []).length, status: (solid && solid.reason) || 'unavailable' };
+  if (!g) return { V: 0, E: 0, F: 0, holes: 0, components: 0, closed: 0, open: 0, boundary: 0, curves: 0, minRadius: 0, maxRadius: 0, surfaces: 0, surfaceKinds: 'none', surfaceLoops: 0, surfaceShells: 0, surfaceOpen: 0, surfaceBoundary: 0, surfaceModel: 'none', surfaceCertificate: 'none', surfaceCertificateIssues: 'none', surfaceCertificateChecks: 0, surfaceLineBoundaries: 0, surfaceSharedLineBoundaries: 0, surfaceCurveBoundaries: 0, recesses: 0, fillets: 0, unresolved: (solid && solid.issues || []).length, status: (solid && solid.reason) || 'unavailable' };
   var faces = g.faceRegions || (g.faces || []).map(function (f) { return { outer: f, holes: [] }; });
   var unique = new Map();
   faces.forEach(function (f) {
@@ -382,6 +382,7 @@ function topologyProperties(solid) {
   var analytic = g.surfaces || [], model = g.surfaceModel || null, modelCheck = g.analyticSurfaceValidation || null;
   var certificate = g.analyticCertificate || null;
   var certificateIssues = certificate ? Array.from(new Set((certificate.issues || []).map(function(i) { return i.code; }))).sort() : [];
+  var boundaryRecords = certificate && Array.isArray(certificate.boundaries) ? certificate.boundaries : [];
   var top = P.projectGeometry(g, 'top'), front = P.projectGeometry(g, 'front');
   return { V: g.vertices.length, E: g.edges.length, F: unique.size,
     holes: Array.from(unique.values()).reduce(function(n,f) { return n+f.holes.length; },0),
@@ -406,8 +407,12 @@ function topologyProperties(solid) {
     surfaceCertificate: certificate ? certificate.status : 'none',
     surfaceCertificateIssues: certificateIssues.length ? certificateIssues.join(',') : 'none',
     surfaceCertificateChecks: certificate && certificate.counts ? certificate.counts.checks : 0,
+    surfaceLineBoundaries: boundaryRecords.filter(function(b) { return b.kind === 'line'; }).length,
+    surfaceSharedLineBoundaries: boundaryRecords.filter(function(b) { return b.kind === 'line' && b.status === 'shared'; }).length,
+    surfaceCurveBoundaries: boundaryRecords.filter(function(b) { return b.kind === 'curve'; }).length,
     surfaceValidation: g.surfaceValidation ? g.surfaceValidation.status : 'none',
     recesses: (g.recesses || []).length,
+    fillets: (g.fillets || []).length,
     minRadius: (g.curves || []).length ? Math.min.apply(null,g.curves.map(function(c) {return c.radius||0;})) : 0,
     maxRadius: (g.curves || []).length ? Math.max.apply(null,g.curves.map(function(c) {return c.radius||0;})) : 0,
     unresolved: (solid.pipeline && solid.pipeline.diagnostics || []).length,

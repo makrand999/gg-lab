@@ -112,11 +112,34 @@
       y:c.center.y + c.frameU.y*cs + c.frameV.y*sn + c.axis.y*axial,
       z:c.center.z + c.frameU.z*cs + c.frameV.z*sn + c.axis.z*axial};
   }
+  function torusSpherePoint(c, t) {
+    var W = c.A * Math.cos(t) + c.B * Math.sin(t);
+    var coeffA = 2 * c.minorRadius * (c.majorRadius + W);
+    var coeffB = 2 * c.minorRadius * c.dA;
+    var N = c.N0 - 2 * c.majorRadius * W;
+    var M = Math.hypot(coeffA, coeffB);
+    if (M <= EPS) return null;
+    var ratio = Math.max(-1, Math.min(1, N / M));
+    if (ratio > 1 - 1e-9) ratio = 1;
+    else if (ratio < -1 + 1e-9) ratio = -1;
+    var psi = Math.atan2(coeffB, coeffA);
+    var v = psi + c.branch * Math.acos(ratio);
+    var radial = c.majorRadius + c.minorRadius * Math.cos(v);
+    var axial = c.minorRadius * Math.sin(v);
+    var cs = Math.cos(t) * radial, sn = Math.sin(t) * radial;
+    return {x:c.center.x + c.frameU.x*cs + c.frameV.x*sn + c.axis.x*axial,
+      y:c.center.y + c.frameU.y*cs + c.frameV.y*sn + c.axis.y*axial,
+      z:c.center.z + c.frameU.z*cs + c.frameV.z*sn + c.axis.z*axial};
+  }
   function curvePoint(c, t) {
     if (c.kind === 'torusContour') return torusContourPoint(c, t);
     if (c.kind === 'torusSectionBranch') {
       var point = torusSectionPoint(c, t);
       if (point) return point;
+    }
+    if (c.kind === 'torusSphereBranch') {
+      var spherePoint = torusSpherePoint(c, t);
+      if (spherePoint) return spherePoint;
     }
     var r=radii(c), cs=Math.cos(t)*r.u, sn=Math.sin(t)*r.v;
     return {x:c.center.x+c.u.x*cs+c.v.x*sn,
@@ -1313,7 +1336,7 @@
         return {from:0, to:length, closed:false};
       }
       if (curve.kind === 'arc' || curve.kind === 'torusContour' ||
-          curve.kind === 'torusSectionBranch') {
+          curve.kind === 'torusSectionBranch' || curve.kind === 'torusSphereBranch') {
         var sweep = curveSweep(curve);
         return {from:curveStart(curve), to:curveStart(curve) + sweep,
           closed:sweep >= TAU - 1e-9};
@@ -2798,6 +2821,130 @@
     ]};
   }
 
+  // A torus/sphere intersection reduces to a quadratic in the major-angle
+  // cosine W = d_perp . e(u), because the sphere equation is linear in
+  // cos(v) and sin(v) once W is fixed. Ring tori only; the branch and loop
+  // structure mirrors the oblique plane section.
+  function torusSphere(torus, sphere) {
+    if (!finite(torus.center) || !finite(torus.axis) || !finite(sphere.center) ||
+        !(sphere.radius > 0)) return null;
+    var axis = unit(torus.axis), frame = basis(axis);
+    var d = sub(torus.center, sphere.center);
+    var dA = dot(d, axis), dPerp = sub(d, mul(axis, dA));
+    var Dperp = length(dPerp);
+    var R = torus.majorRadius, r = torus.minorRadius, sr = sphere.radius;
+    var Q = R*R - r*r;
+    if (!(Q > EPS)) return null;
+    var N0 = sr*sr - dot(d, d) - R*R - r*r;
+    var a2 = 4*Q, a1 = -4*R*(N0 + 2*r*r), a0 = N0*N0 - 4*r*r*(R*R + dA*dA);
+    var disc = a1*a1 - 4*a2*a0;
+    if (disc < -EPS) return none('separate');
+    var root = Math.sqrt(Math.max(0, disc));
+    var w0 = (-a1 - root) / (2*a2), w1 = (-a1 + root) / (2*a2);
+    if (w0 > w1) { var swap = w0; w0 = w1; w1 = swap; }
+    var Acomp = dot(dPerp, frame.u), Bcomp = dot(dPerp, frame.v);
+    function makeBranch(branch, start, end, closed) {
+      return {kind:'torusSphereBranch', branch:branch, center:torus.center,
+        axis:axis, frameU:frame.u, frameV:frame.v, majorRadius:R, minorRadius:r,
+        dA:dA, N0:N0, A:Acomp, B:Bcomp, uStart:start, uEnd:end,
+        startAngle:start, sweepAngle:end - start, closed:closed,
+        surfaceId:torus.id, sectionType:'torus-sphere',
+        confidence:'analytic-parameterization'};
+    }
+    function tangentResult(points) {
+      if (!points.length) return null;
+      return {contract:'torus-quadric-v1', kind:'points', points:points,
+        surfaceId:torus.id, relation:'tangent', sectionType:'torus-sphere-tangent'};
+    }
+    var branches = [], loops = [], intervals = [];
+    if (Dperp <= EPS) {
+      if (w0 > EPS || w1 < -EPS) return none('separate');
+      var coaxial = sr*sr - dot(d, d) - R*R - r*r;
+      var ratio = coaxial / (2*r*R);
+      if (Math.abs(ratio) > 1 + 1e-9) return none('separate');
+      var tangent = Math.abs(1 - Math.abs(ratio)) <= 1e-9;
+      if (tangent) {
+        branches.push(makeBranch(1, 0, TAU, true));
+        loops.push({closed:true, full:true, branches:[0]});
+      } else {
+        [1, -1].forEach(function (branch) {
+          var index = branches.length;
+          branches.push(makeBranch(branch, 0, TAU, true));
+          loops.push({closed:true, full:true, branches:[index]});
+        });
+      }
+      return {contract:'torus-quadric-v1', kind:'torusSphere', relation:'transverse',
+        sectionType:'torus-sphere', branches:branches, loops:loops,
+        parameters:{N0:N0, dA:dA, majorRadius:R, minorRadius:r}};
+    }
+    var amp = Dperp;
+    if (w0 > amp + 1e-9 || w1 < -amp - 1e-9) return none('separate');
+    var c = Math.max(-1, Math.min(1, w0/amp));
+    var dRatio = Math.max(-1, Math.min(1, w1/amp));
+    var phiW = Math.atan2(Bcomp, Acomp);
+    function normAngle(value) { return ((value % TAU) + TAU) % TAU; }
+    if (dRatio - c <= 1e-9) {
+      var base = Math.acos(c);
+      var points = [];
+      var tubeCircle = null;
+      [phiW + base, phiW - base].forEach(function (u) {
+        var W = Acomp*Math.cos(u) + Bcomp*Math.sin(u);
+        var coeffA = 2*r*(R + W), coeffB = 2*r*dA;
+        var N = N0 - 2*R*W;
+        if (Math.abs(coeffA) <= EPS && Math.abs(coeffB) <= EPS && Math.abs(N) <= EPS) {
+          if (!tubeCircle) {
+            var radial = add(mul(frame.u, Math.cos(u)), mul(frame.v, Math.sin(u)));
+            tubeCircle = {contract:'torus-quadric-v1', kind:'circle',
+              center:add(torus.center, mul(radial, R)), u:radial, v:axis,
+              radius:r, surfaceId:torus.id, relation:'tangent',
+              sectionType:'torus-sphere-tube-circle'};
+          }
+          return;
+        }
+        var p = torusSpherePoint(makeBranch(1, u, u, false), u);
+        if (!p) return;
+        if (!points.some(function (q) { return pointDistance(p, q) <= surfaceTolerance(torus); }))
+          points.push(p);
+      });
+      return tubeCircle || tangentResult(points);
+    }
+    if (c <= -1 + 1e-12 && dRatio >= 1 - 1e-12) {
+      intervals.push({start:0, end:TAU, full:true});
+    } else if (c <= -1 + 1e-12) {
+      var hiOnly = Math.acos(dRatio);
+      intervals.push({start:phiW + hiOnly, end:phiW + TAU - hiOnly, full:false});
+    } else if (dRatio >= 1 - 1e-12) {
+      var loOnly = Math.acos(c);
+      intervals.push({start:phiW - loOnly, end:phiW + loOnly, full:false});
+    } else {
+      var hi = Math.acos(c), lo = Math.acos(dRatio);
+      intervals.push({start:phiW - hi, end:phiW - lo, full:false});
+      intervals.push({start:phiW + lo, end:phiW + hi, full:false});
+    }
+    intervals.forEach(function (interval) {
+      var start = interval.full ? 0 : normAngle(interval.start);
+      var end = interval.full ? TAU : normAngle(interval.end);
+      if (!interval.full && end <= start + 1e-12) end += TAU;
+      if (interval.full) {
+        [1, -1].forEach(function (branch) {
+          var index = branches.length;
+          branches.push(makeBranch(branch, 0, TAU, true));
+          loops.push({closed:true, full:true, branches:[index]});
+        });
+      } else {
+        var plus = branches.length;
+        branches.push(makeBranch(1, start, end, false));
+        var minus = branches.length;
+        branches.push(makeBranch(-1, end, start, false));
+        loops.push({closed:true, full:false, branches:[plus, minus]});
+      }
+    });
+    return {contract:'torus-quadric-v1', kind:'torusSphere', relation:'transverse',
+      sectionType:'torus-sphere', branches:branches, loops:loops,
+      parameters:{N0:N0, dA:dA, wMin:w0, wMax:w1, amplitude:amp,
+        majorRadius:R, minorRadius:r}};
+  }
+
   function intersect(a, b) {
     if (!a || !b || !a.kind || !b.kind) return null;
     var result;
@@ -2808,6 +2955,8 @@
     else if (a.kind === 'cylinder' && b.kind === 'cylinder') result = cylinderCylinder(a, b);
     else if (a.kind === 'sphere' && b.kind === 'cylinder') result = sphereCylinder(a, b);
     else if (a.kind === 'cylinder' && b.kind === 'sphere') result = sphereCylinder(b, a);
+    else if (a.kind === 'torus' && b.kind === 'sphere') result = torusSphere(a, b);
+    else if (a.kind === 'sphere' && b.kind === 'torus') result = torusSphere(b, a);
     else return null;
     return result && tagged(result, a, b);
   }
@@ -2946,7 +3095,8 @@
   function subArc(c, t0, t1) {
     boundaryElementId(c, c.kind === 'line' ? 'line' : 'curve');
     var out = copyFields(c);
-    out.kind = c.kind === 'torusContour' || c.kind === 'torusSectionBranch' ? c.kind : 'arc';
+    out.kind = (c.kind === 'torusContour' || c.kind === 'torusSectionBranch' ||
+      c.kind === 'torusSphereBranch') ? c.kind : 'arc';
     // Deterministic child id: the same parent station pair names the same
     // shared seam after a JSON round-trip and across repeated splits.
     out.id = c.id + '/arc:' + Number(t0).toFixed(9) + ':' + Number(t1).toFixed(9);

@@ -303,9 +303,22 @@ domain = {u:[u0,u1], v:[v0,v1]}   // each interval at most one turn
 `classifyPoint` returns `inside`, `boundary` or `outside` with method
 `torus-domain`, including wrap-around intervals. A patch with boundary loops
 but no domain still returns `unknown` with `torus-loops-unsupported`: loops
-alone do not select the material side of a torus band. Torus–quadric
-intersections are not yet implemented. The certificate checks centre, radii,
-axis, domain and boundary on-surface residuals.
+alone do not select the material side of a torus band. Torus–plane
+intersections are supported as above; torus–sphere intersections use the same
+closed-form reduction:
+
+```text
+P-C = (R + r cos v) e(u) + r sin v a,   W = d_perp . e(u)
+2r(R+W) cos v + 2r d_a sin v = N0 - 2RW
+```
+
+The validity condition is again a quadratic in `W`, so each loop has two
+analytic branches with exact major-angle endpoints. Coaxial spheres yield
+circles (two loops, or one when tangent); a sphere centred on the tube
+centerline with the tube radius returns the shared tube circle. Torus–cylinder,
+torus–cone and torus–torus intersections are not yet implemented. The
+certificate checks centre, radii, axis, domain and boundary on-surface
+residuals.
 
 Torus silhouettes are analytic in all orthographic views:
 

@@ -19,6 +19,7 @@
     "analytic-silhouette-v1",
     "silhouette-hlr-v1",
     "torus-section-v1",
+    "torus-quadric-v1",
     "feature-graph-v1",
     "correspondence-audit-v1",
     "constraint-report-v1",

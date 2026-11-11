@@ -353,6 +353,14 @@ function runScript(text, options) {
         if (!branchCurve) throw new Error('Missing torus section branch');
         result = Surfaces.point(branchCurve, request.t === undefined ?
           branchCurve.uStart : request.t);
+      } else if (request.operation === 'intersect-branch-point') {
+        var quadricResult = Surfaces.intersect(request.a, request.b);
+        var quadricIndex = request.branch === undefined ? 0 : request.branch;
+        var quadricCurve = quadricResult && quadricResult.branches &&
+          quadricResult.branches[quadricIndex];
+        if (!quadricCurve) throw new Error('Missing quadric intersection branch');
+        result = Surfaces.point(quadricCurve, request.t === undefined ?
+          quadricCurve.uStart : request.t);
       } else if (request.operation === 'correspondence') {
         var Correspondence = require('../public/lib/educad-correspondence.js');
         result = Correspondence.analyze(table.list(),

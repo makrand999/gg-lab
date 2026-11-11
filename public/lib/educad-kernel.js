@@ -33,6 +33,7 @@
       silhouette:'analytic-silhouette-v1',
       silhouetteHlr:'silhouette-hlr-v1',
       torusSection:'torus-section-v1',
+      torusQuadric:'torus-quadric-v1',
       featureGraph:'feature-graph-v1',
       correspondence:'correspondence-audit-v1',
       constraint:'constraint-report-v1',

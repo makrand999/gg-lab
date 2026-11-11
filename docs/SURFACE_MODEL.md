@@ -286,13 +286,18 @@ algebra and clips its branches to both bounded patches.
   `lines`. `point` is tested against both patches. `plane-overlap` and
   `coincident` return `status:'coincident'` because bounded overlap topology is
   not implemented.
-- Each branch is sampled, every sample is classified by `classifyPoint` against
-  both patches, and inside/outside transitions are bisected to a station.
+- When one patch is planar with straight loop elements and the other is a
+  closed support, the plane crossings are solved analytically from the branch
+  circle/ellipse and the patch's line segments. Those stations are labelled
+  `confidence:'analytic-stations'` and `method:'analytic-plane-stations'`.
+- Otherwise each branch is sampled, every sample is classified by
+  `classifyPoint` against both patches, and inside/outside transitions are
+  bisected to a station labelled `confidence:'numeric'` and
+  `method:'sampled-stations'`.
 - Components keep the analytic support definition: partial results are
   sub-arcs of the source circle/ellipse; full results keep the support curve.
-- Every station is labelled `confidence:'numeric'` and
-  `method:'sampled-stations'`. This layer does not claim exact cut stations;
-  exact station algebra remains a later replacement.
+- Tangent plane-line stations are merged when both adjacent intervals are
+  inside, and a component crossing the parameter seam is merged.
 - The result is `{contract:'bounded-intersection-v1', status, support,
   components, summary, diagnostics, confidence}` with
   `status` in `ok | none | unbounded | coincident | unsupported`.

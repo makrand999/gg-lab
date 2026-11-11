@@ -57,6 +57,10 @@
     var l = length(v);
     return l > EPS ? {x:v.x/l, y:v.y/l, z:v.z/l} : {x:0, y:1, z:0};
   }
+  function unitOrNull(v) {
+    var l = length(v);
+    return l > EPS ? {x:v.x/l, y:v.y/l, z:v.z/l} : null;
+  }
   function finite(v) { return v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z); }
   function basis(n) {
     var ref = Math.abs(n.x) < 0.9 ? {x:1,y:0,z:0} : {x:0,y:1,z:0};
@@ -2679,13 +2683,25 @@
         diagnostics:[{code:'bounded-support-kind', severity:'error',
           message:'Bounded clipping does not handle support kind ' + support.kind + '.'}]};
     }
-    var components = [];
+    var components = [], usedAnalytic = false, usedNumeric = false;
     branches.forEach(function (branch) {
       if (!branch.kind && finite(branch.center)) branch.kind = 'circle';
       if (branch.kind === 'line' || !branch.kind && branch.direction) {
         components = components.concat(clipLineBranch(a, b, branch, geometry, options, diagnostics));
+        usedNumeric = true;
       } else {
-        components = components.concat(clipPeriodicBranch(a, b, branch, geometry, options, diagnostics));
+        var analytic = null;
+        if (a.kind === 'plane' && b.closed === true)
+          analytic = clipPeriodicBranchAnalytic(a, b, branch, geometry, a, b);
+        else if (b.kind === 'plane' && a.closed === true)
+          analytic = clipPeriodicBranchAnalytic(a, b, branch, geometry, b, a);
+        if (analytic !== null) {
+          components = components.concat(analytic);
+          usedAnalytic = true;
+        } else {
+          components = components.concat(clipPeriodicBranch(a, b, branch, geometry, options, diagnostics));
+          usedNumeric = true;
+        }
       }
     });
     var totalSweep = components.reduce(function (sum, component) {
@@ -2698,8 +2714,151 @@
         arcs:components.filter(function (c) { return c.kind === 'arc'; }).length,
         full:components.filter(function (c) { return c.closed === true; }).length,
         sweepRatio:Math.round(totalSweep / Math.PI * 1e4) / 1e4},
-      method:'sampled-stations', confidence:'numeric',
+      method:usedAnalytic && usedNumeric ? 'mixed-stations' :
+        usedAnalytic ? 'analytic-plane-stations' : 'sampled-stations',
+      confidence:usedAnalytic && !usedNumeric ? 'analytic-stations' : 'numeric',
       tolerance:boundedTolerance(a, b)};
+  }
+
+  function planePolygonSegments(surface, geometry) {
+    var segments = [], supported = true;
+    (surface.loops || []).forEach(function (loop) {
+      if (loop.section || (loop.curves && loop.curves.length)) {
+        supported = false;
+        return;
+      }
+      function segment(a, b) {
+        if (finite(a) && finite(b) && pointDistance(a, b) > EPS)
+          segments.push({start:a, end:b});
+      }
+      if (loop.points && loop.points.length) {
+        loop.points.forEach(function (p, i) {
+          segment(p, loop.points[(i+1)%loop.points.length]);
+        });
+      } else if (loop.vertices && loop.vertices.length) {
+        var points = loop.vertices.map(function (i) { return geometry.vertices && geometry.vertices[i]; });
+        points.forEach(function (p, i) { segment(p, points[(i+1)%points.length]); });
+      } else if (loop.lines && loop.lines.length) {
+        loop.lines.forEach(function (line) {
+          if (!validLine(line)) { supported = false; return; }
+          segment(line.start, line.end);
+        });
+      } else if (loop.elements && loop.elements.length) {
+        loop.elements.forEach(function (element) {
+          if (!element) { supported = false; return; }
+          if (element.kind === 'polyline') {
+            (element.points || []).forEach(function (p, i, list) {
+              if (i < list.length - 1) segment(p, list[i+1]);
+            });
+          } else supported = false;
+        });
+      } else supported = false;
+    });
+    return supported && segments.length ? segments : null;
+  }
+  // Analytic stations where a circle/ellipse lying in a plane patch crosses
+  // the patch's straight loop elements. Returns null when the loop has curved
+  // elements or the branch is not in the plane; callers then use sampling.
+  function analyticPlaneStations(surface, branch, geometry, tolerance) {
+    if (!surface || surface.kind !== 'plane' || !finite(surface.origin) ||
+        !finite(surface.normal)) return null;
+    if (!branch || !finite(branch.center) || !finite(branch.u) || !finite(branch.v))
+      return null;
+    var normal = unit(surface.normal), r = radii(branch);
+    if (Math.abs(dot(sub(branch.center, surface.origin), normal)) > tolerance) return null;
+    if (Math.abs(dot(branch.u, normal)) > 1e-7 ||
+        Math.abs(dot(branch.v, normal)) > 1e-7) return null;
+    var segments = planePolygonSegments(surface, geometry);
+    if (!segments) return null;
+    var stations = [];
+    segments.forEach(function (line) {
+      var direction = sub(line.end, line.start);
+      var length2 = dot(direction, direction);
+      if (length2 <= EPS * EPS) return;
+      var inPlaneNormal = unitOrNull(cross(direction, normal));
+      if (!inPlaneNormal) return;
+      var a = dot(inPlaneNormal, mul(branch.u, r.u));
+      var b = dot(inPlaneNormal, mul(branch.v, r.v));
+      var c = dot(inPlaneNormal, sub(branch.center, line.start));
+      var amplitude = Math.hypot(a, b);
+      if (amplitude <= EPS) return;
+      var ratio = -c / amplitude;
+      if (ratio < -1 - 1e-9 || ratio > 1 + 1e-9) return;
+      ratio = Math.max(-1, Math.min(1, ratio));
+      var base = Math.atan2(b, a), delta = Math.acos(ratio);
+      [base + delta, base - delta].forEach(function (angle) {
+        var t = ((angle % TAU) + TAU) % TAU;
+        var point = curvePoint(branch, t);
+        var along = dot(sub(point, line.start), direction) / length2;
+        var distance = length(sub(sub(point, line.start), mul(direction, along)));
+        if (along >= -1e-7 && along <= 1 + 1e-7 && distance <= tolerance * 4) {
+          if (!stations.some(function (u) { return Math.abs(u - t) <= 1e-9; }))
+            stations.push(t);
+        }
+      });
+    });
+    stations.sort(function (a, b) { return a - b; });
+    return stations;
+  }
+  // Clip a periodic branch using analytic plane-patch stations. Only used
+  // when the other patch is a closed support, so no other boundary can cut
+  // the interval between two stations.
+  function clipPeriodicBranchAnalytic(a, b, branch, geometry, planeSurface, otherSurface) {
+    var tolerance = boundedTolerance(a, b);
+    var stations = analyticPlaneStations(planeSurface, branch, geometry, tolerance);
+    if (stations === null) return null;
+    var toleranceAngle = 1e-9;
+    var clean = [];
+    stations.concat([0]).sort(function (x, y) { return x - y; }).forEach(function (t) {
+      if (t >= TAU - toleranceAngle) t = 0;
+      if (!clean.length || Math.abs(t - clean[clean.length-1]) > toleranceAngle) clean.push(t);
+    });
+    if (clean.length === 1) {
+      var fullState = sampleStates(a, b, branch, 0.5 * TAU, geometry);
+      if (!fullState.inside) return [];
+      var full = copyFields(branch);
+      full.bounded = true;
+      full.closed = true;
+      full.confidence = 'analytic-stations';
+      full.method = 'analytic-plane-stations';
+      return [full];
+    }
+    var components = [];
+    for (var i = 0; i < clean.length; i++) {
+      var t0 = clean[i];
+      var t1 = i + 1 < clean.length ? clean[i+1] : clean[0] + TAU;
+      if (t1 - t0 <= 1e-12) continue;
+      var state = sampleStates(a, b, branch, 0.5 * (t0 + t1), geometry);
+      if (!state.inside) continue;
+      var arc = subArc(branch, t0, t1);
+      arc.bounded = true;
+      arc.closed = false;
+      arc.confidence = 'analytic-stations';
+      arc.method = 'analytic-plane-stations';
+      arc.surfaceIds = [a.id === undefined ? null : a.id,
+        b.id === undefined ? null : b.id];
+      components.push(arc);
+    }
+    // Merge intervals separated only by a tangent station, then merge a
+    // component that crosses the parameter seam.
+    var merged = [];
+    components.forEach(function (component) {
+      var last = merged[merged.length-1];
+      if (last && Math.abs(component.startAngle -
+          (last.startAngle + last.sweepAngle)) <= 1e-9) {
+        last.sweepAngle += component.sweepAngle;
+      } else merged.push(component);
+    });
+    components = merged;
+    if (components.length > 1) {
+      var first = components[0], last = components[components.length-1];
+      if (Math.abs(first.startAngle) <= 1e-12 &&
+          Math.abs(last.startAngle + last.sweepAngle - TAU) <= 1e-9) {
+        last.sweepAngle += first.sweepAngle;
+        components.shift();
+      }
+    }
+    return components;
   }
 
   function splitSectionForCrossing(surface, spec, cut, crossingPoints, geometry) {

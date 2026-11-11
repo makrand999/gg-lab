@@ -201,7 +201,8 @@ function runScript(text, options) {
         if (!first || !second) throw new Error('Missing reconstructed surface');
         result = Surfaces.intersect(first,second);
       } else if (request.operation === 'split') {
-        var splitSurface = pick(request.from !== undefined ? request.from : request.surface);
+        var splitSurface = request.surface && request.surface.kind ?
+          request.surface : pick(request.from !== undefined ? request.from : request.surface);
         if (!splitSurface) throw new Error('Missing reconstructed surface');
         var splitDiagnostics = [];
         var splitResult = Surfaces.split(splitSurface,request.plane,g,splitDiagnostics);

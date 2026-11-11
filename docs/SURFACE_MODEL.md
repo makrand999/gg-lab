@@ -318,6 +318,18 @@ Bounded torus patches with an explicit `u`/`v` domain support point
 classification and silhouette clipping; a loop-bounded torus without a domain
 reports `torus-patch-clipping-unsupported` rather than guessing a side.
 
+A closed torus can be split by:
+
+- a plane perpendicular to its axis with `|d| < r`: two annular bands, each
+  carrying both section circles and a `v` domain;
+- a plane through the axis: two half-tori, each carrying both tube circles and
+  a `u` domain.
+
+Tangential and oblique planes are refused with `split-torus-tangent` and
+`split-torus-plane-oblique`; both pieces share the same section circle objects,
+so identity reports boundaries 2 / shared 2 and the certificate stays `ok`.
+An already bounded torus patch is refused with `split-torus-patch-unsupported`.
+
 ## Bounded intersection
 
 `Surfaces.intersectBounded(a, b, geometry, options)` keeps the exact support

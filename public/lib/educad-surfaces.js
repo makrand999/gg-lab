@@ -4107,6 +4107,124 @@
   // Internal split plan. split() keeps the public "null means refused"
   // contract; splitDiagnostic() exposes the reason without duplicating the
   // classification. The optional diagnostics array on split() collects the
+  // A plane perpendicular to the torus axis cuts it into two annular bands;
+  // a plane through the axis cuts it into two half-tori. Both cases have
+  // circular sections, so each piece can carry an explicit u/v domain and the
+  // two shared section circles. Oblique quartic cuts are refused.
+  function torusSplitPlan(surface, plane, geometry) {
+    function fail(code, message, detail) {
+      var diagnostic = {code:code, message:message};
+      Object.keys(detail || {}).forEach(function (k) { diagnostic[k] = detail[k]; });
+      return {ok:false, diagnostic:diagnostic};
+    }
+    var spec = planeSpec(plane);
+    if (!spec) return fail('split-plane-invalid', 'The cutting plane needs a finite origin and unit-able normal.');
+    if (!finite(surface.center) || !finite(surface.axis))
+      return fail('split-torus-invalid', 'The torus needs a finite centre and axis.', {surfaceId:surface.id});
+    if ((surface.loops || []).length || surface.domain)
+      return fail('split-torus-patch-unsupported',
+        'Only a closed torus can be split; a bounded torus patch already has a parameter domain.',
+        {surfaceId:surface.id});
+    if (surface.closed !== true)
+      return fail('split-surface-unbounded',
+        'The torus is neither closed nor bounded by a parameter domain.', {surfaceId:surface.id});
+    var axis = unit(surface.axis), frame = basis(axis);
+    var cut;
+    try { cut = section(surface, spec); }
+    catch (err) { return fail('split-section-failed',
+      'The section of ' + surface.id + ' by the cutting plane failed: ' + (err && err.message || err)); }
+    var nAxis = dot(spec.normal, axis);
+    if (!cut) {
+      if (Math.abs(nAxis) > 1e-7 && Math.abs(Math.abs(nAxis) - 1) > 1e-7)
+        return fail('split-torus-plane-oblique',
+          'An oblique plane meets a torus in a quartic curve; that split is not implemented.',
+          {surfaceId:surface.id, axisDotNormal:nAxis});
+      return fail('split-section-missing', 'The cutting plane does not meet ' + surface.id + '.',
+        {surfaceId:surface.id});
+    }
+    if (cut.kind === 'circle')
+      return fail('split-torus-tangent',
+        'A plane tangent to the tube does not split the torus into two bounded pieces.',
+        {surfaceId:surface.id});
+    if (cut.kind !== 'circles' || !cut.circles || cut.circles.length !== 2)
+      return fail('split-torus-section-unsupported',
+        'Splitting a torus needs two circular section loops from a perpendicular or axis-containing plane.',
+        {surfaceId:surface.id, sectionKind:cut.kind});
+    var circles = cut.circles;
+    if (!circles.every(validCurve))
+      return fail('split-section-invalid', 'The torus section is not a valid analytic circle pair.',
+        {surfaceKind:'torus'});
+    circles.forEach(function (circle) { boundaryElementId(circle, 'section'); });
+
+    var R = surface.majorRadius, r = surface.minorRadius;
+    function pointAt(u, v) {
+      var radial = R + r * Math.cos(v), axial = r * Math.sin(v);
+      return add(surface.center, add(add(mul(frame.u, Math.cos(u) * radial),
+        mul(frame.v, Math.sin(u) * radial)), mul(axis, axial)));
+    }
+    function piece(domain, sign, mode) {
+      var out = {};
+      Object.keys(surface).forEach(function (k) {
+        if (k !== 'loops' && k !== 'domain' && k !== 'closed') out[k] = surface[k];
+      });
+      out.id = (surface.id || 'surface') + '/split:' + (sign > 0 ? 'positive' : 'negative');
+      out.loops = circles.map(function (circle) { return {kind:'outer', section:circle}; });
+      out.domain = {u:domain.u.slice(), v:domain.v.slice()};
+      out.closed = false;
+      out.parentSurfaceId = surface.id === undefined ? null : surface.id;
+      out.splitBy = {surfaceId:out.parentSurfaceId,
+        plane:{origin:copyPoint(spec.origin), normal:copyPoint(spec.normal)},
+        sectionKind:'circles', side:sign > 0 ? 'positive' : 'negative', torusSplit:mode};
+      out.sourceIds = Array.from(new Set((surface.sourceIds || [])
+        .concat(circles[0].sourceIds || [], circles[1].sourceIds || [])));
+      return out;
+    }
+    var tol = surfaceTolerance(surface);
+    var domains, mode;
+    if (Math.abs(Math.abs(nAxis) - 1) <= 1e-7) {
+      var axial = dot(sub(spec.origin, surface.center), axis);
+      if (Math.abs(axial) >= r - tol)
+        return fail('split-torus-tangent',
+          'A plane tangent to the tube does not split the torus into two bounded pieces.',
+          {surfaceId:surface.id, axial:axial});
+      var half = Math.sqrt(Math.max(0, r*r - axial*axial));
+      var v0 = Math.atan2(axial, half), v1 = Math.atan2(axial, -half);
+      if (v1 <= v0) v1 += TAU;
+      var first = {u:[0, TAU], v:[v0, v1]}, second = {u:[0, TAU], v:[v1, v0 + TAU]};
+      // v = +pi/2 is the outer tube crest, hence axial = +r. The first arc
+      // contains it, so nAxis decides which signed side owns that arc.
+      domains = nAxis > 0 ? {positive:first, negative:second} :
+        {positive:second, negative:first};
+      mode = 'perpendicular-plane';
+    } else if (Math.abs(nAxis) <= 1e-7) {
+      if (Math.abs(dot(spec.normal, sub(surface.center, spec.origin))) > tol)
+        return fail('split-torus-plane-offset',
+          'A plane parallel to the torus axis must pass through the centre to produce circular sections.',
+          {surfaceId:surface.id});
+      var radial = sub(circles[0].center, surface.center);
+      var u0 = Math.atan2(dot(radial, frame.v), dot(radial, frame.u));
+      var arcOne = {u:[u0, u0 + Math.PI], v:[0, TAU]};
+      var arcTwo = {u:[u0 + Math.PI, u0 + TAU], v:[0, TAU]};
+      var mid = pointAt(u0 + Math.PI/2, 0);
+      var firstPositive = dot(spec.normal, sub(mid, spec.origin)) > 0;
+      domains = firstPositive ? {positive:arcOne, negative:arcTwo} :
+        {positive:arcTwo, negative:arcOne};
+      mode = 'axis-plane';
+    } else {
+      return fail('split-torus-plane-oblique',
+        'An oblique plane meets a torus in a quartic curve; that split is not implemented.',
+        {surfaceId:surface.id, axisDotNormal:nAxis});
+    }
+    var positive = piece(domains.positive, 1, mode);
+    var negative = piece(domains.negative, -1, mode);
+    var result = {kind:'split', surfaceId:surface.id === undefined ? null : surface.id,
+      plane:{origin:copyPoint(spec.origin), normal:copyPoint(spec.normal)},
+      section:cut, positive:positive, negative:negative,
+      surfaces:[positive, negative]};
+    stampModelIdentity(result);
+    return {ok:true, result:result};
+  }
+
   // same record for callers that prefer one traversal.
   function splitPlan(surface, plane, geometry) {
     function fail(code, message, detail) {
@@ -4119,6 +4237,7 @@
     if (surface.kind === 'plane') return fail('split-plane-surface-unsupported',
       'Splitting a bounded planar face is not implemented; use the loop splitter instead.',
       {surfaceKind:'plane'});
+    if (surface.kind === 'torus') return torusSplitPlan(surface, plane, geometry);
     if (surface.kind !== 'cylinder' && surface.kind !== 'cone' && surface.kind !== 'sphere')
       return fail('split-surface-kind-unsupported',
         'The surface kind "' + surface.kind + '" has no split operation.', {surfaceKind:surface.kind});

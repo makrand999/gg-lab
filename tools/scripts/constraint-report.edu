@@ -1,0 +1,9 @@
+# Exact constraint report over synthetic observations. The report records the
+# projection equations, remaining degrees of freedom and exact conflict sets;
+# it does not run a nonlinear solver.
+# expect: surfaceChecks=1 surfaceQueries=ok
+/datum -100 100
+/point a 0 0 plan
+/point "a'" 0 20 elevation
+
+# surface-query: {"operation":"constraints-spec","profileFrame":{"xRef":0,"dRef":0,"s":1},"entities":[{"id":"u1","type":"POINT","caption":"u","x":0,"y":-10,"viewRole":"PLAN"},{"id":"u2","type":"POINT","caption":"u'","x":0,"y":20,"viewRole":"ELEVATION"},{"id":"m1","type":"POINT","caption":"m","x":20,"y":-10,"viewRole":"PLAN"},{"id":"c1","type":"POINT","caption":"c","x":30,"y":-10,"viewRole":"PLAN"},{"id":"c2","type":"POINT","caption":"c'","x":40,"y":20,"viewRole":"ELEVATION"},{"id":"p1","type":"POINT","caption":"p","x":50,"y":-10,"viewRole":"PLAN"},{"id":"p2","type":"POINT","caption":"p'","x":10,"y":20,"viewRole":"PROFILE"}],"expect":{"contract":"constraint-report-v1","status":"partial","summary":{"groups":4,"determined":2,"underdetermined":1,"conflict":1,"dof":1},"groups":[{"base":"c","status":"conflict","conflicts":[{"axis":"x"}]},{"base":"m","status":"underdetermined","dof":1,"freeAxes":["y"]},{"base":"p","status":"determined","dof":0},{"base":"u","status":"determined","dof":0,"freeAxes":[]}]}}

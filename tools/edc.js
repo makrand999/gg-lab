@@ -315,6 +315,21 @@ function runScript(text, options) {
       } else if (request.operation === 'silhouettes') {
         result = Surfaces.silhouettes(modelOf((g && g.surfaces) || []),
           request.view || request.direction || 'front', g);
+      } else if (request.operation === 'correspondence') {
+        var Correspondence = require('../public/lib/educad-correspondence.js');
+        result = Correspondence.analyze(table.list(),
+          {profileFrame:g && g.profileMap});
+      } else if (request.operation === 'correspondence-spec') {
+        var CorrespondenceSpec = require('../public/lib/educad-correspondence.js');
+        result = CorrespondenceSpec.analyze(request.entities || [],
+          {profileFrame:request.profileFrame || null});
+      } else if (request.operation === 'constraints') {
+        var Constraints = require('../public/lib/educad-constraints.js');
+        result = Constraints.analyze(table.list(), {profileFrame:g && g.profileMap});
+      } else if (request.operation === 'constraints-spec') {
+        var ConstraintsSpec = require('../public/lib/educad-constraints.js');
+        result = ConstraintsSpec.analyze(request.entities || [],
+          {profileFrame:request.profileFrame || null});
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

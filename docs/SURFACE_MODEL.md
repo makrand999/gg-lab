@@ -371,6 +371,34 @@ The result carries `area`, `loops` (`outer` positive area, `inner` negative
 area), per-cell `insideA`/`insideB` flags, and diagnostics. It is polygonal:
 curved boundaries are neither tessellated nor silently simplified.
 
+## Correspondence and constraint audit
+
+`public/lib/educad-correspondence.js` is a read-only audit of point
+correspondence. It groups observations by base name and reports the shared
+orthographic station rule:
+
+- `unique`: exactly one reciprocal match between two views;
+- `ambiguous`: several compatible observations, with the alternatives listed;
+- `conflict`: the same base exists in two views but the shared station differs;
+- `missing`: fewer than two compatible observations.
+
+`analyze(entities, {profileFrame})` returns `correspondence-audit-v1` with
+groups, pairs, alternatives, conflicts and diagnostics. `reconstruct(...,
+{correspondence:'audit'})` attaches the same report as `result.correspondence`
+without changing the reconstructed geometry.
+
+`public/lib/educad-constraints.js` turns the observations into an exact
+constraint report, not a nonlinear solve:
+
+- plan gives `X` and `Z`, elevation gives `X` and `Y`, profile gives `Y`
+  through the side-view frame;
+- each group records known axes, constraints, `dof` and `freeAxes`;
+- repeated axis assignments produce an exact conflict set;
+- status is `determined`, `underdetermined` or `conflict`.
+
+It reports what the drawing fixes and where it is underdetermined; it does not
+average stations or invent a value.
+
 ## Analytic silhouettes
 
 `Surfaces.silhouettes(model, view, geometry)` returns exact analytic

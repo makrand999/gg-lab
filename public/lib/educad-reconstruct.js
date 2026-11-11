@@ -2786,6 +2786,16 @@
       pipeline:{version:1,input:'vertices-edges-curves',identity:opts.identity==='explicit'?'explicit':'inferred',stage:'surface-inference',diagnostics:diagnostics}};
   }
 
+  function auditCorrespondence(entities, profileFrame) {
+    try {
+      var moduleRef = (typeof require === 'function' && typeof module !== 'undefined') ?
+        require('./educad-correspondence.js') :
+        (typeof window !== 'undefined' ? window.EduCADCorrespondence : null);
+      return moduleRef ? moduleRef.analyze(entities, {profileFrame:profileFrame || null}) : null;
+    } catch (err) {
+      return null;
+    }
+  }
   function reconstruct(entities, opts) {
     opts = opts || {};
     var list = Array.isArray(entities) ? entities.filter(Boolean).map(function(e) {
@@ -2870,6 +2880,9 @@
       if (!result.determination) result.determination = result.status === 'ok' ? 'inferred' : 'underdetermined';
       if (result.status === 'ok' && !result.label) result.label = diagnostics.length ?
         'Partial 3D preview: ' + diagnostics[0].message : 'Geometry reconstructed from drawing primitives';
+      if (opts && opts.correspondence === 'audit')
+        result.correspondence = auditCorrespondence(list,
+          result.geometry && result.geometry.profileMap);
       return result;
     }
     function unmatchedPoints(g, exempt) {

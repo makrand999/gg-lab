@@ -275,6 +275,23 @@ The result carries `method`, `residual` and `tolerance`. This is the
 classification primitive used by bounded intersection and clipping; it does
 not build a Boolean result on its own.
 
+### Torus surfaces
+
+The analytic model now accepts `kind:'torus'` with `center`, unit `axis`,
+`majorRadius` and `minorRadius`. Residual and normal come from the tube
+distance `hypot(radial - R, axial) - r`. Supported sections are:
+
+- a plane perpendicular to the axis: one or two circles of radius
+  `R ± sqrt(r² - d²)`, or a tangent circle at `|d| = r`;
+- a plane through the axis: two circles of radius `r` at `center ± radial*R`;
+- general oblique planes remain unsupported rather than approximated.
+
+A closed torus classifies points with `closed-torus`; a bounded torus patch
+with loops returns `unknown` until torus parameter-domain classification is
+implemented. Torus–quadric intersections and torus silhouettes are not yet
+implemented. The certificate checks centre, radii, axis and boundary
+on-surface residuals.
+
 ## Bounded intersection
 
 `Surfaces.intersectBounded(a, b, geometry, options)` keeps the exact support

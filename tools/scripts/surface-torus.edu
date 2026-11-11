@@ -1,0 +1,14 @@
+# Analytic torus foundation: perpendicular and axis-containing plane
+# sections, point classification on a closed torus, and build/certificate.
+# General oblique torus-plane sections remain unsupported.
+# expect: surfaceChecks=6 surfaceQueries=ok
+/datum -100 100
+/point a 0 0 plan
+/point "a'" 0 20 elevation
+
+# surface-query: {"operation":"intersect-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"b":{"kind":"plane","id":"p","origin":{"x":0,"y":0,"z":0},"normal":{"x":0,"y":0,"z":1}},"expect":{"kind":"circles","relation":"transverse","circles":[{"radius":7,"center":{"x":0,"y":0,"z":0}},{"radius":13,"center":{"x":0,"y":0,"z":0}}]}}
+# surface-query: {"operation":"intersect-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"b":{"kind":"plane","id":"p","origin":{"x":0,"y":0,"z":3},"normal":{"x":0,"y":0,"z":1}},"expect":{"kind":"circle","relation":"tangent","radius":10,"center":{"x":0,"y":0,"z":3}}}
+# surface-query: {"operation":"intersect-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"b":{"kind":"plane","id":"p","origin":{"x":0,"y":0,"z":0},"normal":{"x":1,"y":0,"z":0}},"expect":{"kind":"circles","circles":[{"radius":3,"center":{"x":0,"y":10,"z":0}},{"radius":3,"center":{"x":0,"y":-10,"z":0}}]}}
+# surface-query: {"operation":"classify","surface":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"point":{"x":13,"y":0,"z":0},"expect":{"status":"inside","method":"closed-torus","residual":0}}
+# surface-query: {"operation":"classify","surface":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"point":{"x":0,"y":0,"z":0},"expect":{"status":"outside","reason":"off-surface","residual":7}}
+# surface-query: {"operation":"build-spec","patches":[{"kind":"torus","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true}],"expect":{"surfaces":[{"kind":"torus","majorRadius":10,"minorRadius":3,"closed":true}],"summary":{"total":1,"closedShells":1,"openBoundaries":0},"validation":{"status":"ok"},"certificate":{"status":"ok"}}}

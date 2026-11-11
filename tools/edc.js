@@ -281,9 +281,18 @@ function runScript(text, options) {
           result = Predicates.pointOnPlane(Predicates.point(pts[0]), Predicates.plane(pts[1], pts[2]));
         } else throw new Error('Unknown predicate');
       } else if (request.operation === 'classify') {
-        var classifySurface = pick(request.surface);
+        var classifySurface = request.surface && request.surface.kind ?
+          request.surface : pick(request.surface);
         if (!classifySurface) throw new Error('Missing reconstructed surface');
         result = Surfaces.classifyPoint(classifySurface, request.point, g);
+      } else if (request.operation === 'build-spec') {
+        var specModel = Surfaces.build({vertices:request.vertices || [],
+          curves:request.curves || [], faces:request.faces || [],
+          surfacePatches:request.patches || []});
+        result = {surfaces:specModel.surfaces, summary:specModel.summary,
+          diagnostics:specModel.diagnostics,
+          validation:Surfaces.validate(specModel, {vertices:[],curves:request.curves || [],faces:[]}),
+          certificate:Surfaces.certify(specModel, {vertices:[],curves:request.curves || [],faces:[]})};
       } else if (request.operation === 'intersect-bounded') {
         var boundedRefs = request.surfaces || [
           request.from !== undefined ? request.from : request.surface,

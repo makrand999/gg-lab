@@ -434,6 +434,21 @@
           if (sphereBoundary.length) surface.boundaryCurves = sphereBoundary;
           if (patch.cap) surface.cap = patch.cap;
           if (patch.recess) surface.recess = true;
+        } else if (patch.kind === 'torus') {
+          var major = patch.majorRadius !== undefined ? patch.majorRadius : patch.major;
+          var minor = patch.minorRadius !== undefined ? patch.minorRadius : patch.minor;
+          var torusAxis = patch.axis && finite(patch.axis) ? unit(patch.axis) : null;
+          if (!finite(patch.center) || !(major > 0) || !(minor > 0) || !torusAxis) {
+            diag('surface-invalid-torus',
+              'A torus needs a finite centre, a unit axis and positive major/minor radii.', sourceIds);
+            return;
+          }
+          var torusLoops = requested.loops || [];
+          surface = {kind:'torus', origin:patch.center, center:patch.center,
+            axis:torusAxis, majorRadius:major, minorRadius:minor, radius:minor,
+            loops:torusLoops, closed:torusLoops.length === 0 && patch.closed !== false,
+            sourceIds:sourceIds,
+            displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
         } else if (patch.kind === 'plane') {
           if (requested.loops) {
             var origin = patch.origin, normal = patch.normal, u = patch.u, v = patch.v;
@@ -890,6 +905,15 @@
       var delta = sub(point, surface.origin);
       var radial = sub(delta, mul(axis, dot(delta, axis)));
       direction = length(radial) > EPS ? unit(radial) : null;
+    } else if (surface.kind === 'torus') {
+      if (!finite(surface.center) || !finite(surface.axis)) return null;
+      var tAxis = unit(surface.axis), tDelta = sub(point, surface.center);
+      var tAxial = dot(tDelta, tAxis);
+      var tRadial = sub(tDelta, mul(tAxis, tAxial));
+      if (length(tRadial) <= EPS) return null;
+      var tDir = unit(tRadial);
+      direction = unit(add(mul(tDir, length(tRadial) - surface.majorRadius),
+        mul(tAxis, tAxial)));
     }
     if (direction && surface.recess) direction = mul(direction, -1);
     return direction;
@@ -1330,6 +1354,13 @@
       if (s.kind === 'cylinder' || s.kind === 'cone') {
         if (!finite(s.axis) || Math.abs(length(s.axis)-1) > EPS) add('surface-invalid-axis', 'Surface ' + s.id + ' needs a unit axis.', s.sourceIds);
       }
+      if (s.kind === 'torus') {
+        if (!Number.isFinite(s.majorRadius) || !(s.majorRadius > 0) ||
+            !Number.isFinite(s.minorRadius) || !(s.minorRadius > 0))
+          add('surface-invalid-torus', 'Surface ' + s.id + ' needs positive major and minor radii.', s.sourceIds);
+        if (!finite(s.axis) || Math.abs(length(s.axis)-1) > EPS)
+          add('surface-invalid-axis', 'Surface ' + s.id + ' needs a unit axis.', s.sourceIds);
+      }
       if (s.kind === 'sphere' && s.cap) {
         if (!finite(s.cap.pole) || Math.abs(length(s.cap.pole)-1) > EPS ||
             !Number.isFinite(s.cap.angle) || !(s.cap.angle > 0) || !(s.cap.angle < Math.PI)) {
@@ -1355,7 +1386,7 @@
           });
         }
       }
-      var tol = 1e-5 * Math.max(1, s.radius || 1);
+      var tol = 1e-5 * Math.max(1, s.radius || 1, s.majorRadius || 0);
       // Boundary curves and finite line elements must lie on their analytic
       // surface. A line is sampled at its endpoints and midpoint; its straight
       // span is exact, so those samples are sufficient for every supported
@@ -1397,6 +1428,8 @@
               ok = Math.abs(dot(sub(p, s.origin), s.normal)) <= tol;
             } else if (s.kind === 'sphere') {
               ok = Math.abs(length(sub(p, s.center)) - s.radius) <= tol;
+            } else if (s.kind === 'torus') {
+              ok = surfaceResidual(s, p) <= tol;
             }
             if (!ok) { add('surface-boundary-off-surface', 'A boundary curve does not lie on ' + s.id + '.', s.sourceIds); break; }
           }
@@ -1512,16 +1545,28 @@
     if (s.kind === 'cone') return {origin:copyPoint(s.origin), axis:copyPoint(s.axis),
       radius:s.radius, apex:copyPoint(s.apex), halfAngle:s.halfAngle};
     if (s.kind === 'sphere') return {center:copyPoint(s.center), radius:s.radius};
+    if (s.kind === 'torus') return {center:copyPoint(s.center), axis:copyPoint(s.axis),
+      majorRadius:s.majorRadius, minorRadius:s.minorRadius};
     return {};
   }
   function surfaceTolerance(s) {
     var radius = Math.abs((s && s.radius) || 0);
+    if (s && Number.isFinite(s.majorRadius))
+      radius = Math.max(radius, Math.abs(s.majorRadius));
     return 1e-5 * Math.max(1, Number.isFinite(radius) ? radius : 1);
   }
   function surfaceResidual(s, p) {
     if (!s || !finite(p)) return Infinity;
     if (s.kind === 'plane') {
       return finite(s.origin) && finite(s.normal) ? Math.abs(dot(sub(p, s.origin), s.normal)) : Infinity;
+    }
+    if (s.kind === 'torus') {
+      if (!finite(s.center) || !finite(s.axis) || !(s.majorRadius > 0) || !(s.minorRadius > 0))
+        return Infinity;
+      var q = sub(p, s.center), axisT = unit(s.axis);
+      var axialT = dot(q, axisT);
+      var radialT = Math.sqrt(Math.max(0, dot(q,q) - axialT*axialT));
+      return Math.abs(Math.sqrt(Math.pow(radialT - s.majorRadius, 2) + axialT*axialT) - s.minorRadius);
     }
     if (s.kind === 'cylinder') {
       if (!finite(s.origin) || !finite(s.axis) || !(s.radius > 0)) return Infinity;
@@ -1692,7 +1737,7 @@
         sourceIds:unique(surface.sourceIds || []),
         displayFaceIndices:(surface.displayFaceIndices || []).slice(),
         parameters:surfaceParameters(surface), loops:[], checks:[], status:'ok'};
-      var known = ['plane','cylinder','cone','sphere'].indexOf(rec.kind) !== -1;
+      var known = ['plane','cylinder','cone','sphere','torus'].indexOf(rec.kind) !== -1;
 
       check(rec, rec, 'surface-id-present', {status:typeof surface.id === 'string' && surface.id !== '' ? 'ok':'failed',
         arithmetic:'exact-combinatorial', method:'combinatorial', issue:'certificate-surface-id-missing',
@@ -1780,6 +1825,11 @@
       } else if (rec.kind === 'sphere') {
         finiteVector(rec, rec, 'sphere-center-finite', surface.center, 'certificate-sphere-center-invalid');
         positiveExact(rec, rec, 'sphere-radius-positive', surface.radius, 'certificate-sphere-radius-invalid');
+      } else if (rec.kind === 'torus') {
+        finiteVector(rec, rec, 'torus-center-finite', surface.center, 'certificate-torus-center-invalid');
+        positiveExact(rec, rec, 'torus-major-positive', surface.majorRadius, 'certificate-torus-major-invalid');
+        positiveExact(rec, rec, 'torus-minor-positive', surface.minorRadius, 'certificate-torus-minor-invalid');
+        unitVector(rec, rec, 'torus-axis-unit', surface.axis, 'certificate-torus-axis-invalid');
       }
 
       // Plane vertex loops have an exact coplanarity predicate on the stored
@@ -2182,6 +2232,42 @@
         radiusU:r / Math.abs(ca), radiusV:r,
         sourceIds:(surface.sourceIds || []).slice(), surfaceId:surface.id,
         sectionType:'plane-cylinder-ellipse'};
+    }
+    if (surface.kind === 'torus') {
+      var ta = unit(surface.axis), tc = surface.center;
+      var R = surface.majorRadius, r = surface.minorRadius;
+      var tn = dot(n, ta), td = dot(n, sub(tc, q));
+      if (Math.abs(Math.abs(tn) - 1) <= 1e-7) {
+        if (Math.abs(td) > r + EPS) return null;
+        var tube = Math.sqrt(Math.max(0, r*r - td*td));
+        var centerOnPlane = sub(tc, mul(n, td));
+        var tb = basis(n);
+        var radiiList = tube <= EPS ? [R] : [R - tube, R + tube];
+        var torusCircles = radiiList.filter(function (radius) { return radius > EPS; })
+          .map(function (radius) {
+            return {kind:'circle', center:centerOnPlane, u:tb.u, v:tb.v, radius:radius,
+              sourceIds:(surface.sourceIds || []).slice(), surfaceId:surface.id};
+          });
+        if (!torusCircles.length) return null;
+        if (torusCircles.length === 1) {
+          var single = torusCircles[0];
+          single.sectionType = tube <= EPS ? 'plane-torus-tangent' : 'plane-torus-circle';
+          return single;
+        }
+        return {kind:'circles', circles:torusCircles, surfaceId:surface.id,
+          sectionType:'plane-torus-circles'};
+      }
+      if (Math.abs(tn) <= 1e-7 && Math.abs(td) <= EPS * Math.max(1, R, r)) {
+        var radialDir = unit(cross(ta, n));
+        if (!radialDir) return null;
+        var circleBase = {kind:'circle', u:ta, v:radialDir, radius:r,
+          sourceIds:(surface.sourceIds || []).slice(), surfaceId:surface.id};
+        return {kind:'circles', circles:[
+          Object.assign({}, circleBase, {center:add(tc, mul(radialDir, R))}),
+          Object.assign({}, circleBase, {center:add(tc, mul(radialDir, -R))})
+        ], surfaceId:surface.id, sectionType:'plane-torus-axis'};
+      }
+      return null;
     }
     if (surface.kind === 'cone') {
       var apex = surface.apex || surface.origin;
@@ -3145,6 +3231,12 @@
     if (surface.kind === 'plane') return classifyPlanePoint(surface, p, geometry || {});
     if (surface.kind === 'sphere' && surface.closed === true && !surface.cap)
       return {status:'inside', method:'closed-sphere', residual:residual, tolerance:tol};
+    if (surface.kind === 'torus') {
+      if (surface.closed === true)
+        return {status:'inside', method:'closed-torus', residual:residual, tolerance:tol};
+      return {status:'unknown', reason:'torus-loops-unsupported',
+        residual:residual, tolerance:tol};
+    }
     var curves = geometry && geometry.curves || [];
     var vertices = geometry && geometry.vertices || [];
     var contained = patchContainsPoint(surface, p, curves, vertices);

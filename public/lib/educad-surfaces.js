@@ -2982,6 +2982,56 @@
       circles:[circleAt(dz), circleAt(-dz)]};
   }
 
+  // Coaxial torus/cone: a right cone has radial = tan(alpha) * s from its
+  // apex, so substituting into the tube equation leaves a quadratic in the
+  // axial station s. Only the forward nappe (s >= 0) is retained.
+  function torusCone(torus, cone) {
+    if (!finite(torus.center) || !finite(torus.axis) || !finite(cone.axis))
+      return null;
+    var apex = cone.apex || cone.origin;
+    if (!finite(apex) || !Number.isFinite(cone.halfAngle) ||
+        !(cone.halfAngle > 0) || !(cone.halfAngle < Math.PI/2)) return null;
+    var axis = unit(torus.axis), coneAxis = unit(cone.axis);
+    var policy = tolerancePolicy([torus.majorRadius, torus.minorRadius,
+      length(sub(apex, torus.center))]);
+    if (length(cross(axis, coneAxis)) > policy.angle)
+      return {kind:'unsupported', relation:'skew', reason:'torus-cone-skew-unsupported',
+        guarantee:'numeric'};
+    var delta = sub(apex, torus.center);
+    var offset = sub(delta, mul(axis, dot(delta, axis)));
+    if (length(offset) > policy.length)
+      return {kind:'unsupported', relation:'offset', reason:'torus-cone-offset-unsupported',
+        gap:length(offset), tolerance:policy.length, guarantee:'numeric'};
+    var sign = dot(coneAxis, axis) >= 0 ? 1 : -1;
+    var a0 = dot(delta, axis), k = Math.tan(cone.halfAngle);
+    var R = torus.majorRadius, r = torus.minorRadius;
+    var A = k*k + 1, B = -2*k*R + 2*a0*sign, C = R*R + a0*a0 - r*r;
+    var disc = B*B - 4*A*C;
+    if (disc < -policy.length) return none('separate');
+    var root = Math.sqrt(Math.max(0, disc));
+    var stations = [(-B - root) / (2*A), (-B + root) / (2*A)].filter(function (s) {
+      return s >= -policy.length;
+    }).map(function (s) { return Math.max(0, s); });
+    stations.sort(function (x, y) { return x - y; });
+    var frame = basis(axis), circles = [];
+    stations.forEach(function (s, index) {
+      if (index > 0 && Math.abs(s - stations[index-1]) <= policy.length) return;
+      var radial = k*s;
+      if (radial <= policy.length) return;
+      circles.push({kind:'circle', center:add(torus.center, mul(axis, a0 + sign*s)),
+        u:frame.u, v:frame.v, radius:radial, surfaceId:torus.id,
+        sourceIds:(torus.sourceIds || []).slice()});
+    });
+    if (!circles.length) return none('separate');
+    if (circles.length === 1) {
+      circles[0].sectionType = 'torus-cone-coaxial';
+      circles[0].relation = 'tangent';
+      return circles[0];
+    }
+    return {kind:'circles', relation:'transverse', sectionType:'torus-cone-coaxial',
+      circles:circles};
+  }
+
   function intersect(a, b) {
     if (!a || !b || !a.kind || !b.kind) return null;
     var result;
@@ -2996,6 +3046,8 @@
     else if (a.kind === 'sphere' && b.kind === 'torus') result = torusSphere(b, a);
     else if (a.kind === 'torus' && b.kind === 'cylinder') result = torusCylinder(a, b);
     else if (a.kind === 'cylinder' && b.kind === 'torus') result = torusCylinder(b, a);
+    else if (a.kind === 'torus' && b.kind === 'cone') result = torusCone(a, b);
+    else if (a.kind === 'cone' && b.kind === 'torus') result = torusCone(b, a);
     else return null;
     return result && tagged(result, a, b);
   }

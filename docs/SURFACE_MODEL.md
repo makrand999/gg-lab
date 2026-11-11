@@ -317,7 +317,9 @@ analytic branches with exact major-angle endpoints. Coaxial spheres yield
 circles (two loops, or one when tangent); a sphere centred on the tube
 centerline with the tube radius returns the shared tube circle. Coaxial
 torus–cylinder intersections are circles at `z = ±sqrt(r² - (rho - R)²)`;
-offset or skew cylinder axes and torus–cone/torus pairs are not implemented.
+coaxial torus–cone intersections reduce to a quadratic in the cone-nappe
+station and return one or two circles. Offset or skew cylinder/cone axes and
+torus–torus pairs are not implemented.
 The certificate checks centre, radii, axis, domain and boundary on-surface
 residuals.
 

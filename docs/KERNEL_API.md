@@ -52,11 +52,11 @@ Supported surface kinds: plane, cylinder, cone, sphere, torus. Torus plane
 sections and silhouettes include axis-aligned and oblique orthographic views;
 oblique plane sections return analytic `torus-section-v1` branches. Bounded
 torus patches support explicit u/v parameter domains, and a closed torus splits
-on perpendicular or axis-containing planes. Torus–plane and torus–sphere
-intersections return analytic curves, including coaxial torus–cylinder
-circles. General oblique torus splits, offset/skew torus–cylinder,
-torus–cone/torus intersections, loop-bounded torus patches without a domain,
-variable-radius fillets and general solid Booleans are outside this API version.
+on perpendicular or axis-containing planes. Torus–plane, torus–sphere and
+coaxial torus–cylinder/cone intersections return analytic curves. General
+oblique torus splits, offset/skew torus–cylinder/cone and torus–torus
+intersections, loop-bounded torus patches without a domain, variable-radius
+fillets and general solid Booleans are outside this API version.
 
 Kernel modules are deterministic and DOM-free. The app shell owns rendering,
 input, saves and passwords.

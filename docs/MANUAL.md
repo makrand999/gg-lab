@@ -128,6 +128,9 @@ inferred when the supplied boundaries and side surfaces close it.
   the other can define a spherical recess.
 - A circular mouth plus a four-sided face frame and edge-on depth strokes can
   define a flat-bottomed cylindrical recess.
+- A true-shape tangent arc plus matching generator/end strokes can define a
+  partial cylindrical fillet. Its straight tangent boundaries are shared with
+  adjacent planar strips; the feature is open, not a Boolean-union solid.
 
 Surface records carry analytic parameters, ordered loops, source IDs, and
 display faces. The surface model validates boundary incidence and closed shells,
@@ -203,8 +206,12 @@ entities are named.
   implemented. Known special cases are exact; unsupported pairs return `null`.
 - A curved analytic surface is not certified by its display mesh.
 - A recess does not Boolean-subtract an independently drawn surrounding solid.
-- A cylindrical fillet between two planar faces is not yet supported because
-  curved-surface loops do not accept straight boundary elements.
+- The cylindrical fillet is a single partial-cylinder feature. Its ends and the
+  adjacent strips' outer edges remain open; there is no Boolean union with a
+  surrounding solid. Fillet chains, variable radius, and torus blends are not
+  supported.
+- Straight line boundary elements are finite segments. A loop made from them is
+  not split by a cutting plane yet.
 - Analytic curved surfaces can be split by a plane even when a boundary loop
   crosses it; each side receives the matching section sub-arcs. Planar faces
   still do not support this split representation.

@@ -780,6 +780,7 @@
       // In-canvas selection + on-site rename (no DOM inputs; Layer 2 only).
       handle.sel = EduCADCanvas.createSelectionState();
       var lastLabelResult = { placements: [] };
+      var labelCache = { key: null, result: null };
       var caretTimer = null;
       var lastCursor = null;
       function ensureCaretTimer() {
@@ -2553,12 +2554,25 @@
         // sits at the true label position) but is not drawn here.
         if (typeof EduCADLabels !== 'undefined') {
           ctx1.font = EduCADCanvas.LABEL_FONT;
-          var labelResult = EduCADLabels.resolve(drawList, v, {
-            measure: function (t) {
-              var m = ctx1.measureText(t);
-              return { w: m.width, h: 13 * 1.15 };
-            }
-          });
+          // Label layout is the expensive part of a sheet redraw. Orbit and
+          // pose frames only change the 3D camera, so reuse the placement
+          // when the table, viewport, font and visible entity list agree.
+          var labelKey = [handle.table.revision(), v.s, v.tx, v.ty, v.w, v.h,
+            EduCADCanvas.LABEL_FONT, drawList.length,
+            drawList.map(function (ent) { return ent.id; }).join('|')].join('/');
+          var labelResult;
+          if (labelCache.key === labelKey) {
+            labelResult = labelCache.result;
+          } else {
+            labelResult = EduCADLabels.resolve(drawList, v, {
+              measure: function (t) {
+                var m = ctx1.measureText(t);
+                return { w: m.width, h: 13 * 1.15 };
+              }
+            });
+            labelCache.key = labelKey;
+            labelCache.result = labelResult;
+          }
           lastLabelResult = labelResult;
           var editingId = handle.sel.editing ? handle.sel.editing.id : null;
           for (var li = 0; li < labelResult.placements.length; li++) {

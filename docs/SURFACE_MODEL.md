@@ -357,12 +357,17 @@ complementary piece.
 `Surfaces.intersectBounded(a, b, geometry, options)` keeps the exact support
 algebra and clips its branches to both bounded patches.
 
-- Inputs must each have a boundary loop or closed compact support; otherwise the
-  result is `status:'unbounded'`.
-- Supported support kinds are `circle`, `ellipse`, `circles`, `line` and
-  `lines`. `point` is tested against both patches. `plane-overlap` and
-  `coincident` return `status:'coincident'` because bounded overlap topology is
-  not implemented.
+- Inputs must each have a boundary loop, a closed compact support, or an
+  explicit torus parameter domain; otherwise the result is
+  `status:'unbounded'`.
+- Supported support kinds are `circle`, `ellipse`, `circles`, `line`,
+  `lines`, `torusSection` and `torusSphere`. `point` and `points` are tested
+  against both patches. `plane-overlap` and `coincident` return
+  `status:'coincident'` because bounded overlap topology is not implemented.
+- `torusSection` and `torusSphere` branches are clipped in their major-angle
+  range, so a bounded torus domain keeps only the upper/lower or inside arcs.
+  Their stations are labelled `confidence:'numeric'` and
+  `method:'sampled-stations'`.
 - When one patch is planar with straight loop elements and the other is a
   closed support, the plane crossings are solved analytically from the branch
   circle/ellipse and the patch's line segments. Those stations are labelled

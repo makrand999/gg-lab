@@ -3115,6 +3115,10 @@
     out.parentKind = c.kind;
     out.startAngle = t0;
     out.sweepAngle = t1 - t0;
+    if (out.kind === 'torusSectionBranch' || out.kind === 'torusSphereBranch') {
+      out.uStart = t0;
+      out.uEnd = t1;
+    }
     out.closed = false;
     out.splitFrom = {kind:c.kind, startAngle:curveStart(c), sweepAngle:curveSweep(c)};
     return out;
@@ -3686,7 +3690,8 @@
     return !!(state && (state.status === 'inside' || state.status === 'boundary'));
   }
   function patchBounded(surface) {
-    return !!((surface.loops && surface.loops.length) || surface.closed === true);
+    return !!((surface.loops && surface.loops.length) || surface.closed === true ||
+      (surface.kind === 'torus' && validTorusDomain(surface.domain)));
   }
   function branchPointAt(branch, t) {
     if (branch.kind === 'line') {
@@ -3792,6 +3797,83 @@
       return arc;
     });
   }
+  function clipParametricBranch(a, b, branch, start, end, geometry, options, diagnostics) {
+    var count = Math.max(32, options.samples || 128);
+    var closed = Math.abs((end - start) - TAU) <= 1e-9;
+    var samples = [], parameters = [];
+    for (var i = 0; i < count; i++) {
+      var t = start + (end - start) * (i + 0.5) / count;
+      parameters.push(t);
+      samples.push(sampleStates(a, b, branch, t, geometry).inside);
+    }
+    function station(tInside, tOutside) {
+      var inside = tInside, outside = tOutside;
+      for (var k = 0; k < 64; k++) {
+        var mid = 0.5 * (inside + outside);
+        if (sampleStates(a, b, branch, mid, geometry).inside) inside = mid;
+        else outside = mid;
+        if (Math.abs(outside - inside) <= 1e-12 * Math.max(1, Math.abs(mid))) break;
+      }
+      var t = 0.5 * (inside + outside);
+      return {t:t, point:branchPointAt(branch, t), method:'bisection', confidence:'numeric'};
+    }
+    function boundedArc(t0, t1) {
+      var arc = subArc(branch, t0, t1);
+      arc.bounded = true;
+      arc.closed = false;
+      arc.confidence = 'numeric';
+      arc.method = 'sampled-stations';
+      arc.surfaceIds = [a.id === undefined ? null : a.id,
+        b.id === undefined ? null : b.id];
+      return arc;
+    }
+    if (samples.every(Boolean)) {
+      if (closed) {
+        var full = copyFields(branch);
+        full.bounded = true;
+        full.closed = true;
+        full.confidence = 'numeric';
+        full.method = 'sampled-stations';
+        return [full];
+      }
+      return [boundedArc(start, end)];
+    }
+    if (!samples.some(Boolean)) return [];
+    var runs = [];
+    if (closed) {
+      var entering = -1;
+      for (var j = 0; j < count; j++) {
+        if (!samples[j] && samples[(j + 1) % count]) { entering = (j + 1) % count; break; }
+      }
+      if (entering === -1) return [];
+      var index = entering, guard = 0;
+      while (guard++ <= count) {
+        if (!samples[index]) break;
+        var startIndex = index, endIndex = index, steps = 0;
+        while (samples[endIndex] && steps++ <= count) endIndex = (endIndex + 1) % count;
+        var t0 = station(parameters[startIndex], parameters[(startIndex - 1 + count) % count]).t;
+        var t1 = station(parameters[(endIndex - 1 + count) % count], parameters[endIndex]).t;
+        if (t1 <= t0) t1 += TAU;
+        runs.push({t0:t0, t1:t1});
+        index = endIndex;
+        while (!samples[index] && guard++ <= count) index = (index + 1) % count;
+        if (index === entering) break;
+      }
+    } else {
+      var cursor = 0;
+      while (cursor < count) {
+        if (!samples[cursor]) { cursor++; continue; }
+        var first = cursor;
+        while (cursor < count && samples[cursor]) cursor++;
+        var last = cursor - 1;
+        var openStart = first === 0 ? start : station(parameters[first], parameters[first - 1]).t;
+        var openEnd = last === count - 1 ? end : station(parameters[last], parameters[last + 1]).t;
+        runs.push({t0:openStart, t1:openEnd});
+      }
+    }
+    return runs.map(function (run) { return boundedArc(run.t0, run.t1); });
+  }
+
   function clipLineBranch(a, b, branch, geometry, options, diagnostics) {
     var direction = unit(branch.direction), origin = branch.origin;
     var extent = 1;
@@ -3864,18 +3946,38 @@
       return {contract:contract, kind:'bounded', status:'unsupported',
         support:support, components:[], diagnostics:diagnostics};
     }
+    if (support.kind === 'points') {
+      var boundedPoints = (support.points || []).filter(function (point) {
+        return boundedInside(classifyPoint(a, point, geometry)) &&
+          boundedInside(classifyPoint(b, point, geometry));
+      }).map(function (point) {
+        return {kind:'point', point:point, bounded:true, confidence:'analytic'};
+      });
+      return {contract:contract, kind:'bounded', status:'ok', support:support,
+        components:boundedPoints, diagnostics:diagnostics};
+    }
+    var components = [], usedAnalytic = false, usedNumeric = false;
     var branches = [];
     if (support.kind === 'circle' || support.kind === 'ellipse') branches = [support];
     else if (support.kind === 'circles') branches = support.circles || [];
     else if (support.kind === 'line') branches = [support];
     else if (support.kind === 'lines') branches = support.lines || [];
-    else {
+    else if (support.kind === 'torusSection' || support.kind === 'torusSphere') {
+      (support.branches || []).forEach(function (branch) {
+        var start = Number.isFinite(branch.uStart) ? branch.uStart : curveStart(branch);
+        var end = Number.isFinite(branch.uEnd) ? branch.uEnd :
+          start + curveSweep(branch);
+        components = components.concat(clipParametricBranch(a, b, branch, start, end,
+          geometry, options || {}, diagnostics));
+      });
+      return {contract:contract, kind:'bounded', status:'ok', support:support,
+        components:components, diagnostics:diagnostics};
+    } else {
       return {contract:contract, kind:'bounded', status:'unsupported',
         support:support, components:[],
         diagnostics:[{code:'bounded-support-kind', severity:'error',
           message:'Bounded clipping does not handle support kind ' + support.kind + '.'}]};
     }
-    var components = [], usedAnalytic = false, usedNumeric = false;
     branches.forEach(function (branch) {
       if (!branch.kind && finite(branch.center)) branch.kind = 'circle';
       if (branch.kind === 'line' || !branch.kind && branch.direction) {

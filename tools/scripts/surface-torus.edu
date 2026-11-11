@@ -1,7 +1,7 @@
 # Analytic torus foundation: perpendicular and axis-containing plane
 # sections, point classification on a closed torus, and build/certificate.
 # General oblique torus-plane sections remain unsupported.
-# expect: surfaceChecks=37 surfaceQueries=ok
+# expect: surfaceChecks=39 surfaceQueries=ok
 /datum -100 100
 /point a 0 0 plan
 /point "a'" 0 20 elevation
@@ -43,3 +43,5 @@
 # surface-query: {"operation":"intersect-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"b":{"kind":"sphere","id":"s","center":{"x":10,"y":0,"z":0},"radius":3},"expect":{"kind":"circle","radius":3,"center":{"x":10,"y":0,"z":0},"relation":"tangent","sectionType":"torus-sphere-tube-circle"}}
 # surface-query: {"operation":"intersect-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"b":{"kind":"sphere","id":"s","center":{"x":20,"y":0,"z":0},"radius":2},"expect":{"kind":"none"}}
 # surface-query: {"operation":"trim","surface":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":true,"loops":[]},"plane":{"origin":{"x":0,"y":0,"z":0},"normal":{"x":0,"y":0,"z":1}},"keepPositive":true,"expect":{"surface":{"kind":"torus","closed":false,"domain":{"u":[0,6.283185307179586],"v":[0,3.141592653589793]},"trimmedBy":{"keepPositive":true}},"identity":{"after":{"boundaries":2,"open":2}}}}
+# surface-query: {"operation":"intersect-bounded-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":false,"loops":[],"domain":{"u":[0,6.283185307179586],"v":[0,3.141592653589793]}},"b":{"kind":"plane","id":"p","origin":{"x":0,"y":0,"z":0},"normal":{"x":0.5773502691896258,"y":0.5773502691896258,"z":0.5773502691896258},"loops":[{"kind":"outer","points":[{"x":20,"y":-20,"z":0},{"x":20,"y":0,"z":-20},{"x":-20,"y":20,"z":0},{"x":-20,"y":0,"z":20}]}]},"options":{"samples":64},"expect":{"contract":"bounded-intersection-v1","status":"ok","components":[{"kind":"torusSectionBranch","bounded":true},{"kind":"torusSectionBranch","bounded":true},{"kind":"torusSectionBranch","bounded":true},{"kind":"torusSectionBranch","bounded":true}]}}
+# surface-query: {"operation":"intersect-bounded-spec","a":{"kind":"torus","id":"t","center":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"majorRadius":10,"minorRadius":3,"closed":false,"loops":[],"domain":{"u":[0,6.283185307179586],"v":[0,3.141592653589793]}},"b":{"kind":"sphere","id":"s","center":{"x":13,"y":0,"z":0},"radius":2,"closed":true,"loops":[]},"options":{"samples":64},"expect":{"status":"ok","components":[{"kind":"torusSphereBranch","bounded":true}]}}

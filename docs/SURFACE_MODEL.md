@@ -288,9 +288,24 @@ distance `hypot(radial - R, axial) - r`. Supported sections are:
 
 A closed torus classifies points with `closed-torus`; a bounded torus patch
 with loops returns `unknown` until torus parameter-domain classification is
-implemented. Torus–quadric intersections and torus silhouettes are not yet
-implemented. The certificate checks centre, radii, axis and boundary
-on-surface residuals.
+implemented. Torus–quadric intersections are not yet implemented. The
+certificate checks centre, radii, axis and boundary on-surface residuals.
+
+Torus silhouettes are analytic in all orthographic views:
+
+- along the axis: the outer circle `R + r` and, for a ring torus, the inner
+  circle `R - r`;
+- perpendicular to the axis: two tube circles of radius `r` at
+  `center ± R*radial`, plus the two ridge circles of radius `R` at
+  `center ± r*axis` whose projections close the outline as straight segments;
+- oblique direction: two `torusContour` branches parameterised by the tube
+  angle, with the tube angle solved from
+  `cos(v)*W(u) + sin(v)*D = 0` and
+  `W(u) = A*cos(u) + B*sin(u)`. The parameterisation is analytic; only HLR
+  sampling introduces display points (`confidence:'analytic-parameterization'`).
+
+Bounded torus patches report `torus-patch-clipping-unsupported` until their
+parameter-domain classification lands.
 
 ## Bounded intersection
 

@@ -329,6 +329,19 @@ function runScript(text, options) {
         result = Surfaces.silhouetteHLR(modelOf((g && g.surfaces) || []),
           hlrView, g, function (point) { return P.pointHidden(g, point, hlrView); },
           request.options);
+      } else if (request.operation === 'silhouettes-spec') {
+        result = Surfaces.silhouettes({version:1, contract:'analytic-surface-v1',
+          surfaces:request.surfaces || [], diagnostics:[]},
+          request.view || request.direction || 'front',
+          request.geometry || {vertices:[], curves:[]});
+      } else if (request.operation === 'silhouette-hlr-spec') {
+        var hlrSpecView = request.view || 'front';
+        result = Surfaces.silhouetteHLR({version:1, contract:'analytic-surface-v1',
+          surfaces:request.surfaces || [], diagnostics:[]}, hlrSpecView,
+          request.geometry || {vertices:[], curves:[]},
+          function () { return request.hideAll === true; }, request.options);
+      } else if (request.operation === 'curve-point-spec') {
+        result = Surfaces.point(request.curve, request.t || 0);
       } else if (request.operation === 'correspondence') {
         var Correspondence = require('../public/lib/educad-correspondence.js');
         result = Correspondence.analyze(table.list(),

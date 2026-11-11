@@ -81,7 +81,22 @@
     return {u:c.radiusU === undefined ? c.radius : c.radiusU,
       v:c.radiusV === undefined ? c.radius : c.radiusV};
   }
+  function torusContourPoint(c, t) {
+    var axis = unit(c.axis), e1 = unit(c.u), e2 = unit(c.v);
+    var view = unit(c.viewDirection);
+    var A = dot(e1, view), B = dot(e2, view), D = dot(axis, view);
+    var W = A * Math.cos(t) + B * Math.sin(t);
+    var phi = Math.atan2(D, W);
+    var v = phi + (c.branch < 0 ? -0.5 : 0.5) * Math.PI;
+    var radial = c.majorRadius + c.minorRadius * Math.cos(v);
+    var cs = Math.cos(t) * radial, sn = Math.sin(t) * radial;
+    var axial = c.minorRadius * Math.sin(v);
+    return {x:c.center.x + e1.x*cs + e2.x*sn + axis.x*axial,
+      y:c.center.y + e1.y*cs + e2.y*sn + axis.y*axial,
+      z:c.center.z + e1.z*cs + e2.z*sn + axis.z*axial};
+  }
   function curvePoint(c, t) {
+    if (c.kind === 'torusContour') return torusContourPoint(c, t);
     var r=radii(c), cs=Math.cos(t)*r.u, sn=Math.sin(t)*r.v;
     return {x:c.center.x+c.u.x*cs+c.v.x*sn,
       y:c.center.y+c.u.y*cs+c.v.y*sn,
@@ -1112,6 +1127,52 @@
           silhouette:'sphere'};
         if (surface.closed === true && !surface.cap) curves.push(circle);
         else curves = curves.concat(clipCurveToSurface(surface, circle, geometry || {}));
+      } else if (surface.kind === 'torus') {
+        var torusAxis = unit(surface.axis), torusViewDot = dot(torusAxis, direction);
+        var torusFrame = basis(torusAxis), torusR = surface.majorRadius, torusr = surface.minorRadius;
+        if (!(torusR > 0) || !(torusr > 0)) return;
+        if ((surface.loops || []).length && surface.closed !== true) {
+          diagnostics.push({code:'torus-patch-clipping-unsupported', severity:'info',
+            surfaceId:surface.id,
+            message:'A bounded torus patch cannot be clipped until torus parameter-domain classification is implemented.'});
+          return;
+        }
+        function addTorusCurve(curve) {
+          curve.silhouette = 'torus';
+          curve.surfaceId = surface.id;
+          if (!curve.confidence) curve.confidence = 'analytic-silhouette';
+          curves.push(curve);
+        }
+        if (Math.abs(Math.abs(torusViewDot) - 1) <= 1e-7) {
+          var torusRadii = [torusR + torusr];
+          if (torusR - torusr > EPS) torusRadii.push(torusR - torusr);
+          torusRadii.forEach(function (radius) {
+            addTorusCurve({kind:'circle', center:surface.center,
+              u:torusFrame.u, v:torusFrame.v, radius:radius, startAngle:0,
+              sweepAngle:TAU, contourClass:radius > torusR ? 'outer' : 'inner',
+              sourceIds:(surface.sourceIds || []).slice()});
+          });
+        } else if (Math.abs(torusViewDot) <= 1e-7) {
+          var torusRadial = unit(cross(torusAxis, direction));
+          [1,-1].forEach(function (sign) {
+            addTorusCurve({kind:'circle', center:add(surface.center, mul(torusRadial, sign*torusR)),
+              u:torusAxis, v:torusRadial, radius:torusr, startAngle:0, sweepAngle:TAU,
+              contourClass:'tube', sourceIds:(surface.sourceIds || []).slice()});
+          });
+          [1,-1].forEach(function (sign) {
+            addTorusCurve({kind:'circle', center:add(surface.center, mul(torusAxis, sign*torusr)),
+              u:torusFrame.u, v:torusFrame.v, radius:torusR, startAngle:0, sweepAngle:TAU,
+              contourClass:'ridge', sourceIds:(surface.sourceIds || []).slice()});
+          });
+        } else {
+          [1,-1].forEach(function (branch) {
+            addTorusCurve({kind:'torusContour', center:surface.center, axis:torusAxis,
+              u:torusFrame.u, v:torusFrame.v, majorRadius:torusR, minorRadius:torusr,
+              viewDirection:direction, branch:branch, startAngle:0, sweepAngle:TAU,
+              contourClass:'branch', confidence:'analytic-parameterization',
+              sourceIds:(surface.sourceIds || []).slice()});
+          });
+        }
       } else if (surface.kind === 'cylinder') {
         var axis = unit(surface.axis);
         var across = cross(axis, direction);
@@ -1179,6 +1240,15 @@
   }
 
   function projectViewPoint(p, view) {
+    if (view && typeof view === 'object') {
+      var d = unit(view);
+      if (Math.abs(d.z) > 1 - 1e-9) return d.z > 0 ? {x:p.x, y:p.y} : {x:-p.x, y:p.y};
+      if (Math.abs(d.y) > 1 - 1e-9) return d.y > 0 ? {x:p.x, y:-p.z} : {x:p.x, y:p.z};
+      if (Math.abs(d.x) > 1 - 1e-9) return d.x > 0 ? {x:p.z, y:p.y} : {x:-p.z, y:p.y};
+      var screen = unit(cross({x:0, y:0, z:1}, d));
+      var up = cross(d, screen);
+      return {x:dot(p, screen), y:dot(p, up)};
+    }
     if (view === 'top' || view === 'plan') return {x:p.x, y:-p.z};
     if (view === 'front' || view === 'elevation') return {x:p.x, y:p.y};
     if (view === 'left') return {x:-p.z, y:p.y};

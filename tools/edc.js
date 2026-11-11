@@ -280,6 +280,10 @@ function runScript(text, options) {
         else if (request.predicate === 'pointOnPlane') {
           result = Predicates.pointOnPlane(Predicates.point(pts[0]), Predicates.plane(pts[1], pts[2]));
         } else throw new Error('Unknown predicate');
+      } else if (request.operation === 'classify') {
+        var classifySurface = pick(request.surface);
+        if (!classifySurface) throw new Error('Missing reconstructed surface');
+        result = Surfaces.classifyPoint(classifySurface, request.point, g);
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

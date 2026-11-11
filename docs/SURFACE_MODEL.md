@@ -255,6 +255,26 @@ point-on-plane predicates. A floating-point filter handles ordinary inputs;
 near-zero determinants and residuals fall back to exact decimal rationals
 derived from the stored numbers, returning `guarantee:'exact-decimal'`.
 
+## Point classification
+
+`Surfaces.classifyPoint(surface, point, geometry)` returns
+`inside | outside | boundary | unknown` for one bounded patch.
+
+- A point whose residual from the supporting surface exceeds
+  `max(4 * surfaceTolerance, 1e-7)` is `outside` with `reason:'off-surface'`.
+- Planar patches use an ordered polygon approximation of every outer and
+  inner loop, with even-odd containment and a boundary distance test.
+- Cylinders and cones reuse the generator-station test: the point must lie
+  between one station on each loop (or between a loop and the cone apex).
+- A closed sphere with no cap metadata is `inside` everywhere on its support;
+  a spherical cap uses the pole/mouth half-space.
+- Unsupported loop mixes or missing stations return `unknown` with a reason,
+  never a guessed side.
+
+The result carries `method`, `residual` and `tolerance`. This is the
+classification primitive used by bounded intersection and clipping; it does
+not build a Boolean result on its own.
+
 ## Intersections and trimming
 
 `Surfaces.section(surface, plane)` returns analytic section geometry:

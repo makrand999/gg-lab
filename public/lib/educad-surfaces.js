@@ -2266,6 +2266,138 @@
     return {ok:true, inside:true};
   }
 
+  function segmentDistance2(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y, l2 = dx*dx + dy*dy;
+    if (l2 <= 0) return Math.hypot(p.x - a.x, p.y - a.y);
+    var t = Math.max(0, Math.min(1, ((p.x - a.x)*dx + (p.y - a.y)*dy) / l2));
+    return Math.hypot(p.x - a.x - t*dx, p.y - a.y - t*dy);
+  }
+  function pointInPolygon2(p, polygon) {
+    var inside = false;
+    for (var i=0,j=polygon.length-1;i<polygon.length;j=i++) {
+      var a = polygon[i], b = polygon[j];
+      if ((a.y > p.y) !== (b.y > p.y) &&
+          p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+  }
+  function pointOnPolygon2(p, polygon, tol) {
+    for (var i=0;i<polygon.length;i++) {
+      if (segmentDistance2(p, polygon[i], polygon[(i+1)%polygon.length]) <= tol)
+        return true;
+    }
+    return false;
+  }
+  function appendPolygonCurve(out, c) {
+    if (!validCurve(c)) return false;
+    var start = curveStart(c), sweep = curveSweep(c);
+    var count = Math.max(16, Math.ceil(64 * sweep / TAU));
+    var closed = sweep >= TAU - 1e-9;
+    for (var i=0;i<(closed?count:count+1);i++)
+      out.push(curvePoint(c, start + sweep*i/count));
+    return true;
+  }
+  // Ordered polygon approximation of one loop, used only for point
+  // classification. Mixed curve/line order is refused rather than guessed.
+  function loopPolygon(loop, curves, vertices) {
+    var out = [];
+    function add(p) {
+      if (!finite(p)) return false;
+      if (!out.length || pointDistance(p, out[out.length-1]) > EPS) out.push(p);
+      return true;
+    }
+    if (loop.elements) {
+      for (var e=0;e<loop.elements.length;e++) {
+        var el = loop.elements[e];
+        if (!el) return null;
+        if (el.kind === 'curve') {
+          if (!appendPolygonCurve(out, el.curve)) return null;
+        } else if (el.kind === 'polyline') {
+          (el.points || []).forEach(function (p) { add(p); });
+        } else return null;
+      }
+    } else if (loop.section) {
+      if (!appendPolygonCurve(out, loop.section)) return null;
+    } else if (loop.curves && loop.curves.length) {
+      if (loop.lines && loop.lines.length) return null;
+      for (var c=0;c<loop.curves.length;c++) {
+        var curve = typeof loop.curves[c] === 'object' ? loop.curves[c] : curves[loop.curves[c]];
+        if (!appendPolygonCurve(out, curve)) return null;
+      }
+    } else if (loop.lines && loop.lines.length) {
+      for (var l=0;l<loop.lines.length;l++) {
+        if (!validLine(loop.lines[l])) return null;
+        add(loop.lines[l].start);
+        if (l === loop.lines.length-1) add(loop.lines[l].end);
+      }
+    } else if (loop.vertices && loop.vertices.length) {
+      for (var v=0;v<loop.vertices.length;v++) {
+        var point = vertices && vertices[loop.vertices[v]];
+        if (!add(point)) return null;
+      }
+    } else if (loop.points && loop.points.length) {
+      loop.points.forEach(function (p) { add(p); });
+    } else return null;
+    return out.length >= 3 ? out : null;
+  }
+
+  function classifyPlanePoint(surface, p, geometry) {
+    var loops = surface.loops || [];
+    if (!loops.length) return {status:'inside', method:'plane-unbounded', residual:0};
+    var normal = unit(surface.normal), frame = basis(normal);
+    var u = finite(surface.u) ? unit(surface.u) : frame.u;
+    var v = finite(surface.v) ? unit(surface.v) : frame.v;
+    var origin = surface.origin;
+    var tol = surfaceTolerance(surface);
+    function project(point) {
+      var d = sub(point, origin);
+      return {x:dot(d, u), y:dot(d, v)};
+    }
+    var q = project(p);
+    var outers = [], holes = [];
+    for (var i=0;i<loops.length;i++) {
+      var polygon = loopPolygon(loops[i], geometry && geometry.curves || [],
+        geometry && geometry.vertices || []);
+      if (!polygon) return {status:'unknown', reason:'loop-unsupported', loopIndex:i, residual:0};
+      var flat = polygon.map(project);
+      if (loops[i].kind === 'inner') holes.push(flat); else outers.push(flat);
+    }
+    if (!outers.length) return {status:'unknown', reason:'no-outer-loop', residual:0};
+    if (outers.some(function (poly) { return pointOnPolygon2(q, poly, tol); }) ||
+        holes.some(function (poly) { return pointOnPolygon2(q, poly, tol); }))
+      return {status:'boundary', method:'plane-loops', residual:0, tolerance:tol};
+    var inOuter = outers.some(function (poly) { return pointInPolygon2(q, poly); });
+    var inHole = holes.some(function (poly) { return pointInPolygon2(q, poly); });
+    return {status:inOuter && !inHole ? 'inside' : 'outside',
+      method:'plane-loops', residual:0, tolerance:tol};
+  }
+
+  // Classify a point against a bounded surface patch: inside the trimmed
+  // region, outside it, on its boundary, or unknown when the loop topology
+  // cannot decide. The point must lie on the supporting surface; otherwise
+  // it is outside with reason "off-surface".
+  function classifyPoint(surface, p, geometry) {
+    if (!surface || !finite(p))
+      return {status:'unknown', reason:'invalid-input'};
+    var tol = surfaceTolerance(surface);
+    var residual = surfaceResidual(surface, p);
+    if (!Number.isFinite(residual) || residual > Math.max(tol*4, EPS))
+      return {status:'outside', reason:'off-surface', residual:residual,
+        tolerance:Math.max(tol*4, EPS)};
+    if (surface.kind === 'plane') return classifyPlanePoint(surface, p, geometry || {});
+    if (surface.kind === 'sphere' && surface.closed === true && !surface.cap)
+      return {status:'inside', method:'closed-sphere', residual:residual, tolerance:tol};
+    var curves = geometry && geometry.curves || [];
+    var vertices = geometry && geometry.vertices || [];
+    var contained = patchContainsPoint(surface, p, curves, vertices);
+    if (!contained.ok)
+      return {status:contained.reason === 'boundary' ? 'boundary' : 'unknown',
+        reason:contained.reason, residual:residual, tolerance:tol};
+    return {status:contained.inside ? 'inside' : 'outside',
+      method:surface.kind === 'sphere' ? 'sphere-cap' : 'loop-stations',
+      residual:residual, tolerance:tol};
+  }
+
   function splitSectionForCrossing(surface, spec, cut, crossingPoints, geometry) {
     var params = [];
     for (var i=0;i<crossingPoints.length;i++) {
@@ -2766,6 +2898,7 @@
     attachBoundary:attachBoundary,
     shareBoundary:shareBoundary,
     intersectionCurves:intersectionCurves,
+    classifyPoint:classifyPoint,
     planeSpec:planeSpec,
     point:curvePoint,
     radii:radii,

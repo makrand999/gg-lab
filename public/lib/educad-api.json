@@ -1,0 +1,26 @@
+{
+  "apiVersion": "1.0.0",
+  "version": "0.1.0",
+  "modules": {
+    "Surfaces": ["build", "validate", "certify", "incidence", "topology", "featureGraph", "section", "intersect", "intersectBounded", "split", "trim", "attachBoundary", "shareBoundary", "intersectionCurves", "classifyPoint", "planarBoolean", "subtractContainedLoop", "silhouettes", "silhouetteHLR"],
+    "Predicates": ["orient2d", "orient3d", "coplanar", "pointOnPlane"],
+    "Planar": ["arrangement", "booleanRegion", "pointInRegion"],
+    "Correspondence": ["analyze"],
+    "Constraints": ["analyze", "viewState"],
+    "Ref3d": ["buildPreview", "validPreview"]
+  },
+  "contracts": [
+    "analytic-surface-v1",
+    "analytic-surface-certificate-v1",
+    "analytic-topology-v1",
+    "bounded-intersection-v1",
+    "educad-planar-v1",
+    "planar-boolean-v1",
+    "analytic-silhouette-v1",
+    "silhouette-hlr-v1",
+    "feature-graph-v1",
+    "correspondence-audit-v1",
+    "constraint-report-v1",
+    "view-state-v1"
+  ]
+}

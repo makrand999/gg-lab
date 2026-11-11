@@ -22,3 +22,5 @@ jobs:
       - name: Kernel modules load
         run: |
           node -e "['educad-predicates','educad-surfaces','educad-entities','educad-saves','educad-reconstruct','educad-ref3d'].forEach(function (m) { require('./public/lib/' + m + '.js'); })"
+      - name: Kernel API manifest
+        run: node tools/check-api.js

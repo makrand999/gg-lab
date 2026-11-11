@@ -1,7 +1,7 @@
 {
   "name": "educad-phase0",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "EduCAD: zero-dependency teaching CAD for first-angle Monge projection",
   "type": "commonjs",
   "scripts": {
@@ -12,6 +12,7 @@
     "build:cpp": "cmake -S backend -B backend/build -DCMAKE_BUILD_TYPE=Release && cmake --build backend/build -j",
     "start:cpp": "npm run build:cpp && ./backend/build/educad-seed tools/users.json backend/data/educad.db && ./backend/build/educad-server",
     "build:manual": "node tools/build-manual.js",
+    "check:api": "node tools/check-api.js",
     "edc": "node tools/edc.js"
   },
   "license": "MIT",

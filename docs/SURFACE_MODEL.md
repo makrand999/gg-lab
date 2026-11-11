@@ -208,10 +208,9 @@ circle/ellipse sections can currently become trim boundaries; open line sets,
 unparameterized conics, and tangent points are rejected. Inline section curves
 participate in the same boundary validation and incidence analysis as drawing
 curves. A trim is open until its new boundary is shared with another patch;
-sharing an inline section requires referencing the same section object. This is
-one trimming operation; `Surfaces.split` below now divides a surface whose
-loops stay wholly on one side, but a boundary loop that crosses the cutting
-plane is still not split into sub-arcs. `cone.edu` exercises a cone trim
+sharing an inline section requires referencing the same section object. `trim`
+remains the one-sided operation; `split` below performs the two-sided cut,
+including a loop that crosses the plane. `cone.edu` exercises a cone trim
 parallel to its base; an oblique conic cut is rejected rather than approximated.
 
 ### Splitting a surface and sharing a boundary
@@ -225,65 +224,113 @@ success it returns:
   kind: 'split',
   surfaceId,                    // the input surface id
   plane: {origin, normal},
-  section,                      // one analytic circle/ellipse record
+  section,                      // one full analytic circle/ellipse record
   positive, negative,           // same objects as surfaces[0], surfaces[1]
-  surfaces: [positive, negative]
+  surfaces: [positive, negative],
+  sectionArcs,                  // crossing cuts only: the shared sub-arcs
+  sectionArcCount
 }
 ```
 
 `positive` is the side where the signed distance to the plane is positive.
-Both pieces carry the exact same `section` object in their new outer loop, so
-the cut is already a shared boundary with incidence 2. The result is therefore
-a valid two-patch model without a second construction step:
+When every loop stays wholly on one side, both pieces carry the exact same
+full `section` object in their new outer loop, so the cut is already a shared
+boundary with incidence 2. When a loop crosses the plane, the full section is
+not a boundary of the bounded band: it is split at the same crossings and only
+the section sub-arcs inside the patch are shared. `sectionArcs` lists those
+sub-arcs; the pieces reference the same objects in their ordered loops, so
+incidence is again 2 without a sampled seam. In both cases the result is a
+valid two-patch model without a second construction step:
 
 - splitting a complete sphere through its centre gives two spherical caps and
   one closed shell;
 - splitting the truncated-cylinder side above its base gives two cylinder bands
   that share the new circle and retain one original end loop each;
+- splitting a truncated-cylinder band obliquely through both end loops gives
+  one patch per side, each bounded by one top sub-arc, one bottom sub-arc and
+  the same two section arcs;
+- splitting a spherical-recess cap through its mouth gives two open lunes,
+  each bounded by one mouth sub-arc and the same section arc;
 - splitting a cone between its apex and base gives a tip patch (bounded by the
   section and the apex) and a frustum band (bounded by the section and base).
 
 The pieces keep the analytic kind and parameters, `sourceIds` (plus the
 section's source ids), `displayFaceIndices`, and the input `patchIndex`. Their
 ids are `<surface-id>/split:positive` and `<surface-id>/split:negative`; they
-also record `parentSurfaceId` and `splitBy`. The advisory `boundaryCurves`
-list and the single-cap metadata (`cap`, `recess`) are dropped because the
-pieces no longer have one mouth loop. Display faces are inherited, not
-re-tessellated; split is an analytic boundary operation.
+also record `parentSurfaceId` and `splitBy` (`sectionKind`, `side`, and for a
+crossing cut `sectionArcCount` and `analyticLoops:true`). The advisory
+`boundaryCurves` list and the single-cap metadata (`cap`, `recess`) are dropped
+because the pieces no longer have one mouth loop. Display faces are inherited,
+not re-tessellated; split is an analytic boundary operation.
 
-The operation is deliberately conservative:
+#### Crossing-loop algorithm
+
+For a loop that has points on both sides, `split` cuts the boundary itself
+instead of refusing:
+
+1. A circle, ellipse or arc is intersected with the plane analytically. With
+   the curve parameter `c + r_u cos(t) u + r_v sin(t) v`, the signed distance is
+   `A cos(t) + B sin(t) + C`; its roots split the curve into ordered sub-arcs.
+   Each sub-arc keeps the parent centre, frame, radii, start angle and sweep
+   direction. A same-side run that crosses the `0..2π` parameter origin is
+   re-joined into one sub-arc rather than two boundary elements. A tangent root
+   does not split the curve.
+2. A vertex loop is walked edge by edge. An edge whose endpoints straddle the
+   plane is cut at linear parameter `d0/(d0-d1)`. The cut point must lie on the
+   analytic surface (otherwise `split-loop-crossing-off-surface`); a loop edge
+   lying in the plane is refused with `split-loop-on-plane`.
+3. The full section is split at the same crossing stations. Each section arc
+   is classified against the bounded patch: a spherical cap uses its analytic
+   pole/mouth half-space; a cylinder or cone patch tests the point's axial
+   station against the station where the same generator meets each boundary
+   loop. Only arcs strictly inside the patch become the shared section
+   sub-arcs. An arc on the loop boundary or a patch test that cannot be decided
+   is refused rather than guessed.
+4. Each side keeps its own loop sub-arcs and the shared section sub-arcs.
+   Endpoints are matched analytically and traced into closed cycles; a chain
+   that does not close, a section-only cycle, or an unused chain is refused
+   with `split-loop-assembly-failed`. Cycles become ordered `elements` loops:
+   `{kind:'curve',curve}` for an analytic sub-arc and
+   `{kind:'polyline',points}` for an inline straight piece. Loops that stay
+   wholly on one side keep their original boundary identity and vertex or
+   curve references.
+5. A side is bounded when it receives at least one assembled or retained loop,
+   or by the existing compact-sphere/cone-apex rules. Otherwise the split is
+   refused with `split-patch-unbounded`.
+
+The operation remains deliberately conservative:
 
 - only `cylinder`, `cone` and `sphere` supports are split; a bounded planar
   face returns `split-plane-surface-unsupported`;
 - the plane section must be a closed `circle` or `ellipse`. A line set,
   tangent point, classified conic, coplanar overlap or missing section is
-  refused;
-- every existing boundary loop must lie wholly on one side of the plane. A
-  loop that crosses the plane is refused with `split-loop-crosses-plane`; a
-  loop lying in the plane is refused with `split-loop-on-plane`. The operation
-  does not yet cut a circle, ellipse or arc into sub-arcs;
-- each piece must be bounded. A side with no retained loop is accepted only on
-  a sphere (compact support) or when it contains the cone apex. A cylinder side
-  with no retained end loop is refused with `split-patch-unbounded`, which also
-  covers a cut outside the bounded band;
-- a sphere patch that already has a loop is only split when `build` preserved
-  its recess `cap` metadata, the cut plane is parallel to the cap mouth, and
-  the section lies strictly between the pole and the mouth. Otherwise the
-  material side is ambiguous (`split-sphere-cap-unknown`) or the section is
-  outside the patch (`split-section-outside-patch`). A complete sphere has no
-  such ambiguity.
+  refused. In particular, the current cone classifier returns `conic` for every
+  oblique plane, so a cone base crossed by an oblique cutting plane is still
+  refused rather than approximated;
+- a crossing cut needs a closed, single-valued patch boundary. A cylinder needs
+  both end loops; a cone needs two loops or one loop plus its apex; a sphere
+  patch needs recess `cap` metadata. Other crossing topologies return
+  `split-patch-topology-unsupported`, `split-sphere-cap-unknown` or
+  `split-loop-disconnected`;
+- a loop lying in the plane is refused with `split-loop-on-plane`;
+- `trim` still refuses crossing loops; only `split` cuts them.
 
 `Surfaces.splitDiagnostic(surface, plane, geometry)` returns `null` when the
 same call would succeed, otherwise a `{code, message, ...}` record with fields
-such as `sectionKind`, `loopIndex` or `side`. `split` also accepts an optional
-fourth argument, an array that receives that same record, so a caller can get
-the reason in one traversal. Refusal codes include
+such as `sectionKind`, `loopIndex`, `side` or `reason`. `split` also accepts an
+optional fourth argument, an array that receives that same record, so a caller
+can get the reason in one traversal. Refusal codes include
 `split-surface-missing`, `split-plane-invalid`, `split-surface-kind-unsupported`,
 `split-plane-surface-unsupported`, `split-section-missing`,
 `split-section-not-closed`, `split-section-invalid`,
 `split-section-degenerate`, `split-boundary-invalid`, `split-surface-unbounded`,
-`split-loop-crosses-plane`, `split-loop-on-plane`, `split-sphere-cap-unknown`,
-`split-section-outside-patch` and `split-patch-unbounded`.
+`split-loop-on-plane`, `split-loop-mixed-elements`,
+`split-loop-unsupported-element`, `split-loop-disconnected`,
+`split-loop-crossing-off-surface`, `split-loop-crossing-missing`,
+`split-loop-assembly-failed`, `split-section-tangent`,
+`split-section-intersection-mismatch`, `split-section-outside-patch`,
+`split-sphere-cap-unknown`, `split-patch-topology-unsupported` and
+`split-patch-unbounded`.
 
 `Surfaces.attachBoundary(surface, boundary, geometry, diagnostics)` clones a
 surface with one additional loop of the form `{kind:'outer', section:boundary}`.
@@ -650,18 +697,33 @@ mouth/bottom loops are shared. The open sheet's analytic certificate is
 - Intersection results describe the unbounded supporting surfaces. Boundary
   loops are not used to clip a line, circle, or conic to the bounded patches.
 - Trimming handles one cutting plane at a time and does not split a loop that
-  crosses the plane.
-- `split` handles one cutting plane at a time and only when every existing loop
-  is wholly on one side. It does not cut a circle, ellipse, arc or straight
-  edge into sub-elements, so a crossing loop is refused rather than
-  approximated. Planar faces, open line sections, tangent points and
-  parabola/hyperbola sections are refused. A sphere patch with an existing
-  loop needs recess `cap` metadata; a trimmed sphere does not yet carry enough
-  material-side information to be split again.
-- `split` uses the full analytic section of the supporting surface as the new
-  loop. The loop-side and per-side boundedness checks prove that section lies
-  inside the bounded patch for the accepted cases; there is no general
-  point-in-patch test for an arbitrary curved patch.
+  crosses the plane. `split` performs that two-sided cut for the crossing cases
+  described above.
+- `split` handles one cutting plane at a time. Planar faces, open line
+  sections, tangent points and parabola/hyperbola sections are refused. A
+  sphere patch with an existing loop needs recess `cap` metadata; a trimmed
+  sphere does not carry enough material-side information to be split again.
+  The cone `section` classifier still returns `conic` for every oblique plane,
+  so a cone boundary crossed by such a plane is refused before loop splitting.
+- A crossing cylinder or cone patch needs a closed loop that the generator-ray
+  station test can intersect exactly once. Highly non-star-shaped or
+  self-intersecting loops, non-closed loops, and more than two cylinder loops
+  return `split-patch-topology-unsupported` or `split-loop-disconnected`
+  instead of a possibly unsound split.
+- Vertex loops are split at edge/plane intersections, but the intersection
+  point must also lie on the analytic surface so it can meet the shared section
+  sub-arc. A polygon chord that crosses the plane away from the surface is
+  refused with `split-loop-crossing-off-surface`; the operation does not snap
+  or project it onto the surface. A loop edge lying in the cutting plane is
+  refused with `split-loop-on-plane`.
+- A crossing cut's section sub-arcs are classified by a patch-interior test:
+  a sphere uses its cap half-space; a cylinder or cone uses the axial stations
+  of the same generator on each boundary loop. That test decides the accepted
+  band, tip and frustum cases, but it is not a general point-in-patch test for
+  an arbitrary curved patch with holes or several nested loops.
+- `split` uses the full analytic section of the supporting surface as the
+  `section` result, but the piece loops reference only the section sub-arcs
+  inside the patch. It does not return the outside-patch section arcs.
 - `attachBoundary`/`shareBoundary` only promote an existing boundary object
   into another loop. They do not clip either surface, orient material, merge
   coincident loops or remove an outer loop that the new loop should replace.
@@ -702,12 +764,13 @@ Query result shapes:
 - **section** returns the analytic section record or `null`.
 - **intersect** returns the tagged intersection result or `null`.
 - **trim** returns `{surface, validation, certificate}` or `null`.
-- **split** returns `{refused:false, section, surfaces, positive, negative,
-  validation, certificate}` on success, or
+- **split** returns `{refused:false, section, sectionArcs, sectionArcCount,
+  surfaces, positive, negative, validation, certificate}` on success, or
   `{refused:true, diagnostic}` when `Surfaces.split` returns `null`. The
   validation and certificate cover the two-piece model, so a split sphere is
-  `ok` with one closed shell and a split cylinder band is `partial` with two
-  open end loops and one shared section.
+  `ok` with one closed shell, a split cylinder band is `partial` with two open
+  end loops and one shared section, and a crossing band reports the number of
+  shared section sub-arcs.
 - **attach** names one or more surfaces with `surfaces:[...]` (or one with
   `surface`/`from`) and a promoted curve with `curve`. It returns
   `{surfaces, boundary, validation, certificate}`, where `boundary` is the
@@ -731,9 +794,22 @@ New sheets exercise the split and promotion API:
 - `surface-split-cylinder.edu` splits the truncated-cylinder band below its
   inclined end and refuses a later cut outside the remaining band
   (`split-patch-unbounded`).
-- `surface-split-crossing.edu` refuses a cut whose plane crosses the inclined
-  top loop (`split-loop-crosses-plane`), refuses a line section and a planar
-  face, and refuses an invalid plane.
+- `surface-split-crossing.edu` cuts the truncated-cylinder top loop with a
+  horizontal plane. The top ellipse and the section are split at the same two
+  stations; the positive sliver keeps one top sub-arc and the section arc, and
+  the negative band keeps the other top sub-arc, the same section arc, and the
+  untouched bottom loop. It also refuses a line section and a planar face.
+- `surface-split-band-oblique.edu` cuts the same band obliquely through both
+  end loops. Each piece is one loop with one top sub-arc, one bottom sub-arc
+  and the same two section sub-arcs (`sectionArcCount:2`,
+  `sharedBoundaries:2`).
+- `surface-split-recess-cap.edu` cuts a spherical-recess cap through its mouth.
+  The mouth circle and the sphere section are split at the same two crossings;
+  each open lune shares the one section arc and keeps one mouth sub-arc.
+- `surface-split-unsupported.edu` trims a complete sphere (removing its cap
+  metadata) and shows that a later crossing cut is refused with
+  `split-sphere-cap-unknown`; it also rechecks that the original complete
+  sphere still splits.
 - `surface-attach-shared.edu` promotes a sphere/plane intersection circle with
   `intersectionCurves`, attaches that exact object to both surfaces, and checks
   `boundary.useCount:2`.

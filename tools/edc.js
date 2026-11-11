@@ -194,6 +194,8 @@ function runScript(text, options) {
           }
           var splitModel = modelOf(splitResult.surfaces);
           result = {refused:false, section:splitResult.section, surfaces:splitResult.surfaces,
+            sectionArcs:splitResult.sectionArcs || [],
+            sectionArcCount:splitResult.sectionArcCount || 0,
             positive:splitResult.positive, negative:splitResult.negative,
             validation:Surfaces.validate(splitModel,g),
             certificate:Surfaces.certify(splitModel,g)};

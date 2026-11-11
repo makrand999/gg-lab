@@ -205,21 +205,84 @@
     return model;
   }
 
-  // Indexed drawing curves and inline section curves share boundary processing.
+  // A loop names boundary elements in one of four ways: drawing-curve indices
+  // (`curves`), one inline section object (`section`), drawing-vertex indices
+  // (`vertices`), or an ordered mixed list (`elements`). The last form is
+  // produced by an analytic loop split and holds `{kind:'curve',curve}` and
+  // `{kind:'polyline',points}` records. `points` is the older inline-polyline
+  // form. All four are consumed through the helpers below.
   function loopCurves(loop, curves) {
-    return (loop.curves || []).map(function(i) { return curves[i]; })
-      .concat(loop.section ? [loop.section] : []);
+    var out = [];
+    (loop.elements || []).forEach(function (el) {
+      if (el && el.kind === 'curve' && el.curve) out.push(el.curve);
+    });
+    (loop.curves || []).forEach(function(i) {
+      out.push(typeof i === 'object' && i ? i : curves[i]);
+    });
+    if (loop.section) out.push(loop.section);
+    return out;
+  }
+
+  function loopInlinePoints(loop) {
+    var out = [];
+    (loop.elements || []).forEach(function (el) {
+      if (el && el.kind === 'polyline') (el.points || []).forEach(function (p) { out.push(p); });
+    });
+    (loop.points || []).forEach(function (p) { out.push(p); });
+    return out;
+  }
+
+  function pointKey(p) { return p.x + ',' + p.y + ',' + p.z; }
+  function edgeKey(a, b) { return 'p:' + pointKey(a) + '_' + pointKey(b); }
+
+  // Ordered boundary geometry used by side tests and station queries. Curves
+  // are analytic records; edges are [a,b] point pairs (straight boundaries).
+  function loopGeometry(loop, curves, vertices) {
+    var out = {curves:[], edges:[]};
+    if (loop.elements) {
+      loop.elements.forEach(function (el) {
+        if (!el) return;
+        if (el.kind === 'curve' && el.curve) out.curves.push(el.curve);
+        else if (el.kind === 'polyline') {
+          for (var i=0;i<(el.points || []).length-1;i++) out.edges.push([el.points[i], el.points[i+1]]);
+        }
+      });
+      return out;
+    }
+    (loop.curves || []).forEach(function (i) {
+      out.curves.push(typeof i === 'object' && i ? i : curves[i]);
+    });
+    if (loop.section) out.curves.push(loop.section);
+    var verts = (loop.vertices || []).map(function (i) { return vertices && vertices[i]; });
+    for (var i=0;i<verts.length;i++) out.edges.push([verts[i], verts[(i+1)%verts.length]]);
+    var pts = loop.points || [];
+    for (var j=0;j<pts.length;j++) out.edges.push([pts[j], pts[(j+1)%pts.length]]);
+    return out;
   }
 
   function loopElements(loop) {
     var keys = [];
+    if (loop && loop.elements) loop.elements.forEach(function (el) {
+      if (!el) return;
+      if (el.kind === 'curve' && el.curve) keys.push(el.curve);
+      else if (el.kind === 'polyline') {
+        var pts = el.points || [];
+        for (var i=0;i<pts.length-1;i++) keys.push(edgeKey(pts[i], pts[i+1]));
+      }
+    });
     if (loop && loop.section) keys.push(loop.section);
-    if (loop && loop.curves) loop.curves.forEach(function (i) { keys.push('c:' + i); });
+    if (loop && loop.curves) loop.curves.forEach(function (i) {
+      keys.push(typeof i === 'object' && i ? i : 'c:' + i);
+    });
     if (loop && loop.vertices && loop.vertices.length >= 2) {
       for (var i=0;i<loop.vertices.length;i++) {
         var a=loop.vertices[i], b=loop.vertices[(i+1)%loop.vertices.length];
         keys.push('e:' + Math.min(a,b) + '_' + Math.max(a,b));
       }
+    }
+    if (loop && loop.points && loop.points.length >= 2) {
+      for (var j=0;j<loop.points.length;j++)
+        keys.push(edgeKey(loop.points[j], loop.points[(j+1)%loop.points.length]));
     }
     return keys;
   }
@@ -331,6 +394,10 @@
           var p = geometry && geometry.vertices && geometry.vertices[i];
           if (p && Math.abs(dot(sub(p, s.origin), s.normal)) > tol)
             add('surface-boundary-off-surface', 'A plane boundary vertex is off ' + s.id + '.', s.sourceIds);
+        });
+        loopInlinePoints(loop).forEach(function (p) {
+          if (!finite(p) || surfaceResidual(s, p) > tol)
+            add('surface-boundary-off-surface', 'An inline boundary point is off ' + s.id + '.', s.sourceIds);
         });
         loopCurves(loop, curves).forEach(function (c) {
           if (!validCurve(c)) { add('surface-boundary-missing', 'Surface ' + s.id + ' references a missing boundary curve.', s.sourceIds); return; }
@@ -502,6 +569,7 @@
     if (typeof element === 'string') {
       if (/^c:\d+$/.test(element)) return 'curve';
       if (/^e:\d+_\d+$/.test(element)) return 'edge';
+      if (/^p:/.test(element)) return 'edge';
       return 'unknown';
     }
     return element && typeof element === 'object' ? 'section' : 'unknown';
@@ -735,6 +803,7 @@
         var planePoints = [];
         (surface.loops || []).forEach(function (loop) {
           (loop.vertices || []).forEach(function (i) { if (finite(vertices[i])) planePoints.push(vertices[i]); });
+          loopInlinePoints(loop).forEach(function (p) { if (finite(p)) planePoints.push(p); });
         });
         if (planePoints.length) {
           var exact = exactCoplanar(planePoints);
@@ -767,6 +836,11 @@
           elements:elements, checks:[], sourceIds:unique(sourceIds), status:'ok'};
         if (loop.vertices) loopRec.vertices = loop.vertices.slice();
         if (loop.curves) loopRec.curves = loop.curves.slice();
+        if (loop.points) loopRec.points = loop.points.slice();
+        if (loop.elements) loopRec.elements = loop.elements.map(function (el) {
+          return el && el.kind === 'curve' ? {kind:'curve', curve:elementId(el.curve)} :
+            el && el.kind === 'polyline' ? {kind:'polyline', points:(el.points || []).length} : {kind:'unknown'};
+        });
         if (loop.section) loopRec.section = elementId(loop.section);
         loopRec.incidence = loopIncidence(loop);
         if (!elements.length) {
@@ -779,6 +853,13 @@
         var maxResidual = 0, samples = 0, missing = false, invalidCurve = false, undefinedResidual = false;
         (loop.vertices || []).forEach(function (i) {
           var p = vertices[i];
+          if (!finite(p)) { missing = true; return; }
+          var r = surfaceResidual(surface, p);
+          if (!Number.isFinite(r)) undefinedResidual = true;
+          else maxResidual = Math.max(maxResidual, r);
+          samples++;
+        });
+        loopInlinePoints(loop).forEach(function (p) {
           if (!finite(p)) { missing = true; return; }
           var r = surfaceResidual(surface, p);
           if (!Number.isFinite(r)) undefinedResidual = true;
@@ -1283,6 +1364,10 @@
       if (!vertices || !finite(vertices[i])) invalid = true;
       else distances.push(distance(vertices[i]));
     });
+    loopInlinePoints(loop).forEach(function (p) {
+      if (!finite(p)) invalid = true;
+      else distances.push(distance(p));
+    });
     loopCurves(loop, curves).forEach(function(c) {
       if (!validCurve(c)) { invalid = true; return; }
       // Signed distance is A cos(t) + B sin(t) + C. Its extrema, together
@@ -1338,13 +1423,539 @@
   // two cases are separated before the side classification.
   function loopValid(loop, curves, vertices) {
     var ok = true;
-    (loop.curves || []).forEach(function (i) { if (!validCurve(curves[i])) ok = false; });
+    (loop.curves || []).forEach(function (i) {
+      var c = typeof i === 'object' && i ? i : curves[i];
+      if (!validCurve(c)) ok = false;
+    });
+    (loop.elements || []).forEach(function (el) {
+      if (!el) { ok = false; return; }
+      if (el.kind === 'curve') { if (!validCurve(el.curve)) ok = false; }
+      else if (el.kind === 'polyline') {
+        if (!el.points || el.points.length < 2) ok = false;
+        (el.points || []).forEach(function (p) { if (!finite(p)) ok = false; });
+      } else ok = false;
+    });
+    (loop.points || []).forEach(function (p) { if (!finite(p)) ok = false; });
     if (loop.section && !validCurve(loop.section)) ok = false;
     if (loop.vertices && loop.vertices.length < 2) ok = false;
     (loop.vertices || []).forEach(function (i) {
       if (!vertices || !finite(vertices[i])) ok = false;
     });
     return ok;
+  }
+
+  // ---------------------------------------------------------------------
+  // Analytic loop splitting for a plane-crossing boundary.
+  //
+  // The plane cuts a circle/ellipse/arc where A cos t + B sin t + C = 0. The
+  // roots split the curve into ordered sub-arcs that keep the parent curve's
+  // centre, frame, radii and parameter direction. Straight polygon edges are
+  // split at their plane intersection and carried as inline point polylines.
+  // The section is split at the same crossing stations, so both pieces share
+  // the section arcs rather than the full section.
+  // ---------------------------------------------------------------------
+  function curveStart(c) { return Number.isFinite(c.startAngle) ? c.startAngle : 0; }
+  function curveSweep(c) { return Number.isFinite(c.sweepAngle) ? c.sweepAngle : TAU; }
+  function pointDistance(a, b) {
+    var dx=a.x-b.x, dy=a.y-b.y, dz=a.z-b.z;
+    return Math.sqrt(dx*dx + dy*dy + dz*dz);
+  }
+  function pointsClose(a, b, tol) { return finite(a) && finite(b) && pointDistance(a,b) <= tol; }
+
+  function curveAcceptsParameter(c, t, tol) {
+    var start = curveStart(c), sweep = curveSweep(c);
+    if (sweep >= TAU - 1e-9) return true;
+    for (var k=-2;k<=2;k++) {
+      var u = t + k*TAU;
+      if (u >= start - tol && u <= start + sweep + tol) return true;
+    }
+    return false;
+  }
+  function curveAcceptsPoint(c, p, tol) {
+    if (!finite(p)) return false;
+    var r = radii(c), q = sub(p, c.center);
+    var a = dot(q, c.u)/r.u, b = dot(q, c.v)/r.v;
+    if (Math.abs(a*a + b*b - 1) > 1e-5) return false;
+    return curveAcceptsParameter(c, Math.atan2(b, a), 1e-6);
+  }
+
+  function subArc(c, t0, t1) {
+    var out = copyFields(c);
+    out.kind = 'arc';
+    out.parentKind = c.kind;
+    out.startAngle = t0;
+    out.sweepAngle = t1 - t0;
+    out.closed = false;
+    out.splitFrom = {kind:c.kind, startAngle:curveStart(c), sweepAngle:curveSweep(c)};
+    return out;
+  }
+
+  function planeCurveData(c, spec) {
+    var r = radii(c), n = spec.normal;
+    return {A:dot(n, c.u)*r.u, B:dot(n, c.v)*r.v,
+      C:dot(n, sub(c.center, spec.origin))};
+  }
+  function curveSignedDistance(c, t, spec) {
+    return dot(spec.normal, sub(curvePoint(c, t), spec.origin));
+  }
+  // Interior roots of the signed-distance sinusoid. A tangent root does not
+  // switch sides, so callers merge equal-sign intervals back into the parent
+  // curve. Roots at the curve endpoints are not split points.
+  function curveRoots(c, spec) {
+    var data = planeCurveData(c, spec), amplitude = Math.hypot(data.A, data.B);
+    var start = curveStart(c), sweep = curveSweep(c), roots = [];
+    if (amplitude <= EPS) {
+      return {onPlane:Math.abs(data.C) <= EPS,
+        roots:roots, data:data, amplitude:amplitude};
+    }
+    var ratio = -data.C/amplitude;
+    if (ratio < -1-1e-9 || ratio > 1+1e-9)
+      return {onPlane:false, roots:roots, data:data, amplitude:amplitude};
+    ratio = Math.max(-1, Math.min(1, ratio));
+    var base = Math.atan2(data.B, data.A), delta = Math.acos(ratio);
+    var critical = delta <= 1e-12 || Math.PI - delta <= 1e-12 ? [base] : [base+delta, base-delta];
+    critical.forEach(function (a) {
+      for (var k=-2;k<=2;k++) {
+        var t = a + k*TAU;
+        if (t > start + 1e-9 && t < start + sweep - 1e-9 &&
+            !roots.some(function (u) { return Math.abs(u-t) <= 1e-9; })) roots.push(t);
+      }
+    });
+    roots.sort(function (a,b) { return a-b; });
+    return {onPlane:false, roots:roots, data:data, amplitude:amplitude};
+  }
+  function splitCurveElement(c, spec) {
+    var info = curveRoots(c, spec), start = curveStart(c), sweep = curveSweep(c);
+    if (info.onPlane) return {ok:false, code:'split-loop-on-plane'};
+    var startPoint = curvePoint(c, start), endPoint = curvePoint(c, start + sweep);
+    var cuts = [start].concat(info.roots).concat([start + sweep]);
+    var scale = Math.max(1, length(sub(c.center, spec.origin)));
+    var segments = [];
+    for (var i=0;i<cuts.length-1;i++) {
+      var t0 = cuts[i], t1 = cuts[i+1];
+      if (t1 - t0 <= 1e-10) continue;
+      var d = curveSignedDistance(c, 0.5*(t0+t1), spec);
+      // A true on-plane curve was rejected above via curveRoots(). Here a
+      // sub-arc midpoint can be very close to the plane merely because the
+      // arc is a tiny sliver, so only an exact-zero interval is ambiguous.
+      if (Math.abs(d) <= 1e-12*scale) return {ok:false, code:'split-loop-on-plane'};
+      segments.push({sign:d > 0 ? 1 : -1, curve:subArc(c, t0, t1),
+        start:curvePoint(c, t0), end:curvePoint(c, t1), t0:t0, t1:t1});
+    }
+    if (!segments.length) return {ok:false, code:'split-loop-invalid'};
+    if (segments.every(function (s) { return s.sign === segments[0].sign; })) {
+      return {ok:true, segments:[{sign:segments[0].sign, curve:c,
+        start:startPoint, end:endPoint}]};
+    }
+    // A closed curve can cross the parameter origin in the middle of one
+    // same-side run. Merge the parameter-wrap pair so the run is one sub-arc,
+    // not two boundary elements that meet away from the cutting plane.
+    if (sweep >= TAU - 1e-9 && segments.length > 2 &&
+        segments[0].sign === segments[segments.length-1].sign) {
+      var firstSeg = segments.shift(), lastSeg = segments.pop();
+      var merged = subArc(c, lastSeg.t0, firstSeg.t1 + TAU);
+      segments.unshift({sign:firstSeg.sign, curve:merged, start:lastSeg.start,
+        end:firstSeg.end, t0:lastSeg.t0, t1:firstSeg.t1 + TAU});
+    }
+    return {ok:true, segments:segments};
+  }
+
+  function splitPolylineElement(points, spec, surface, loopIndex) {
+    if (!points || points.length < 2) return {ok:false, code:'split-boundary-invalid', loopIndex:loopIndex};
+    var scale = 1;
+    points.forEach(function (p) {
+      if (!finite(p)) return;
+      scale = Math.max(scale, Math.abs(p.x), Math.abs(p.y), Math.abs(p.z));
+    });
+    var planeTol = 1e-7*scale, surfaceTol = surfaceTolerance(surface);
+    var segments = [];
+    for (var i=0;i<points.length;i++) {
+      var a = points[i], b = points[(i+1)%points.length];
+      if (!finite(a) || !finite(b)) return {ok:false, code:'split-boundary-invalid', loopIndex:loopIndex};
+      var da = dot(spec.normal, sub(a, spec.origin));
+      var db = dot(spec.normal, sub(b, spec.origin));
+      if (Math.abs(da) <= planeTol && surfaceResidual(surface, a) > Math.max(surfaceTol*4, planeTol*4))
+        return {ok:false, code:'split-loop-crossing-off-surface', loopIndex:loopIndex,
+          point:copyPoint(a)};
+      if (Math.abs(db) <= planeTol && surfaceResidual(surface, b) > Math.max(surfaceTol*4, planeTol*4))
+        return {ok:false, code:'split-loop-crossing-off-surface', loopIndex:loopIndex,
+          point:copyPoint(b)};
+      if (Math.abs(da) <= planeTol && Math.abs(db) <= planeTol)
+        return {ok:false, code:'split-loop-on-plane', loopIndex:loopIndex};
+      if (da*db < -planeTol*planeTol) {
+        var alpha = da/(da-db);
+        var p = add(a, mul(sub(b, a), alpha));
+        if (surfaceResidual(surface, p) > Math.max(surfaceTol*4, planeTol*4))
+          return {ok:false, code:'split-loop-crossing-off-surface', loopIndex:loopIndex,
+            point:copyPoint(p)};
+        segments.push({sign:da > 0 ? 1 : -1, points:[a, p], start:a, end:p});
+        segments.push({sign:db > 0 ? 1 : -1, points:[p, b], start:p, end:b});
+      } else {
+        var sign = Math.abs(da) > planeTol ? (da > 0 ? 1 : -1) :
+          Math.abs(db) > planeTol ? (db > 0 ? 1 : -1) : 0;
+        if (!sign) return {ok:false, code:'split-loop-on-plane', loopIndex:loopIndex};
+        segments.push({sign:sign, points:[a, b], start:a, end:b});
+      }
+    }
+    return {ok:true, segments:segments};
+  }
+
+  function loopOrderedElements(loop, curves, vertices) {
+    if (loop.elements) {
+      var mapped = loop.elements.map(function (el) {
+        if (el && el.kind === 'curve') return {type:'curve', curve:el.curve};
+        if (el && el.kind === 'polyline') return {type:'points', points:el.points || []};
+        return {type:'unknown'};
+      });
+      if (mapped.some(function (el) { return el.type === 'unknown'; }))
+        return {ok:false, code:'split-loop-unsupported-element'};
+      return {ok:true, elements:mapped};
+    }
+    var out = [], groups = 0;
+    if (loop.curves && loop.curves.length) {
+      groups++;
+      loop.curves.forEach(function (i) {
+        out.push({type:'curve', curve:typeof i === 'object' && i ? i : curves[i]});
+      });
+    }
+    if (loop.section) { groups++; out.push({type:'curve', curve:loop.section}); }
+    if (loop.vertices && loop.vertices.length) {
+      groups++;
+      out.push({type:'points', points:loop.vertices.map(function (i) { return vertices && vertices[i]; })});
+    }
+    if (loop.points && loop.points.length) {
+      groups++;
+      out.push({type:'points', points:loop.points.slice()});
+    }
+    if (groups > 1) return {ok:false, code:'split-loop-mixed-elements'};
+    return {ok:true, elements:out};
+  }
+
+  function appendLoopSegment(chain, segment, matchTol) {
+    if (segment.curve) {
+      chain.elements.push({kind:'curve', curve:segment.curve});
+    } else {
+      var last = chain.elements[chain.elements.length-1];
+      if (last && last.kind === 'polyline' &&
+          pointsClose(last.points[last.points.length-1], segment.points[0], matchTol))
+        last.points.push(segment.points[1]);
+      else chain.elements.push({kind:'polyline', points:[segment.points[0], segment.points[1]]});
+    }
+    chain.end = segment.end;
+  }
+
+  // Split one loop into maximal same-side chains. `segments` are in loop
+  // order; a sign change is a crossing with the cutting plane and also a
+  // station that must appear in the section split.
+  function splitLoopForCrossing(loop, surface, spec, curves, vertices, loopIndex) {
+    var ordered = loopOrderedElements(loop, curves, vertices);
+    if (!ordered.ok) return {ok:false, code:ordered.code, loopIndex:loopIndex};
+    var matchTol = 1e-7*Math.max(1, surface.radius || 1);
+    var segments = [];
+    for (var e=0;e<ordered.elements.length;e++) {
+      var el = ordered.elements[e], part;
+      if (el.type === 'curve') {
+        if (!validCurve(el.curve)) return {ok:false, code:'split-boundary-invalid', loopIndex:loopIndex};
+        part = splitCurveElement(el.curve, spec);
+      } else {
+        part = splitPolylineElement(el.points, spec, surface, loopIndex);
+      }
+      if (!part.ok) return {ok:false, code:part.code, loopIndex:loopIndex, detail:part};
+      if (segments.length && part.segments.length &&
+          !pointsClose(segments[segments.length-1].end, part.segments[0].start, matchTol))
+        return {ok:false, code:'split-loop-disconnected', loopIndex:loopIndex};
+      segments = segments.concat(part.segments);
+    }
+    if (!segments.length) return {ok:false, code:'split-loop-invalid', loopIndex:loopIndex};
+    if (!pointsClose(segments[segments.length-1].end, segments[0].start, matchTol))
+      return {ok:false, code:'split-loop-disconnected', loopIndex:loopIndex};
+    if (segments.some(function (s) { return s.sign === 0; }))
+      return {ok:false, code:'split-loop-on-plane', loopIndex:loopIndex};
+
+    var groups = [], current = null;
+    segments.forEach(function (segment) {
+      if (!current || current.sign !== segment.sign) {
+        current = {sign:segment.sign, elements:[], start:segment.start, end:segment.end};
+        groups.push(current);
+      }
+      appendLoopSegment(current, segment, matchTol);
+    });
+    if (groups.length > 1 && groups[0].sign === groups[groups.length-1].sign) {
+      var last = groups.pop(), first = groups.shift();
+      groups.unshift({sign:first.sign, elements:last.elements.concat(first.elements),
+        start:last.start, end:first.end});
+    }
+    if (groups.length < 2) return {ok:false, code:'split-loop-crossing-missing', loopIndex:loopIndex};
+
+    var crossingPoints = [];
+    for (var i=0;i<segments.length;i++) {
+      var next = segments[(i+1)%segments.length];
+      if (segments[i].sign !== next.sign) crossingPoints.push(segments[i].end);
+    }
+    return {ok:true, chains:groups, crossingPoints:crossingPoints};
+  }
+
+  function loopIsClosed(loop, curves, vertices, tol) {
+    var ordered = loopOrderedElements(loop, curves, vertices);
+    if (!ordered.ok || !ordered.elements.length) return false;
+    function ends(el) {
+      if (el.type === 'curve') {
+        return {start:curvePoint(el.curve, curveStart(el.curve)),
+          end:curvePoint(el.curve, curveStart(el.curve) + curveSweep(el.curve)),
+          closed:curveSweep(el.curve) >= TAU - 1e-9};
+      }
+      return {start:el.points[0], end:el.points[el.points.length-1],
+        closed:el.points.length >= 3};
+    }
+    tol = tol || 1e-6;
+    if (ordered.elements.length === 1) return ends(ordered.elements[0]).closed ||
+      pointsClose(ends(ordered.elements[0]).start, ends(ordered.elements[0]).end, tol);
+    for (var i=0;i<ordered.elements.length;i++) {
+      var a = ends(ordered.elements[i]);
+      var b = ends(ordered.elements[(i+1)%ordered.elements.length]);
+      if (!pointsClose(a.end, b.start, tol)) return false;
+    }
+    return true;
+  }
+
+  function sectionParameterOf(cut, p) {
+    var r = radii(cut), q = sub(p, cut.center);
+    var a = dot(q, cut.u)/r.u, b = dot(q, cut.v)/r.v;
+    if (Math.abs(a*a + b*b - 1) > 1e-5) return null;
+    var t = Math.atan2(b, a);
+    if (!curveAcceptsPoint(cut, p, 1e-5*Math.max(1, r.u, r.v))) return null;
+    return t;
+  }
+
+  function axisFrame(surface) {
+    var axis = unit(surface.axis), b = basis(axis);
+    return {axis:axis, u:b.u, v:b.v};
+  }
+  function radialAngleAt(base, p, frame) {
+    var d = sub(p, base), axial = dot(d, frame.axis);
+    var radial = sub(d, mul(frame.axis, axial));
+    return Math.atan2(dot(radial, frame.v), dot(radial, frame.u));
+  }
+
+  // Axial station of the loop boundary on the generator at radial angle
+  // theta. Analytic curves use their supporting plane; polygon edges use a
+  // line/segment intersection. Both are exact, not mesh samples.
+  function curveStationAt(surface, c, theta, frame, tol) {
+    var n = curveNormal(c);
+    var d = add(mul(frame.u, Math.cos(theta)), mul(frame.v, Math.sin(theta)));
+    var point, den, base;
+    if (surface.kind === 'cylinder') {
+      base = surface.origin;
+      var q0 = add(base, mul(d, surface.radius));
+      den = dot(n, frame.axis);
+      if (Math.abs(den) <= EPS) {
+        if (Math.abs(dot(n, sub(c.center, q0))) <= tol) return {ambiguous:true};
+        return {station:null};
+      }
+      point = add(q0, mul(frame.axis, dot(n, sub(c.center, q0))/den));
+    } else {
+      base = surface.apex || surface.origin;
+      var alpha = surface.halfAngle;
+      if (!Number.isFinite(alpha)) return {station:null};
+      var g = add(mul(frame.axis, Math.cos(alpha)), mul(d, Math.sin(alpha)));
+      den = dot(n, g);
+      if (Math.abs(den) <= EPS) {
+        if (Math.abs(dot(n, sub(c.center, base))) <= tol) return {ambiguous:true};
+        return {station:null};
+      }
+      point = add(base, mul(g, dot(n, sub(c.center, base))/den));
+    }
+    if (!curveAcceptsPoint(c, point, tol)) return {station:null};
+    if (surfaceResidual(surface, point) > tol*10) return {station:null};
+    return {station:dot(sub(point, base), frame.axis)};
+  }
+
+  function segmentStationAt(a, b, q0, dir, axis, base, tol) {
+    if (!finite(a) || !finite(b) || !finite(q0)) return {station:null};
+    var e = sub(b, a), dd = dot(dir, dir), ee = dot(e, e), de = dot(dir, e);
+    var den = dd*ee - de*de;
+    if (ee <= EPS*EPS || Math.abs(den) <= EPS*Math.max(1, dd*ee)) return {ambiguous:true};
+    var w = sub(q0, a), wd = dot(w, dir), we = dot(w, e);
+    var t = (-wd*ee - de*we)/den;
+    var u = (-dd*we - de*wd)/den;
+    var p = add(q0, mul(dir, t));
+    var q = add(a, mul(e, u));
+    if (!pointsClose(p, q, tol)) return {station:null};
+    if (u < -1e-6 || u > 1+1e-6) return {station:null};
+    return {station:dot(sub(p, base), axis)};
+  }
+
+  function loopStationsAt(surface, loop, theta, curves, vertices, frame, tol) {
+    var geometry = loopGeometry(loop, curves, vertices);
+    var stations = [];
+    for (var i=0;i<geometry.curves.length;i++) {
+      var c = geometry.curves[i];
+      if (!validCurve(c)) return {ok:false, reason:'invalid-curve'};
+      var cs = curveStationAt(surface, c, theta, frame, tol);
+      if (cs.ambiguous) return {ok:false, reason:'generator-ambiguous'};
+      if (cs.station !== null && cs.station !== undefined) stations.push(cs.station);
+    }
+    var q0, dir, base;
+    if (surface.kind === 'cylinder') {
+      base = surface.origin;
+      var d = add(mul(frame.u, Math.cos(theta)), mul(frame.v, Math.sin(theta)));
+      q0 = add(base, mul(d, surface.radius));
+      dir = frame.axis;
+    } else {
+      base = surface.apex || surface.origin;
+      var dd = add(mul(frame.u, Math.cos(theta)), mul(frame.v, Math.sin(theta)));
+      q0 = base;
+      dir = add(mul(frame.axis, Math.cos(surface.halfAngle)), mul(dd, Math.sin(surface.halfAngle)));
+    }
+    for (var j=0;j<geometry.edges.length;j++) {
+      var edge = geometry.edges[j];
+      if (!finite(edge[0]) || !finite(edge[1])) return {ok:false, reason:'invalid-edge'};
+      var es = segmentStationAt(edge[0], edge[1], q0, dir, frame.axis, base, tol);
+      if (es.ambiguous) return {ok:false, reason:'generator-ambiguous'};
+      if (es.station !== null && es.station !== undefined) stations.push(es.station);
+    }
+    var unique = [];
+    stations.forEach(function (s) {
+      if (!Number.isFinite(s)) return;
+      if (!unique.some(function (u) { return Math.abs(u-s) <= tol*8; })) unique.push(s);
+    });
+    return {ok:true, stations:unique};
+  }
+
+  function sphereCapContainsPoint(surface, p) {
+    var cap = surface.cap;
+    if (!cap || !finite(cap.pole) || !finite(cap.mouth && cap.mouth.origin) ||
+        !Number.isFinite(cap.angle)) return {ok:false, reason:'cap-unknown'};
+    var pole = unit(cap.pole), tol = surfaceTolerance(surface);
+    var h = dot(sub(cap.mouth.origin, surface.center), pole);
+    var s = dot(sub(p, surface.center), pole);
+    if (s < h - tol) return {ok:true, inside:false};
+    if (s < h + tol) return {ok:false, reason:'boundary'};
+    return {ok:true, inside:true};
+  }
+
+  // Is a point of the supporting surface inside the bounded patch? Cylinder
+  // and cone patches are tested between their loop stations along the same
+  // generator. A spherical cap is an analytic pole/angle half-space.
+  function patchContainsPoint(surface, p, curves, vertices) {
+    var tol = surfaceTolerance(surface);
+    if (surface.kind === 'sphere') return sphereCapContainsPoint(surface, p);
+    if (surface.kind !== 'cylinder' && surface.kind !== 'cone')
+      return {ok:false, reason:'surface-kind'};
+    var loops = surface.loops || [];
+    if (surface.kind === 'cylinder' && loops.length !== 2)
+      return {ok:false, reason:'topology'};
+    if (surface.kind === 'cone' &&
+        !(loops.length === 2 || (loops.length === 1 && finite(surface.apex || surface.origin))))
+      return {ok:false, reason:'topology'};
+    var frame = axisFrame(surface);
+    var base = surface.kind === 'cone' ? (surface.apex || surface.origin) : surface.origin;
+    var theta = radialAngleAt(base, p, frame), stations = [];
+    for (var i=0;i<loops.length;i++) {
+      var info = loopStationsAt(surface, loops[i], theta, curves, vertices, frame, tol);
+      if (!info.ok) return {ok:false, reason:info.reason};
+      if (info.stations.length !== 1)
+        return {ok:false, reason:info.stations.length ? 'generator-multiple' : 'generator-missing'};
+      stations.push(info.stations[0]);
+    }
+    if (surface.kind === 'cone' && loops.length === 1) stations.push(0);
+    if (surface.kind === 'cone' && loops.length === 2 && stations[0]*stations[1] < 0)
+      return {ok:false, reason:'apex-between-loops'};
+    var s = dot(sub(p, base), frame.axis);
+    var lo = Math.min.apply(null, stations), hi = Math.max.apply(null, stations);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return {ok:false, reason:'station'};
+    if (s < lo - tol || s > hi + tol) return {ok:true, inside:false};
+    if (s < lo + tol || s > hi - tol) return {ok:false, reason:'boundary'};
+    return {ok:true, inside:true};
+  }
+
+  function splitSectionForCrossing(surface, spec, cut, crossingPoints, geometry) {
+    var params = [];
+    for (var i=0;i<crossingPoints.length;i++) {
+      var t = sectionParameterOf(cut, crossingPoints[i]);
+      if (t === null) return {ok:false, code:'split-section-intersection-mismatch',
+        point:copyPoint(crossingPoints[i])};
+      var normalized = ((t % TAU) + TAU) % TAU;
+      if (!params.some(function (u) { return Math.abs(u-normalized) <= 1e-7 || Math.abs(u-normalized) >= TAU-1e-7; }))
+        params.push(normalized);
+    }
+    params.sort(function (a,b) { return a-b; });
+    if (params.length < 2) return {ok:false, code:'split-section-tangent'};
+    var closed = curveSweep(cut) >= TAU - 1e-9;
+    var arcs = [];
+    for (var j=0;j<params.length;j++) {
+      var t0 = params[j];
+      var t1 = j+1 < params.length ? params[j+1] : (closed ? params[0] + TAU : null);
+      if (t1 === null) break;
+      if (t1 - t0 <= 1e-9) continue;
+      var mid = 0.5*(t0+t1);
+      var contains = patchContainsPoint(surface, curvePoint(cut, mid),
+        geometry && geometry.curves || [], geometry && geometry.vertices || []);
+      if (!contains.ok) return {ok:false, code:'split-section-outside-patch',
+        reason:contains.reason};
+      if (contains.inside) {
+        var arc = subArc(cut, t0, t1);
+        arc.sourceIds = (cut.sourceIds || []).slice();
+        arc.sectionArc = true;
+        arcs.push(arc);
+      }
+    }
+    if (!arcs.length) return {ok:false, code:'split-section-outside-patch'};
+    return {ok:true, arcs:arcs};
+  }
+
+  function sectionArcChain(arc) {
+    return {sign:0, shared:true, elements:[{kind:'curve', curve:arc}],
+      start:curvePoint(arc, curveStart(arc)),
+      end:curvePoint(arc, curveStart(arc) + curveSweep(arc))};
+  }
+  function chainElements(chain, reversed) {
+    var elements = reversed ? chain.elements.slice().reverse() : chain.elements;
+    return elements.map(function (el) {
+      if (el.kind === 'curve') return {kind:'curve', curve:el.curve};
+      var pts = reversed ? el.points.slice().reverse() : el.points.slice();
+      return {kind:'polyline', points:pts};
+    });
+  }
+
+  // Assemble closed loops from open same-side loop chains plus the shared
+  // section arcs. Endpoint identity is the only junction rule; a cycle that
+  // does not close is refused instead of being guessed.
+  function assembleCrossingLoops(surface, loopChains, arcs) {
+    var matchTol = 1e-6*Math.max(1, surface.radius || 1);
+    var chains = loopChains.concat(arcs.map(sectionArcChain));
+    if (!chains.length) return {ok:true, loops:[]};
+    var used = chains.map(function () { return false; }), loops = [];
+    for (var i=0;i<chains.length;i++) {
+      if (used[i]) continue;
+      used[i] = true;
+      var cycle = [{chain:chains[i], reversed:false}];
+      var start = chains[i].start, current = chains[i].end, guard = 0;
+      while (!pointsClose(current, start, matchTol)) {
+        if (++guard > chains.length + 1)
+          return {ok:false, code:'split-loop-assembly-failed', reason:'cycle-guard'};
+        var found = -1, reversed = false;
+        for (var j=0;j<chains.length;j++) {
+          if (used[j]) continue;
+          if (pointsClose(chains[j].start, current, matchTol)) { found = j; reversed = false; break; }
+          if (pointsClose(chains[j].end, current, matchTol)) { found = j; reversed = true; break; }
+        }
+        if (found < 0) return {ok:false, code:'split-loop-assembly-failed', reason:'open-chain'};
+        used[found] = true;
+        cycle.push({chain:chains[found], reversed:reversed});
+        current = reversed ? chains[found].start : chains[found].end;
+      }
+      if (!cycle.some(function (entry) { return !entry.chain.shared; }))
+        return {ok:false, code:'split-loop-assembly-failed', reason:'section-only-cycle'};
+      var elements = [];
+      cycle.forEach(function (entry) {
+        elements = elements.concat(chainElements(entry.chain, entry.reversed));
+      });
+      if (elements.length) loops.push({kind:'outer', elements:elements});
+    }
+    if (used.some(function (u) { return !u; }))
+      return {ok:false, code:'split-loop-assembly-failed', reason:'unused-chain'};
+    return {ok:true, loops:loops};
   }
 
   // The bounded patch of a sphere is only explicit when build() preserved the
@@ -1378,14 +1989,17 @@
     return false;
   }
 
-  function splitPiece(surface, loops, cut, spec, sign) {
+  function splitPiece(surface, loops, cut, spec, sign, detail) {
     var out = {};
     Object.keys(surface).forEach(function (k) { if (k !== 'loops') out[k] = surface[k]; });
     out.id = (surface.id || 'surface') + '/split:' + (sign > 0 ? 'positive' : 'negative');
     out.loops = loops.slice();
-    // Both pieces reference this exact object, so boundary incidence becomes
-    // 2 without a second geometric construction or a sampled seam.
-    out.loops.push({kind:'outer', section:cut});
+    // In the non-crossing case both pieces reference this exact closed
+    // section object, so the section is a shared boundary (incidence 2).
+    // A crossing cut instead already placed the shared section sub-arcs in
+    // the assembled loops.
+    if (!detail || detail.appendSection !== false)
+      out.loops.push({kind:'outer', section:cut});
     out.closed = false;
     // A split curved patch is no longer a single spherical cap, and the
     // advisory boundaryCurves list no longer names every loop element.
@@ -1396,8 +2010,111 @@
     out.splitBy = {surfaceId:out.parentSurfaceId,
       plane:{origin:copyPoint(spec.origin), normal:copyPoint(spec.normal)},
       sectionKind:cut.kind, side:sign > 0 ? 'positive' : 'negative'};
+    if (detail && detail.sectionArcCount !== undefined)
+      out.splitBy.sectionArcCount = detail.sectionArcCount;
+    if (detail && detail.analyticLoops) out.splitBy.analyticLoops = true;
     out.sourceIds = Array.from(new Set((surface.sourceIds || []).concat(cut.sourceIds || [])));
     return out;
+  }
+
+  // Crossing-loop split: every crossing loop is cut into ordered same-side
+  // chains, the section is cut at the same stations, and only the section
+  // arcs inside the bounded patch are used as the shared seam.
+  function crossingSplitPlan(surface, spec, cut, geometry, loops, sides) {
+    function fail(code, message, detail) {
+      var diagnostic = {code:code, message:message};
+      Object.keys(detail || {}).forEach(function (k) { diagnostic[k] = detail[k]; });
+      return {ok:false, diagnostic:diagnostic};
+    }
+    var curves = geometry && geometry.curves || [];
+    var vertices = geometry && geometry.vertices || [];
+    if (surface.kind === 'sphere') {
+      if (!surface.cap || !finite(surface.cap.pole) ||
+          !finite(surface.cap.mouth && surface.cap.mouth.origin) ||
+          !Number.isFinite(surface.cap.angle))
+        return fail('split-sphere-cap-unknown',
+          'A bounded sphere patch without recess cap metadata has an ambiguous material side.',
+          {surfaceId:surface.id});
+    } else if (surface.kind === 'cylinder') {
+      if (loops.length !== 2) return fail('split-patch-topology-unsupported',
+        'A crossing cut on a cylinder needs both end loops; the patch would be unbounded otherwise.',
+        {surfaceId:surface.id, loopCount:loops.length});
+    } else if (surface.kind === 'cone') {
+      if (!(loops.length === 2 || (loops.length === 1 && finite(surface.apex || surface.origin))))
+        return fail('split-patch-topology-unsupported',
+          'A crossing cut on a cone needs a frustum between two loops or an apex-bounded tip patch.',
+          {surfaceId:surface.id, loopCount:loops.length});
+    }
+    var closureTol = 1e-6*Math.max(1, surface.radius || 1);
+    for (var i=0;i<loops.length;i++) {
+      if (!loopIsClosed(loops[i], curves, vertices, closureTol))
+        return fail('split-loop-disconnected',
+          'Boundary loop ' + i + ' is not a closed cycle, so a crossing split cannot close both sides.',
+          {surfaceId:surface.id, loopIndex:i});
+    }
+
+    var positiveChains = [], negativeChains = [], positiveFull = [], negativeFull = [];
+    var crossingPoints = [];
+    for (var j=0;j<loops.length;j++) {
+      if (sides[j] !== 2) {
+        (sides[j] > 0 ? positiveFull : negativeFull).push(loops[j]);
+        continue;
+      }
+      var splitLoop = splitLoopForCrossing(loops[j], surface, spec, curves, vertices, j);
+      if (!splitLoop.ok) return fail(splitLoop.code,
+        'Boundary loop ' + j + ' could not be split analytically at the cutting plane.',
+        {surfaceId:surface.id, loopIndex:j, reason:splitLoop.detail && splitLoop.detail.code});
+      splitLoop.chains.forEach(function (chain) {
+        (chain.sign > 0 ? positiveChains : negativeChains).push(chain);
+      });
+      crossingPoints = crossingPoints.concat(splitLoop.crossingPoints);
+    }
+    if (!crossingPoints.length)
+      return fail('split-section-crossing-missing',
+        'The crossing loops did not produce a section station.', {surfaceId:surface.id});
+
+    var sectionSplit = splitSectionForCrossing(surface, spec, cut, crossingPoints, geometry);
+    if (!sectionSplit.ok) {
+      var messages = {
+        'split-section-tangent':'The crossing loops touch the section at fewer than two stations.',
+        'split-section-intersection-mismatch':'A loop/section crossing point is not on the analytic section.',
+        'split-section-outside-patch':'The analytic section does not pass through the bounded patch interior.'
+      };
+      return fail(sectionSplit.code, messages[sectionSplit.code] ||
+        'The cutting section could not be split into patch-interior arcs.',
+        {surfaceId:surface.id, reason:sectionSplit.reason});
+    }
+
+    var positiveAssembly = assembleCrossingLoops(surface, positiveChains, sectionSplit.arcs);
+    if (!positiveAssembly.ok) return fail('split-loop-assembly-failed',
+      'The positive loop pieces did not close into boundary cycles.',
+      {surfaceId:surface.id, side:'positive', reason:positiveAssembly.reason});
+    var negativeAssembly = assembleCrossingLoops(surface, negativeChains, sectionSplit.arcs);
+    if (!negativeAssembly.ok) return fail('split-loop-assembly-failed',
+      'The negative loop pieces did not close into boundary cycles.',
+      {surfaceId:surface.id, side:'negative', reason:negativeAssembly.reason});
+
+    var positiveLoops = positiveAssembly.loops.concat(positiveFull);
+    var negativeLoops = negativeAssembly.loops.concat(negativeFull);
+    if (!splitSideBounded(surface, positiveLoops.length, spec, 1))
+      return fail('split-patch-unbounded',
+        'The positive piece has no boundary loop and no compact support to bound it.',
+        {surfaceId:surface.id, side:'positive'});
+    if (!splitSideBounded(surface, negativeLoops.length, spec, -1))
+      return fail('split-patch-unbounded',
+        'The negative piece has no boundary loop and no compact support to bound it.',
+        {surfaceId:surface.id, side:'negative'});
+
+    var detail = {appendSection:false, analyticLoops:true,
+      sectionArcCount:sectionSplit.arcs.length};
+    var positive = splitPiece(surface, positiveLoops, cut, spec, 1, detail);
+    var negative = splitPiece(surface, negativeLoops, cut, spec, -1, detail);
+    var result = {kind:'split', surfaceId:surface.id === undefined ? null : surface.id,
+      plane:{origin:copyPoint(spec.origin), normal:copyPoint(spec.normal)},
+      section:cut, sectionArcs:sectionSplit.arcs,
+      sectionArcCount:sectionSplit.arcs.length,
+      positive:positive, negative:negative, surfaces:[positive, negative]};
+    return {ok:true, result:result};
   }
 
   // Internal split plan. split() keeps the public "null means refused"
@@ -1438,6 +2155,7 @@
     var curves = geometry && geometry.curves || [];
     var vertices = geometry && geometry.vertices || [];
     var positiveLoops = [], negativeLoops = [], positiveRetained = 0, negativeRetained = 0;
+    var loopSides = [], crossing = false;
     var loops = surface.loops || [];
     if (!loops.length && !(surface.kind === 'sphere' && surface.closed === true))
       return fail('split-surface-unbounded',
@@ -1450,15 +2168,18 @@
           'Boundary loop ' + i + ' of ' + surface.id + ' references a missing or invalid element.',
           {loopIndex:i});
       var side = loopSide(loop, spec, curves, vertices);
-      if (side === 2) return fail('split-loop-crosses-plane',
-        'Boundary loop ' + i + ' crosses the cutting plane; analytic sub-loop construction is not implemented.',
-        {loopIndex:i, side:'both'});
       if (side === 0) return fail('split-loop-on-plane',
         'Boundary loop ' + i + ' lies in the cutting plane and cannot be assigned to one side.',
         {loopIndex:i, side:'plane'});
+      loopSides.push(side);
+      if (side === 2) { crossing = true; continue; }
       if (side > 0) { positiveLoops.push(loop); positiveRetained++; }
       else { negativeLoops.push(loop); negativeRetained++; }
     }
+
+    // A boundary that crosses the cutting plane is split analytically. The
+    // old whole-loop path remains for loops that stay on one side.
+    if (crossing) return crossingSplitPlan(surface, spec, cut, geometry, loops, loopSides);
 
     if (surface.kind === 'sphere' && loops.length) {
       var capCheck = sphereCapContainsCut(surface, spec, cut);
@@ -1515,7 +2236,10 @@
 
   function loopReferencesCurve(loop, boundary, curves) {
     if (loop.section === boundary) return true;
-    return (loop.curves || []).some(function (i) { return curves[i] === boundary; });
+    if ((loop.elements || []).some(function (el) { return el && el.curve === boundary; })) return true;
+    return (loop.curves || []).some(function (i) {
+      return (typeof i === 'object' && i ? i : curves[i]) === boundary;
+    });
   }
 
   // Clone a surface with one more analytic loop. The exact same boundary

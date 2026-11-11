@@ -1,6 +1,8 @@
-# A cutting plane that crosses the inclined top loop cannot be promoted into
-# two shared sub-loops yet. split() returns null and reports the precise loop
-# that crosses; it does not clip or approximate the ellipse.
+# The cutting plane y=25 crosses the inclined top loop of the truncated
+# cylinder. split() cuts that ellipse into two parameterized sub-arcs and cuts
+# the circular section at the same stations. The positive sliver keeps one
+# top sub-arc plus the section arc; the negative band keeps the other top
+# sub-arc, the same section arc, and the untouched bottom loop.
 # expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
 /datum -30 80
 /point o 20 -30 plan
@@ -15,7 +17,7 @@
 /line d a A elevation
 
 # expect: surfaceChecks=4 surfaceQueries=ok
-# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":25,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-loop-crosses-plane","loopIndex":1}}}
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":25,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":false,"section":{"kind":"circle","radius":20,"center":{"x":20,"y":25,"z":30}},"sectionArcCount":1,"surfaces":[{"kind":"cylinder","closed":false},{"kind":"cylinder","closed":false}],"positive":{"loops":[{"kind":"outer"}]},"negative":{"loops":[{"kind":"outer"},{"kind":"outer"}]},"validation":{"status":"partial","openBoundaries":3,"closedShells":0},"certificate":{"status":"partial","counts":{"sharedBoundaries":1,"openBoundaries":3,"boundaryLoops":3,"closedShells":0}}}}
 # surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":0,"z":30},"normal":{"x":1,"y":0,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-section-not-closed","sectionKind":"lines"}}}
 # surface-query: {"operation":"split","surface":1,"plane":{"origin":{"x":0,"y":10,"z":0},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-plane-surface-unsupported"}}}
 # surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":0,"z":30},"normal":{"x":0,"y":0,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-plane-invalid"}}}

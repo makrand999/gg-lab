@@ -13,7 +13,7 @@ direction, not a claim that every operation below is implemented.
 | Spherical recess | circular mouth + rim-to-rim silhouette arc | partial `sphere` with one mouth loop | cap/sphere fitting and closure |
 | Cylindrical recess | circular mouth + face frame + edge-on depth strokes and bottom edge | bounded `cylinder` + bottom cap + optional mouth closure | depth solve and shared-loop closure |
 | Surface intersections | two analytic supports | curves/points, not clipped to loops | `Surfaces.intersect` |
-| Boundary algebra | one surface + plane, or an existing curve | two patches sharing a section loop / one promoted curve | `Surfaces.split`, `attachBoundary`, `shareBoundary`, `intersectionCurves` |
+| Boundary algebra | one surface + plane, or an existing curve | two patches sharing a section loop or section sub-arcs / one promoted curve | `Surfaces.split`, `attachBoundary`, `shareBoundary`, `intersectionCurves` |
 | Analytic certificate | an existing bounded model | read-only certificate | `Surfaces.certify` |
 
 All five already agree on the same vocabulary: a surface has a `kind`, analytic
@@ -64,29 +64,37 @@ the same curve vocabulary (`circle`, `ellipse`, `arc`, `line`, `conic`) and the
 same plane specification. `trim` consumes a closed `circle`/`ellipse` section
 and inserts it as a loop; `intersect` returns the supporting-surface
 intersection without clipping. `split` divides a bounded curved surface at a
-plane and inserts the same section object as a new loop in both pieces, so the
-cut starts life as a shared boundary. `intersectionCurves` turns a closed
-circle/ellipse intersection into that same loop-element vocabulary, and
-`attachBoundary`/`shareBoundary` promote such a curve into one or two surfaces
-without resampling it.
+plane. When every loop stays on one side it inserts the same section object as
+a new loop in both pieces. When a loop crosses the plane it cuts the loop
+analytically into ordered sub-arcs and splits the section at the same
+stations, so the cut is the same set of section sub-arc objects in both
+pieces. `intersectionCurves` turns a closed circle/ellipse intersection into
+that same loop-element vocabulary, and `attachBoundary`/`shareBoundary` promote
+such a curve into one or two surfaces without resampling it.
 
-A general loop operation would make the remaining relationship explicit:
+A general loop operation makes the remaining relationship explicit:
 
 ```text
 intersect(S1, S2) -> boundary curve(s)
 intersectionCurves(result) -> analytic curve record(s)
 trim(S, plane)     -> replace discarded loops with a section
 split(S, plane)    -> divide the surface, sharing the section loop
+                      or the section sub-arcs inside the bounded patch
 share(S1, S2, curve) -> the same curve object in both loops
-split(loop, curve) -> sub-loops (not implemented)
+split(loop, plane) -> ordered same-side sub-loops (implemented inside split)
 ```
 
-The recess work already added analytic inner curves to plane patches, so the
-loop element kinds are ready. What is still missing is a single
-`BoundaryElement` factory and the generic loop split for a boundary that crosses
-a cutting plane. The plane split is deliberately limited to surfaces whose
-existing loops stay wholly on one side; `split` refuses a crossing loop with
-`split-loop-crosses-plane` instead of sampling a replacement curve.
+The loop element vocabulary now carries both cases: an ordered loop may hold
+drawing-curve indices, drawing-vertex edges, one inline closed section, or an
+`elements` list of inline analytic sub-arcs (`{kind:'curve',curve}`) and
+polyline pieces (`{kind:'polyline',points}`). Incidence treats each shared
+sub-arc object as one boundary element, exactly as it treats a full section.
+The crossing-loop split supports circle/ellipse/arc boundaries and straight
+vertex-loop edges, refuses an edge crossing that is not on the analytic
+surface, and classifies the section sub-arcs with a sphere cap half-space or a
+cylinder/cone generator-station interval. It is not a general Boolean clip:
+non-closed loops, unsupported loop topologies, and section arcs outside the
+bounded patch are refused with specific diagnostics rather than sampled.
 
 ### 4. Surface type-specific checks
 
@@ -106,8 +114,8 @@ C = (S, B, boundary, incidence)
 ```
 
 - `S` — surface records: `{kind, parameters, loops, sourceIds}`;
-- `B` — boundary elements: drawing curve index, mesh edge key, or inline
-  section object;
+- `B` — boundary elements: drawing curve index, mesh edge key, inline section
+  object, or an inline analytic sub-arc/polyline piece produced by a split;
 - `boundary : S x loop -> B` — ordered element sequences;
 - `incidence : B -> {surface uses}` — the graph already exposed by
   `Surfaces.incidence`.
@@ -148,10 +156,13 @@ Implemented now:
 - `section`, `trim`, `intersect`;
 - `split`, `splitDiagnostic`, `attachBoundary`, `shareBoundary`,
   `intersectionCurves`;
+- crossing-loop `split` with analytic circle/ellipse/arc sub-arcs, straight
+  edge/plane cuts, section splitting at the same stations, and shared section
+  sub-arcs;
 - cone-over-inclined-circle inference;
 - spherical-recess inference;
 - cylindrical-recess inference with flat bottom and optional mouth closure;
-- 141 drawing scripts covering positive, open, conflict, split, attachment and
+- 144 drawing scripts covering positive, open, conflict, split, attachment and
   cross-feature cases.
 
 Not yet unified:
@@ -159,11 +170,14 @@ Not yet unified:
 - the curve/silhouette projection helpers themselves; their vector arithmetic
   now comes from the shared `educad-vec3.js`;
 - a generic candidate resolver for overlapping inferred surfaces;
-- `split` for a loop that crosses a cutting surface, including analytic
-  sub-arcs for circle/ellipse/arc loops;
-- a generic point-in-patch test for an arbitrary curved patch; `split` currently
-  proves the section is inside the accepted patch from loop sides, per-side
-  boundedness and, for a sphere cap, the mouth/pole interval;
+- a generic point-in-patch test for an arbitrary curved patch; `split` uses a
+  sphere cap half-space or a cylinder/cone generator-station interval and
+  refuses the cases those tests cannot decide;
+- cone crossing cuts: the `section` classifier returns `conic` for every
+  oblique cone plane, so the split section gate still refuses them before the
+  crossing-loop machinery can run;
+- vertex-loop crossings whose polygon chord leaves the analytic surface; they
+  are refused rather than projected or snapped;
 - automatic chaining of intersection -> promotion -> attach in one resolver;
   the three operations exist but are not called by the reconstruction pipeline;
 - fillet inference;
@@ -172,7 +186,6 @@ Not yet unified:
 The shared incidence graph is the first concrete step. It makes validation,
 certification and the boundary operations agree on boundary identity, and
 `educad-vec3.js` removes the duplicated vector arithmetic. `split`, attachment
-and `intersectionCurves` now provide the boundary algebra. The next refactor
-should move the curve/silhouette projection helpers into one module and add
-analytic sub-loop splitting for crossing loops, after which a fillet is a
-cylinder patch with two shared loops rather than a new reader.
+and `intersectionCurves` now provide the boundary algebra, including analytic
+sub-loop splitting for a boundary that crosses a cutting plane. A fillet is
+now a cylinder patch with two shared loops rather than a new reader.

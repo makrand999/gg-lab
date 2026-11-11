@@ -284,7 +284,13 @@ distance `hypot(radial - R, axial) - r`. Supported sections are:
 - a plane perpendicular to the axis: one or two circles of radius
   `R ± sqrt(r² - d²)`, or a tangent circle at `|d| = r`;
 - a plane through the axis: two circles of radius `r` at `center ± radial*R`;
-- general oblique planes remain unsupported rather than approximated.
+- any other plane on a ring torus (`R > r`): a `torusSection`
+  (`contract:'torus-section-v1'`) with closed-form major-angle intervals and
+  two tube-angle branches per loop. The valid set is the quadratic inequality
+  `Q*W² - 2ERW + E² - r²D² <= 0` with `Q = R² - r²` and
+  `W = A cos u + B sin u`; each loop is the two branch arcs over one interval.
+  A tangent plane returns `kind:'points'`; a missing plane returns `null`.
+  Spindle/horn tori keep the axis-aligned sections only.
 
 A closed torus classifies points with `closed-torus`. A bounded torus patch can
 carry an explicit periodic parameter domain:

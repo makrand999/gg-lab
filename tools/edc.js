@@ -345,6 +345,14 @@ function runScript(text, options) {
           function () { return request.hideAll === true; }, request.options);
       } else if (request.operation === 'curve-point-spec') {
         result = Surfaces.point(request.curve, request.t || 0);
+      } else if (request.operation === 'section-branch-point') {
+        var branchSection = Surfaces.section(request.surface, request.plane);
+        var branchIndex = request.branch === undefined ? 0 : request.branch;
+        var branchCurve = branchSection && branchSection.branches &&
+          branchSection.branches[branchIndex];
+        if (!branchCurve) throw new Error('Missing torus section branch');
+        result = Surfaces.point(branchCurve, request.t === undefined ?
+          branchCurve.uStart : request.t);
       } else if (request.operation === 'correspondence') {
         var Correspondence = require('../public/lib/educad-correspondence.js');
         result = Correspondence.analyze(table.list(),
@@ -365,7 +373,8 @@ function runScript(text, options) {
         result = ViewState.viewState(request.entities || table.list(),
           {hiddenLines:request.hiddenLines, expectedViews:request.expectedViews});
       } else {
-        var surface = pick(request.from !== undefined ? request.from : request.surface);
+        var surface = request.surface && request.surface.kind ?
+          request.surface : pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');
         if (request.operation === 'section') result = Surfaces.section(surface,request.plane);
         else if (request.operation === 'trim') {

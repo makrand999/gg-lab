@@ -95,8 +95,29 @@
       y:c.center.y + e1.y*cs + e2.y*sn + axis.y*axial,
       z:c.center.z + e1.z*cs + e2.z*sn + axis.z*axial};
   }
+  function torusSectionPoint(c, t) {
+    var W = c.A * Math.cos(t) + c.B * Math.sin(t);
+    var M = Math.hypot(W, c.D);
+    if (M <= EPS) return null;
+    var R = c.majorRadius, r = c.minorRadius;
+    var K = (c.E - R * W) / r;
+    var ratio = Math.max(-1, Math.min(1, K / M));
+    if (ratio > 1 - 1e-9) ratio = 1;
+    else if (ratio < -1 + 1e-9) ratio = -1;
+    var phi = Math.atan2(c.D, W);
+    var v = phi + c.branch * Math.acos(ratio);
+    var radial = R + r * Math.cos(v), axial = r * Math.sin(v);
+    var cs = Math.cos(t) * radial, sn = Math.sin(t) * radial;
+    return {x:c.center.x + c.frameU.x*cs + c.frameV.x*sn + c.axis.x*axial,
+      y:c.center.y + c.frameU.y*cs + c.frameV.y*sn + c.axis.y*axial,
+      z:c.center.z + c.frameU.z*cs + c.frameV.z*sn + c.axis.z*axial};
+  }
   function curvePoint(c, t) {
     if (c.kind === 'torusContour') return torusContourPoint(c, t);
+    if (c.kind === 'torusSectionBranch') {
+      var point = torusSectionPoint(c, t);
+      if (point) return point;
+    }
     var r=radii(c), cs=Math.cos(t)*r.u, sn=Math.sin(t)*r.v;
     return {x:c.center.x+c.u.x*cs+c.v.x*sn,
       y:c.center.y+c.u.y*cs+c.v.y*sn,
@@ -1291,7 +1312,8 @@
           pointDistance(curve.start, curve.end) : 1;
         return {from:0, to:length, closed:false};
       }
-      if (curve.kind === 'arc' || curve.kind === 'torusContour') {
+      if (curve.kind === 'arc' || curve.kind === 'torusContour' ||
+          curve.kind === 'torusSectionBranch') {
         var sweep = curveSweep(curve);
         return {from:curveStart(curve), to:curveStart(curve) + sweep,
           closed:sweep >= TAU - 1e-9};
@@ -2301,6 +2323,107 @@
       openBoundaries:analysis.openBoundaries, status:analysis.openBoundaries ? 'partial' : 'ok'};
   }
 
+  // Oblique plane/torus intersection. For a ring torus the plane equation
+  // reduces to a quadratic in W(u) = A cos u + B sin u, so the valid major-
+  // angle intervals and the two v branches have closed-form endpoints.
+  // Each loop is two branch arcs over one interval; a fully valid interval
+  // gives one closed branch per sign. The curve is analytic and is sampled
+  // only by display/HLR consumers.
+  function torusObliqueSection(surface, spec) {
+    var axis = unit(surface.axis), frame = basis(axis), n = spec.normal;
+    var A = dot(n, frame.u), B = dot(n, frame.v), D = dot(n, axis);
+    var E = dot(n, sub(spec.origin, surface.center));
+    var R = surface.majorRadius, r = surface.minorRadius;
+    var Q = R*R - r*r;
+    if (!(Q > EPS)) return null;
+    var amp = Math.hypot(A, B);
+    if (amp <= EPS) return null;
+    var disc = r*r*(E*E + Q*D*D);
+    var root = Math.sqrt(Math.max(0, disc));
+    var w0 = (E*R - root) / Q, w1 = (E*R + root) / Q;
+    if (w0 > w1) { var swap = w0; w0 = w1; w1 = swap; }
+    var phiW = Math.atan2(B, A);
+    function normAngle(value) { return ((value % TAU) + TAU) % TAU; }
+    function tangentPointAt(u) {
+      var W = A*Math.cos(u) + B*Math.sin(u);
+      var M = Math.hypot(W, D);
+      if (M <= EPS) return null;
+      var phi = Math.atan2(D, W);
+      var K = (E - R*W) / r;
+      var v = phi + (K >= 0 ? 0 : Math.PI);
+      var radial = R + r*Math.cos(v), axial = r*Math.sin(v);
+      return add(surface.center, add(add(mul(frame.u, Math.cos(u)*radial),
+        mul(frame.v, Math.sin(u)*radial)), mul(axis, axial)));
+    }
+    function tangentResult(candidates) {
+      var points = [];
+      candidates.forEach(function (point) {
+        if (!point) return;
+        if (!points.some(function (p) { return pointDistance(p, point) <= surfaceTolerance(surface); }))
+          points.push(point);
+      });
+      if (!points.length) return null;
+      return {contract:'torus-section-v1', kind:'points', points:points,
+        surfaceId:surface.id, relation:'tangent', sectionType:'plane-torus-tangent'};
+    }
+    if (w1 - w0 <= 1e-9) {
+      if (w0 > amp + 1e-9 || w0 < -amp - 1e-9) return null;
+      var base = Math.acos(Math.max(-1, Math.min(1, w0/amp)));
+      return tangentResult([tangentPointAt(phiW + base), tangentPointAt(phiW - base)]);
+    }
+    if (w0 > amp + 1e-9 || w1 < -amp - 1e-9) return null;
+    var c = Math.max(-1, Math.min(1, w0/amp));
+    var d = Math.max(-1, Math.min(1, w1/amp));
+    if (d - c <= 1e-9)
+      return tangentResult([tangentPointAt(phiW + (c > 0 ? 0 : Math.PI))]);
+    var intervals = [];
+    if (c <= -1 + 1e-12 && d >= 1 - 1e-12) {
+      intervals.push({start:0, end:TAU, full:true});
+    } else if (c <= -1 + 1e-12) {
+      var hiOnly = Math.acos(d);
+      intervals.push({start:phiW + hiOnly, end:phiW + TAU - hiOnly, full:false});
+    } else if (d >= 1 - 1e-12) {
+      var loOnly = Math.acos(c);
+      intervals.push({start:phiW - loOnly, end:phiW + loOnly, full:false});
+    } else {
+      var hi = Math.acos(c), lo = Math.acos(d);
+      intervals.push({start:phiW - hi, end:phiW - lo, full:false});
+      intervals.push({start:phiW + lo, end:phiW + hi, full:false});
+    }
+    function branchRecord(branch, start, end, closed) {
+      return {kind:'torusSectionBranch', branch:branch, center:surface.center,
+        axis:axis, frameU:frame.u, frameV:frame.v, majorRadius:R, minorRadius:r,
+        A:A, B:B, D:D, E:E, uStart:start, uEnd:end, startAngle:start,
+        sweepAngle:end - start, closed:closed, surfaceId:surface.id,
+        sectionType:'plane-torus-quartic', confidence:'analytic-parameterization'};
+    }
+    var branches = [], loops = [];
+    intervals.forEach(function (interval) {
+      var start = normAngle(interval.start), end = normAngle(interval.end);
+      if (interval.full) start = 0, end = TAU;
+      else if (end <= start + 1e-12) end += TAU;
+      if (interval.full) {
+        [1, -1].forEach(function (branch) {
+          var index = branches.length;
+          branches.push(branchRecord(branch, 0, TAU, true));
+          loops.push({closed:true, full:true, branches:[index]});
+        });
+      } else {
+        var plus = branches.length;
+        branches.push(branchRecord(1, start, end, false));
+        var minus = branches.length;
+        branches.push(branchRecord(-1, end, start, false));
+        loops.push({closed:true, full:false, branches:[plus, minus]});
+      }
+    });
+    return {contract:'torus-section-v1', kind:'torusSection', surfaceId:surface.id,
+      plane:{origin:copyPoint(spec.origin), normal:copyPoint(spec.normal)},
+      relation:'transverse', sectionType:'plane-torus-quartic',
+      branches:branches, loops:loops,
+      parameters:{A:A, B:B, D:D, E:E, majorRadius:R, minorRadius:r,
+        wMin:w0, wMax:w1, amplitude:amp}};
+  }
+
   // Analytic section of a bounded surface by a plane. The result is a conic
   // or line set in space; it is independent of the display tessellation.
   function section(surface, plane) {
@@ -2399,7 +2522,7 @@
           Object.assign({}, circleBase, {center:add(tc, mul(radialDir, -R))})
         ], surfaceId:surface.id, sectionType:'plane-torus-axis'};
       }
-      return null;
+      return torusObliqueSection(surface, {origin:q, normal:n});
     }
     if (surface.kind === 'cone') {
       var apex = surface.apex || surface.origin;
@@ -2823,7 +2946,7 @@
   function subArc(c, t0, t1) {
     boundaryElementId(c, c.kind === 'line' ? 'line' : 'curve');
     var out = copyFields(c);
-    out.kind = c.kind === 'torusContour' ? 'torusContour' : 'arc';
+    out.kind = c.kind === 'torusContour' || c.kind === 'torusSectionBranch' ? c.kind : 'arc';
     // Deterministic child id: the same parent station pair names the same
     // shared seam after a JSON round-trip and across repeated splits.
     out.id = c.id + '/arc:' + Number(t0).toFixed(9) + ':' + Number(t1).toFixed(9);
@@ -4142,10 +4265,14 @@
       return fail('split-section-missing', 'The cutting plane does not meet ' + surface.id + '.',
         {surfaceId:surface.id});
     }
-    if (cut.kind === 'circle')
+    if (cut.kind === 'circle' || cut.kind === 'point' || cut.kind === 'points')
       return fail('split-torus-tangent',
         'A plane tangent to the tube does not split the torus into two bounded pieces.',
         {surfaceId:surface.id});
+    if (cut.kind !== 'circles' && Math.abs(nAxis) > 1e-7 && Math.abs(Math.abs(nAxis) - 1) > 1e-7)
+      return fail('split-torus-plane-oblique',
+        'An oblique plane meets a torus in a quartic curve; that split is not implemented.',
+        {surfaceId:surface.id, axisDotNormal:nAxis});
     if (cut.kind !== 'circles' || !cut.circles || cut.circles.length !== 2)
       return fail('split-torus-section-unsupported',
         'Splitting a torus needs two circular section loops from a perpendicular or axis-containing plane.',

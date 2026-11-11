@@ -310,6 +310,8 @@ function runScript(text, options) {
         if (!planarA || !planarB) throw new Error('Missing planar face');
         result = Surfaces.planarBoolean(planarA, planarB,
           request.boolean || request.op || 'union', g);
+      } else if (request.operation === 'feature-graph') {
+        result = Surfaces.featureGraph(modelOf((g && g.surfaces) || []), g);
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');

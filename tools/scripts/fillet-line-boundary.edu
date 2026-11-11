@@ -31,9 +31,10 @@
 
 # The fillet cylinder section at mid-length is a circle r=10 centred on its
 # axis. Both tangent planes meet the cylinder in one generator line.
-# expect: surfaceChecks=4 surfaceQueries=ok
+# expect: surfaceChecks=5 surfaceQueries=ok
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":10,"y":10,"z":20},"normal":{"x":0,"y":0,"z":1}},"expect":{"kind":"circle","radius":10,"center":{"x":10,"y":10,"z":20}}}
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"line","relation":"tangent"}}
 # surface-query: {"operation":"attach","surfaces":[0,1],"line":{"kind":"line","start":{"x":0,"y":10,"z":10},"end":{"x":0,"y":10,"z":30}},"expect":{"boundary":{"useCount":2},"validation":{"status":"partial"},"certificate":{"status":"partial"}}}
 # A one-loop fillet has no second end loop to bound a crossing cut.
 # surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":10,"y":10,"z":20},"normal":{"x":0,"y":0,"z":1}},"expect":{"refused":true,"diagnostic":{"code":"split-patch-topology-unsupported"}}}
+# surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":3,"edges":10,"smooth":2,"open":8,"fillets":1},"features":[{"type":"fillet","family":"cylindrical","closure":"open","faces":["surface:0","surface:1","surface:2"]}]}}

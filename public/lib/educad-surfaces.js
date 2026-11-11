@@ -553,6 +553,7 @@
               displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
             if (patch.apex) explicitSurface.apex = patch.apex;
             if (Number.isFinite(patch.halfAngle)) explicitSurface.halfAngle = patch.halfAngle;
+            if (patch.recess) explicitSurface.recess = true;
             if (explicitKind === 'cone' && !explicitSurface.apex && explicitFirst && explicitSecond) {
               var er1 = explicitFirst.radius, er2 = explicitSecond.radius;
               if (Math.abs(er1 - er2) > EPS) {
@@ -580,6 +581,7 @@
               displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
             if (patch.apex) surface2.apex = patch.apex;
             if (Number.isFinite(patch.halfAngle)) surface2.halfAngle = patch.halfAngle;
+            if (patch.recess) surface2.recess = true;
             if (kind === 'cone' && !surface2.apex && second) {
               var r1 = first.radius, r2 = second.radius;
               if (Math.abs(r1 - r2) > EPS) {
@@ -756,7 +758,7 @@
       if (!edges.has(id)) {
         var edge = {id:id, kind:kind, closed:!!data.closed, uses:[],
           faces:[], sourceIds:(data.sourceIds || []).slice()};
-        if (data.curve) edge.curveId = data.curve.id || null;
+        if (data.curve) edge.curveId = data.curveId || data.curve.id || null;
         if (data.curve) edge.curveKind = data.curve.kind || null;
         if (data.start) edge.start = {x:data.start.x, y:data.start.y, z:data.start.z};
         if (data.end) edge.end = {x:data.end.x, y:data.end.y, z:data.end.z};
@@ -779,7 +781,8 @@
       var start = curvePoint(curve, curveStart(curve));
       var closed = curveSweep(curve) >= TAU - 1e-9;
       var end = closed ? start : curvePoint(curve, curveStart(curve) + curveSweep(curve));
-      addEdge(id, 'curve', {curve:curve, start:start, end:end, closed:closed,
+      addEdge(id, 'curve', {curve:curve, curveId:explicitId || curve.id || null,
+        start:start, end:end, closed:closed,
         sourceIds:curve.sourceIds || []}, surfaceId, loopIndex, role);
       return id;
     }
@@ -873,6 +876,112 @@
         loops:faces.reduce(function (n, f) { return n + f.loops.length; }, 0),
         openEdges:openEdges, sharedEdges:sharedEdges, nonmanifoldEdges:nonmanifoldEdges,
         status:openEdges || nonmanifoldEdges ? 'partial' : 'closed'}};
+  }
+
+  function surfaceNormalAt(surface, point) {
+    if (!surface || !finite(point)) return null;
+    var direction = null;
+    if (surface.kind === 'plane') direction = finite(surface.normal) ? unit(surface.normal) : null;
+    else if (surface.kind === 'sphere')
+      direction = finite(surface.center) ? unit(sub(point, surface.center)) : null;
+    else if (surface.kind === 'cylinder' || surface.kind === 'cone') {
+      if (!finite(surface.origin) || !finite(surface.axis)) return null;
+      var axis = unit(surface.axis);
+      var delta = sub(point, surface.origin);
+      var radial = sub(delta, mul(axis, dot(delta, axis)));
+      direction = length(radial) > EPS ? unit(radial) : null;
+    }
+    if (direction && surface.recess) direction = mul(direction, -1);
+    return direction;
+  }
+  function edgeMidpoint(edge) {
+    if (!edge || !finite(edge.start) || !finite(edge.end)) return null;
+    return {x:0.5*(edge.start.x + edge.end.x), y:0.5*(edge.start.y + edge.end.y),
+      z:0.5*(edge.start.z + edge.end.z)};
+  }
+  function edgeTangent(edge, geometry) {
+    if (!edge) return null;
+    var curve = null;
+    if (edge.curveId) {
+      var indexed = /^c:(\d+)$/.exec(edge.curveId);
+      if (indexed && geometry && geometry.curves)
+        curve = geometry.curves[Number(indexed[1])];
+      if (!curve) curve = ((geometry && geometry.curves) || []).find(function (c) {
+        return c.id === edge.curveId;
+      });
+    }
+    if (curve && validCurve(curve)) {
+      var t = curveStart(curve) + 0.5 * curveSweep(curve);
+      var a = curvePoint(curve, t - 1e-6), b = curvePoint(curve, t + 1e-6);
+      var tangent = sub(b, a);
+      return length(tangent) > EPS ? unit(tangent) : null;
+    }
+    if (finite(edge.start) && finite(edge.end) && pointDistance(edge.start, edge.end) > EPS)
+      return unit(sub(edge.end, edge.start));
+    return null;
+  }
+  function classifyDihedral(edge, model, geometry) {
+    if (!edge || edge.useCount !== 2) return {convexity:'open', angle:null};
+    var first = model.surfaces.find(function (s) { return s.id === edge.uses[0].surfaceId; });
+    var second = model.surfaces.find(function (s) { return s.id === edge.uses[1].surfaceId; });
+    var point = edgeMidpoint(edge), tangent = edgeTangent(edge, geometry);
+    var one = first && surfaceNormalAt(first, point);
+    var two = second && surfaceNormalAt(second, point);
+    if (!one || !two || !tangent) return {convexity:'unknown', angle:null};
+    var cosine = Math.max(-1, Math.min(1, dot(one, two)));
+    var angle = Math.acos(cosine);
+    if (angle <= 1e-3 || Math.PI - angle <= 1e-3)
+      return {convexity:'smooth', angle:angle};
+    var side = dot(cross(one, two), tangent);
+    return {convexity:side > 0 ? 'convex' : 'concave', angle:angle,
+      tangent:tangent, normals:[one, two]};
+  }
+  function featureGraph(model, geometry) {
+    model = model || {surfaces:[]};
+    var graph = topology(model, geometry);
+    var edges = graph.edges.map(function (edge) {
+      var dihedral = classifyDihedral(edge, model, geometry);
+      return {id:edge.id, kind:edge.kind, surfaceIds:edge.faces.slice(),
+        useCount:edge.useCount, status:edge.status,
+        convexity:dihedral.convexity, angle:dihedral.angle};
+    });
+    var surfaceIndex = new Map();
+    (model.surfaces || []).forEach(function (surface, index) { surfaceIndex.set(index, surface); });
+    var features = [];
+    ((geometry && geometry.recesses) || []).forEach(function (record, index) {
+      var faces = [];
+      if (Number.isInteger(record.surface) && surfaceIndex.has(record.surface))
+        faces.push(surfaceIndex.get(record.surface).id);
+      (model.surfaces || []).forEach(function (surface) {
+        if (!surface.recess) return;
+        if (faces.indexOf(surface.id) === -1) faces.push(surface.id);
+      });
+      features.push({id:'feature:recess:' + index, type:'recess',
+        family:record.kind, faces:faces, closure:record.closure || 'open',
+        mouthCurve:record.mouthCurve === undefined ? null : record.mouthCurve,
+        sourceIds:(record.sourceIds || []).slice()});
+    });
+    ((geometry && geometry.fillets) || []).forEach(function (record, index) {
+      var faces = [];
+      if (Number.isInteger(record.surface) && surfaceIndex.has(record.surface))
+        faces.push(surfaceIndex.get(record.surface).id);
+      (record.adjacentSurfaces || []).forEach(function (i) {
+        if (surfaceIndex.has(i)) faces.push(surfaceIndex.get(i).id);
+      });
+      features.push({id:'feature:fillet:' + index, type:'fillet',
+        family:record.kind || 'cylindrical', faces:faces, closure:record.closure || 'open',
+        tangentLines:(record.tangentLines || []).map(function (line) { return line.id || null; }),
+        sourceIds:(record.sourceIds || []).slice()});
+    });
+    var counts = {convex:0, concave:0, smooth:0, open:0, unknown:0};
+    edges.forEach(function (edge) { counts[edge.convexity] = (counts[edge.convexity] || 0) + 1; });
+    return {contract:'feature-graph-v1', graphContract:graph.contract,
+      faces:graph.faces, edges:edges, features:features,
+      summary:{faces:graph.faces.length, edges:graph.edges.length,
+        convex:counts.convex, concave:counts.concave, smooth:counts.smooth,
+        open:counts.open, unknown:counts.unknown,
+        recesses:features.filter(function (f) { return f.type === 'recess'; }).length,
+        fillets:features.filter(function (f) { return f.type === 'fillet'; }).length}};
   }
 
   function analyze(model) {
@@ -3693,6 +3802,7 @@
     certify:certify,
     incidence:incidence,
     topology:topology,
+    featureGraph:featureGraph,
     summarize:summarize,
     section:section,
     intersect:intersect,

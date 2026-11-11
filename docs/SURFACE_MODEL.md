@@ -371,6 +371,25 @@ The result carries `area`, `loops` (`outer` positive area, `inner` negative
 area), per-cell `insideA`/`insideB` flags, and diagnostics. It is polygonal:
 curved boundaries are neither tessellated nor silently simplified.
 
+## Feature graph v1
+
+`Surfaces.featureGraph(model, geometry)` builds on the topology shadow:
+
+- one edge per shared boundary with `convexity` (`convex | concave | smooth |
+  open | unknown`) and dihedral `angle`;
+- face normals evaluated analytically at the edge midpoint (plane, cylinder,
+  cone, sphere); recess cylinder/sphere normals are flipped so a cavity mouth
+  reads concave while an external box edge reads convex;
+- smooth transitions use a `1e-3` rad window;
+- feature records re-express existing evidence as graph predicates: recesses
+  with family/closure/faces/source IDs, fillets with tangent lines and adjacent
+  faces;
+- `summary` counts faces, edges, convex/concave/smooth/open/unknown edges,
+  recesses and fillets.
+
+The graph does not add geometry. It is the shared vocabulary for later cavity,
+hole and fillet-chain recognition.
+
 ## Intersections and trimming
 
 `Surfaces.section(surface, plane)` returns analytic section geometry:

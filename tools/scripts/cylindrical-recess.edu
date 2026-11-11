@@ -53,9 +53,10 @@
 /line h3 h0 A elevation
 
 # The cylinder radius is 10 at mid-depth and at the shared bottom loop.
-# expect: surfaceChecks=5 surfaceQueries=ok
+# expect: surfaceChecks=6 surfaceQueries=ok
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":30,"y":50,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":10,"center":{"x":30,"y":50,"z":30}}}
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","radius":10,"relation":"transverse","center":{"x":30,"y":40,"z":30}}}
 # surface-query: {"operation":"intersect","surfaces":[0,4],"expect":{"kind":"circle","radius":10,"relation":"transverse","center":{"x":30,"y":60,"z":30}}}
 # surface-query: {"operation":"classify","surface":4,"point":{"x":30,"y":60,"z":30},"expect":{"status":"outside","method":"plane-loops"}}
 # surface-query: {"operation":"topology","expect":{"contract":"analytic-topology-v1","summary":{"faces":8,"edges":14,"vertices":10,"loops":10,"openEdges":0,"sharedEdges":14,"nonmanifoldEdges":0,"status":"closed"},"edges":[{"id":"c:0","kind":"curve","useCount":2,"status":"shared"},{"id":"c:1","kind":"curve","useCount":2,"status":"shared"}]}}
+# surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":8,"edges":14,"convex":12,"concave":2,"smooth":0,"open":0,"unknown":0,"recesses":1,"fillets":0},"features":[{"type":"recess","family":"cylindrical","closure":"host","faces":["surface:0"]}]}}

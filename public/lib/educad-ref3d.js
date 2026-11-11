@@ -177,9 +177,9 @@
             if(!Parametric.validate(c)||!indices(c.displayVertices,g.vertices.length)||!indices(c.displayEdges,g.edges.length))return false;
             continue;
           }
-          if (!c || ['circle','circular-arc','ellipse'].indexOf(c.kind)===-1 ||
+          if (!c || ['circle','circular-arc','ellipse','arc'].indexOf(c.kind)===-1 ||
               !isFiniteNumber(c.startAngle) || !isFiniteNumber(c.sweepAngle) || c.sweepAngle<=0) return false;
-          if (c.kind === 'ellipse') {
+          if (c.kind === 'ellipse' || c.radiusU !== undefined || c.radiusV !== undefined) {
             if (!isFiniteNumber(c.radiusU) || c.radiusU<=0 || !isFiniteNumber(c.radiusV) || c.radiusV<=0) return false;
           } else if (!isFiniteNumber(c.radius) || c.radius<=0) return false;
           copyVertex(c.center); copyVertex(c.u); copyVertex(c.v);

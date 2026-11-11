@@ -130,6 +130,10 @@ function runScript(text, options) {
   properties.obliqueVisibilityFit=checkObliqueVisibility(solid,table.list());
   properties.arcSweep=obliqueCurves.filter(function(c) {return c.kind==='arc';}).map(function(c) {return Math.round(c.sweepAngle*180/Math.PI);}).sort(function(a,b) {return a-b;}).join(',') || 'none';
   if(/^\d+$/.test(properties.arcSweep)) properties.arcSweep=Number(properties.arcSweep);
+  if (obliqueCurves.length) {
+    var arcPreview = JSON.parse(JSON.stringify(Ref3d.buildPreview(table.list(), R)));
+    properties.obliquePreview = Ref3d.validPreview(arcPreview) ? 'ok' : 'issues';
+  } else properties.obliquePreview = 'none';
   properties.diagnostics = Array.from(new Set(((solid.pipeline || {}).diagnostics || solid.issues || []).map(function(d) {return d.code;}))).sort().join(',') || 'none';
   var evidenced = ((solid.geometry || {}).curves || []).filter(function(c) {return c.oblique && (c.pointEvidence || []).length;});
   properties.obliquePoints = evidenced.reduce(function(n,c) {return n+c.pointEvidence.length;},0);
@@ -171,6 +175,22 @@ function runScript(text, options) {
       function modelOf(surfaces) {
         return {version:1,contract:'analytic-surface-v1',surfaces:surfaces,diagnostics:[]};
       }
+      function identityCounts(surfaces) {
+        var graph = Surfaces.incidence(modelOf(surfaces));
+        var counts = {boundaries:0, shared:0, open:0, nonmanifold:0};
+        graph.uses.forEach(function (use) {
+          counts.boundaries++;
+          if (use.useCount === 1) counts.open++;
+          else if (use.useCount === 2) counts.shared++;
+          else counts.nonmanifold++;
+        });
+        return counts;
+      }
+      function identitySummary(surfaces) {
+        var model = modelOf(surfaces);
+        return {before:identityCounts(model.surfaces),
+          after:identityCounts(JSON.parse(JSON.stringify(model)).surfaces)};
+      }
       var result;
       if (request.operation === 'intersect') {
         var refs = request.surfaces || [
@@ -196,6 +216,7 @@ function runScript(text, options) {
           result = {refused:false, section:splitResult.section, surfaces:splitResult.surfaces,
             sectionArcs:splitResult.sectionArcs || [],
             sectionArcCount:splitResult.sectionArcCount || 0,
+            identity:identitySummary(splitResult.surfaces),
             positive:splitResult.positive, negative:splitResult.negative,
             validation:Surfaces.validate(splitModel,g),
             certificate:Surfaces.certify(splitModel,g)};
@@ -229,8 +250,23 @@ function runScript(text, options) {
           if (use.element === boundary) boundaryUse = {useCount:use.useCount, surfaceIds:use.surfaceIds.slice()};
         });
         result = {surfaces:attached, boundary:boundaryUse,
+          identity:identitySummary(attached),
           validation:Surfaces.validate(attachModel,g),
           certificate:Surfaces.certify(attachModel,g)};
+      } else if (request.operation === 'rebuild') {
+        var rebuildRefs = request.surfaces || [
+          request.from !== undefined ? request.from : request.surface
+        ];
+        if (!Array.isArray(rebuildRefs)) rebuildRefs = [rebuildRefs];
+        var rebuildSurfaces = rebuildRefs.map(pick).filter(Boolean);
+        if (!rebuildSurfaces.length) throw new Error('Missing reconstructed surface');
+        var rebuilt = Surfaces.build({vertices:[], curves:[], faces:[],
+          surfacePatches:rebuildSurfaces});
+        if (request.save && typeof request.save === 'string')
+          querySurfaces[request.save] = (rebuilt.surfaces || [])[0];
+        result = {surfaces:rebuilt.surfaces, summary:rebuilt.summary,
+          diagnostics:rebuilt.diagnostics,
+          identity:identitySummary(rebuilt.surfaces)};
       } else {
         var surface = pick(request.from !== undefined ? request.from : request.surface);
         if (!surface) throw new Error('Missing reconstructed surface');
@@ -238,7 +274,7 @@ function runScript(text, options) {
         else if (request.operation === 'trim') {
           var trimmed = Surfaces.trim(surface,request.plane,request.keepPositive,g);
           if (request.save && trimmed) querySurfaces[request.save] = trimmed;
-          result = trimmed && {surface:trimmed, validation:Surfaces.validate({surfaces:[trimmed]},g),
+          result = trimmed && {surface:trimmed, identity:identitySummary([trimmed]), validation:Surfaces.validate({surfaces:[trimmed]},g),
             certificate:Surfaces.certify({version:1,contract:'analytic-surface-v1',surfaces:[trimmed],diagnostics:[]},g)};
         } else throw new Error('Unknown surface operation');
       }

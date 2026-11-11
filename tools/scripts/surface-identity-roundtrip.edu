@@ -1,0 +1,12 @@
+# Boundary identity v2: a sphere split by its equatorial plane gives both
+# caps the same analytic section. The identity report serializes the model
+# and re-reads it; the shared seam must keep useCount 2 after the round-trip,
+# and rebuilding from the saved surface records must keep the same seam.
+# expect: 86V 252E 168F spheres=1 surfaces=1 surfaceKinds=sphere surfaceLoops=0 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok unresolved=0 status=inferred
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+
+# expect: surfaceChecks=2 surfaceQueries=ok
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"save":{"positive":"north","negative":"south"},"expect":{"refused":false,"identity":{"before":{"boundaries":1,"shared":1,"open":0,"nonmanifold":0},"after":{"boundaries":1,"shared":1,"open":0,"nonmanifold":0}}}}
+# surface-query: {"operation":"rebuild","surfaces":["north","south"],"expect":{"surfaces":[{"kind":"sphere"},{"kind":"sphere"}],"identity":{"before":{"boundaries":1,"shared":1,"open":0,"nonmanifold":0},"after":{"boundaries":1,"shared":1,"open":0,"nonmanifold":0}},"summary":{"total":2,"openBoundaries":0}}}

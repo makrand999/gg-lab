@@ -1,5 +1,5 @@
 # An open elliptical arc in plan and its edge-on line in elevation form one oblique arc.
-# expect: 0F curves=1 oblique=1 obliqueArcs=1 obliqueReprojection=ok arcSweep=90 unresolved=0 status=inferred
+# expect: 0F curves=1 oblique=1 obliqueArcs=1 obliqueReprojection=ok obliquePreview=ok arcSweep=90 unresolved=0 status=inferred
 /datum -100 400
 /point p0 40.0000000000 -10.0000000000 plan
 /point p1 39.9571784648 -8.6919374154 plan

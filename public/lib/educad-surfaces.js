@@ -72,6 +72,35 @@
       Math.abs(length(c.u)-1) <= EPS && Math.abs(length(c.v)-1) <= EPS && Math.abs(dot(c.u,c.v)) <= EPS;
   }
 
+  // Every boundary element carries a persisted id. Object identity still
+  // shares a boundary in memory, but the id is what survives JSON storage and
+  // what incidence uses first, so a reloaded model keeps the same seams.
+  var boundarySerial = 0;
+  function boundaryElementId(element, prefix) {
+    if (!element || typeof element !== 'object') return null;
+    if (typeof element.id === 'string' && element.id !== '') return element.id;
+    element.id = (prefix || element.kind || 'boundary') + ':' + (++boundarySerial);
+    return element.id;
+  }
+  function stampLoopIdentity(loop) {
+    if (!loop || typeof loop !== 'object') return;
+    if (loop.section) boundaryElementId(loop.section, 'section');
+    (loop.lines || []).forEach(function (line) { boundaryElementId(line, 'line'); });
+    (loop.curves || []).forEach(function (curve) {
+      if (curve && typeof curve === 'object') boundaryElementId(curve, 'curve');
+    });
+    (loop.elements || []).forEach(function (element) {
+      if (!element || element.kind !== 'curve' || !element.curve) return;
+      boundaryElementId(element.curve, element.curve.parentKind ? 'arc' : 'curve');
+    });
+  }
+  function stampModelIdentity(model) {
+    (model.surfaces || []).forEach(function (surface) {
+      (surface.loops || []).forEach(stampLoopIdentity);
+    });
+    return model;
+  }
+
   // A straight boundary element is a finite line segment on the surface. It
   // is stored inline on a loop as {kind:'line', start, end, sourceIds}. The
   // object itself is the identity used by incidence, exactly like an inline
@@ -115,16 +144,28 @@
       if (Array.isArray(loop.vertices)) out.vertices = loop.vertices.slice();
       if (Array.isArray(loop.curves)) out.curves = loop.curves.slice();
       if (Array.isArray(loop.lines)) out.lines = loop.lines.slice();
+      if (Array.isArray(loop.elements)) out.elements = loop.elements.slice();
+      if (Array.isArray(loop.points)) out.points = loop.points.slice();
       if (loop.section) out.section = loop.section;
       return out;
     }
     function loopInputValid(loop) {
-      if (!loop || (!loop.vertices && !loop.curves && !loop.lines && !loop.section)) return false;
+      if (!loop || (!loop.vertices && !loop.curves && !loop.lines &&
+          !loop.section && !loop.elements && !loop.points)) return false;
       if (loop.vertices && loop.vertices.length < 2) return false;
       var okay = true;
       (loop.curves || []).forEach(function (i) { if (!validCurve(curves[i])) okay = false; });
       (loop.lines || []).forEach(function (l) { if (!validLine(l)) okay = false; });
       if (loop.section && !validCurve(loop.section)) okay = false;
+      (loop.elements || []).forEach(function (el) {
+        if (!el) { okay = false; return; }
+        if (el.kind === 'curve') { if (!validCurve(el.curve)) okay = false; }
+        else if (el.kind === 'polyline') {
+          if (!Array.isArray(el.points) || el.points.length < 2 ||
+              el.points.some(function (p) { return !finite(p); })) okay = false;
+        } else okay = false;
+      });
+      (loop.points || []).forEach(function (p) { if (!finite(p)) okay = false; });
       return okay;
     }
     // Patches may supply their ordered loops directly. This is the common
@@ -355,6 +396,7 @@
       addSurface(surface);
     });
     model.summary = summarize(model);
+    stampModelIdentity(model);
     if (model.diagnostics.length) model.summary.status = 'issues';
     return model;
   }
@@ -450,8 +492,8 @@
     function elementId(element) {
       if (typeof element === 'string') return element;
       if (element && typeof element === 'object') {
+        if (typeof element.id === 'string' && element.id !== '') return 'boundary:' + element.id;
         if (element.kind === 'line') {
-          if (typeof element.id === 'string' && element.id !== '') return 'line:id:' + element.id;
           if (!lineIds.has(element)) lineIds.set(element, 'line:' + lineIds.size);
           return lineIds.get(element);
         }
@@ -1611,6 +1653,7 @@
     if (!spec) return null;
     var cut = section(surface, spec);
     if (!cut || (cut.kind !== 'circle' && cut.kind !== 'ellipse')) return null;
+    boundaryElementId(cut, 'section');
     var curves = geometry && geometry.curves || [];
     var vertices = geometry && geometry.vertices || [];
     var keep = keepPositive === false ? -1 : 1;
@@ -1630,6 +1673,7 @@
     out.cut = cut;
     out.trimmedBy = {plane:{origin:spec.origin, normal:spec.normal}, keepPositive:keep === 1};
     out.sourceIds = Array.from(new Set((surface.sourceIds || []).concat(cut.sourceIds || [])));
+    stampModelIdentity({surfaces:[out]});
     return out;
   }
 
@@ -1696,8 +1740,12 @@
   }
 
   function subArc(c, t0, t1) {
+    boundaryElementId(c, c.kind === 'line' ? 'line' : 'curve');
     var out = copyFields(c);
     out.kind = 'arc';
+    // Deterministic child id: the same parent station pair names the same
+    // shared seam after a JSON round-trip and across repeated splits.
+    out.id = c.id + '/arc:' + Number(t0).toFixed(9) + ':' + Number(t1).toFixed(9);
     out.parentKind = c.kind;
     out.startAngle = t0;
     out.sweepAngle = t1 - t0;
@@ -2330,6 +2378,7 @@
       section:cut, sectionArcs:sectionSplit.arcs,
       sectionArcCount:sectionSplit.arcs.length,
       positive:positive, negative:negative, surfaces:[positive, negative]};
+    stampModelIdentity(result);
     return {ok:true, result:result};
   }
 
@@ -2364,6 +2413,7 @@
         'Only a closed circle or ellipse section can split a surface.', {sectionKind:cut.kind});
     if (!validCurve(cut)) return fail('split-section-invalid',
       'The section is not a valid analytic circle or ellipse.', {sectionKind:cut.kind});
+    boundaryElementId(cut, 'section');
     var sr = radii(cut);
     if (!(sr.u > EPS) || !(sr.v > EPS)) return fail('split-section-degenerate',
       'The section has zero radius and cannot bound two patches.', {sectionKind:cut.kind});
@@ -2427,6 +2477,7 @@
       plane:{origin:copyPoint(spec.origin), normal:copyPoint(spec.normal)},
       section:cut, positive:positive, negative:negative,
       surfaces:[positive, negative]};
+    stampModelIdentity(result);
     return {ok:true, result:result};
   }
 
@@ -2481,6 +2532,7 @@
     var sweep = isLine ? 0 : Number.isFinite(boundary.sweepAngle) ? boundary.sweepAngle : TAU;
     if (!isLine && sweep < TAU - 1e-9) return fail('attach-boundary-open',
       'attachBoundary needs a full closed curve, not an arc.');
+    boundaryElementId(boundary, isLine ? 'line' : 'section');
     var curves = geometry && geometry.curves || [];
     var loops = surface.loops || [];
     if (loops.some(function (loop) { return loopReferencesCurve(loop, boundary, curves); }))
@@ -2553,6 +2605,7 @@
         curve.radiusV = c.radiusV === undefined ? c.radius : c.radiusV;
       } else curve.radius = c.radius;
       if (!validCurve(curve)) return null;
+      boundaryElementId(curve, 'section');
       curve.closed = true;
       curve.startAngle = 0;
       curve.sweepAngle = TAU;

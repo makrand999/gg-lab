@@ -6,14 +6,14 @@
   <link rel="stylesheet" href="fonts/handwriting.css">
   <title>EduCAD • Master Engineering Drawing Sheet (Draftsman's Organic Workbook)</title>
   <style>
-    /* ==========================================================================
-       DRAFTSMAN ORGANIC GRAPHITE PALETTES
-       - Endless blank vellum surface (pure flat paper, zero grid, zero mesh, zero grain)
-       - Completely clean paper: NO HUD, NO minimap, NO edge chevrons, NO overlays
-       - Four red accents: 01-05 numerals, index 1-5, fig captions, APPROVED stamp
-       - Organic, non-grid wandering composition with hand-drawn leader trails
-       - Every topic has an INVISIBLE region: no border, no outline, no shadow
-       ========================================================================== */
+
+
+
+
+
+
+
+
     :root[data-paper="white"] {
       --sheet: #fdfcf8;
       --sheet-tint: #f6f3ea;
@@ -46,7 +46,7 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ENDLESS FULL-SCREEN STAGE — FLAT BLANK PAPER SURFACE */
+
     html, body {
       width: 100vw;
       height: 100vh;
@@ -57,7 +57,7 @@
       inset: 0;
       touch-action: none;
     }
-    /* Viewport chrome is not selectable; zone copy stays selectable. */
+
     #viewport-stage { user-select: none; -webkit-user-select: none; }
     .plate-cell, .sheet-top-band, #cell-signoff-block {
       user-select: text;
@@ -79,7 +79,7 @@
       cursor: grabbing !important;
     }
 
-    /* EXPANSIVE ORGANIC CONTENT CANVAS (4400 x 2750 px — fits header, trails, zones, legend) */
+
     #sheet-content {
       position: absolute;
       top: 0;
@@ -94,7 +94,7 @@
       line-height: 1.65;
     }
 
-    /* TOP SHEET HEADER BAND (Loose, Unboxed, Sits on paper) */
+
     .sheet-top-band {
       position: absolute;
       top: 60px;
@@ -143,7 +143,7 @@
       margin-top: 2px;
     }
 
-    /* Header Key Figure */
+
     .top-band-keyfigure {
       width: 360px;
       height: 170px;
@@ -164,7 +164,7 @@
       padding-top: 2px;
     }
 
-    /* Header Tools */
+
     .top-band-tools {
       display: flex;
       flex-direction: column;
@@ -200,11 +200,11 @@
       border-bottom: 2px solid var(--pencil);
     }
 
-    /* ==========================================================================
-       TOPIC GROUPS WITH INVISIBLE REGIONS
-       - NO border, NO outline, NO fill, NO shadow, NO corner ticks, NO hover state.
-       - Purely logical bounding box that captures clicks and determines focus.
-       ========================================================================== */
+
+
+
+
+
     .plate-cell {
       position: absolute;
       display: flex;
@@ -215,55 +215,55 @@
       outline: none;
       background: none;
       box-shadow: none;
-      /* Modest padding to define logical click region */
+
       padding: 24px;
       margin: -24px;
     }
 
-    /* WIDE-GAP ASYMMETRIC POSITIONING (680px-760px Horizontal Gaps) */
-    /* Zone A: Hero 1 (x: 120..1000, y: 320..1240) */
+
+
     #zone-a {
       top: 320px;
       left: 120px;
       width: 880px;
       transform: rotate(-0.7deg);
     }
-    /* Zone B: Compact Mid-Tier (x: 1720..2520, y: 480..1360) — 720px gap from Zone A */
+
     #zone-b {
       top: 480px;
       left: 1720px;
       width: 800px;
       transform: rotate(1.2deg);
     }
-    /* Zone C: Compact Upper-Right (x: 3280..4080, y: 300..1180) — 760px gap from Zone B */
+
     #zone-c {
       top: 300px;
       left: 3280px;
       width: 800px;
       transform: rotate(-1.0deg);
     }
-    /* Zone D: Detailed 3-View (x: 280..1160, y: 1600..2520) — 360px vertical gap below Zone A */
+
     #zone-d {
       top: 1600px;
       left: 280px;
       width: 880px;
       transform: rotate(0.8deg);
     }
-    /* Zone E: Hero 2 (x: 1840..2720, y: 1720..2640) — 680px gap from Zone D, 360px below Zone B */
+
     #zone-e {
       top: 1720px;
       left: 1840px;
       width: 880px;
       transform: rotate(-0.6deg);
     }
-    /* Legend / Index: Mid-Right (x: 3460..4240, y: 1480..1920) — 740px gap from Zone E, 300px below Zone C */
+
     #cell-legend {
       top: 1480px;
       left: 3460px;
       width: 780px;
       transform: rotate(0.6deg);
     }
-    /* Title Block: Lower-Right (x: 3460..4240, y: 2060..2420) — 140px gap below Legend */
+
     #cell-signoff-block {
       position: absolute;
       top: 2060px;
@@ -275,7 +275,7 @@
       transform: rotate(-0.3deg);
     }
 
-    /* Plain tracked-out zone label */
+
     .zone-meta-label {
       font-family: "Architects Daughter", cursive;
       font-size: 13px;
@@ -307,7 +307,7 @@
       flex-grow: 1;
     }
 
-    /* Figure Plate Stage (Directly on Paper) */
+
     .drafting-viewport-area {
       display: flex;
       flex-direction: column;
@@ -361,13 +361,13 @@
       margin: 0 auto;
       cursor: grab;
     }
-    /* Wobble is applied ONLY via explicit filter="url(#wobble)" attributes
-       (zone numerals, trails, key figure, stamp) — never globally, to keep pan/zoom smooth. */
+
+
     .interactive-stage-box svg text {
       font-family: "Architects Daughter", cursive !important;
     }
 
-    /* Red Accent: fig captions */
+
     .plate-red-caption {
       width: 100%;
       margin-top: 4px;
@@ -377,7 +377,7 @@
       color: var(--red-pencil);
     }
 
-    /* Slider */
+
     .slider-container {
       width: 100%;
       margin-top: 6px;
@@ -489,7 +489,7 @@
       color: var(--pencil);
     }
 
-    /* NOTES & NAVIGATION LEGEND */
+
     .legend-steps-row {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -555,7 +555,7 @@
       flex-shrink: 0;
     }
 
-    /* TITLE BLOCK */
+
     .signoff-inner-layout {
       display: grid;
       grid-template-columns: 1.3fr 1fr 140px;
@@ -614,9 +614,9 @@
       margin-top: 2px;
     }
 
-    /* ==========================================================================
-       FIXED NAVIGATION TOOLBAR (always visible, outside the panning sheet)
-       ========================================================================== */
+
+
+
     #sheet-nav {
       position: fixed;
       left: 50%;
@@ -682,7 +682,7 @@
       padding: 0 4px;
       white-space: nowrap;
     }
-    /* First-run hint toast */
+
     #sheet-toast {
       position: fixed;
       left: 50%;
@@ -708,7 +708,7 @@
       text-overflow: ellipsis;
     }
     #sheet-toast.hidden { opacity: 0; pointer-events: none; }
-    /* Focused zone gets a subtle pencil underline on its heading (no boxes) */
+
     .plate-cell.is-focused .zone-heading {
       text-decoration: underline;
       text-decoration-thickness: 2px;
@@ -719,7 +719,7 @@
       #sheet-toast { transition: none; }
     }
 
-    /* Rotate hint for portrait phones (dismissible, touch devices only) */
+
     #rotate-hint {
       position: fixed;
       inset: 0;
@@ -778,7 +778,7 @@
       #rotate-hint { transition: none; }
     }
 
-    /* Narrow portrait phones: single-row compact nav, never wraps or clips */
+
     @media (max-width: 720px) {
       #sheet-nav {
         gap: 2px;
@@ -801,7 +801,7 @@
         margin: 0 1px;
         flex-shrink: 0;
       }
-      /* Labels are expendable on phones; buttons stay reachable via swipe */
+
       #nav-focus-label, #nav-zoom-label { display: none; }
       #sheet-toast {
         font-size: 16px;
@@ -810,11 +810,11 @@
         text-align: center;
       }
     }
-  </style>
+</style>
 </head>
 <body>
 
-  <!-- SHARED SVG WOBBLE FILTER -->
+
   <svg class="svg-defs" style="position:absolute;width:0;height:0;overflow:hidden;" aria-hidden="true">
     <filter id="wobble">
       <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="n"/>
@@ -822,43 +822,38 @@
     </filter>
   </svg>
 
-  <!-- FIXED FULL-SCREEN CAD PLOT VIEWPORT: ENDLESS BLANK VELLUM SURFACE -->
+
   <div id="viewport-stage">
 
-    <!-- FLOATING CONTENT ON THE INFINITE SURFACE (3800 x 2700) -->
+
     <main id="sheet-content">
 
-      <!-- ==================================================================
-           HAND-DRAWN PENCIL TRAIL LEADER CURVES BETWEEN TOPICS
-           Connecting Zone A -> Zone B -> Zone C -> Zone D -> Zone E -> Legend
-           ================================================================== -->
+
       <svg id="sheet-trail" width="4400" height="2750" viewBox="0 0 4400 2750" style="position:absolute; inset:0; pointer-events:none; z-index:2;" aria-hidden="true">
         <g filter="url(#wobble)">
-          <!-- Trail 1: Zone A -> Zone B (Clean dashed pencil line, zero arrowheads, zero arrow glyphs) -->
+
           <path d="M 1020,480 C 1200,480 1460,490 1660,500" fill="none" stroke="var(--pencil-mid)" stroke-width="1.6" stroke-dasharray="6 6" />
           <text x="1280" y="460" font-family="'Kalam', cursive" font-size="15" fill="var(--pencil-mid)">start with the dihedral hinge</text>
 
-          <!-- Trail 2: Zone B -> Zone C -->
+
           <path d="M 2540,480 C 2760,420 3000,340 3220,310" fill="none" stroke="var(--pencil-mid)" stroke-width="1.6" stroke-dasharray="6 6" />
           <text x="2820" y="380" font-family="'Kalam', cursive" font-size="15" fill="var(--pencil-mid)" transform="rotate(-15 2820 380)">project vertical rays</text>
 
-          <!-- Trail 3: Zone C -> Zone D -->
+
           <path d="M 3400,1200 C 3100,1440 1800,1440 1180,1545" fill="none" stroke="var(--pencil-mid)" stroke-width="1.8" stroke-dasharray="8 6" />
           <text x="2100" y="1430" font-family="'Kalam', cursive" font-size="16" fill="var(--pencil-mid)">swing into horizon for true length</text>
 
-          <!-- Trail 4: Zone D -> Zone E -->
+
           <path d="M 1180,1720 C 1380,1720 1580,1730 1780,1740" fill="none" stroke="var(--pencil-mid)" stroke-width="1.6" stroke-dasharray="6 6" />
           <text x="1420" y="1700" font-family="'Kalam', cursive" font-size="15" fill="var(--pencil-mid)">reflect depth via 45&deg; miter</text>
 
-          <!-- Trail 5: Zone E -> Legend -->
+
           <path d="M 2740,1720 C 2960,1650 3180,1560 3400,1500" fill="none" stroke="var(--pencil-mid)" stroke-width="1.6" stroke-dasharray="6 6" />
           <text x="3020" y="1570" font-family="'Kalam', cursive" font-size="15" fill="var(--pencil-mid)" transform="rotate(-15 3020 1570)">synthesize the 3D solid</text>
         </g>
       </svg>
 
-      <!-- ==================================================================
-           TOP HEADER BAND: MINIMALIST (NO BOX, FINE HAIRLINE DIVIDER)
-           ================================================================== -->
+
       <header class="sheet-top-band">
         <div class="top-band-left">
           <div class="top-meta-chip">
@@ -871,7 +866,7 @@
           </div>
         </div>
 
-        <!-- Key Figure -->
+
         <div class="top-band-keyfigure">
           <svg width="340" height="140" viewBox="0 0 340 140">
             <g filter="url(#wobble)">
@@ -883,7 +878,7 @@
               <text x="41" y="101" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-mid)" text-anchor="middle">TOP (a)</text>
 
               <path d="M 85,68 C 115,55 135,62 165,68" fill="none" stroke="var(--pencil)" stroke-width="2" />
-              
+
               <text x="125" y="52" font-family="'Caveat', cursive" font-size="14" font-weight="bold" fill="var(--pencil)" text-anchor="middle">3D Synthesis</text>
 
               <polygon points="230,110 195,90 230,70 265,90" fill="var(--pencil-wash)" />
@@ -912,15 +907,12 @@
           </div>
         </div>
 
-        <!-- Plain text action links -->
+
         <div class="top-band-tools">
           <div class="tools-btn-row">
             <button class="text-action-link" id="theme-stamp" onclick="togglePaperTheme()">
               PAPER: <strong id="paper-mode-name">WHITE</strong>
             </button>
-            <a href="manual.html" class="text-action-link" target="_blank">
-              &equiv; SPEC MANUAL
-            </a>
             <a href="index.html" class="text-action-link text-action-primary">
               &#11042; OPEN CAD CANVAS
             </a>
@@ -932,9 +924,7 @@
       </header>
 
 
-      <!-- ====================================================================
-           ZONE A: DIHEDRAL PROJECTION PLANES (Hero 1, Upper-Left)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-a">
         <span class="zone-meta-label">Zone A &bull; Coordinate Datum &bull; Ground Line XY</span>
         <div class="zone-header-line">
@@ -945,7 +935,7 @@
           <h2 class="zone-heading">Monge Ground Line &amp; Dihedral Hinge Unfolding</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE A-1 &bull; DIHEDRAL HINGE</span>
@@ -953,26 +943,26 @@
           </div>
           <div class="interactive-stage-box">
             <svg width="360" height="200" viewBox="0 0 360 200" id="svg-hinge-sheet">
-              <!-- VP Plane: Discrete upper rectangle sitting above hinge axis with 6px clearance -->
+
               <rect x="25" y="16" width="275" height="72" fill="var(--pencil-wash)" stroke="var(--pencil)" stroke-width="2" />
               <text x="38" y="38" font-family="'Architects Daughter', cursive" font-size="11.5" font-weight="bold" fill="var(--pencil)">VERTICAL PLANE [VP]</text>
               <text x="38" y="54" font-family="'Architects Daughter', cursive" font-size="9.5" fill="var(--pencil-mid)">ELEVATION (FRONT VIEW) &bull; HEIGHT (Z)</text>
 
-              <!-- Projection Point a' in VP -->
+
               <circle cx="230" cy="50" r="4" fill="var(--pencil)" />
               <text x="238" y="54" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil)">a'</text>
 
-              <!-- Vertical Alignment Projector ray connecting a' (VP) to a (HP) -->
+
               <line id="sheet-hinge-ray" x1="230" y1="50" x2="230" y2="140" stroke="var(--pencil-light)" stroke-width="1" stroke-dasharray="3 3" />
 
-              <!-- Ground Line XY: Heavy central hinge axis with endpoint ticks -->
+
               <line x1="15" y1="95" x2="345" y2="95" stroke="var(--pencil)" stroke-width="2.6" />
               <circle cx="20" cy="95" r="3" fill="var(--pencil)" />
               <circle cx="340" cy="95" r="3" fill="var(--pencil)" />
               <text x="22" y="86" font-family="'Architects Daughter', cursive" font-size="11.5" font-weight="bold" fill="var(--pencil)">X (Ground Line XY &mdash; Hinge Axis)</text>
               <text x="332" y="86" font-family="'Architects Daughter', cursive" font-size="11.5" font-weight="bold" fill="var(--pencil)">Y</text>
 
-              <!-- Dimension Annotation for z = 45 in VP (Witness lines, dimension rule, terminal ticks) -->
+
               <line x1="250" y1="50" x2="285" y2="50" stroke="var(--pencil-light)" stroke-width="0.8" />
               <line x1="250" y1="95" x2="285" y2="95" stroke="var(--pencil-light)" stroke-width="0.8" />
               <line x1="278" y1="50" x2="278" y2="95" stroke="var(--pencil-mid)" stroke-width="1" />
@@ -980,24 +970,24 @@
               <line x1="274" y1="95" x2="282" y2="95" stroke="var(--pencil-mid)" stroke-width="1" />
               <text x="288" y="76" font-family="'Architects Daughter', cursive" font-size="9.5" fill="var(--pencil-mid)">z = 45</text>
 
-              <!-- HP Plane: Unfolding lower rectangle, hinged downward from XY axis -->
+
               <g id="sheet-hp-group">
                 <rect id="sheet-hp-rect" x="25" y="102" width="275" height="74" fill="none" stroke="var(--pencil-mid)" stroke-width="1.6" />
                 <text id="sheet-hp-txt1" x="38" y="126" font-family="'Architects Daughter', cursive" font-size="11.5" font-weight="bold" fill="var(--pencil)">HORIZONTAL PLANE [HP]</text>
                 <text id="sheet-hp-txt2" x="38" y="142" font-family="'Architects Daughter', cursive" font-size="9.5" fill="var(--pencil-mid)">PLAN (TOP VIEW) &bull; DEPTH (Y)</text>
 
-                <!-- Projection Point a in HP (aligned at exactly cx=230) -->
+
                 <circle cx="230" cy="140" r="4" fill="var(--pencil-mid)" />
                 <text x="238" y="144" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil-mid)">a</text>
 
-                <!-- Dimension Annotation for y = 45 in HP -->
+
                 <line x1="250" y1="140" x2="285" y2="140" stroke="var(--pencil-light)" stroke-width="0.8" />
                 <line x1="278" y1="95" x2="278" y2="140" stroke="var(--pencil-mid)" stroke-width="1" />
                 <line x1="274" y1="140" x2="282" y2="140" stroke="var(--pencil-mid)" stroke-width="1" />
                 <text x="288" y="121" font-family="'Architects Daughter', cursive" font-size="9.5" fill="var(--pencil-mid)">y = 45</text>
               </g>
 
-              <!-- Dihedral Hinge Fold Indicator at Right -->
+
               <path d="M 318,72 A 22,22 0 0,1 318,118" fill="none" stroke="var(--pencil-mid)" stroke-width="1.2" stroke-dasharray="3 3" />
               <text x="324" y="99" font-family="'Architects Daughter', cursive" font-size="10.5" font-weight="bold" fill="var(--pencil-mid)">90&deg;</text>
             </svg>
@@ -1039,9 +1029,7 @@
       </section>
 
 
-      <!-- ====================================================================
-           ZONE B: PROJECTORS & VERTICAL CORRESPONDENCE (Compact, Mid-Tier)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-b">
         <span class="zone-meta-label">Zone B &bull; Projector Invariant &bull; Snapping Detent</span>
         <div class="zone-header-line">
@@ -1052,7 +1040,7 @@
           <h2 class="zone-heading">Vertical Projector Rays &amp; Coordinate Snapping</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE B-1 &bull; MAGNETIC DETENT SIMULATOR</span>
@@ -1060,22 +1048,22 @@
           </div>
           <div class="interactive-stage-box" id="sheet-snap-stage" style="cursor:crosshair;" role="application" aria-label="Magnetic snap simulator. Move your pointer over the plate to test projector snapping." tabindex="0">
             <svg width="360" height="200" viewBox="0 0 360 200" id="svg-sheet-proj">
-              <!-- Region Identification Labels -->
+
               <text x="25" y="32" font-family="'Architects Daughter', cursive" font-size="10" font-weight="bold" fill="var(--pencil-light)">VERTICAL PLANE [VP]</text>
               <text x="25" y="172" font-family="'Architects Daughter', cursive" font-size="10" font-weight="bold" fill="var(--pencil-light)">HORIZONTAL PLANE [HP]</text>
 
-              <!-- Central Magnetic Capture Band (±14px around X=180) -->
+
               <rect x="166" y="15" width="28" height="170" fill="var(--pencil-wash)" stroke="rgba(51,54,59,0.22)" stroke-width="1" stroke-dasharray="2 2" />
               <text x="180" y="194" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-mid)" text-anchor="middle">DETENT CAPTURE &plusmn;14PX</text>
 
-              <!-- Heavy Ground Line XY Hinge Axis (Spanning from left dot to right dot) -->
+
               <line x1="18" y1="100" x2="342" y2="100" stroke="var(--pencil)" stroke-width="2.6" stroke-linecap="round" />
               <circle cx="20" cy="100" r="3.5" fill="var(--pencil)" />
               <circle cx="340" cy="100" r="3.5" fill="var(--pencil)" />
               <text x="26" y="91" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil)">XY</text>
               <text x="320" y="91" font-family="'Architects Daughter', cursive" font-size="10" fill="var(--pencil-mid)">Y=0</text>
 
-              <!-- Millimeter Datum Ticks across the plate -->
+
               <line x1="60" y1="96" x2="60" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
               <line x1="100" y1="96" x2="100" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
               <line x1="140" y1="96" x2="140" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
@@ -1084,18 +1072,18 @@
               <line x1="260" y1="96" x2="260" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
               <line x1="300" y1="96" x2="300" y2="104" stroke="var(--pencil-light)" stroke-width="1" />
 
-              <!-- Elevation Datum Point a' in VP -->
+
               <circle cx="180" cy="45" r="5" fill="var(--pencil)" stroke="var(--sheet)" stroke-width="1.5" />
               <text x="194" y="49" font-family="'Architects Daughter', cursive" font-size="11.5" font-weight="bold" fill="var(--pencil)">a' (Elevation Datum)</text>
 
-              <!-- Dynamic Vertical Alignment Ray (BIS Type B/G) -->
+
               <line id="sheet-ray" x1="180" y1="18" x2="180" y2="182" stroke="var(--pencil-mid)" stroke-width="1.8" stroke-dasharray="4 3" />
 
-              <!-- Follower Plan Point a in HP -->
+
               <circle id="sheet-pt-hp" cx="180" cy="150" r="5" fill="var(--pencil-mid)" stroke="var(--sheet)" stroke-width="1.5" />
               <text id="sheet-hp-txt" x="194" y="154" font-family="'Architects Daughter', cursive" font-size="11.5" font-weight="bold" fill="var(--pencil-mid)">a (Plan Follower)</text>
 
-              <!-- Magnetic Snap Detent Halo -->
+
               <circle id="sheet-halo" cx="180" cy="150" r="14" fill="none" stroke="var(--pencil)" stroke-width="1.8" stroke-dasharray="2 2" />
             </svg>
           </div>
@@ -1132,9 +1120,7 @@
       </section>
 
 
-      <!-- ====================================================================
-           ZONE C: TRUE LENGTH & RABATTEMENT (Compact, Upper-Right)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-c">
         <span class="zone-meta-label">Zone C &bull; Line Rotation &bull; True Length</span>
         <div class="zone-header-line">
@@ -1145,7 +1131,7 @@
           <h2 class="zone-heading">The Rotating Line Solver &amp; Horizontal Loci</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE C-1 &bull; ROTATING LINE SOLVER</span>
@@ -1153,33 +1139,33 @@
           </div>
           <div class="interactive-stage-box">
             <svg width="360" height="200" viewBox="0 0 360 200" id="svg-sheet-rot" role="img" aria-label="Line rotation diagram: endpoint B swings on a circular arc down to the horizon of A, revealing true length">
-              <!-- Horizon of a' (rotation datum): B lands here at 0 deg showing TL -->
+
               <line x1="20" y1="150" x2="344" y2="150" stroke="var(--pencil-light)" stroke-width="1" stroke-dasharray="3 2" />
               <text x="340" y="144" font-family="'Architects Daughter', cursive" font-size="9" fill="var(--pencil-light)" text-anchor="end">HORIZON a'</text>
 
-              <!-- Moving locus through B (constant height of the endpoint) -->
+
               <line id="sheet-locus-line" x1="20" y1="75" x2="120" y2="75" stroke="var(--pencil-mid)" stroke-width="1.1" stroke-dasharray="4 3" />
               <text id="sheet-locus-lbl" x="22" y="70" font-family="'Architects Daughter', cursive" font-size="9" font-weight="bold" fill="var(--pencil-mid)">LOCUS B'</text>
 
-              <!-- TL datum: horizontal reference of true length -->
+
               <line x1="60" y1="150" x2="210" y2="150" stroke="var(--pencil-mid)" stroke-width="1.6" stroke-dasharray="5 3" />
               <circle cx="210" cy="150" r="3.5" fill="none" stroke="var(--pencil-mid)" stroke-width="1.6" />
               <text x="218" y="142" font-family="'Architects Daughter', cursive" font-size="10.5" font-weight="bold" fill="var(--pencil-mid)">b&#8321;' (TL)</text>
 
-              <!-- Rotation arc centered on a', radius TL -->
+
               <path id="sheet-rot-arc" d="M 189.9,75 A 150,150 0 0,1 210,150" fill="none" stroke="var(--pencil)" stroke-width="1.6" stroke-dasharray="3 3" />
 
-              <!-- Inclined line a'b' at angle theta -->
+
               <line id="sheet-app-line" x1="60" y1="150" x2="189.9" y2="75" stroke="var(--pencil)" stroke-width="2.6" stroke-linecap="round" />
               <circle id="sheet-b1-pt" cx="189.9" cy="75" r="4.5" fill="var(--pencil)" />
               <text id="sheet-b1-lbl" x="196" y="72" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil)">b'</text>
 
-              <!-- Pivot a' -->
+
               <circle cx="60" cy="150" r="4.5" fill="var(--pencil)" />
               <text x="44" y="155" font-family="'Architects Daughter', cursive" font-size="13" font-weight="bold" fill="var(--pencil)">a'</text>
               <text id="sheet-theta-lbl" x="87" y="143" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil-mid)">&theta;</text>
 
-              <!-- TL dimension below datum -->
+
               <line x1="60" y1="172" x2="210" y2="172" stroke="var(--pencil-mid)" stroke-width="1.2" />
               <line x1="60" y1="168" x2="60" y2="178" stroke="var(--pencil-mid)" stroke-width="1.2" />
               <line x1="210" y1="168" x2="210" y2="178" stroke="var(--pencil-mid)" stroke-width="1.2" />
@@ -1223,9 +1209,7 @@
       </section>
 
 
-      <!-- ====================================================================
-           ZONE D: 3-VIEW ORTHOGRAPHIC PROJECTION & 45 MITER (Lower-Left)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-d">
         <span class="zone-meta-label">Zone D &bull; Multi-View &bull; 45&deg; Miter Depth Transfer</span>
         <div class="zone-header-line">
@@ -1236,7 +1220,7 @@
           <h2 class="zone-heading">Multi-View Projection &amp; 45&deg; Depth Transfer</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE D-1 &bull; THREE-VIEW ALIGNMENT</span>
@@ -1244,7 +1228,7 @@
           </div>
           <div class="interactive-stage-box">
             <svg width="360" height="200" viewBox="0 0 360 200">
-              <!-- Primary Axes (XY & YZ) -->
+
               <line x1="12" y1="100" x2="348" y2="100" stroke="var(--pencil)" stroke-width="2" />
               <line x1="180" y1="12" x2="180" y2="188" stroke="var(--pencil)" stroke-width="2" />
               <text x="16" y="95" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">X</text>
@@ -1252,26 +1236,26 @@
               <text x="185" y="24" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">Z (Height)</text>
               <text x="185" y="195" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)">Y (Depth)</text>
 
-              <!-- 45 Miter Reflection Line in Quadrant IV -->
+
               <line x1="180" y1="100" x2="270" y2="190" stroke="var(--pencil)" stroke-width="2" />
               <text x="238" y="152" font-family="'Architects Daughter', cursive" font-size="12" font-weight="bold" fill="var(--pencil-mid)">45&deg; MITER</text>
 
-              <!-- Front View Box (Elevation in Quadrant II) -->
+
               <rect x="58" y="28" width="98" height="58" fill="var(--pencil-wash)" stroke="var(--pencil)" stroke-width="2" />
               <text x="107" y="55" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)" text-anchor="middle">FRONT VIEW (VP)</text>
               <text x="107" y="70" font-family="'Architects Daughter', cursive" font-size="9.5" fill="var(--pencil-mid)" text-anchor="middle">X &bull; Z Elevation</text>
 
-              <!-- Top View Box (Plan in Quadrant III) -->
+
               <rect x="58" y="116" width="98" height="54" fill="none" stroke="var(--pencil-mid)" stroke-width="1.6" />
               <text x="107" y="142" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)" text-anchor="middle">TOP VIEW (HP)</text>
               <text x="107" y="156" font-family="'Architects Daughter', cursive" font-size="9.5" fill="var(--pencil-mid)" text-anchor="middle">X &bull; Y Plan</text>
 
-              <!-- Side View Box (Left Profile in Quadrant I) -->
+
               <rect x="204" y="28" width="86" height="58" fill="var(--pencil-wash)" stroke="var(--pencil)" stroke-width="1.8" />
               <text x="247" y="52" font-family="'Architects Daughter', cursive" font-size="11" font-weight="bold" fill="var(--pencil)" text-anchor="middle">SIDE VIEW</text>
               <text x="247" y="68" font-family="'Architects Daughter', cursive" font-size="9.5" fill="var(--pencil-mid)" text-anchor="middle">(LPP &bull; Y-Z)</text>
 
-              <!-- Dynamic Depth Reflection Rays -->
+
               <polyline points="156,143 225,143 225,86" fill="none" stroke="var(--pencil-mid)" stroke-width="1.6" stroke-dasharray="4 3">
                 <animate attributeName="stroke-dashoffset" values="14;0" dur="1.2s" repeatCount="indefinite" />
               </polyline>
@@ -1315,9 +1299,7 @@
       </section>
 
 
-      <!-- ====================================================================
-           ZONE E: ISOMETRIC AXONOMETRIC 3D GLASS BOX (Hero 2, Lower-Center)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-e">
         <span class="zone-meta-label">Zone E &bull; Axonometric &bull; 3D Glass Box Turntable</span>
         <div class="zone-header-line">
@@ -1328,7 +1310,7 @@
           <h2 class="zone-heading">The Real-Time 3D Glass Box Turntable Widget</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE E-1 &bull; LIVE AXONOMETRIC STAGE</span>
@@ -1370,9 +1352,7 @@
       </section>
 
 
-      <!-- ====================================================================
-           REFERENCE LEGEND / INDEX (Mid-Right)
-           ==================================================================== -->
+
       <section class="plate-cell" id="cell-legend">
         <span class="zone-meta-label">Reference &bull; Sheet Instructions &bull; Contents</span>
         <div class="zone-header-line">
@@ -1468,12 +1448,10 @@
       </section>
 
 
-      <!-- ====================================================================
-           ISO 7200 TITLE BLOCK (Far Bottom-Right)
-           ==================================================================== -->
+
       <footer id="cell-signoff-block" aria-label="Sheet Title Block and Sign-off">
         <div class="signoff-inner-layout">
-          <!-- Institutional Cells -->
+
           <div class="so-cell-group">
             <div class="so-box">
               <div class="so-box-label">ORGANIZATION / INSTITUTION</div>
@@ -1495,7 +1473,7 @@
             </div>
           </div>
 
-          <!-- Signatures Column -->
+
           <div class="so-sig-box">
             <div class="sig-line-item">
               <span class="sig-script-text">Alex Chen</span>
@@ -1509,7 +1487,7 @@
             </div>
           </div>
 
-          <!-- Red Accent: Red Hand-Drawn APPROVED Stamp -->
+
           <div class="stamp-container-col">
             <svg width="135" height="85" viewBox="0 0 150 90">
               <g filter="url(#wobble)" transform="rotate(-8 75 45)">
@@ -1527,7 +1505,7 @@
     </main>
   </div>
 
-  <!-- FIXED NAVIGATION: always reachable, never pans away -->
+
   <nav id="sheet-nav" aria-label="Sheet navigation">
     <button type="button" id="nav-overview" title="Overview of the whole sheet (Esc)">&#10022; Overview</button>
     <span class="nav-sep" aria-hidden="true"></span>
@@ -1554,33 +1532,24 @@
     </div>
   </div>
 
-  <!-- ====================================================================
-       INTERACTIVE JAVASCRIPT: EXPLICIT-FOCUS SHEET NAVIGATION
-       Contract:
-       - focusTopic(id) sets explicit focus and frames the zone; fitContent()
-         clears focus and frames the whole sheet. No intersection guessing.
-       - Interactive elements (links, buttons, sliders, canvas, snap stage)
-         NEVER start a pan and NEVER trigger a focus jump.
-       - Drag on anything else pans; release without moving clicks:
-         click on a zone focuses it, double-click on background overviews.
-       ==================================================================== -->
+
   <script>
-    // ---- Global transform + explicit focus state ----
+
     var panX = 0, panY = 0, scale = 1.0;
-    var focusedTopicId = null; // explicit: set by focusTopic, cleared by fitContent
+    var focusedTopicId = null;
     var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.currentDraftingScale = 1.0;
 
     var viewport = document.getElementById('viewport-stage');
     var sheetContent = document.getElementById('sheet-content');
 
-    // Focusable regions: five zones plus legend/index. Header + sign-off excluded.
+
     var focusableTopicIds = ['zone-a', 'zone-b', 'zone-c', 'zone-d', 'zone-e', 'cell-legend'];
 
     var CONTENT_W = 4400, CONTENT_H = 2750;
     var MIN_SCALE = 0.12, MAX_SCALE = 2.5, MAX_FOCUS_SCALE = 0.9;
 
-    // Smooth camera tween; direct pan/zoom cancel it for 1:1 control.
+
     var camAnim = null;
     function cancelCamAnim() {
       if (camAnim) { cancelAnimationFrame(camAnim); camAnim = null; }
@@ -1615,7 +1584,7 @@
       updateNavChrome();
     }
 
-    // Explicit focus: set by navigation only, so it always sticks.
+
     window.getFocusedTopic = function() { return focusedTopicId; };
 
     function setFocused(id) {
@@ -1628,7 +1597,7 @@
       dismissToast();
     }
 
-    // Rotation-aware visual size of a zone in sheet coordinates.
+
     function measureTopic(id) {
       var el = document.getElementById(id);
       if (!el) return null;
@@ -1655,13 +1624,13 @@
       var m = measureTopic(id);
       if (!m) return null;
       var vw = window.innerWidth, vh = window.innerHeight;
-      var padX = 160, padY = 160; // >=70px air around content, incl. fixed toolbar
+      var padX = 160, padY = 160;
       var s = Math.min(MAX_FOCUS_SCALE, (vw - padX) / m.vw, (vh - padY) / m.vh);
       s = Math.max(MIN_SCALE, s);
       return { x: vw / 2 - m.cx * s, y: vh / 2 - m.cy * s, s: s };
     }
 
-    // Center a topic with guaranteed margins; sets explicit focus.
+
     window.focusTopic = function(id, instant) {
       if (focusableTopicIds.indexOf(id) === -1) return;
       var f = frameForTopic(id);
@@ -1686,7 +1655,7 @@
       return { x: (vw - CONTENT_W * s) / 2, y: (vh - 44 - CONTENT_H * s) / 2, s: s };
     }
 
-    // Overview: frame the whole sheet and clear focus.
+
     window.fitContent = function(instant) {
       var f = frameForContent();
       setFocused(null);
@@ -1699,11 +1668,11 @@
       }
     };
 
-    // ==========================================================================
-    // GESTURES: DRAG TO PAN, WHEEL/PINCH TO ZOOM, CLICK ZONE TO FOCUS.
-    // Interactive elements never start a pan and never trigger focus jumps.
-    // No click-fallback double-handling: release-click is decided in pointerup.
-    // ==========================================================================
+
+
+
+
+
     var INTERACTIVE_SEL = 'a, button, input, textarea, select, canvas, #sheet-snap-stage, #sheet-nav, #sheet-toast';
     function isInteractiveTarget(t) {
       return !!(t && t.closest && t.closest(INTERACTIVE_SEL));
@@ -1737,7 +1706,7 @@
       var pinch = null;
 
       viewport.addEventListener('pointerdown', function(e) {
-        // Widgets own their gestures: never capture, never pan, never focus-jump.
+
         if (isInteractiveTarget(e.target)) {
           downInteractive = true;
           downZone = null;
@@ -1755,7 +1724,7 @@
             s0: scale, px0: panX, py0: panY
           };
           panning = false;
-          didDrag = true; // a pinch is never a click
+          didDrag = true;
           viewport.classList.add('is-dragging');
           try { viewport.setPointerCapture(e.pointerId); } catch (err) {}
           return;
@@ -1823,7 +1792,7 @@
         try { if (viewport.hasPointerCapture(e.pointerId)) viewport.releasePointerCapture(e.pointerId); } catch (err) {}
 
         if (!didDrag && !downInteractive) {
-          // Pointer capture retargets e.target, so hit-test the release point.
+
           var upEl = null;
           try { upEl = document.elementFromPoint(e.clientX, e.clientY); } catch (err) {}
           var z = zoneOf(upEl) || downZone;
@@ -1835,7 +1804,7 @@
       viewport.addEventListener('pointerup', endPointer);
       viewport.addEventListener('pointercancel', endPointer);
 
-      // Normalized wheel zoom toward cursor (handles mouse notches, trackpads, pinch).
+
       viewport.addEventListener('wheel', function(e) {
         e.preventDefault();
         var dy = e.deltaY;
@@ -1846,7 +1815,7 @@
         zoomAt(e.clientX, e.clientY, factor);
       }, { passive: false });
 
-      // Double-click: re-frame a zone, or overview from empty paper.
+
       viewport.addEventListener('dblclick', function(e) {
         if (isInteractiveTarget(e.target)) return;
         var z = zoneOf(e.target);
@@ -1854,11 +1823,11 @@
         else window.fitContent();
       });
 
-      // Keyboard: Esc overview, 1-5 zones, 0 overview, +/- zoom, arrows pan.
+
       window.addEventListener('keydown', function(e) {
         var t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
-          if (e.key !== 'Escape') return; // sliders keep arrows/typing
+          if (e.key !== 'Escape') return;
         }
         var k = e.key;
         if (k === 'Escape') { window.fitContent(); }
@@ -1882,7 +1851,7 @@
         }
       });
 
-      // Resize: re-frame current focus (or overview) instead of drifting.
+
       var rzT = null;
       window.addEventListener('resize', function() {
         if (rzT) clearTimeout(rzT);
@@ -1893,7 +1862,7 @@
         }, 120);
       });
 
-      // Initial overview; re-frame once webfonts settle (zone heights shift).
+
       window.fitContent(true);
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(function() {
@@ -1904,10 +1873,10 @@
       }
     })();
 
-    // ==========================================================================
-    // THEME SWITCHER & INTERACTIVE ZONE SOLVERS
-    // Widgets work in ANY camera state — no focus gate, no stolen first click.
-    // ==========================================================================
+
+
+
+
     function togglePaperTheme() {
       var root = document.documentElement;
       var cur = root.getAttribute('data-paper') || 'white';
@@ -1918,7 +1887,7 @@
       if (window.drawSheetCube) window.drawSheetCube();
     }
 
-    // ---- Zone A: fold the whole HP group about the XY hinge (y=95) ----
+
     var SHEET_HINGE_Y = 95, SHEET_HP_PT_Y = 140;
     function scrubSheetHinge(val) {
       var pct = Math.max(0, Math.min(100, Number(val))) / 100;
@@ -1932,7 +1901,7 @@
       var angle = Math.round(90 + 90 * pct);
       if (readout) readout.textContent = pct >= 0.999 ? '180° FLAT MONGE SHEET' : (angle + '° DIHEDRAL ANGLE');
 
-      // Squash toward the hinge so point a, dims, and labels fold together.
+
       var k = 0.12 + 0.88 * pct;
       group.setAttribute('transform',
         'translate(0,' + SHEET_HINGE_Y + ') scale(1,' + k.toFixed(3) + ') translate(0,' + (-SHEET_HINGE_Y) + ')');
@@ -1946,7 +1915,7 @@
       if (txt2) txt2.style.visibility = show ? 'visible' : 'hidden';
     }
 
-    // ---- Zone B: magnetic snap simulator (true ±14-unit detent) ----
+
     var snapPos = { x: 180, y: 150 };
     var SHEET_SNAP_X = 180, SHEET_DETENT = 14;
     function scrubSheetProjector(e) {
@@ -1954,7 +1923,7 @@
       if (!svg || e.clientX === undefined) return;
       var pt = null;
       try {
-        // getScreenCTM handles zone rotation + sheet zoom exactly.
+
         if (svg.getScreenCTM) {
           var m = svg.getScreenCTM();
           if (m && m.inverse) pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
@@ -2031,7 +2000,7 @@
       renderSheetSnap();
     })();
 
-    // ---- Zone C: honest vertical-plane rotation about a' (radius = TL) ----
+
     var SHEET_ROT_AX = 60, SHEET_ROT_AY = 150, SHEET_ROT_TL = 150;
     function scrubSheetRotation(thetaDeg) {
       var th = Math.max(5, Math.min(60, Number(thetaDeg)));
@@ -2075,7 +2044,7 @@
       var dragging = false;
       var lastX = 0, lastY = 0;
 
-      var sz = 112; // Perfectly proportioned to stay clear of top and bottom captions
+      var sz = 112;
       var vertices = [
         [-sz, -sz, -sz], [sz, -sz, -sz], [sz, sz, -sz], [-sz, sz, -sz],
         [-sz, -sz,  sz], [sz, -sz,  sz], [sz, sz,  sz], [-sz, sz,  sz]
@@ -2129,13 +2098,13 @@
         edges.forEach(function(e) {
           var p1 = proj[e[0]];
           var p2 = proj[e[1]];
-          // Back-half edges render hidden (dashed); threshold scales with cube size.
+
           var isHidden = (p1.z + p2.z) < -sz * 0.24;
 
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
-          
+
           if (isHidden) {
             ctx.strokeStyle = hiddenStroke;
             ctx.globalAlpha = 0.45;
@@ -2161,7 +2130,7 @@
 
       drawSheetCube();
 
-      // Orbit works in ANY camera state; the sheet never steals canvas gestures.
+
       var ISO_YAW = 45 * Math.PI / 180, ISO_PITCH = 35.26 * Math.PI / 180;
       function resetPose() {
         yaw = ISO_YAW;
@@ -2180,7 +2149,7 @@
       });
       canvas.addEventListener('pointermove', function(e) {
         if (!dragging) return;
-        // Screen-space orbit speed: independent of sheet zoom.
+
         var dx = e.clientX - lastX, dy = e.clientY - lastY;
         lastX = e.clientX;
         lastY = e.clientY;
@@ -2217,9 +2186,9 @@
       });
     })();
 
-    // ==========================================================================
-    // FIXED NAV CHROME, HINT TOAST, SVG THEME SHIM
-    // ==========================================================================
+
+
+
     var NAV_ZONE_LABELS = {
       'zone-a': 'zone A · hinge', 'zone-b': 'zone B · projectors',
       'zone-c': 'zone C · true length', 'zone-d': 'zone D · 3-view',
@@ -2241,7 +2210,7 @@
       }
     }
     var toastDismissed = false;
-    var navReady = false; // true once chrome is wired; init-time framing must not dismiss the toast
+    var navReady = false;
     function dismissToast() {
       if (!navReady || toastDismissed) return;
       toastDismissed = true;
@@ -2273,10 +2242,10 @@
       updateNavChrome();
     })();
 
-    // ---- Mobile portrait: suggest landscape, never trap ----
-    // True forcing is impossible (iOS ignores orientation lock; lock needs
-    // fullscreen on most browsers), so: polite overlay + best-effort lock
-    // attempt on first touch, always dismissible.
+
+
+
+
     var rotateDismissed = false;
     function shouldSuggestLandscape() {
       if (rotateDismissed) return false;
@@ -2306,16 +2275,16 @@
         rotateDismissed = true;
         updateRotateHint();
       });
-      // Orientation lock requires a user gesture; try once on first touch.
+
       window.addEventListener('pointerdown', function firstTouch() {
         window.removeEventListener('pointerdown', firstTouch);
         tryLandscapeLock();
       });
     })();
 
-    // Some browsers don't resolve var() inside SVG presentation ATTRIBUTES
-    // (stroke="var(--pencil)"), which would break strokes and the paper theme.
-    // Mirror those attributes onto inline style, where var() always works.
+
+
+
     (function shimSvgVarAttributes() {
       function wantsVar(v) { return typeof v === 'string' && v.indexOf('var(') !== -1; }
       var els = document.querySelectorAll('#sheet-content svg [stroke], #sheet-content svg [fill]');
@@ -2327,6 +2296,6 @@
         if (wantsVar(f) && f !== 'none') el.style.fill = f;
       }
     })();
-  </script>
+</script>
 </body>
 </html>

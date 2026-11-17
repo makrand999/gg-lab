@@ -1,0 +1,7 @@
+# expect: 24V 24E 1F curves=1 analyticConics=1 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok status=inferred
+# conic-query: {"expect":{"count":1,"kind":"ellipse","center":{"x":1000,"y":2000,"z":2000},"axes":[223.60679774997897,200],"sourceExact":true,"inferred":true,"fitted":false,"projectionOk":true,"jsonParity":true}}
+/datum -100 400
+/ellipse 1000 -2000 200 100 8 A plan
+/ellipse 1000 2000 200 200 8 A elevation
+/point p 1165.067122982 -2056.4642473395 plan
+/point p' 1165.067122982 2112.928494679 elevation

@@ -1,9 +1,9 @@
-/* EduCAD mobile inspection: split 2D/3D panes, compact header, pose
-   dock, bottom sheet, and overflow menu. Everything here is scoped
-   under body.mobile-layout (split panes by space) or
-   body.mobile-inspect (inspection-only by input), so desktop keeps its
-   exact current look. Plain actions sit over canvas edges; the thin
-   divider has a larger invisible touch area. */
+
+
+
+
+
+
 
 body.mobile-layout {
   overscroll-behavior: none;
@@ -22,7 +22,7 @@ body.mobile-layout #app-container {
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* Desktop chrome replaced by the mobile header/overflow while split. */
+
 body.mobile-layout .demo-bar,
 body.mobile-layout #session-bar,
 body.mobile-layout .drafting-controls,
@@ -34,7 +34,7 @@ body.mobile-layout .edugraphics-hud {
 
 body.mobile-layout .coords-hud { display: none !important; }
 
-/* ---- Header ---- */
+
 #mobile-header {
   flex: none;
   display: flex;
@@ -108,7 +108,7 @@ body.mobile-layout .coords-hud { display: none !important; }
 }
 #mobile-header .mobile-icon-btn { border: none; font-size: 22px; }
 
-/* ---- Panes ---- */
+
 #mobile-panes {
   flex: 1 1 auto;
   display: flex;
@@ -235,7 +235,7 @@ body.mobile-landscape .mobile-divider::before { inset: 0 -18px; }
   outline-offset: -2px;
 }
 
-/* Menus moved into the sheet slot keep pane-relative offsets. */
+
 #mobile-sheet-slot .edugraphics-menu {
   max-width: calc(100% - 16px);
   touch-action: pan-y;
@@ -246,7 +246,7 @@ body.mobile-landscape .mobile-divider::before { inset: 0 -18px; }
   align-items: center;
 }
 
-/* ---- Expand bar ---- */
+
 #mobile-expandbar {
   flex: none;
   display: flex;
@@ -258,7 +258,7 @@ body.mobile-landscape .mobile-divider::before { inset: 0 -18px; }
 }
 #mobile-expandbar[hidden] { display: none; }
 
-/* ---- Pose dock ---- */
+
 #mobile-pose {
   flex: none;
   padding: 0 8px;
@@ -341,7 +341,7 @@ body.mobile-landscape .mobile-divider::before { inset: 0 -18px; }
   color: #475569;
 }
 
-/* ---- Bottom sheet ---- */
+
 #mobile-sheet {
   flex: none;
   background: #fff;
@@ -393,7 +393,7 @@ body.mobile-landscape .mobile-divider::before { inset: 0 -18px; }
   margin-bottom: 8px;
 }
 #mobile-inspect-card[hidden] { display: none; }
-/* The spatial panel docks into the sheet instead of floating. */
+
 #mobile-spatial-slot .spatial-panel {
   position: static;
   width: auto;
@@ -413,7 +413,7 @@ body.mobile-landscape .mobile-divider::before { inset: 0 -18px; }
   align-items: center;
 }
 
-/* ---- Overflow menu + account panels ---- */
+
 #mobile-menu-root {
   position: fixed;
   inset: 0;
@@ -464,7 +464,7 @@ body.mobile-landscape .mobile-divider::before { inset: 0 -18px; }
 .mobile-menu-btn:disabled { opacity: 0.4; cursor: default; }
 .mobile-menu-btn[aria-pressed="true"] { color: #0284c7; font-weight: 600; }
 .mobile-menu-link { display: flex; }
-/* Saved drawings / sets panels dock as overlays while split. */
+
 body.mobile-layout #drawings-panel,
 body.mobile-layout #sets-panel {
   position: fixed;
@@ -486,7 +486,7 @@ body.mobile-layout #sets-panel .cf-link {
   align-items: center;
 }
 
-/* ---- Toast ---- */
+
 #mobile-toast {
   position: fixed;
   left: 50%;
@@ -507,7 +507,7 @@ body.mobile-layout #sets-panel .cf-link {
 }
 #mobile-toast[hidden] { display: none; }
 
-/* ---- Candidate chooser ---- */
+
 #mobile-chooser {
   position: fixed;
   z-index: 80;
@@ -543,7 +543,7 @@ body.mobile-layout #sets-panel .cf-link {
 .mobile-chooser-btn:active { background: #f1f5f9; }
 .mobile-chooser-close { color: #64748b; }
 
-/* ---- Small-height + verify/tutorial overlays ---- */
+
 body.mobile-layout #verify-panel {
   position: fixed;
   left: 8px;
@@ -583,7 +583,7 @@ body.mobile-layout #cmd-suggest {
   body.mobile-layout .mobile-pane-bar { min-height: 40px; }
 }
 
-/* Focus visibility on touch + keyboard. */
+
 #mobile-header button:focus-visible,
 #mobile-pose button:focus-visible,
 #mobile-pose input:focus-visible,

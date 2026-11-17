@@ -6,14 +6,14 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function (Entities) {
   'use strict';
-  // EduCAD verify-only lesson checker: the student does competing-points
-  // analysis (hidden verdicts in parens, projector member claims) and this
-  // module grades it against curriculum corner truth. It never derives
-  // geometry and never feeds reconstruction: verdicts and claims are
-  // student input, checked here and nowhere else. Without truth (hand
-  // drawings) claim/verdict checks report unverifiable explicitly.
-  // Uses the shared entity identity model. Dual-env: browser via window.EduCADVerify, plain Node via
-  // module.exports. Node-safe.
+
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '1.0.0-educad';
   var MATCH_EPS_MM = 0.5;
@@ -40,7 +40,7 @@
     }
   }
 
-  // Mirrors EduCADLabels.splitCaption/bareName/isHiddenMark (zero-dep).
+
   function splitCaption(caption) {
     var parts = String(caption === undefined || caption === null ? '' : caption).split(',');
     var out = [];
@@ -66,7 +66,7 @@
     return t.length >= 2 && t.charAt(0) === '(' && t.charAt(t.length - 1) === ')';
   }
 
-  // Trailing prime ticks name the view, not the corner: a' is corner a.
+
   function cornerOf(bare) {
     var s = String(bare === undefined || bare === null ? '' : bare);
     while (s.length > 0) {
@@ -87,14 +87,14 @@
   }
 
   function crossesXY(e) {
-    // Mirrors the reconstruction helper rule: strict crossing, plus
-    // touching-from-below (a base-station projector starts at y = 0).
+
+
     var lo = Math.min(e.y, e.y2), hi = Math.max(e.y, e.y2);
     return lo < 0 && hi >= 0;
   }
 
-  // Projector-shaped: the same geometric rule the reconstruction input
-  // filter uses for helper verticals.
+
+
   function isProjectorShaped(e) {
     if (!e) return false;
     if (e.type !== 'SEGMENT' && e.type !== 'LINE' && e.type !== 'RAY') return false;
@@ -118,7 +118,7 @@
     return null;
   }
 
-  // Foot candidates: every drawn POINT plus every line-like endpoint.
+
   function collectFeet(entities, skipId) {
     var feet = [];
     for (var i = 0; i < entities.length; i++) {
@@ -151,9 +151,9 @@
     return map;
   }
 
-  // True visibility of one corner within its station set: elevation shows
-  // the foremost (max depth d = -planY), plan shows the tallest (max
-  // elevY). Single-member stations are always visible.
+
+
+
   function truthHidden(cornerId, stationIds, corners, view) {
     var self = corners[cornerId];
     if (!self) return false;
@@ -264,11 +264,11 @@
       label: 'station ' + e.id + ': ' + bad.join(', ') + ' verdict flipped' };
   }
 
-  // verify(entities, truth, opts): grade student verdicts + claims.
-  // entities: table list (only kind 'user-line' segments and POINTs with
-  // captions are read; demo geometry is never judged). truth: corners map
-  // ({id -> {plan:{x,y}, elev:{x,y}}}) or a bundle carrying .corners, or
-  // null. opts.eps (default 0.5 mm).
+
+
+
+
+
   function verify(entities, truth, opts) {
     if (Entities && Array.isArray(entities) && entities.some(function (e) { return e.meta && Array.isArray(e.meta.members); })) entities = Entities.semanticEntities(entities, false);
     if (!Array.isArray(entities)) throw new Error('entities must be an array');

@@ -1,5 +1,4 @@
-# A horizontal line cannot be the edge-on projection of either mirror plane.
-# expect: curves=0 diagnostics=oblique-curve-projection-missing,oblique-line-conflict unresolved=2 status=oblique-line-conflict
+# expect: 24V 24E 1F curves=1 oblique=1 analyticConics=1 obliqueReprojection=ok conicProjection=ok status=inferred diagnostics=none
 /datum -100 400
 /ellipse 20 -30 14.1421356237 20 A plan
 /point a 0 30 elevation

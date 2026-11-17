@@ -1,19 +1,19 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-parametric.js'), require('./educad-vec3.js'));
-  else root.EduCADCurveReconstruct = factory(root.EduCADParametric, root.EduCADVec3);
-})(typeof window !== 'undefined' ? window : globalThis, function (Parametric, Vec3) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-parametric.js'), require('./educad-vec3.js'), require('./educad-cavity-boolean.js'));
+  else root.EduCADCurveReconstruct = factory(root.EduCADParametric, root.EduCADVec3, root.EduCADCavityBoolean);
+})(typeof window !== 'undefined' ? window : globalThis, function (Parametric, Vec3, CavityBoolean) {
   'use strict';
 
-  // First primitive lifting stage: a circle/arc seen in true shape in one
-  // principal view and edge-on in the other. Analytic geometry is authoritative;
-  // vertices/edges below are only the display approximation. No solid names.
+
+
+
   var TAU = 2 * Math.PI, EPS = 1e-6, SAMPLES = 24;
   function near(a, b) { return Math.abs(a - b) <= EPS; }
-  // One vector implementation for every stage in this file. Local names keep
-  // the long geometry expressions readable.
+
+
   var add = Vec3.add, sub = Vec3.sub, mul = Vec3.mul, dot = Vec3.dot, cross = Vec3.cross;
-  // The coaxial ruled-surface stage historically treated a zero normal as the
-  // Y axis; the oblique-cone stage needs null so it can reject a degeneracy.
+
+
   function unit(v) { return Vec3.unit(v, EPS) || {x:0, y:1, z:0}; }
   function cvUnit(v) { return Vec3.unit(v, EPS); }
   function helper(e) {
@@ -46,7 +46,7 @@
     var byId = new Map(ink.map(function (e) { return [e.id, e]; }));
     var curves = [], issues = [], used = new Set(), vertices = [], edges = [], faces = [], patches = [], smooth = [];
     function issue(code, e, message) { issues.push({ code: code, entityId: e.id, message: message }); }
-    // Union touching/overlapping edge-on strokes, keeping their evidence IDs.
+
     function horizontalRuns(role) {
       var rows = [];
       segments.forEach(function (s) {
@@ -68,20 +68,25 @@
       });
       return runs;
     }
-    // Slanted edge-on traces are the projection of a circle whose plane is
-    // inclined to the projection plane. They are distinct from the horizontal
-    // traces of planes parallel to the projection plane.
+
+
+
     function slantedRuns(role) {
       var rows = [];
-      function sameLine(m1,b1,m2,b2) {
-        return Math.abs(m1-m2) <= 1e-6*(1+Math.abs(m1)) &&
-          Math.abs(b1-b2) <= 1e-5*(1+Math.abs(b1));
+      function sameLine(a, b) {
+        var ax=a.x2-a.x, ay=a.y2-a.y, bx=b.x2-b.x, by=b.y2-b.y;
+        var la=Math.hypot(ax,ay), lb=Math.hypot(bx,by), scale=Math.max(1,la,lb);
+        if (la<=EPS || lb<=EPS) return false;
+        if (Math.abs(ax*by-ay*bx) > 1e-6*la*lb) return false;
+        var d1=Math.abs(ax*(b.y-a.y)-ay*(b.x-a.x))/la;
+        var d2=Math.abs(ax*(b.y2-a.y)-ay*(b.x2-a.x))/la;
+        return Math.max(d1,d2) <= 1e-6*scale;
       }
       segments.forEach(function (s) {
         if (side(s) !== role || near(s.y, s.y2) || near(s.x, s.x2)) return;
         var m = (s.y2-s.y)/(s.x2-s.x), b = s.y - m*s.x;
-        var row = rows.find(function (r) { return sameLine(r.m,r.b,m,b); });
-        if (!row) { row = { m:m, b:b, intervals: [] }; rows.push(row); }
+        var row = rows.find(function (r) { return sameLine(r.segment,s); });
+        if (!row) { row = { m:m, b:b, segment:s, intervals: [] }; rows.push(row); }
         row.intervals.push({ min: Math.min(s.x,s.x2), max: Math.max(s.x,s.x2), ids: [s.id] });
       });
       var runs = [];
@@ -109,7 +114,7 @@
         var covering = runs[other].filter(function(r) {return r.min <= span.min+EPS && r.max >= span.max-EPS;});
         if (covering.length === 1) matches = covering;
       }
-      // A linked centre constrains the missing coordinate when present.
+
       var center = byId.get(e.meta && e.meta.centerRef);
       if (center) {
         var members = ((center.meta || {}).members || []).map(function (m) { return m.id; });
@@ -132,9 +137,9 @@
         else curves.push(c);
         c.sourceIds.forEach(function (id) { used.add(id); });
       });
-      // A full circle plus a slanted trace in the paired view describes one
-      // elliptical boundary in an inclined plane. The trace's x extent is the
-      // circle diameter; its slope fixes the plane through the missing axis.
+
+
+
       if (e.type === 'CIRCLE') slants[other].forEach(function (r) {
         if (!near(r.min,span.min) || !near(r.max,span.max)) return;
         var m = r.m, b = r.b, len = Math.hypot(1,m), c;
@@ -148,7 +153,7 @@
         c.sourceView = view;
         c.displayVertices = [];
         c.displayEdges = [];
-        // Coordinate of the trace at the centre station in the paired view.
+
         c.edgeOnCoordinate = m*e.x+b;
         c.inclinedTrace = { m:m, b:b, view:other, ids:r.ids.slice() };
         var duplicate = curves.find(function (d) { return d.kind === c.kind && d.sourceView === c.sourceView &&
@@ -182,14 +187,14 @@
       for (var j=0;j<n;j++) { c.displayEdges.push(edges.length); edges.push([c.displayVertices[j],c.displayVertices[(j+1)%c.displayVertices.length]]); }
     });
     function lineEvidence(view, x1,y1,x2,y2) {
-      // Accept split and overlapping straight evidence along the same segment.
+
       var dx=x2-x1,dy=y2-y1,length=Math.hypot(dx,dy), candidates=[];
       if(length<EPS) return [];
       segments.forEach(function(s) {
         if(side(s)!==view) return;
         var a=((s.x-x1)*dx+(s.y-y1)*dy)/(length*length), b=((s.x2-x1)*dx+(s.y2-y1)*dy)/(length*length);
         if(Math.abs((s.x-x1)*dy-(s.y-y1)*dx)/length>EPS || Math.abs((s.x2-x1)*dy-(s.y2-y1)*dx)/length>EPS) return;
-        // Do not claim a longer stroke was fully explained by a shorter edge.
+
         if(Math.min(a,b)<-EPS || Math.max(a,b)>1+EPS) return;
         candidates.push({a:Math.min(a,b),b:Math.max(a,b),id:s.id});
       });
@@ -203,16 +208,16 @@
     }
     function axial(c) { return c.sourceView === 'PLAN' ? c.center.y : c.center.z; }
     function curveNormal(c) {return unit(cross(c.u,c.v));}
-    // The two silhouette generators of a surface join the same angular station
-    // on its boundaries. This also gives the cap orientation axis.
+
+
     function generatorPoint(c, positive) {
       var p=point(c,positive?c.startAngle:c.startAngle+Math.PI);
       return c.sourceView==='PLAN'?{x:p.x,y:p.y}:{x:p.x,y:-p.z};
     }
     var bound = new Set();
-    // A straight generator at each silhouette bounds a ruled patch between
-    // coaxial boundaries. A true-shape circle and an inclined ellipse use the
-    // same operation: their generators meet at matching angular stations.
+
+
+
     var circular = curves.filter(function(c) {return c.kind==='circle'||c.kind==='ellipse';});
     circular.sort(function(a,b) {return axial(a)-axial(b);});
     circular.forEach(function(a,ai) {
@@ -243,8 +248,8 @@
         boundaryCurves:[curves.indexOf(a),curves.indexOf(b)],faceIndices:indices,sourceIds:left.concat(right)});
       bound.add(a);bound.add(b);
     });
-    // A collapsed circular boundary is a point. This is the same ruled-surface
-    // construction, with its position constrained by two meeting generators.
+
+
     circular.forEach(function(c) {
       if(bound.has(c)) return;
       var view=c.sourceView==='PLAN'?'ELEVATION':'PLAN', apexCandidates=[];
@@ -274,15 +279,15 @@
       c.apexDirection=positive?1:-1;bound.add(c);
       a.left.concat(a.right).forEach(function(id) {used.add(id);});
     });
-    // An inclined boundary without a connecting side surface leaves the
-    // cylinder/cut interpretation incomplete; report it instead of showing
-    // two unrelated end disks as a finished object.
+
+
+
     curves.forEach(function(c) {
       if (c.inclinedTrace && !bound.has(c)) issue('curve-surface-missing', {id:c.sourceIds[0]},
         'An inclined boundary has no supporting generators; the connecting surface is unresolved.');
     });
-    // End disks are inferred planar patches. Internal rings shared by two
-    // side patches do not get an artificial interior cap.
+
+
     circular.forEach(function(c) {
       var ci=curves.indexOf(c),incident=patches.filter(function(p) {return p.boundaryCurves && p.boundaryCurves.indexOf(ci)!==-1 && p.kind!=='plane';});
       if(incident.length>1) return;
@@ -340,8 +345,8 @@
     });
     return {xs:xs,zs:zs};
   }
-  // Mirrors the drafting layout convention when no /profile or stored
-  // meta.draftingLayout exists. An explicit frame always wins.
+
+
   function inferProfileFrame(list) {
     var pb=extentOf(list,'PROFILE'), eb=extentOf(list,'ELEVATION'), plan=extentOf(list,'PLAN');
     if (!pb.xs.length) return null;
@@ -367,9 +372,9 @@
     if (!p) return false;
     return Object.keys(p).every(function(k) {return near(p[k],center[k]);});
   }
-  // Equal full circles in two or more views are sphere silhouettes. This is a
-  // surface family, not a solid-name declaration: the shared radius and the
-  // projected centre fix the three centre coordinates.
+
+
+
   function inferSpheres(list, profile) {
     var circles=list.filter(function(e) {return e.type==='CIRCLE' && !helper(e);}), out=[];
     for (var i=0;i<circles.length;i++) {
@@ -431,14 +436,14 @@
     for (var j3=0;j3<lon;j3++) tri(bottom,ring(lat-1,j3+1),ring(lat-1,j3));
     return {vertices:vertices,edges:edges,faces:faces};
   }
-  // --- Spherical recess inference -----------------------------------------
-  // A full circular mouth in one principal view plus a circular-arc
-  // silhouette in the other view determine a sphere: the mouth circle fixes
-  // the axis and mouth radius, the silhouette fixes the sphere centre/radius,
-  // and the two must satisfy R^2 = a^2 + offset^2. This is a bounded curved
-  // recess, not a solid/feature-name reader. Only PLAN/ELEVATION pairs are
-  // used; PROFILE-mouth recesses remain unsupported.
-  function principalFrame(role) {
+
+
+
+
+
+
+
+  function principalFrame(role,profile) {
     if(role==='PLAN') return {role:'PLAN',free:'y',u:{x:1,y:0,z:0},v:{x:0,y:0,z:-1},
       normal:{x:0,y:1,z:0},
       to3D:function(u,v,free) {return {x:u,y:free,z:-v};},
@@ -447,6 +452,10 @@
       normal:{x:0,y:0,z:1},
       to3D:function(u,v,free) {return {x:u,y:v,z:free};},
       project:function(p) {return {x:p.x,y:p.y};}};
+    if(role==='PROFILE' && profile) return {role:'PROFILE',free:'x',u:{x:0,y:0,z:profile.s},v:{x:0,y:1,z:0},
+      normal:{x:1,y:0,z:0},
+      to3D:function(u,v,free) {return {x:free,y:v,z:profile.dRef+profile.s*(u-profile.xRef)};},
+      project:function(p) {return {x:profile.xRef+profile.s*(p.z-profile.dRef),y:p.y};}};
     return null;
   }
   function sheetArcSpan(e) {
@@ -459,9 +468,9 @@
     var off=((a-start)%TAU+TAU)%TAU;
     return off<=sweep+tol || off>=TAU-tol;
   }
-  // A recess is closed only when the drawing supplies the edge-on mouth
-  // stroke. Exact/contained strokes are consumed; a longer face edge is
-  // treated as corroboration but is left for the straight-wire stage.
+
+
+
   function mouthLineEvidence(ink,W,p1,p2,used) {
     var dx=p2.x-p1.x,dy=p2.y-p1.y,len2=dx*dx+dy*dy;
     if(len2<EPS*EPS) return {found:false,ids:[]};
@@ -486,7 +495,7 @@
     var C0=V.to3D(C.x,C.y,0),O=W.to3D(A.x,A.y,0);
     O[W.free]=C0[W.free];
     var op=V.project(O);
-    // Not even on the mouth axis: this is an unrelated circle/arc pair.
+
     if(Math.abs(op.x-C.x)>tol || Math.abs(op.y-C.y)>tol) return null;
     var span=sheetArcSpan(A);
     if(!(span.sweep>EPS)) return null;
@@ -494,9 +503,9 @@
     var q1=at(span.start),q2=at(span.start+span.sweep);
     var E1=W.to3D(q1.x,q1.y,O[W.free]),E2=W.to3D(q2.x,q2.y,O[W.free]);
     var mf1=E1[V.free],mf2=E2[V.free];
-    // An arc whose ends are not on one mouth plane is not a rim-to-rim cap
-    // silhouette; leave it to the ordinary curve stage instead of claiming a
-    // recess conflict.
+
+
+
     if(Math.abs(mf1-mf2)>tol) return null;
     var mouthFree=(mf1+mf2)/2,M=V.to3D(C.x,C.y,mouthFree);
     var mid=at(span.start+span.sweep/2);
@@ -510,8 +519,8 @@
     }
     var poleAngle=Math.atan2(dot(pole,W.v),dot(pole,W.u));
     if(!arcHasAngle(poleAngle,span.start,span.sweep,1e-5)) return null;
-    // The rim pair must straddle the mouth centre before a radius/endpoint
-    // mismatch is worth reporting as a recess conflict.
+
+
     if(Vec3.length(add(sub(E1,M),sub(E2,M)))>Math.max(tol,0.25*a)) return null;
     if(Math.abs(Vec3.length(sub(E1,M))-a)>tol || Math.abs(Vec3.length(sub(E2,M))-a)>tol)
       return {conflict:'The silhouette arc endpoints do not meet the mouth circle.'};
@@ -552,8 +561,8 @@
       var pa=vertices[a],pb=vertices[b],pc=vertices[c];
       var n=cross(sub(pb,pa),sub(pc,pa));
       var centroid=mul(add(add(pa,pb),pc),1/3);
-      // A recess is viewed from inside its bowl: orient the display mesh
-      // toward the sphere centre, unlike the outward full-sphere mesh.
+
+
       if(dot(n,sub(centroid,O))>0) {var swap=b;b=c;c=swap;}
       faces.push([a,b,c]);
     }
@@ -580,7 +589,7 @@
     return {vertices:vertices,faces:faces,edges:edges,boundaryVertices:boundary,
       boundaryEdges:boundaryEdges};
   }
-  function addSphericalRecess(geometry,cand,sourceIds,closureIds,closed) {
+  function addSphericalRecess(geometry,cand,sourceIds,closureIds,closed,volumeIndex) {
     var mesh=sphereCapMesh(cand.center,cand.radius,cand.pole,cand.capAngle,cand.u,cand.v,SAMPLES);
     var vo=geometry.vertices.length,eo=geometry.edges.length,fo=geometry.faces.length;
     geometry.vertices=geometry.vertices.concat(mesh.vertices);
@@ -599,7 +608,8 @@
     geometry.surfacePatches.push({kind:'sphere',center:cand.center,radius:cand.radius,
       boundaryCurves:[ci],cap:{pole:cand.pole,angle:cand.capAngle,
         mouth:{origin:cand.mouthCenter,normal:cand.outward}},
-      faceIndices:faceIndices,sourceIds:sourceIds.slice(),recess:true});
+      faceIndices:faceIndices,sourceIds:sourceIds.slice(),recess:true,
+      volumeIndex:volumeIndex,memberRole:'cap'});
     if(closed) geometry.surfacePatches.push({kind:'plane',boundaryCurves:[ci],faceIndices:[],
       closure:'recess-mouth',recessMouth:true,
       sourceIds:[cand.circle.id].concat(closureIds)});
@@ -609,24 +619,29 @@
       depth:cand.depth,capAngle:cand.capAngle,closure:closed?'plane':'open',
       sourceIds:sourceIds.slice(),mouthCurve:ci,surface:sphereIndex});
   }
-  function inferRecesses(ink,used,geometry) {
-    var issues=[],records=[],claimed=new Set();
+  function inferRecesses(ink,used,geometry,profile) {
+    var issues=[],records=[],resolutions=[],claimed=new Set();
     var circles=ink.filter(function(e) {return e && e.type==='CIRCLE' && !helper(e) &&
-      !used.has(e.id) && principalFrame(viewOf(e));});
+      !used.has(e.id) && principalFrame(viewOf(e),profile);});
     var arcs=ink.filter(function(e) {return e && e.type==='CIRCULAR_ARC' && !helper(e) &&
-      !used.has(e.id) && principalFrame(viewOf(e));});
+      !used.has(e.id) && principalFrame(viewOf(e),profile);});
     circles.forEach(function(C) {
       if(used.has(C.id)) return;
-      var V=principalFrame(viewOf(C)),valid=[],conflicts=[];
+      var V=principalFrame(viewOf(C),profile),valid=[],conflicts=[];
       arcs.forEach(function(A) {
         if(claimed.has(A.id) || used.has(A.id)) return;
-        var W=principalFrame(viewOf(A));
+        var W=principalFrame(viewOf(A),profile);
         if(!W || W.role===V.role) return;
         var cand=recessCandidate(C,V,A,W,ink,used);
         if(!cand) return;
         if(cand.conflict) conflicts.push({C:C,A:A,message:cand.conflict});
         else valid.push(cand);
       });
+      if(valid.length&&conflicts.length) {
+        issues.push({code:'recess-evidence-conflict',entityId:C.id,
+          message:conflicts[0].message,sourceIds:[C.id].concat(conflicts.map(function(c){return c.A.id;}))});
+        return;
+      }
       if(!valid.length) {
         if(conflicts.length) issues.push({code:'recess-evidence-conflict',entityId:C.id,
           message:conflicts[0].message,
@@ -660,23 +675,24 @@
       var sourceIds=Array.from(new Set([C.id].concat(group.candidates.map(function(c) {return c.arc.id;}),group.closureIds)));
       if(!group.closure) issues.push({code:'recess-mouth-unclosed',entityId:C.id,
         message:'The spherical recess is determined, but no edge-on mouth stroke closes it; the cap is retained open.'});
-      addSphericalRecess(geometry,cand,sourceIds,group.closureIds,group.closure);
+      resolutions.push({kind:'spherical',cand:cand,sourceIds:sourceIds,
+        closureIds:group.closureIds.slice(),closed:group.closure,index:resolutions.length});
       sourceIds.forEach(function(id) {used.add(id);claimed.add(id);});
       records.push({kind:'spherical',center:cand.center,radius:cand.radius,
         mouthCenter:cand.mouthCenter,mouthRadius:cand.mouthRadius,depth:cand.depth,
         closure:group.closure?'plane':'open',sourceIds:sourceIds.slice()});
     });
-    return {records:records,issues:issues};
+    return {records:records,issues:issues,resolutions:resolutions};
   }
-  // --- Cylindrical recess inference ---------------------------------------
-  // A blind cylindrical recess is a full circular mouth in one principal view
-  // (the centre of a recess, not a bare end cap) and, in the paired view, two
-  // edge-on depth strokes at the mouth's lateral extremes plus a bottom edge.
-  // The mouth normal is the cylinder axis; the depth strokes and bottom edge
-  // fix its depth and the bottom circle. The mouth must be an opening in a
-  // drawn face: a four-sided straight frame around the circle in its own view.
-  // That keeps a bare circular end face with matching far edge in the existing
-  // ruled-surface path instead of relabelling it as a recess.
+
+
+
+
+
+
+
+
+
   function frameAroundMouth(ink, role, cx, cy, a) {
     var segments=ink.filter(function(s) {
       return s && s.type==='SEGMENT' && viewOf(s)===role && !helper(s);
@@ -694,8 +710,8 @@
     });
     return above && below && left && right;
   }
-  // Group collinear strokes into merged intervals. horizontal groups by y and
-  // measures x; vertical groups by x and measures y.
+
+
   function recessRuns(ink, role, horizontal, used) {
     var rows=[];
     ink.forEach(function(s) {
@@ -727,13 +743,25 @@
     });
     return rows;
   }
-  function cylindricalRecessEvidence(C,V,ink,used) {
+  function cylindricalRecessEvidence(C,V,ink,used,W) {
     var a=C.radius;
     if(!(a>EPS) || !frameAroundMouth(ink,V.role,C.x,C.y,a)) return null;
-    var W=principalFrame(V.role==='PLAN'?'ELEVATION':'PLAN');
     if(!W) return null;
-    var tol=1e-4*Math.max(1,a),spanMin=C.x-a,spanMax=C.x+a;
-    var hRows=recessRuns(ink,W.role,true,used),vRows=recessRuns(ink,W.role,false,used);
+
+
+
+    var origin=W.project(V.to3D(C.x,C.y,0)),unit=W.project(V.to3D(C.x,C.y,1));
+    var dx=unit.x-origin.x,dy=unit.y-origin.y,len=Math.hypot(dx,dy);
+    if(len<EPS) return null;
+    var depthDirection={x:dx/len,y:dy/len},across={x:dy/len,y:-dx/len};
+    function local(x,y) {return {x:x*across.x+y*across.y,y:x*depthDirection.x+y*depthDirection.y};}
+    var center=local(origin.x,origin.y),projectedInk=ink.map(function(e) {
+      if(viewOf(e)!==W.role) return e;
+      var p=local(e.x,e.y),q=local(e.x2,e.y2);
+      return Object.assign({},e,{x:p.x,y:p.y,x2:q.x,y2:q.y});
+    });
+    var tol=1e-4*Math.max(1,a),spanMin=center.x-a,spanMax=center.x+a;
+    var hRows=recessRuns(projectedInk,W.role,true,used),vRows=recessRuns(projectedInk,W.role,false,used);
     var full=[];
     hRows.forEach(function(row) {
       row.intervals.forEach(function(r) {
@@ -741,10 +769,16 @@
           var exactIds=r.items.filter(function(item) {
             return near(item.min,spanMin)&&near(item.max,spanMax);
           }).map(function(item) {return item.id;});
+          var hostCover=r.items.some(function(item) {
+            return item.min<=spanMin+EPS && item.max>=spanMax-EPS &&
+              (item.min<spanMin-EPS || item.max>spanMax+EPS);
+          });
           full.push({station:row.key,min:r.min,max:r.max,
             exact:near(r.min,spanMin)&&near(r.max,spanMax),
+            sourceExact:exactIds.length>0,
             exactIds:Array.from(new Set(exactIds)),
-            cover:r.min<spanMin-EPS || r.max>spanMax+EPS,ids:r.ids});
+            cover:r.min<spanMin-EPS || r.max>spanMax+EPS,
+            hostCover:hostCover,ids:r.ids});
         }
       });
     });
@@ -768,23 +802,43 @@
       if(full.length) return {missing:'The mouth is an opening in a drawn face, but no depth strokes fix the recess depth.'};
       return null;
     }
+    var linked=null;
+    var centerId=C.meta&&C.meta.centerRef;
+    if(centerId) {
+      var centerPoint=ink.filter(function(e) {return e.id===centerId;})[0];
+      var memberIds=centerPoint&&centerPoint.meta&&Array.isArray(centerPoint.meta.members)?
+        centerPoint.meta.members.map(function(m) {return m.id;}):[];
+      if(memberIds.length) linked=ink.filter(function(e) {
+        return e && e.type==='POINT' && viewOf(e)===W.role && e.meta && Array.isArray(e.meta.members) &&
+          e.meta.members.some(function(m) {return memberIds.indexOf(m.id)!==-1;});
+      });
+    }
+    var linkedStations=[];
+    if(linked) linked.forEach(function(p) {
+      var q=local(p.x,p.y);
+      if(near(q.x,center.x)) linkedStations.push(q.y);
+    });
     var candidates=[],conflicts=[];
     unique.forEach(function(span) {
       var depth=span.hi-span.lo;
       if(!(depth>tol)) return;
       var loRun=runAt(span.lo),hiRun=runAt(span.hi);
-      var loExact=!!(loRun&&loRun.exact),hiExact=!!(hiRun&&hiRun.exact);
-      var loMouth=!!(loRun&&loRun.exactIds.length),hiMouth=!!(hiRun&&hiRun.exactIds.length);
-      var mouthStation,bottomStation,bottomRun,mouthRun,closedMouth=false;
-      // Exact edges at both ends, with no longer face edge, are an ordinary
-      // cylinder between two drawn circles; the existing ruled-surface stage
-      // owns that case.
-      if(loExact&&hiExact) return;
-      if(loExact) {
-        bottomStation=span.lo;bottomRun=loRun;mouthStation=span.hi;mouthRun=hiRun;closedMouth=hiMouth;
-      } else if(hiExact) {
-        bottomStation=span.hi;bottomRun=hiRun;mouthStation=span.lo;mouthRun=loRun;closedMouth=loMouth;
-      } else {
+      var loMerged=!!(loRun&&loRun.exact),hiMerged=!!(hiRun&&hiRun.exact);
+      var loSource=!!(loRun&&loRun.sourceExact),hiSource=!!(hiRun&&hiRun.sourceExact);
+      var loBoundary=!!(loRun&&loRun.hostCover),hiBoundary=!!(hiRun&&hiRun.hostCover);
+      var loCover=!!(loRun&&loRun.cover),hiCover=!!(hiRun&&hiRun.cover);
+      var mouthStation,bottomStation,bottomRun,mouthRun,closedMouth=false,mouthIsLo=null;
+      if(loBoundary!==hiBoundary) mouthIsLo=loBoundary;
+      else if(loMerged!==hiMerged) mouthIsLo=hiMerged;
+      else if(loSource!==hiSource) mouthIsLo=hiSource;
+      else if(loCover!==hiCover) mouthIsLo=loCover;
+      if(mouthIsLo===null&&linkedStations.length) {
+        var loLinked=linkedStations.some(function(station) {return near(station,span.lo);});
+        var hiLinked=linkedStations.some(function(station) {return near(station,span.hi);});
+        if(loLinked!==hiLinked) mouthIsLo=loLinked;
+      }
+      if(mouthIsLo===null) {
+        if(loMerged&&hiMerged) return;
         var partial=false;
         hRows.forEach(function(row) {
           row.intervals.forEach(function(r) {
@@ -796,62 +850,102 @@
           'The depth strokes end without an exact bottom edge; the flat bottom is unresolved.');
         return;
       }
-      // A full edge inside the side-stroke span is a bottom at a different
-      // level than the strokes assert.
+      bottomRun=mouthIsLo?hiRun:loRun;
+      if(!(bottomRun&&(bottomRun.sourceExact||bottomRun.exact))) {
+        conflicts.push(bottomRun?'The bottom edge does not span the mouth diameter.':
+          'The depth strokes end without an exact bottom edge; the flat bottom is unresolved.');
+        return;
+      }
+      bottomStation=mouthIsLo?span.hi:span.lo;
+      mouthStation=mouthIsLo?span.lo:span.hi;
+      mouthRun=mouthIsLo?loRun:hiRun;
+      closedMouth=!!(mouthRun&&mouthRun.exactIds.length);
+
       full.forEach(function(r) {
-        if(r.station>span.lo+tol && r.station<span.hi-tol)
+        if(r.station<=span.lo+tol || r.station>=span.hi-tol) return;
+        if(r.sourceExact || r.exact)
           conflicts.push('A bottom edge lies inside the depth strokes at another level.');
       });
-      // A partial edge at the bottom station is an incomplete bottom loop.
+
       hRows.forEach(function(row) {
         row.intervals.forEach(function(r) {
-          if(near(row.key,bottomStation) && (r.min>spanMin+tol || r.max<spanMax-tol))
+          if(!near(row.key,bottomStation)) return;
+          var overlaps=r.max>=spanMin-EPS && r.min<=spanMax+EPS;
+          var covers=r.min<=spanMin+EPS && r.max>=spanMax-EPS;
+          if(overlaps && !covers)
             conflicts.push('The bottom edge does not span the mouth diameter.');
         });
       });
       candidates.push({span:span,mouthStation:mouthStation,bottomStation:bottomStation,
-        mouthRun:mouthRun,bottomRun:bottomRun,closedMouth:closedMouth});
+        mouthRun:mouthRun,bottomRun:bottomRun,closedMouth:closedMouth,
+        mouthFree:(mouthStation-center.y)/len,bottomFree:(bottomStation-center.y)/len});
     });
-    if(conflicts.length) return {conflict:conflicts[0]};
-    if(candidates.length>1) return {ambiguous:'Several depth-stroke spans fit this mouth circle; the recess depth is unresolved.'};
-    if(!candidates.length) return {missing:'The depth strokes do not bound a consistent flat-bottomed cavity.'};
-    return {candidate:candidates[0]};
-  }
-  function cylinderRecessMesh(M,axis,depth,a,u,v,lon) {
-    var vertices=[],faces=[],edges=[],edgeMap=new Map();
-    var bottom=add(M,mul(axis,depth)),topRing=[],bottomRing=[];
-    for(var j=0;j<lon;j++) {
-      var t=TAU*j/lon,radial=add(mul(u,Math.cos(t)*a),mul(v,Math.sin(t)*a));
-      topRing.push(vertices.length);vertices.push(add(M,radial));
-      bottomRing.push(vertices.length);vertices.push(add(bottom,radial));
+    if(linked&&linked.length) {
+      var fixed=[];
+      candidates.forEach(function(cand) {
+        if(linked.every(function(p) {
+          var q=local(p.x,p.y);
+          return near(q.x,center.x)&&near(q.y,cand.mouthStation);
+        })) fixed.push(cand);
+      });
+      if(fixed.length) candidates=fixed;
+      else if(candidates.length) return {conflict:'The linked centre station does not agree with any depth-stroke mouth level for this mouth circle.'};
     }
+    if(conflicts.length) return {conflict:conflicts[0]};
+    if(candidates.length>1) return {candidates:candidates,ambiguous:'Several depth-stroke spans fit this mouth circle; the recess depth is unresolved.'};
+    if(!candidates.length) return {missing:'The depth strokes do not bound a consistent flat-bottomed cavity.'};
+    var only=candidates[0];
+    return {candidates:candidates,candidate:only,mouthFree:only.mouthFree,bottomFree:only.bottomFree};
+  }
+  function axialRecessMesh(M,axis,depth,topRadius,bottomRadius,u,v,lon,through) {
+    var vertices=[],faces=[],edges=[],edgeMap=new Map();
+    var bottom=add(M,mul(axis,depth)),topRing=[],bottomRing=[],apexIndex=null;
+    var hasBottom=bottomRadius>EPS;
+    for(var j=0;j<lon;j++) {
+      var t=TAU*j/lon,radial=add(mul(u,Math.cos(t)*topRadius),mul(v,Math.sin(t)*topRadius));
+      topRing.push(vertices.length);vertices.push(add(M,radial));
+      if(hasBottom) {
+        var lower=add(mul(u,Math.cos(t)*bottomRadius),mul(v,Math.sin(t)*bottomRadius));
+        bottomRing.push(vertices.length);vertices.push(add(bottom,lower));
+      }
+    }
+    if(!hasBottom) {apexIndex=vertices.length;vertices.push(bottom);}
     function edge(i,j) {
       var key=i<j?i+'_'+j:j+'_'+i;
       if(!edgeMap.has(key)) {edgeMap.set(key,edges.length);edges.push([i,j]);}
       return edgeMap.get(key);
     }
     var topEdges=[],bottomEdges=[],sideFaces=[];
+    for(var j=0;j<lon;j++) topEdges.push(edge(topRing[j],topRing[(j+1)%lon]));
+    if(hasBottom) for(var j=0;j<lon;j++) bottomEdges.push(edge(bottomRing[j],bottomRing[(j+1)%lon]));
     for(var j=0;j<lon;j++) {
-      topEdges.push(edge(topRing[j],topRing[(j+1)%lon]));
-      bottomEdges.push(edge(bottomRing[j],bottomRing[(j+1)%lon]));
-    }
-    for(var j=0;j<lon;j++) {
-      var j2=(j+1)%lon,loop=[topRing[j],topRing[j2],bottomRing[j2],bottomRing[j]];
+      var j2=(j+1)%lon;
+      var loop=hasBottom?[topRing[j],topRing[j2],bottomRing[j2],bottomRing[j]]:
+        [topRing[j],topRing[j2],apexIndex];
       var p0=vertices[loop[0]],p1=vertices[loop[1]],p2=vertices[loop[2]];
       var n=cross(sub(p1,p0),sub(p2,p0));
-      var centroid=mul(add(add(p0,p1),p2),1/3);
+      var centroid={x:0,y:0,z:0};
+      loop.forEach(function(index) {
+        var p=vertices[index];
+        centroid.x+=p.x/loop.length;centroid.y+=p.y/loop.length;centroid.z+=p.z/loop.length;
+      });
       var along=dot(sub(centroid,M),axis);
       var radial=sub(sub(centroid,M),mul(axis,along));
-      // A cavity is viewed from inside: orient the display facets toward the
-      // axis, matching the inward-facing spherical-recess bowl.
       if(dot(n,radial)>0) loop.reverse();
       sideFaces.push(faces.length);faces.push(loop);
-      edge(bottomRing[j],topRing[j]);
+      if(hasBottom) edge(bottomRing[j],topRing[j]);
+      else edge(topRing[j],apexIndex);
     }
-    return {vertices:vertices,faces:faces,edges:edges,topRing:topRing,bottomRing:bottomRing,
-      topEdges:topEdges,bottomEdges:bottomEdges,sideFaces:sideFaces};
+    var bottomFace=null;
+    if(hasBottom&&!through) {bottomFace=faces.length;faces.push(bottomRing.slice());}
+    return {vertices:vertices,faces:faces,edges:edges,topRing:topRing,
+      bottomRing:bottomRing,apex:apexIndex,topEdges:topEdges,
+      bottomEdges:bottomEdges,sideFaces:sideFaces,bottomFace:bottomFace};
   }
-  function addCylindricalRecess(geometry,cand,sourceIds,mouthIds,bottomIds,closedMouth) {
+  function cylinderRecessMesh(M,axis,depth,a,u,v,lon) {
+    return axialRecessMesh(M,axis,depth,a,a,u,v,lon,true);
+  }
+  function addCylindricalRecess(geometry,cand,sourceIds,mouthIds,bottomIds,closedMouth,volumeIndex) {
     var mesh=cylinderRecessMesh(cand.mouthCenter,cand.axis,cand.depth,cand.radius,cand.u,cand.v,SAMPLES);
     var vo=geometry.vertices.length,eo=geometry.edges.length,fo=geometry.faces.length;
     geometry.vertices=geometry.vertices.concat(mesh.vertices);
@@ -876,9 +970,11 @@
     var cylinderIndex=geometry.surfacePatches.length;
     geometry.surfacePatches.push({kind:'cylinder',analyticKind:'cylinder',origin:cand.mouthCenter,
       axis:cand.axis,radius:cand.radius,boundaryCurves:[mouthCi,bottomCi],
-      faceIndices:sideFaceIndices,sourceIds:sourceIds.slice(),recess:true});
+      faceIndices:sideFaceIndices,sourceIds:sourceIds.slice(),recess:true,
+      volumeIndex:volumeIndex,memberRole:'side'});
     geometry.surfacePatches.push({kind:'plane',boundaryCurves:[bottomCi],faceIndices:[bottomFaceIndex],
-      closure:'recess-bottom',recessBottom:true,sourceIds:[cand.circle.id].concat(bottomIds)});
+      closure:'recess-bottom',recessBottom:true,sourceIds:[cand.circle.id].concat(bottomIds),
+      volumeIndex:volumeIndex,memberRole:'bottom'});
     if(closedMouth) geometry.surfacePatches.push({kind:'plane',boundaryCurves:[mouthCi],
       faceIndices:[],closure:'recess-mouth',recessMouth:true,
       sourceIds:[cand.circle.id].concat(mouthIds)});
@@ -888,66 +984,973 @@
       closure:closedMouth?'plane':'open',bottomClosure:'plane',sourceIds:sourceIds.slice(),
       mouthCurve:mouthCi,bottomCurve:bottomCi,surface:cylinderIndex});
   }
-  function inferCylindricalRecesses(ink,used,geometry) {
-    var issues=[],records=[],claimed=new Set();
+  function coneRecessMesh(M,axis,depth,a,b,u,v,lon,through) {
+    return axialRecessMesh(M,axis,depth,a,b,u,v,lon,through===true);
+  }
+  function coneGeometry(radius,bottomRadius,depth,axis) {
+    var difference=bottomRadius-radius;
+    var scale=Math.max(1,Math.abs(radius),Math.abs(bottomRadius));
+    var slope=depth>EPS?difference/depth:0;
+    if(Math.abs(difference)<=1e-9*scale)
+      return {apexOffset:0,halfAngle:0,slope:0,zeroSlope:true};
+    var apexOffset=-radius/slope;
+    return {apexOffset:apexOffset,halfAngle:Math.atan2(radius,Math.abs(apexOffset)),
+      slope:slope,zeroSlope:false};
+  }
+  function addTaperedRecess(geometry,cand,sourceIds,mouthIds,bottomIds,ringIds,closedMouth,volumeIndex) {
+    var a=cand.radius,rb=cand.bottomRadius;
+    var openBottom=cand.bottomClosure==='open';
+    var mesh=coneRecessMesh(cand.mouthCenter,cand.axis,cand.depth,a,rb,cand.u,cand.v,
+      SAMPLES,cand.through||openBottom);
+    var vo=geometry.vertices.length,eo=geometry.edges.length,fo=geometry.faces.length;
+    geometry.vertices=geometry.vertices.concat(mesh.vertices);
+    geometry.edges=geometry.edges.concat(mesh.edges.map(function(e) {return [e[0]+vo,e[1]+vo];}));
+    geometry.faces=geometry.faces.concat(mesh.faces.map(function(f) {return f.map(function(v) {return v+vo;});}));
+    var sideFaceIndices=mesh.sideFaces.map(function(i) {return i+fo;});
+    geometry.smoothSideFaces=geometry.smoothSideFaces.concat(sideFaceIndices);
+    var mouthCi=geometry.curves.length;
+    geometry.curves.push({kind:'circle',center:cand.mouthCenter,u:cand.u,v:cand.v,radius:a,
+      startAngle:0,sweepAngle:TAU,sourceIds:[cand.circle.id].concat(mouthIds),
+      sourceView:cand.view.role,recessMouth:true,
+      displayVertices:mesh.topRing.map(function(v) {return v+vo;}),
+      displayEdges:mesh.topEdges.map(function(e) {return e+eo;})});
+    var bottomCi=null;
+    if(rb>EPS) {
+      bottomCi=geometry.curves.length;
+      geometry.curves.push({kind:'circle',center:cand.bottomCenter,u:cand.u,v:cand.v,radius:rb,
+        startAngle:0,sweepAngle:TAU,sourceIds:[cand.circle.id].concat(bottomIds,ringIds),
+        sourceView:cand.view.role,recessBottom:true,
+        recessMouth:cand.through?true:undefined,throughOpening:cand.through?true:undefined,
+        displayVertices:mesh.bottomRing.map(function(v) {return v+vo;}),
+        displayEdges:mesh.bottomEdges.map(function(e) {return e+eo;})});
+    }
+    var analytic=coneGeometry(a,rb,cand.depth,cand.axis);
+    var apex=add(cand.mouthCenter,mul(cand.axis,analytic.apexOffset));
+    var coneIndex=geometry.surfacePatches.length;
+    geometry.surfacePatches.push({kind:'cone',analyticKind:'cone',origin:cand.mouthCenter,
+      axis:cand.axis,radius:a,bottomRadius:rb,apex:apex,halfAngle:analytic.halfAngle,
+      boundaryCurves:bottomCi===null?[mouthCi]:[mouthCi,bottomCi],
+      faceIndices:sideFaceIndices,sourceIds:sourceIds.slice(),recess:true,
+      volumeIndex:volumeIndex,memberRole:'side'});
+    if(bottomCi!==null&&!cand.through&&!openBottom) geometry.surfacePatches.push({kind:'plane',
+      boundaryCurves:[bottomCi],faceIndices:[mesh.bottomFace+fo],closure:'recess-bottom',
+      recessBottom:true,sourceIds:[cand.circle.id].concat(bottomIds,ringIds),
+      volumeIndex:volumeIndex,memberRole:'bottom'});
+    else if(bottomCi!==null&&cand.through) geometry.surfacePatches.push({kind:'plane',
+      boundaryCurves:[bottomCi],faceIndices:[],closure:'recess-mouth',recessMouth:true,
+      recessBottom:true,throughOpening:true,
+      sourceIds:[cand.circle.id].concat(bottomIds,ringIds),
+      volumeIndex:volumeIndex,memberRole:'bottom'});
+    if(closedMouth) geometry.surfacePatches.push({kind:'plane',boundaryCurves:[mouthCi],
+      faceIndices:[],closure:'recess-mouth',recessMouth:true,
+      sourceIds:[cand.circle.id].concat(mouthIds)});
+    if(!geometry.recesses) geometry.recesses=[];
+    geometry.recesses.push({kind:'conical',mouth:{center:cand.mouthCenter,normal:cand.outward,
+      radius:a},axis:cand.axis,depth:cand.depth,bottom:{center:cand.bottomCenter,
+      radius:rb},apex:rb>EPS?null:{x:apex.x,y:apex.y,z:apex.z},
+      taper:analytic.slope,through:cand.through,
+      throughCandidate:cand.throughCandidate===true,volumeIndex:volumeIndex,
+      floorEvidence:cand.floorEvidence||null,
+      closure:closedMouth?'plane':'open',
+      bottomClosure:cand.bottomClosure||(cand.through?'through':openBottom?'open':'plane'),
+      sourceIds:sourceIds.slice(),mouthCurve:mouthCi,bottomCurve:bottomCi,surface:coneIndex});
+  }
+
+  function inferCylindricalRecesses(ink,used,geometry,profile,skip) {
+    var issues=[],records=[],claimed=new Set(),resolutions=[];
+    var evidenceBlocked=new Set(used);
+    skip=skip||new Set();
+    function sameCandidate(a,b) {return near(a.mouthFree,b.mouthFree)&&near(a.bottomFree,b.bottomFree);}
     var circles=ink.filter(function(e) {
-      return e && e.type==='CIRCLE' && !helper(e) && !used.has(e.id) && principalFrame(viewOf(e));
+      return e && e.type==='CIRCLE' && !helper(e) && !used.has(e.id) && !skip.has(e.id) &&
+        principalFrame(viewOf(e),profile);
     });
     circles.forEach(function(C) {
       if(used.has(C.id)||claimed.has(C.id)) return;
-      var V=principalFrame(viewOf(C)),evidence=cylindricalRecessEvidence(C,V,ink,used);
-      if(!evidence) return;
-      if(evidence.conflict) {
-        issues.push({code:'recess-depth-conflict',entityId:C.id,message:evidence.conflict});
+      var V=principalFrame(viewOf(C),profile);
+      var observations=['PLAN','ELEVATION','PROFILE'].filter(function(role){return role!==V.role;}).map(function(role) {
+        return cylindricalRecessEvidence(C,V,ink,evidenceBlocked,principalFrame(role,profile));
+      }).filter(Boolean);
+      var conflicting=observations.find(function(e){return e.conflict;});
+      if(conflicting) {
+        issues.push({code:'recess-depth-conflict',entityId:C.id,message:conflicting.conflict});
         return;
       }
-      if(evidence.missing) {
-        issues.push({code:'recess-depth-missing',entityId:C.id,message:evidence.missing});
+      var sets=observations.map(function(o){return o.candidates||(o.candidate?[o.candidate]:[]);}).filter(function(set){return set.length;});
+      var chosen=null,ambig=null;
+      if(sets.length) {
+        var common=sets[0].slice();
+        sets.slice(1).forEach(function(set) {
+          common=common.filter(function(c) {return set.some(function(d) {return sameCandidate(c,d);});});
+        });
+        if(common.length===1) chosen=common[0];
+        else if(common.length>1) ambig='Several depth-stroke spans fit this mouth circle; the recess depth is unresolved.';
+        else ambig='The paired views support different mouth or bottom levels; constrain the recess depth.';
+      }
+      if(!chosen) {
+        var missing=observations.find(function(e){return e.missing;});
+        var ambiguous=observations.find(function(e){return e.ambiguous;});
+        if(missing) issues.push({code:'recess-depth-missing',entityId:C.id,message:missing.missing});
+        else if(ambig||ambiguous) issues.push({code:'recess-depth-ambiguous',entityId:C.id,
+          message:ambig||ambiguous.ambiguous});
         return;
       }
-      if(evidence.ambiguous) {
-        issues.push({code:'recess-depth-ambiguous',entityId:C.id,message:evidence.ambiguous});
-        return;
-      }
-      var cand=evidence.candidate,a=C.radius,W=principalFrame(V.role==='PLAN'?'ELEVATION':'PLAN');
-      var o0=W.project(V.to3D(0,0,0)),o1=W.project(V.to3D(0,0,1));
-      var dx=o1.x-o0.x,dy=o1.y-o0.y,len=Math.hypot(dx,dy);
-      if(len<EPS) return;
-      var axis2={x:dx/len,y:dy/len};
-      if(Math.abs(axis2.y)<EPS) return;
-      var mouthFree=(cand.mouthStation-o0.y)/axis2.y;
-      var bottomFree=(cand.bottomStation-o0.y)/axis2.y;
-      var freeDelta=bottomFree-mouthFree;
+      var matched=observations.map(function(o) {
+        return (o.candidates||[]).filter(function(c) {return sameCandidate(c,chosen);})[0];
+      }).filter(Boolean);
+      var cand=matched[0]||chosen,a=C.radius;
+      var freeDelta=cand.bottomFree-cand.mouthFree;
       if(Math.abs(freeDelta)<=1e-6*Math.max(1,a)) return;
       var axis=mul(V.normal,freeDelta>0?1:-1),outward=mul(axis,-1);
       var u=V.u,v=V.v;
       if(dot(cross(u,v),outward)<0) v=mul(v,-1);
-      var mouthCenter=V.to3D(C.x,C.y,mouthFree);
+      var mouthCenter=V.to3D(C.x,C.y,cand.mouthFree);
       var resolved={circle:C,view:V,mouthCenter:mouthCenter,radius:a,axis:axis,outward:outward,
         depth:Math.abs(freeDelta),bottomCenter:add(mouthCenter,mul(axis,Math.abs(freeDelta))),
         u:u,v:v,mouthRun:cand.mouthRun,bottomRun:cand.bottomRun,span:cand.span};
       var mouthIds=cand.mouthRun&&cand.closedMouth?cand.mouthRun.exactIds.slice():[];
-      var bottomIds=cand.bottomRun.ids.slice();
-      var sideIds=cand.span.left.ids.concat(cand.span.right.ids);
-      var sourceIds=Array.from(new Set([C.id].concat(cand.mouthRun?cand.mouthRun.ids:[],bottomIds,sideIds)));
-      var consumed=Array.from(new Set([C.id].concat(mouthIds,bottomIds,sideIds)));
-      if(!cand.closedMouth) issues.push({code:'recess-mouth-unclosed',entityId:C.id,
-        message:'The cylindrical recess is determined, but no exact mouth stroke closes it; the cavity is retained open.'});
-      addCylindricalRecess(geometry,resolved,sourceIds,mouthIds,bottomIds,cand.closedMouth);
-      consumed.forEach(function(id) {used.add(id);claimed.add(id);});
-      records.push({kind:'cylindrical',mouthCenter:mouthCenter,mouthRadius:a,axis:axis,depth:resolved.depth,
-        bottomCenter:resolved.bottomCenter,closure:cand.closedMouth?'plane':'open',
-        bottomClosure:'plane',sourceIds:sourceIds.slice()});
+      var bottomIds=cand.bottomRun.exactIds.length?cand.bottomRun.exactIds.slice():cand.bottomRun.ids.slice();
+      var sourceIds=Array.from(new Set([C.id].concat(cand.mouthRun?cand.mouthRun.ids:[],bottomIds,
+        cand.span.left.ids,cand.span.right.ids)));
+      var consumed=Array.from(new Set([C.id].concat(mouthIds,bottomIds,cand.span.left.ids,cand.span.right.ids)));
+      matched.forEach(function(other) {
+        var oMouth=other.mouthRun?other.mouthRun.exactIds:[],
+          oBottom=other.bottomRun?(other.bottomRun.exactIds.length?other.bottomRun.exactIds:other.bottomRun.ids):[],
+          oSides=other.span.left.ids.concat(other.span.right.ids);
+        sourceIds=sourceIds.concat(other.mouthRun?other.mouthRun.ids:[],oBottom,oSides);
+        consumed=consumed.concat(other.closedMouth?oMouth:[],oBottom,oSides);
+      });
+      sourceIds=Array.from(new Set(sourceIds));consumed=Array.from(new Set(consumed));
+      resolutions.push({C:C,cand:cand,resolved:resolved,sourceIds:sourceIds,consumed:consumed,
+        mouthIds:mouthIds,bottomIds:bottomIds});
     });
-    return {records:records,issues:issues};
+    resolutions.forEach(function(item) {
+      var cand=item.cand;
+      if(!cand.closedMouth) issues.push({code:'recess-mouth-unclosed',entityId:item.C.id,
+        message:'The cylindrical recess is determined, but no exact mouth stroke closes it; the cavity is retained open.'});
+      item.consumed.forEach(function(id) {used.add(id);claimed.add(id);});
+      item.kind='cylindrical';
+      records.push({kind:'cylindrical',mouthCenter:item.resolved.mouthCenter,mouthRadius:item.resolved.radius,
+        axis:item.resolved.axis,depth:item.resolved.depth,bottomCenter:item.resolved.bottomCenter,
+        closure:cand.closedMouth?'plane':'open',bottomClosure:'plane',sourceIds:item.sourceIds.slice()});
+    });
+    return {records:records,issues:issues,resolutions:resolutions};
   }
-  // --- Cylindrical fillet between two planar faces -------------------------
-  // A fillet is a partial cylinder tangent to two planar faces. In the view
-  // where its cross-section is true (PLAN or ELEVATION) it is a circular arc
-  // whose endpoints are tangent to two straight face edges. The paired view
-  // shows the two tangent generator lines (the straight boundaries shared
-  // with the faces) spanning the fillet length; the same view's end strokes
-  // already fix the two coaxial end arcs. No solid or feature name is read.
+
+  function taperedRecessEvidence(C,V,ink,used,W,profile) {
+    if(!W||W.role===V.role) return null;
+    var a=C.radius;
+    if(!(a>EPS)||!frameAroundMouth(ink,V.role,C.x,C.y,a)) return null;
+    var origin=W.project(V.to3D(C.x,C.y,0)),unit=W.project(V.to3D(C.x,C.y,1));
+    var dx=unit.x-origin.x,dy=unit.y-origin.y,len=Math.hypot(dx,dy);
+    if(len<EPS) return null;
+    var depthDirection={x:dx/len,y:dy/len},across={x:dy/len,y:-dx/len};
+    function local(x,y) {return {x:x*across.x+y*across.y,y:x*depthDirection.x+y*depthDirection.y};}
+    var center=local(origin.x,origin.y);
+    var tol=1e-4*Math.max(1,a);
+    var projectedInk=ink.map(function(e) {
+      if(viewOf(e)!==W.role) return e;
+      var p=local(e.x,e.y),q=local(e.x2,e.y2);
+      return Object.assign({},e,{x:p.x,y:p.y,x2:q.x,y2:q.y});
+    });
+    var hRows=recessRuns(projectedInk,W.role,true,used),runs=[];
+    hRows.forEach(function(row) {
+      row.intervals.forEach(function(r) {
+        runs.push({station:row.key,min:r.min,max:r.max,ids:r.ids.slice(),
+          items:(r.items||[]).slice()});
+      });
+    });
+    function spanIds(station,radius) {
+      var ids=[];
+      runs.forEach(function(run) {
+        if(!near(run.station,station)) return;
+        run.items.forEach(function(item) {
+          if(near(item.min,center.x-radius)&&near(item.max,center.x+radius)) ids.push(item.id);
+        });
+      });
+      return Array.from(new Set(ids));
+    }
+    function hostCover(station,radius) {
+      return runs.some(function(run) {
+        return near(run.station,station) &&
+          run.min<=center.x-radius+tol&&run.max>=center.x+radius-tol&&
+          (run.min<center.x-radius-tol||run.max>center.x+radius+tol);
+      });
+    }
+    function hostComponentExtent(excluded) {
+      var segments=[];
+      ink.forEach(function(s) {
+        if(!s||s.type!=='SEGMENT'||viewOf(s)!==W.role||helper(s)||excluded.has(s.id)) return;
+        var p=local(s.x,s.y),q=local(s.x2,s.y2);
+        segments.push({id:s.id,p:p,q:q,min:Math.min(p.x,q.x),max:Math.max(p.x,q.x)});
+      });
+      if(!segments.length) return null;
+      var parent=segments.map(function(_,i) {return i;});
+      function find(i) {while(parent[i]!==i) {parent[i]=parent[parent[i]];i=parent[i];} return i;}
+      function unite(a,b) {a=find(a);b=find(b);if(a!==b)parent[b]=a;}
+      function pointSegment(p,a,b) {
+        var dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+        var t=l2>0?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2)):0;
+        return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)<=tol;
+      }
+      for(var i=0;i<segments.length;i++) for(var j=i+1;j<segments.length;j++) {
+        var segA=segments[i],segB=segments[j];
+        if(near(segA.p.x,segB.p.x)&&near(segA.p.y,segB.p.y)||
+           near(segA.p.x,segB.q.x)&&near(segA.p.y,segB.q.y)||
+           near(segA.q.x,segB.p.x)&&near(segA.q.y,segB.p.y)||
+           near(segA.q.x,segB.q.x)&&near(segA.q.y,segB.q.y)||
+           pointSegment(segA.p,segB.p,segB.q)||pointSegment(segA.q,segB.p,segB.q)||
+           pointSegment(segB.p,segA.p,segA.q)||pointSegment(segB.q,segA.p,segA.q)) unite(i,j);
+      }
+      var seeds=[];
+      segments.forEach(function(s,i) {
+        if(near(s.p.y,mouthStation)&&near(s.q.y,mouthStation)&&
+           s.min<=center.x-a+tol&&s.max>=center.x+a-tol) seeds.push(i);
+      });
+      if(!seeds.length) return null;
+      var root=find(seeds[0]),stations=[];
+      segments.forEach(function(s,i) {
+        if(find(i)!==root) return;
+        stations.push(s.p.y,s.q.y);
+      });
+      if(!stations.length) return null;
+      return {min:Math.min.apply(null,stations),max:Math.max.apply(null,stations)};
+    }
+
+    var linked=null,centerId=C.meta&&C.meta.centerRef;
+    if(centerId) {
+      var centerPoint=ink.filter(function(e) {return e.id===centerId;})[0];
+      var memberIds=centerPoint&&centerPoint.meta&&Array.isArray(centerPoint.meta.members)?
+        centerPoint.meta.members.map(function(m) {return m.id;}):[];
+      if(memberIds.length) linked=ink.filter(function(e) {
+        return e && e.type==='POINT' && viewOf(e)===W.role && e.meta && Array.isArray(e.meta.members) &&
+          e.meta.members.some(function(m) {return memberIds.indexOf(m.id)!==-1;});
+      });
+    }
+    var linkedStations=[];
+    if(linked) linked.forEach(function(p) {
+      var q=local(p.x,p.y);
+      if(near(q.x,center.x)) linkedStations.push(q.y);
+    });
+    var rawSlanted=[];
+    ink.forEach(function(s) {
+      if(!s||s.type!=='SEGMENT'||viewOf(s)!==W.role||used.has(s.id)||helper(s)) return;
+      var p=local(s.x,s.y),q=local(s.x2,s.y2);
+      if(near(p.y,q.y)||near(p.x,q.x)) return;
+      rawSlanted.push({id:s.id,p:p,q:q});
+    });
+    var lineGroups=[];
+    rawSlanted.forEach(function(seg) {
+      var dx=seg.q.x-seg.p.x;
+      if(Math.abs(dx)<=EPS) return;
+      var m=(seg.q.y-seg.p.y)/dx,b=seg.p.y-m*seg.p.x;
+      var group=lineGroups.find(function(g) {
+        return Math.abs(g.m-m)<=1e-6*(1+Math.abs(g.m))&&
+          Math.abs(g.b-b)<=1e-6*Math.max(1,Math.abs(g.m),Math.abs(g.b));
+      });
+      if(!group) {group={m:m,b:b,intervals:[]};lineGroups.push(group);}
+      group.intervals.push({min:Math.min(seg.p.x,seg.q.x),max:Math.max(seg.p.x,seg.q.x),ids:[seg.id]});
+    });
+    var slanted=[];
+    lineGroups.forEach(function(group) {
+      group.intervals.sort(function(a,b) {return a.min-b.min||a.max-b.max;});
+      var merged=[];
+      group.intervals.forEach(function(interval) {
+        var last=merged[merged.length-1];
+        if(last&&interval.min<=last.max+tol) {
+          last.max=Math.max(last.max,interval.max);
+          last.ids=Array.from(new Set(last.ids.concat(interval.ids)));
+        } else merged.push({min:interval.min,max:interval.max,ids:interval.ids.slice()});
+      });
+      merged.forEach(function(interval) {
+        slanted.push({id:interval.ids[0],ids:interval.ids.slice(),
+          p:{x:interval.min,y:group.m*interval.min+group.b},
+          q:{x:interval.max,y:group.m*interval.max+group.b}});
+      });
+    });
+    function mirror(p) {return {x:2*center.x-p.x,y:p.y};}
+    function samePoint(p,q) {return near(p.x,q.x)&&near(p.y,q.y);}
+    function mouthEnd(seg) {
+      var ends=[seg.p,seg.q];
+      var atMouth=ends.filter(function(p) {return Math.abs(Math.abs(p.x-center.x)-a)<=tol;});
+      if(atMouth.length!==1) return null;
+      var mouth=atMouth[0],other=ends[0]===mouth?ends[1]:ends[0];
+      return {mouth:mouth,other:other};
+    }
+    function inverseLocal(p) {
+      return {x:p.x*across.x+p.y*depthDirection.x,
+        y:p.x*across.y+p.y*depthDirection.y};
+    }
+    function pointMembers(p) {
+      return ((p.meta||{}).members||[]).map(function(m) {return m.id;});
+    }
+    function linkedEndpoint(localPoint,free,mouthFree,radius,isMouth) {
+      var worldPoints=ink.filter(function(e) {
+        if(!e||e.type!=='POINT'||viewOf(e)!==W.role) return false;
+        var p=local(e.x,e.y);
+        return near(p.x,localPoint.x)&&near(p.y,localPoint.y);
+      });
+      var memberIds=new Set();
+      worldPoints.forEach(function(p) {
+        pointMembers(p).forEach(function(id) {memberIds.add(id);});
+      });
+      if(!memberIds.size) return null;
+      var matePoints=[];
+      ink.forEach(function(P) {
+        if(!P||P.type!=='POINT'||viewOf(P)===W.role) return;
+        if(!P.meta||!Array.isArray(P.meta.members)) return;
+        if(!P.meta.members.some(function(m) {return memberIds.has(m.id);})) return;
+        var RP=principalFrame(viewOf(P),profile);
+        if(!RP) return;
+        var p3=RP.to3D(P.x,P.y,free);
+        var projected=W.project(p3),lp=local(projected.x,projected.y);
+        if(!near(lp.x,localPoint.x)||!near(lp.y,localPoint.y)) return;
+        if(!matePoints.some(function(q) {
+          return near(q.x,p3.x)&&near(q.y,p3.y)&&near(q.z,p3.z);
+        })) matePoints.push(p3);
+      });
+      if(!matePoints.length) return null;
+      if(matePoints.length>1)
+        return {conflict:'Linked observations for a generator endpoint do not agree.'};
+      var freeDelta=free-mouthFree;
+      var axis=mul(V.normal,freeDelta>0?1:-1);
+      var M=V.to3D(C.x,C.y,mouthFree);
+      function acrossAt(p3) {return local(W.project(p3).x,W.project(p3).y).x;}
+      var au=acrossAt(add(M,mul(V.u,a)))-center.x;
+      var av=acrossAt(add(M,mul(V.v,a)))-center.x;
+      var angle=Math.atan2(av,au);
+      var radial=cvUnit(add(mul(V.u,Math.cos(angle)),mul(V.v,Math.sin(angle))));
+      var sign=localPoint.x>=center.x?1:-1;
+      var nominal=isMouth?add(M,mul(radial,a*sign)):
+        add(add(M,mul(axis,Math.abs(freeDelta))),mul(radial,radius*sign));
+      var residual=Math.hypot(matePoints[0].x-nominal.x,
+        matePoints[0].y-nominal.y,matePoints[0].z-nominal.z);
+      if(residual>tol) return {unsupported:isMouth?
+        {code:'recess-taper-mouth-conflict',
+          message:'A linked mouth boundary point does not match the stated mouth circle.'}:
+        radius<=EPS?
+        {code:'recess-taper-axis-unsupported',
+          message:'The linked apex identity implies an oblique cone; only axial linear-radius cavities are supported.'}:
+        {code:'recess-taper-bottom-conflict',
+          message:'A linked lower boundary point does not match the generator bottom circle.'}};
+      return {point:matePoints[0]};
+    }
+    var nearMouth=false;
+    slanted.forEach(function(seg) {
+      [seg.p,seg.q].forEach(function(p) {
+        if(Math.abs(Math.abs(p.x-center.x)-a)<=tol&&spanIds(p.y,a).length) nearMouth=true;
+      });
+    });
+    var candidates=[],conflicts=[];
+    for(var i=0;i<slanted.length;i++) for(var j=i+1;j<slanted.length;j++) {
+      var A=slanted[i],B=slanted[j];
+      var direct=samePoint(mirror(A.p),B.p)&&samePoint(mirror(A.q),B.q);
+      var swapped=samePoint(mirror(A.p),B.q)&&samePoint(mirror(A.q),B.p);
+      if(!direct&&!swapped) continue;
+      var ea=mouthEnd(A),eb=mouthEnd(B);
+      if(!ea||!eb) continue;
+      if(!near(ea.mouth.y,eb.mouth.y)||!near(ea.other.y,eb.other.y)) continue;
+      if(!near(Math.abs(ea.other.x-center.x),Math.abs(eb.other.x-center.x))) continue;
+      var mouthStation=(ea.mouth.y+eb.mouth.y)/2;
+      var bottomStation=(ea.other.y+eb.other.y)/2;
+      var bottomRadius=(Math.abs(ea.other.x-center.x)+Math.abs(eb.other.x-center.x))/2;
+      if(!(Math.abs(bottomStation-mouthStation)>tol)) continue;
+      if(Math.abs(bottomRadius-a)<=tol) continue;
+      var mouthIds=spanIds(mouthStation,a);
+      if(!mouthIds.length||!hostCover(mouthStation,a)) continue;
+      if(linkedStations.length&&!linkedStations.some(function(station) {return near(station,mouthStation);})) {
+        conflicts.push('The linked mouth centre does not agree with the generator mouth level.');
+        continue;
+      }
+      var bottomIds=spanIds(bottomStation,bottomRadius);
+      var excludedStrokes=new Set(A.ids.concat(B.ids,mouthIds,bottomIds));
+      var hostExtent=hostComponentExtent(excludedStrokes);
+      var through=bottomRadius>EPS&&hostCover(bottomStation,bottomRadius)&&
+        !!hostExtent&&(near(bottomStation,hostExtent.min)||near(bottomStation,hostExtent.max));
+      if(bottomRadius>EPS&&!through&&!bottomIds.length) {
+        var mismatched=runs.some(function(run) {
+          return near(run.station,bottomStation)&&
+            run.max>center.x-bottomRadius+tol&&run.min<center.x+bottomRadius-tol;
+        });
+        if(mismatched) {
+          conflicts.push('The bottom edge at this level does not match the generator radius.');
+          continue;
+        }
+      }
+      var mouthFree=(mouthStation-center.y)/len,bottomFree=(bottomStation-center.y)/len;
+      var linkedChecks=[
+        linkedEndpoint(ea.mouth,mouthFree,mouthFree,a,true),
+        linkedEndpoint(eb.mouth,mouthFree,mouthFree,a,true),
+        linkedEndpoint(ea.other,bottomFree,mouthFree,bottomRadius,false),
+        linkedEndpoint(eb.other,bottomFree,mouthFree,bottomRadius,false)
+      ];
+      var linkedProblem=linkedChecks.find(function(check) {
+        return check&&(check.conflict||check.unsupported);
+      });
+      if(linkedProblem) {
+        if(linkedProblem.unsupported) return {unsupported:linkedProblem.unsupported};
+        conflicts.push(linkedProblem.conflict);
+        continue;
+      }
+      var duplicate=candidates.find(function(c) {
+        return near(c.mouthFree,mouthFree)&&near(c.bottomFree,bottomFree)&&
+          near(c.bottomRadius,bottomRadius);
+      });
+      var candidate={mouthFree:mouthFree,bottomFree:bottomFree,bottomRadius:bottomRadius,
+        through:through,mouthStation:mouthStation,bottomStation:bottomStation,
+        mouthIds:mouthIds,bottomIds:bottomIds,generatorIds:A.ids.concat(B.ids)};
+      if(duplicate) duplicate.generatorIds=Array.from(new Set(duplicate.generatorIds.concat(candidate.generatorIds)));
+      else candidates.push(candidate);
+    }
+    if(candidates.length>1) {
+      var unique=[];
+      candidates.forEach(function(c) {
+        if(!unique.some(function(u) {
+          return near(u.mouthFree,c.mouthFree)&&near(u.bottomFree,c.bottomFree)&&
+            near(u.bottomRadius,c.bottomRadius);
+        })) unique.push(c);
+      });
+      if(unique.length>1)
+        return {ambiguous:'Several generator pairs fit this mouth circle with different linear-radius profiles; the tapered cavity is unresolved.'};
+      candidates=unique;
+    }
+    if(!candidates.length) {
+      if(conflicts.length) return {conflict:conflicts[0]};
+      if(nearMouth)
+        return {conflict:'The generator strokes at the mouth do not form a symmetric linear-radius wall about the mouth axis.'};
+      return null;
+    }
+    return {candidate:candidates[0],candidates:candidates};
+  }
+
+  function inferTaperedRecesses(ink,used,geometry,profile) {
+    var issues=[],records=[],claimed=new Set(),resolutions=[],blocked=new Set();
+    function sameCandidate(a,b) {
+      return near(a.mouthFree,b.mouthFree)&&near(a.bottomFree,b.bottomFree)&&
+        near(a.bottomRadius,b.bottomRadius);
+    }
+    var circles=ink.filter(function(e) {
+      return e && e.type==='CIRCLE' && !helper(e) && !used.has(e.id) &&
+        principalFrame(viewOf(e),profile);
+    });
+    circles.forEach(function(C) {
+      if(used.has(C.id)||claimed.has(C.id)) return;
+      var V=principalFrame(viewOf(C),profile);
+      var roles=['PLAN','ELEVATION','PROFILE'].filter(function(role) {return role!==V.role;});
+      var observations=roles.map(function(role) {
+        return taperedRecessEvidence(C,V,ink,used,principalFrame(role,profile),profile);
+      }).filter(Boolean);
+      var unsupported=observations.find(function(e) {return e.unsupported;});
+      if(unsupported) {
+        issues.push({code:unsupported.unsupported.code,entityId:C.id,
+          message:unsupported.unsupported.message});
+        blocked.add(C.id);
+        return;
+      }
+      var conflicting=observations.find(function(e) {return e.conflict;});
+      if(conflicting) {
+        issues.push({code:'recess-taper-conflict',entityId:C.id,message:conflicting.conflict});
+        blocked.add(C.id);
+        return;
+      }
+      var sets=observations.map(function(o) {return o.candidates||(o.candidate?[o.candidate]:[]);})
+        .filter(function(set) {return set.length;});
+      var chosen=null,ambig=null,crossConflict=false;
+      if(sets.length) {
+        var common=sets[0].slice();
+        sets.slice(1).forEach(function(set) {
+          common=common.filter(function(c) {return set.some(function(d) {return sameCandidate(c,d);});});
+        });
+        if(common.length===1) chosen=common[0];
+        else if(common.length>1) ambig='Several generator pairs fit this mouth circle; the tapered cavity is unresolved.';
+        else crossConflict=true;
+      }
+      if(!chosen) {
+        var ambiguous=observations.find(function(e) {return e.ambiguous;});
+        if(crossConflict) {
+          issues.push({code:'recess-taper-conflict',entityId:C.id,
+            message:'The paired views support different tapered profiles for this mouth circle.'});
+          blocked.add(C.id);
+        } else if(ambig||ambiguous) {
+          issues.push({code:'recess-taper-ambiguous',entityId:C.id,message:ambig||ambiguous.ambiguous});
+          blocked.add(C.id);
+        }
+        return;
+      }
+      var a=C.radius;
+      var freeDelta=chosen.bottomFree-chosen.mouthFree;
+      if(Math.abs(freeDelta)<=1e-6*Math.max(1,a)) return;
+      var axis=mul(V.normal,freeDelta>0?1:-1),outward=mul(axis,-1);
+      var u=V.u,v=V.v;
+      if(dot(cross(u,v),outward)<0) v=mul(v,-1);
+      var mouthCenter=V.to3D(C.x,C.y,chosen.mouthFree);
+      var bottomCenter=V.to3D(C.x,C.y,chosen.bottomFree);
+      var ring=null;
+      ink.forEach(function(R) {
+        if(!R||R.type!=='CIRCLE'||R.id===C.id||used.has(R.id)||claimed.has(R.id)||helper(R)) return;
+        var RV=principalFrame(viewOf(R),profile);
+        if(!RV) return;
+        var projected=RV.project(bottomCenter);
+        if(!near(projected.x,R.x)||!near(projected.y,R.y)) return;
+        if(!near(R.radius,chosen.bottomRadius)) return;
+        ring=R;
+      });
+      var through=chosen.through;
+      var throughValues=[];
+      sets.forEach(function(set) {
+        set.forEach(function(candidate) {
+          if(sameCandidate(candidate,chosen)) throughValues.push(candidate.through);
+        });
+      });
+      if(throughValues.length&&throughValues.some(Boolean)) through=true;
+      var floorEvidence=chosen.bottomRadius<=EPS?'apex':
+        chosen.bottomIds.length||ring?'plane':'open';
+      var bottomClosure=through?'through':floorEvidence;
+      if(bottomClosure==='open')
+        issues.push({code:'recess-bottom-unclosed',entityId:C.id,
+          message:'The tapered wall is determined, but no bottom edge or lower boundary circle fixes the floor; the bottom is retained open.'});
+      var resolved={circle:C,view:V,mouthCenter:mouthCenter,radius:a,bottomCenter:bottomCenter,
+        bottomRadius:chosen.bottomRadius,axis:axis,outward:outward,depth:Math.abs(freeDelta),
+        u:u,v:v,through:through,throughCandidate:through,bottomClosure:bottomClosure,
+        floorEvidence:floorEvidence};
+      var sourceIds=Array.from(new Set([C.id].concat(chosen.generatorIds,chosen.mouthIds,
+        chosen.bottomIds,ring?[ring.id]:[])));
+      var consumed=sourceIds.slice();
+      resolutions.push({kind:'conical',C:C,cand:chosen,resolved:resolved,sourceIds:sourceIds,
+        consumed:consumed,mouthIds:chosen.mouthIds,bottomIds:chosen.bottomIds,
+        ringIds:ring?[ring.id]:[]});
+      sourceIds.forEach(function(id) {used.add(id);claimed.add(id);});
+      records.push({kind:'conical',mouthCenter:mouthCenter,mouthRadius:a,
+        bottomCenter:bottomCenter,bottomRadius:chosen.bottomRadius,axis:axis,
+        depth:Math.abs(freeDelta),through:through,throughCandidate:through,
+        closure:'plane',bottomClosure:bottomClosure,
+        sourceIds:sourceIds.slice()});
+    });
+    return {records:records,issues:issues,resolutions:resolutions,blocked:blocked};
+  }
+
+  function cavityVolumeOf(resolution) {
+    if(resolution.kind==='cylindrical') {
+      var r=resolution.resolved;
+      return {kind:'cylinder',index:resolution.index,origin:r.mouthCenter,axis:r.axis,
+        radius:r.radius,depth:r.depth,outward:r.outward,mouthCenter:r.mouthCenter,
+        bottomCenter:r.bottomCenter,sourceIds:resolution.sourceIds.slice()};
+    }
+    if(resolution.kind==='conical') {
+      var q=resolution.resolved;
+      return {kind:'cone',index:resolution.index,origin:q.mouthCenter,axis:q.axis,
+        radius:q.radius,bottomRadius:q.bottomRadius,depth:q.depth,outward:q.outward,
+        mouthCenter:q.mouthCenter,bottomCenter:q.bottomCenter,through:q.through,
+        throughCandidate:q.throughCandidate===true,
+        openBottom:q.bottomClosure==='open'||q.through===true,
+        floorEvidence:q.floorEvidence||null,
+        sourceIds:resolution.sourceIds.slice()};
+    }
+    if(resolution.kind==='spherical') {
+      var c=resolution.cand;
+      return {kind:'sphere',index:resolution.index,center:c.center,radius:c.radius,
+        pole:c.pole,outward:c.outward,capAngle:c.capAngle,mouthCenter:c.mouthCenter,
+        mouthRadius:c.mouthRadius,depth:c.depth,sourceIds:resolution.sourceIds.slice()};
+    }
+    return null;
+  }
+  function cavityVolumeSize(volume) {
+    if(volume.kind==='cylinder') return Math.PI*volume.radius*volume.radius*volume.depth;
+    if(volume.kind==='cone') {
+      var a=volume.radius,b=volume.bottomRadius;
+      return Math.PI*volume.depth*(a*a+a*b+b*b)/3;
+    }
+    if(volume.kind==='sphere') {
+      var h=volume.radius*(1-Math.cos(volume.capAngle));
+      return Math.PI*h*h*(3*volume.radius-h)/3;
+    }
+    return 0;
+  }
+  function cavityExclusion(volume) {
+    if(volume.kind==='cylinder') return {kind:'cylinder',origin:volume.origin,axis:volume.axis,
+      radius:volume.radius,depth:volume.depth};
+    if(volume.kind==='cone') return {kind:'cone',origin:volume.origin,axis:volume.axis,
+      radius:volume.radius,bottomRadius:volume.bottomRadius,depth:volume.depth,
+      mouthCenter:volume.mouthCenter,bottomCenter:volume.bottomCenter,
+      outward:volume.outward,through:volume.through===true,
+      throughCandidate:volume.throughCandidate===true,
+      openBottom:volume.openBottom===true,floorEvidence:volume.floorEvidence||null};
+    if(volume.kind==='sphere') return {kind:'sphere',center:volume.center,radius:volume.radius,
+      pole:volume.pole,outward:volume.outward,capAngle:volume.capAngle,
+      mouthCenter:volume.mouthCenter,mouthRadius:volume.mouthRadius};
+    return null;
+  }
+  function unionFindGroups(count, pairs) {
+    var parent=[];
+    for(var i=0;i<count;i++) parent.push(i);
+    function find(i) {while(parent[i]!==i) {parent[i]=parent[parent[i]];i=parent[i];} return i;}
+    pairs.forEach(function(pair) {
+      var a=find(pair.a),b=find(pair.b);
+      if(a!==b) parent[b]=a;
+    });
+    var groups=new Map();
+    for(var i=0;i<count;i++) {
+      var root=find(i);
+      if(!groups.has(root)) groups.set(root,[]);
+      groups.get(root).push(i);
+    }
+    return Array.from(groups.values()).sort(function(a,b) {return a[0]-b[0];});
+  }
+  function addParentCircle(geometry,center,u,v,radius,sourceIds) {
+    var index=geometry.curves.length;
+    geometry.curves.push({kind:'circle',center:center,u:u,v:v,radius:radius,
+      startAngle:0,sweepAngle:TAU,sourceIds:sourceIds.slice(),unionParent:true,
+      displayVertices:[],displayEdges:[]});
+    return index;
+  }
+  function addUnionMouth(geometry,group,curveSourceIds) {
+    var addedCurves=[];
+    group.loops.forEach(function(loop) {
+      var indices=[],base=geometry.vertices.length,added=0;
+      function vertexKey(p) {
+        var scale=group.vertexTolerance;
+        return [Math.round(p.x/scale),Math.round(p.y/scale),Math.round(p.z/scale)].join(',');
+      }
+      loop.forEach(function(p) {
+        var index=group.vertexIndex.get(vertexKey(p));
+        if(index===undefined) {
+          index=base+added;
+          geometry.vertices.push({x:p.x,y:p.y,z:p.z});
+          added++;
+        }
+        if(!indices.length||indices[indices.length-1]!==index) indices.push(index);
+      });
+      if(indices.length>1&&indices[0]===indices[indices.length-1]) indices.pop();
+      var displayEdges=[];
+      for(var i=0;i<indices.length;i++) {
+        var a=indices[i],b=indices[(i+1)%indices.length];
+        var key=Math.min(a,b)+'_'+Math.max(a,b);
+        if(group.edgeIndex.has(key)) displayEdges.push(group.edgeIndex.get(key));
+      }
+      var curveIndex=geometry.curves.length;
+      geometry.curves.push({kind:'polyline',points:loop.map(function(p){return {x:p.x,y:p.y,z:p.z};}),
+        displayVertices:indices,displayEdges:displayEdges,sourceIds:curveSourceIds.slice(),
+        unionMouth:true,recessMouth:true,unionGroup:group.unionGroup,approximate:true,
+        sourceView:group.sourceView});
+      addedCurves.push(curveIndex);
+    });
+    return addedCurves;
+  }
+  function rotateFaceStart(face,vertices) {
+    function areaAt(index) {
+      var a=vertices[face[index%face.length]],b=vertices[face[(index+1)%face.length]],c=vertices[face[(index+2)%face.length]];
+      var u=sub(b,a),v=sub(c,a);
+      return Math.hypot(cross(u,v).x,cross(u,v).y,cross(u,v).z);
+    }
+    for(var i=0;i<face.length;i++) {
+      if(areaAt(i)>EPS) return face.slice(i).concat(face.slice(0,i));
+    }
+    return face;
+  }
+  function addResolvedCavities(geometry,resolutions) {
+    if(!resolutions.length) return;
+    resolutions.forEach(function(resolution,index) {resolution.index=index;});
+    var volumes=resolutions.map(function(resolution) {return cavityVolumeOf(resolution);});
+    var relations=[],interacting=[];
+    for(var i=0;i<volumes.length;i++) for(var j=i+1;j<volumes.length;j++) {
+      var result=CavityBoolean.relation(volumes[i],volumes[j]);
+      relations.push({a:i,b:j,relation:result.relation,clearance:result.clearance,
+        aInsideB:result.aInsideB,bInsideA:result.bInsideA,tolerance:result.tolerance,
+        contact:result.contact});
+      if(result.relation==='overlap'||result.relation==='contained'||result.relation==='duplicate'||result.relation==='touch')
+        interacting.push({a:i,b:j});
+    }
+    var groups=unionFindGroups(volumes.length,interacting);
+    var absorbed=new Set(),absorbedBy={},duplicateOf={};
+    groups.forEach(function(group) {
+      group.forEach(function(a) {
+        group.forEach(function(b) {
+          if(a===b) return;
+          var relation=relations.find(function(pair) {
+            return (pair.a===a&&pair.b===b)||(pair.a===b&&pair.b===a);
+          });
+          if(!relation) return;
+          if(relation.relation==='duplicate') {
+            var keep=Math.min(a,b),drop=Math.max(a,b);
+            if(a===drop) {absorbed.add(a);duplicateOf[a]=keep;}
+          } else if(relation.relation==='contained') {
+            if(relation.aInsideB&&a===relation.a) {absorbed.add(a);absorbedBy[a]=b;}
+            if(relation.bInsideA&&b===relation.b) {absorbed.add(b);absorbedBy[b]=a;}
+          }
+        });
+      });
+    });
+    var unionGroupFor={};
+    groups.forEach(function(group,groupIndex) {
+      if(group.length<2) return;
+      group.forEach(function(index) {unionGroupFor[index]=groupIndex;});
+    });
+    geometry.cavityRelations=relations;
+    geometry.cavityVolumes=volumes.map(function(volume,index) {
+      var entry=Object.assign({},cavityExclusion(volume));
+      entry.index=index;
+      entry.group=unionGroupFor[index]===undefined?null:unionGroupFor[index];
+      entry.absorbed=absorbed.has(index);
+      entry.sourceIds=volume.sourceIds.slice();
+      return entry;
+    });
+    geometry.cavityUnions=geometry.cavityUnions||[];
+    geometry.recesses=geometry.recesses||[];
+    function addAnalyticParent(volume,groupIndex,exclusions) {
+      var resolution=resolutions[volume.index];
+      var booleanDomain={exclude:exclusions,unionGroup:groupIndex,volumeIndex:volume.index,volume:cavityExclusion(volume)};
+      if(volume.kind==='cone') {
+        var cone=resolution.resolved;
+        var coneMouth=addParentCircle(geometry,cone.mouthCenter,cone.u,cone.v,cone.radius,resolution.sourceIds);
+        var coneBottom=cone.bottomRadius>EPS?
+          addParentCircle(geometry,cone.bottomCenter,cone.u,cone.v,cone.bottomRadius,resolution.sourceIds):null;
+        var coneAnalytic=coneGeometry(cone.radius,cone.bottomRadius,cone.depth,cone.axis);
+        var coneApex=add(cone.mouthCenter,mul(cone.axis,coneAnalytic.apexOffset));
+        var coneSideFaceIndices=volume.faceIndices&&volume.faceIndices.side||[];
+        var coneBottomFaceIndices=volume.faceIndices&&volume.faceIndices.bottom||[];
+        var coneSidePatch=geometry.surfacePatches.length;
+        geometry.surfacePatches.push({kind:'cone',analyticKind:'cone',origin:cone.mouthCenter,
+          axis:cone.axis,radius:cone.radius,bottomRadius:cone.bottomRadius,apex:coneApex,
+          halfAngle:coneAnalytic.halfAngle,
+          boundaryCurves:coneBottom===null?[coneMouth]:[coneMouth,coneBottom],
+          faceIndices:coneSideFaceIndices,sourceIds:resolution.sourceIds.slice(),recess:true,
+          unionGroup:groupIndex,volumeIndex:volume.index,memberRole:'side',
+          approximateTrim:true,displayOnlyBoundary:true,booleanDomain:booleanDomain});
+        var coneBottomPatch=null;
+        if(coneBottom!==null&&!cone.through&&cone.bottomClosure!=='open') {
+          coneBottomPatch=geometry.surfacePatches.length;
+          geometry.surfacePatches.push({kind:'plane',boundaryCurves:[coneBottom],
+            faceIndices:coneBottomFaceIndices,closure:'recess-bottom',recessBottom:true,
+            sourceIds:resolution.sourceIds.slice(),unionGroup:groupIndex,
+            volumeIndex:volume.index,memberRole:'bottom',approximateTrim:true,
+            displayOnlyBoundary:true,booleanDomain:booleanDomain});
+        }
+        return {surface:coneSidePatch,bottom:coneBottomPatch};
+      }
+      if(volume.kind==='cylinder') {
+        var r=resolution.resolved;
+        var mouth=addParentCircle(geometry,r.mouthCenter,r.u,r.v,r.radius,resolution.sourceIds);
+        var bottom=addParentCircle(geometry,r.bottomCenter,r.u,r.v,r.radius,resolution.sourceIds);
+        var sideFaceIndices=[],bottomFaceIndices=[];
+        if(volume.faceIndices) {
+          sideFaceIndices=volume.faceIndices.side||[];
+          bottomFaceIndices=volume.faceIndices.bottom||[];
+        }
+        var sidePatch=geometry.surfacePatches.length;
+        geometry.surfacePatches.push({kind:'cylinder',analyticKind:'cylinder',origin:r.mouthCenter,
+          axis:r.axis,radius:r.radius,boundaryCurves:[mouth,bottom],faceIndices:sideFaceIndices,
+          sourceIds:resolution.sourceIds.slice(),recess:true,unionGroup:groupIndex,
+          volumeIndex:volume.index,memberRole:'side',
+          approximateTrim:true,displayOnlyBoundary:true,booleanDomain:booleanDomain});
+        var bottomPatch=geometry.surfacePatches.length;
+        geometry.surfacePatches.push({kind:'plane',boundaryCurves:[bottom],faceIndices:bottomFaceIndices,
+          closure:'recess-bottom',recessBottom:true,sourceIds:resolution.sourceIds.slice(),
+          unionGroup:groupIndex,volumeIndex:volume.index,memberRole:'bottom',
+          approximateTrim:true,displayOnlyBoundary:true,
+          booleanDomain:booleanDomain});
+        return {surface:sidePatch,bottom:bottomPatch};
+      }
+      var c=resolution.cand;
+      var capMouth=addParentCircle(geometry,c.mouthCenter,c.u,c.v,c.mouthRadius,resolution.sourceIds);
+      var capFaceIndices=volume.faceIndices&&volume.faceIndices.cap?volume.faceIndices.cap:[];
+      var capPatch=geometry.surfacePatches.length;
+      geometry.surfacePatches.push({kind:'sphere',center:c.center,radius:c.radius,
+        boundaryCurves:[capMouth],cap:{pole:c.pole,angle:c.capAngle,
+          mouth:{origin:c.mouthCenter,normal:c.outward}},faceIndices:capFaceIndices,
+        sourceIds:resolution.sourceIds.slice(),recess:true,unionGroup:groupIndex,
+        volumeIndex:volume.index,memberRole:'cap',
+        approximateTrim:true,displayOnlyBoundary:true,booleanDomain:booleanDomain});
+      return {surface:capPatch};
+    }
+    groups.forEach(function(group,groupIndex) {
+      if(group.length===1) {
+        var only=resolutions[group[0]];
+        if(only.kind==='cylindrical')
+          addCylindricalRecess(geometry,only.resolved,only.sourceIds,only.mouthIds,only.bottomIds,only.cand.closedMouth,group[0]);
+        else if(only.kind==='conical')
+          addTaperedRecess(geometry,only.resolved,only.sourceIds,only.mouthIds,only.bottomIds,
+            only.ringIds||[],true,group[0]);
+        else
+          addSphericalRecess(geometry,only.cand,only.sourceIds,only.closureIds,only.closed,group[0]);
+        return;
+      }
+      var groupRelations=relations.filter(function(pair) {
+        return group.indexOf(pair.a)!==-1&&group.indexOf(pair.b)!==-1;
+      });
+      var booleanGroup=groupRelations.some(function(pair) {
+        return pair.relation==='overlap'||pair.relation==='contained'||pair.relation==='duplicate'||
+          (pair.relation==='touch'&&pair.contact&&pair.contact.positiveArea===true);
+      });
+      if(!booleanGroup) {
+        group.forEach(function(index) {
+          var only=resolutions[index];
+          if(only.kind==='cylindrical')
+            addCylindricalRecess(geometry,only.resolved,only.sourceIds,only.mouthIds,only.bottomIds,only.cand.closedMouth,index);
+          else if(only.kind==='conical')
+            addTaperedRecess(geometry,only.resolved,only.sourceIds,only.mouthIds,only.bottomIds,
+              only.ringIds||[],true,index);
+          else
+            addSphericalRecess(geometry,only.cand,only.sourceIds,only.closureIds,only.closed,index);
+        });
+        return;
+      }
+      var active=group.filter(function(index) {return !absorbed.has(index);});
+      if(!active.length) active=[group[0]];
+      var groupVolumes=group.map(function(originalIndex,localIndex) {
+        var copy=Object.assign({},volumes[originalIndex]);
+        copy.index=localIndex;
+        copy.absorbed=absorbed.has(originalIndex)&&active.indexOf(originalIndex)===-1;
+        return copy;
+      });
+      var union=CavityBoolean.union(groupVolumes,{segments:SAMPLES});
+      var unionMouths=union.mouths.map(function(mouth) {
+        return {plane:mouth.plane,loops:mouth.loops,
+          sourceVolumes:mouth.sourceVolumes.map(function(localIndex) {
+            return group[localIndex];
+          })};
+      });
+      var vertexOffset=geometry.vertices.length,faceOffset=geometry.faces.length;
+      var edgeMap=new Map();
+      union.vertices.forEach(function(p) {geometry.vertices.push({x:p.x,y:p.y,z:p.z});});
+      union.faces.forEach(function(record,faceIndex) {
+        var face=rotateFaceStart(record.face.slice().reverse().map(function(index) {return index+vertexOffset;}),geometry.vertices);
+        geometry.faces.push(face);
+        for(var i=0;i<face.length;i++) {
+          var a=face[i],b=face[(i+1)%face.length];
+          var key=Math.min(a,b)+'_'+Math.max(a,b);
+          if(!edgeMap.has(key)) {
+            edgeMap.set(key,geometry.edges.length);
+            geometry.edges.push([a,b]);
+          }
+        }
+        var role=record.tag&&record.tag.role;
+        if(role==='side'||role==='cap') geometry.smoothSideFaces.push(faceOffset+faceIndex);
+      });
+      var faceGroups={};
+      union.parents.forEach(function(parent,faceIndex) {
+        var originalIndex=group[parent.volume];
+        if(!faceGroups[originalIndex]) faceGroups[originalIndex]={side:[],bottom:[],cap:[]};
+        if(parent.role==='side') faceGroups[originalIndex].side.push(faceOffset+faceIndex);
+        else if(parent.role==='bottom') faceGroups[originalIndex].bottom.push(faceOffset+faceIndex);
+        else if(parent.role==='cap') faceGroups[originalIndex].cap.push(faceOffset+faceIndex);
+      });
+      var patchInfo={},memberRecords=[];
+      active.forEach(function(index) {
+        var volume=volumes[index];
+        volume.faceIndices=faceGroups[index]||{side:[],bottom:[],cap:[]};
+        var exclusions=[];
+        group.forEach(function(other) {
+          if(other!==index&&!absorbed.has(other)) exclusions.push(cavityExclusion(volumes[other]));
+        });
+        patchInfo[index]=addAnalyticParent(volume,groupIndex,exclusions);
+        if(volume.kind==='cylinder') {
+          var r=resolutions[index].resolved;
+          memberRecords.push({kind:'cylindrical',mouthCenter:r.mouthCenter,mouthRadius:r.radius,
+            axis:r.axis,depth:r.depth,bottomCenter:r.bottomCenter,closure:'host',
+            bottomClosure:'plane',sourceIds:resolutions[index].sourceIds.slice(),
+            unionGroup:groupIndex,unionMode:'display-boolean',absorbed:false,volumeIndex:index,
+            approximateTrim:true,surface:patchInfo[index].surface});
+        } else if(volume.kind==='cone') {
+          var q=resolutions[index].resolved;
+          memberRecords.push({kind:'conical',mouthCenter:q.mouthCenter,mouthRadius:q.radius,
+            axis:q.axis,depth:q.depth,bottomCenter:q.bottomCenter,bottomRadius:q.bottomRadius,
+            through:q.through,throughCandidate:q.throughCandidate===true,
+            floorEvidence:q.floorEvidence||null,
+            closure:'host',
+            bottomClosure:q.through?'through':q.bottomClosure==='open'?'open':'plane',
+            sourceIds:resolutions[index].sourceIds.slice(),
+            unionGroup:groupIndex,unionMode:'display-boolean',absorbed:false,volumeIndex:index,
+            approximateTrim:true,surface:patchInfo[index].surface});
+        } else {
+          var c=resolutions[index].cand;
+          memberRecords.push({kind:'spherical',center:c.center,radius:c.radius,
+            mouthCenter:c.mouthCenter,mouthRadius:c.mouthRadius,depth:c.depth,
+            capAngle:c.capAngle,closure:'host',sourceIds:resolutions[index].sourceIds.slice(),
+            unionGroup:groupIndex,unionMode:'display-boolean',absorbed:false,volumeIndex:index,
+            approximateTrim:true,surface:patchInfo[index].surface});
+        }
+      });
+      group.filter(function(index){return absorbed.has(index);}).forEach(function(index) {
+        var volume=volumes[index];
+        if(volume.kind==='cylinder') {
+          var r=resolutions[index].resolved;
+          memberRecords.push({kind:'cylindrical',mouthCenter:r.mouthCenter,mouthRadius:r.radius,
+            axis:r.axis,depth:r.depth,bottomCenter:r.bottomCenter,
+            closure:'absorbed',bottomClosure:'plane',sourceIds:resolutions[index].sourceIds.slice(),
+            unionGroup:groupIndex,unionMode:'display-boolean',absorbed:true,volumeIndex:index,
+            absorbedBy:absorbedBy[index]===undefined?null:absorbedBy[index],
+            duplicateOf:duplicateOf[index]===undefined?null:duplicateOf[index],
+            approximateTrim:true});
+        } else if(volume.kind==='cone') {
+          var q=resolutions[index].resolved;
+          memberRecords.push({kind:'conical',mouthCenter:q.mouthCenter,mouthRadius:q.radius,
+            axis:q.axis,depth:q.depth,bottomCenter:q.bottomCenter,bottomRadius:q.bottomRadius,
+            through:q.through,closure:'absorbed',
+            bottomClosure:q.through?'through':q.bottomClosure==='open'?'open':'plane',
+            sourceIds:resolutions[index].sourceIds.slice(),
+            unionGroup:groupIndex,unionMode:'display-boolean',absorbed:true,volumeIndex:index,
+            absorbedBy:absorbedBy[index]===undefined?null:absorbedBy[index],
+            duplicateOf:duplicateOf[index]===undefined?null:duplicateOf[index],
+            approximateTrim:true});
+        } else {
+          var c=resolutions[index].cand;
+          memberRecords.push({kind:'spherical',center:c.center,radius:c.radius,
+            mouthCenter:c.mouthCenter,mouthRadius:c.mouthRadius,depth:c.depth,
+            capAngle:c.capAngle,closure:'absorbed',sourceIds:resolutions[index].sourceIds.slice(),
+            unionGroup:groupIndex,unionMode:'display-boolean',absorbed:true,volumeIndex:index,
+            absorbedBy:absorbedBy[index]===undefined?null:absorbedBy[index],
+            duplicateOf:duplicateOf[index]===undefined?null:duplicateOf[index],
+            approximateTrim:true});
+        }
+      });
+      var firstFaceIndex=faceOffset;
+      var vertexTolerance=Math.max(union.tolerance*0.5,1e-9);
+      var unionVertexIndex=new Map();
+      union.vertices.forEach(function(p,index) {
+        unionVertexIndex.set([Math.round(p.x/vertexTolerance),Math.round(p.y/vertexTolerance),
+          Math.round(p.z/vertexTolerance)].join(','),vertexOffset+index);
+      });
+      unionMouths.forEach(function(mouth) {
+        var sourceIds=[];
+        mouth.sourceVolumes.forEach(function(index) {
+          sourceIds=sourceIds.concat(resolutions[index].sourceIds);
+        });
+        var sourceResolution=resolutions[mouth.sourceVolumes[0]];
+        var sourceView=sourceResolution.kind==='cylindrical'||sourceResolution.kind==='conical'?
+          sourceResolution.resolved.view.role:'PLAN';
+        var curves=addUnionMouth(geometry,{loops:mouth.loops,unionGroup:groupIndex,
+          firstFaceIndex:firstFaceIndex,sourceView:sourceView,
+          vertexTolerance:vertexTolerance,vertexIndex:unionVertexIndex,edgeIndex:edgeMap},sourceIds);
+        if(curves.length) memberRecords.forEach(function(record) {
+          if(mouth.sourceVolumes.indexOf(record.volumeIndex)!==-1&&record.mouthCurve===undefined)
+            record.mouthCurve=curves[0];
+        });
+      });
+      memberRecords.forEach(function(record) {geometry.recesses.push(record);});
+      geometry.cavityUnions.push({id:'cavity-union:'+geometry.cavityUnions.length,
+        members:group.map(function(index) {
+          return {volume:index,kind:volumes[index].kind,absorbed:absorbed.has(index),
+            absorbedBy:absorbedBy[index]===undefined?null:absorbedBy[index],
+            duplicateOf:duplicateOf[index]===undefined?null:duplicateOf[index],
+            sourceIds:resolutions[index].sourceIds.slice()};
+        }),relations:relations.filter(function(pair) {
+          return group.indexOf(pair.a)!==-1&&group.indexOf(pair.b)!==-1;
+        }),display:'polyhedral-boolean',analyticParents:true,approximate:true,
+        volume:union.metrics.volume,closed:union.metrics.closed,
+        openEdges:union.metrics.openEdges,nonmanifoldEdges:union.metrics.nonmanifoldEdges,
+        mouthArea:union.mouthArea,segments:SAMPLES,mouths:unionMouths.map(function(mouth) {
+          return {sourceVolumes:mouth.sourceVolumes.slice(),
+            loops:mouth.loops.map(function(loop){return loop.map(function(p){return {x:p.x,y:p.y,z:p.z};});})};
+        })});
+      if(!Array.isArray(geometry.faceHoles))
+        geometry.faceHoles=geometry.faces.map(function(){return [];});
+      while(geometry.faceHoles.length<geometry.faces.length) geometry.faceHoles.push([]);
+    });
+    if(!Array.isArray(geometry.faceHoles))
+      geometry.faceHoles=geometry.faces.map(function(){return [];});
+    while(geometry.faceHoles.length<geometry.faces.length) geometry.faceHoles.push([]);
+  }
+
   var FILLET_VIEWS = ['PLAN','ELEVATION','PROFILE'];
   function filletTolerance(arc) {
     return Math.max(1e-4, 1e-6 * Math.max(1, arc.radius));
@@ -970,10 +1973,10 @@
   function filletTangentDirection(arc, theta) {
     return add(mul(arc.u, -Math.sin(theta)), mul(arc.v, Math.cos(theta)));
   }
-  // Find one straight stroke tangent to the projected cross-section arc at
-  // each endpoint. The stroke must contain the tangency point and must extend
-  // along the face, away from the arc's angular span. The extent it draws
-  // becomes the adjacent planar patch's width.
+
+
+
+
   function filletTangentEvidence(arc, role, profile, ink, used, tol) {
     var conic = projectedConic(arc, role, profile);
     if (!conic) return {conflict:'The fillet cross-section cannot be projected into its own view.'};
@@ -1030,9 +2033,9 @@
       return {conflict:'The two tangent face edges are parallel and do not form a fillet corner.'};
     return {start:first, end:second};
   }
-  // The tangent generator at each arc endpoint is a straight boundary shared
-  // with a planar face. It is visible as a line in a view perpendicular to the
-  // arc plane; that drawn line is the paired-view evidence.
+
+
+
   function filletBoundaryCoverage(line, arcRole, profile, ink, used, tol) {
     for (var i=0;i<FILLET_VIEWS.length;i++) {
       var role = FILLET_VIEWS[i];
@@ -1088,8 +2091,8 @@
     }
     var cylinderFaces = [];
     for (var i=0;i<n;i++) {
-      // The quad follows the arc tessellation and its z translation. Adjacent
-      // quads share the existing arc display edges and a new generator edge.
+
+
       cylinderFaces.push(addFace([lowDV[i], lowDV[i+1], highDV[i+1], highDV[i]], true));
       ensureEdge(lowDV[i], highDV[i]);
     }
@@ -1107,9 +2110,9 @@
     geometry.vertices.push(offsetVertex(A1, wallDirection, wallExtent));
     geometry.vertices.push(offsetVertex(B0, floorDirection, floorExtent));
     geometry.vertices.push(offsetVertex(B1, floorDirection, floorExtent));
-    // Planar face strips. The shared generator lines are traversed in the
-    // opposite direction from the cylinder side, so the display complex stays
-    // consistently oriented.
+
+
+
     var wallFace = addFace([A0, A1, W1, W0], false);
     var floorFace = addFace([B0, F0, F1, B1], false);
     ensureEdge(A1, W1); ensureEdge(W1, W0); ensureEdge(W0, A0);
@@ -1162,7 +2165,7 @@
       normal:normalEnd,u:floorFrame.u,v:floorFrame.v,
       loops:[{kind:'outer',lines:[lineEnd,floorEndLow,floorOuter,floorEndHigh]}],
       faceIndices:[floorFace],sourceIds:cylinderSource.slice(),filletAdjacent:true});
-    // Close the corner bar: one back plane and two cross-section end caps.
+
     var backStart={kind:'line',start:{x:geometry.vertices[W0].x,y:geometry.vertices[W0].y,z:geometry.vertices[W0].z},
       end:{x:geometry.vertices[F0].x,y:geometry.vertices[F0].y,z:geometry.vertices[F0].z},
       id:'fillet-line:' + filletNumber + ':back-start', sourceIds:cylinderSource.slice()};
@@ -1296,7 +2299,7 @@
     });
     return {records:records,issues:issues,consumedIds:Array.from(consumed)};
   }
-  // Share frame validation and inference with the oblique primitive stage.
+
   function resolveProfileFrame(entities, options) {
     options = options || {};
     var ink = entities.filter(function(e) {return e && !helper(e);});
@@ -1316,9 +2319,9 @@
     }
     return {profile:profile || null, issue:frameIssue, inferred:inferredProfile};
   }
-  // Principal views are coordinate observations. Rotate each view pair into
-  // one canonical two-view problem, then transform the inferred primitives
-  // back. This reuses the same curve and ruled-patch construction for all axes.
+
+
+
   function reconstruct(entities, options) {
     options = options || {};
     var ink = entities.filter(function(e) {return e && !helper(e);});
@@ -1352,8 +2355,8 @@
       return [e.type,e.viewRole,r(e.x),r(e.y),r(e.radius),
         e.type==='CIRCLE'?0:r(e.startAngle),e.type==='CIRCLE'?0:r(e.endAngle)].join('|');
     }
-    // Sphere silhouettes are consumed before paired curve lifting so the same
-    // circles are not also reported as missing edge-on projections.
+
+
     inferSpheres(ink,profile).forEach(function(s) {
       var mesh=sphereMesh(s.center,s.radius), vo=geometry.vertices.length, eo=geometry.edges.length, fo=geometry.faces.length;
       geometry.vertices=geometry.vertices.concat(mesh.vertices);
@@ -1366,20 +2369,24 @@
         sourceIds:s.sourceIds.slice(),faceIndices:indices});
       s.sourceIds.forEach(function(id) {used.add(id);});
     });
-    // A full mouth circle plus a cap-silhouette arc determines a spherical
-    // recess. This runs before paired curve lifting so the same primitives are
-    // not also reported as unrelated circles/arcs.
-    inferRecesses(ink,used,geometry).issues.forEach(function(issue) {selectedIssues.push(issue);});
-    // A cylindrical recess needs the surrounding-face frame and the edge-on
-    // depth strokes; this runs after the spherical pass so a mouth/arc pair is
-    // not consumed by the wrong surface family.
-    inferCylindricalRecesses(ink,used,geometry).issues.forEach(function(issue) {selectedIssues.push(issue);});
+
+
+
+    var sphericalCavities=inferRecesses(ink,used,geometry,profile);
+    sphericalCavities.issues.forEach(function(issue) {selectedIssues.push(issue);});
+    var taperedCavities=inferTaperedRecesses(ink,used,geometry,profile);
+    taperedCavities.issues.forEach(function(issue) {selectedIssues.push(issue);});
+    var cylindricalCavities=inferCylindricalRecesses(ink,used,geometry,profile,
+      taperedCavities.blocked);
+    cylindricalCavities.issues.forEach(function(issue) {selectedIssues.push(issue);});
+    addResolvedCavities(geometry,sphericalCavities.resolutions
+      .concat(taperedCavities.resolutions,cylindricalCavities.resolutions));
     function project(p,role) {
       return role==='PLAN'?[p.x,-p.z]:role==='ELEVATION'?[p.x,p.y]:[profile.xRef+profile.s*(p.z-profile.dRef),p.y];
     }
-    // A planar curve is edge-on in a principal view only when both projected
-    // basis vectors are collinear. The returned span includes arc extrema so
-    // the evidence check does not depend on display sampling.
+
+
+
     function projectedSpan(c,role) {
       var center=project(c.center,role);
       var u=project({x:c.center.x+c.u.x,y:c.center.y+c.u.y,z:c.center.z+c.u.z},role).map(function(v,i) {return v-center[i];});
@@ -1394,9 +2401,9 @@
       if(len<EPS*EPS) return null;
       return {a:a,b:b,dx:dx,dy:dy,len:len};
     }
-    // Treat overlapping and split strokes as one interval set, exactly as an
-    // inferred straight edge does. A drawn stroke at the same line either
-    // covers the projection or contradicts it; no stroke leaves the view silent.
+
+
+
     function strokeEvidence(role,span) {
       var intervals=[];
       ink.forEach(function(e) {
@@ -1417,9 +2424,9 @@
       return {kind:c.kind,center:pair.world(c.center),u:pair.world(c.u),v:pair.world(c.v),
         radius:c.radius,startAngle:c.startAngle,sweepAngle:c.sweepAngle};
     }
-    // Score a pair interpretation against every declared view. A third view
-    // can distinguish real curve levels from the cross product of two
-    // overlapping two-view matches; silent views do not vote against a curve.
+
+
+
     function candidateSupport(pair,result) {
       var support={covered:0,contradicted:0,curves:0};
       if(!result.geometry) return support;
@@ -1437,10 +2444,10 @@
       });
       return support;
     }
-    // Select supported groups; never reconstruct the same source curve twice
-    // merely because it is corroborated by a third view. When two pairs explain
-    // the same source curves, prefer the one that no other view contradicts,
-    // then the one with more corroboration and fewer speculative instances.
+
+
+
+
     while(true) {
       var candidates=pairs.map(function(pair) {
         var rows=ink.filter(function(e) {return !isCurve(e) || !used.has(e.id);}).map(function(e) {return transformEntity(e,pair);}).filter(Boolean);
@@ -1479,8 +2486,8 @@
       choice.result.issues.filter(function(i) {
         return ['curve-surface-ambiguous','curve-surface-missing','curve-projection-ambiguous','curve-inclined-arc-unsupported'].indexOf(i.code)!==-1;
       }).forEach(function(i) {selectedIssues.push(i);});
-      // Several distinct source projections each yielding several levels is the
-      // cross-product ambiguity left when no third view selects a pairing.
+
+
       var sourceGroups=new Map();
       g.curves.forEach(function(c) {
         var ids=c.sourceIds.filter(function(id) {var e=sourceById.get(id);return e && isCurve(e);});
@@ -1498,9 +2505,10 @@
           message:'Several curves share this projected extent; add a third view to select the matching level.'});
       });
     }
-    // Validate extra edge-on observations analytically, including vertical
-    // side-view strokes and arc extrema that fall between display samples.
+
+
     geometry.curves.forEach(function(c) {
+      if(c.unionParent||c.unionMouth) return;
       ['PLAN','ELEVATION','PROFILE'].forEach(function(role) {
         if(role==='PROFILE' && !profile) return;
         var span=projectedSpan(c,role);
@@ -1512,9 +2520,9 @@
         });
       });
     });
-    // A cylindrical fillet needs two coaxial cross-section arcs, a tangent
-    // face edge at each arc endpoint and matching generator edges in the paired
-    // view. This runs after curve lifting, so the end arcs already exist.
+
+
+
     var fillets=inferCylindricalFillets(geometry,ink,used,profile);
     fillets.issues.forEach(function(issue) {selectedIssues.push(issue);});
     var issues=selectedIssues.slice();
@@ -1532,13 +2540,13 @@
     return {geometry:geometry.vertices.length?geometry:null,issues:issues,consumedIds:Array.from(used),
       unresolvedIds:ink.filter(function(e) {return (isCurve(e)||e.type==='SEGMENT') && !used.has(e.id);}).map(function(e) {return e.id;})};
   }
-  // ---- Bounded cones over inclined circular boundaries ----
-  // A circle in a general plane projects to an ellipse in a principal view.
-  // Two straight silhouette strokes tangent to that projection and meeting at
-  // a common point locate the projected apex. The 3D apex is then the point on
-  // the base circle's plane normal that projects to it. This is the same
-  // surface family as the coaxial cone path, but the tangency and apex are
-  // derived from the actual projected conic instead of center.x +/- radius.
+
+
+
+
+
+
+
   function cvNormal(c) {return cvUnit(cross(c.u,c.v));}
   function sheetPoint(p,role,profile) {
     if(role==='PLAN') return {x:p.x,y:-p.z};
@@ -1569,10 +2577,10 @@
     var radii=curveRadii(c);
     return Math.max(0.75,0.01*Math.max(radii.u,radii.v));
   }
-  // A line is tangent to x(t)=center+u*cos(t)+v*sin(t) exactly when its
-  // signed support at the centre equals the conic's support in that normal
-  // direction. Solving that sinusoid gives the tangency station on the drawn
-  // boundary, including the degenerate line projection of an edge-on circle.
+
+
+
+
   function segmentTangency(conic,segment,tol) {
     var dx=segment.x2-segment.x,dy=segment.y2-segment.y,len=Math.hypot(dx,dy);
     if(len<EPS) return null;
@@ -1590,8 +2598,8 @@
     var t=((b.x-a.x)*dy2-(b.y-a.y)*dx2)/den;
     return {x:a.x+t*dx1,y:a.y+t*dy1};
   }
-  // Accept split/overlapping strokes along the same tangent. The union must
-  // start at the tangency station and reach the common apex station.
+
+
   function tangentStrokeEvidence(segments,role,from,to,tol) {
     var dx=to.x-from.x,dy=to.y-from.y,len2=dx*dx+dy*dy;
     if(len2<EPS*EPS) return [];
@@ -1613,8 +2621,8 @@
     if(first>slack||reach<1-slack) return [];
     return Array.from(new Set(ids));
   }
-  // The base plane normal is the only direction a right circular cone's apex
-  // can lie along. Intersect that line with the view's projection ray.
+
+
   function solveConeApex(c,role,projected,profile,tol) {
     var normal=cvNormal(c);
     if(!normal) return {state:'invalid'};
@@ -1630,9 +2638,9 @@
       if(Math.abs(coef)>1e-6&&(!best||Math.abs(coef)>Math.abs(best.coef))) best={axis:f.axis,coef:coef};
     });
     if(!best) {
-      // The normal is parallel to this view's projection ray. If the ray is
-      // the normal line itself the apex height is genuinely open; a distinct
-      // parallel ray cannot contain any right-cone apex.
+
+
+
       var centerOnSheet=sheetPoint(c.center,role,profile);
       if(centerOnSheet&&Math.hypot(centerOnSheet.x-projected.x,centerOnSheet.y-projected.y)<=tol)
         return {state:'undetermined'};
@@ -1707,10 +2715,10 @@
       sourceIds:c.sourceIds.slice()});
     return true;
   }
-  // Public surface-inference stage for curves that were lifted by the oblique
-  // kernel. It mutates the geometry and returns consumed stroke IDs and
-  // specific diagnostics. A boundary with no tangent-pair evidence is left as
-  // a standalone planar boundary rather than promoted to a guessed cone.
+
+
+
+
   function inferBoundedCones(geometry,entities,profile) {
     if(!geometry||!Array.isArray(geometry.curves)||!geometry.curves.length) return {consumedIds:[],issues:[]};
     var issues=[],consumed=new Set();

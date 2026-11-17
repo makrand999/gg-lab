@@ -1,5 +1,4 @@
 # expect: 52V 76E 27F curves=2 unresolved=0 status=inferred minRadius=10 maxRadius=20
-# Unequal circular boundaries joined by straight generators.
 /datum -30 70
 /circle 20 -30 20 A plan
 /circle 20 -30 10 A plan

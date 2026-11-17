@@ -1,0 +1,45 @@
+# expect: 8V 12E 6F recesses=0 curves=0 surfaces=6 surfaceKinds=plane surfaceLoops=6 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok diagnostics=curve-projection-missing,point-correspondence-missing,recess-depth-conflict,unresolved-edge unresolved=10 status=partial previewParity=ok
+/datum -100 400
+/profile 100 -7 -1
+/point "v0''" 93 0 profile
+/point "v0'" 20 0 elevation
+/point "v1''" 93 60 profile
+/point "v1'" 20 60 elevation
+/point "v2''" 33 60 profile
+/point "v2'" 20 60 elevation
+/point "v3''" 33 0 profile
+/point "v3'" 20 0 elevation
+/point "v8''" 93 0 profile
+/point "v8'" 60 0 elevation
+/point "v9''" 93 60 profile
+/point "v9'" 60 60 elevation
+/point "v10''" 33 60 profile
+/point "v10'" 60 60 elevation
+/point "v11''" 33 0 profile
+/point "v11'" 60 0 elevation
+/line "v0''" "v1''" A profile
+/line "v0'" "v1'" A elevation
+/line "v1''" "v2''" A profile
+/line "v2''" "v3''" A profile
+/line "v2'" "v3'" A elevation
+/line "v3''" "v0''" A profile
+/line "v8''" "v9''" A profile
+/line "v8'" "v9'" A elevation
+/line "v9''" "v10''" A profile
+/line "v10''" "v11''" A profile
+/line "v10'" "v11'" A elevation
+/line "v11''" "v8''" A profile
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/circle 63 30 10 A profile
+/point "h0'" 60 20 elevation
+/point "h1'" 60 40 elevation
+/point "h2'" 40 40 elevation
+/point "h3'" 40 20 elevation
+/point "h4'" 40 30 elevation
+/line "h0'" "h1'" A elevation
+/line "h1'" "h2'" A elevation
+/line "h3'" "h0'" A elevation
+/line "h3'" "h4'" A elevation

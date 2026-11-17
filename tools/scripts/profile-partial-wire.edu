@@ -1,0 +1,10 @@
+# expect: 2V 1E 0F diagnostics=point-correspondence-missing status=partial previewParity=ok
+/datum -60 240
+/profile 100 0 1
+/point a 0 -10 plan
+/point a'' 110 20 profile
+/point b 20 -30 plan
+/point b'' 130 40 profile
+/line a b A plan
+/line a'' b'' A profile
+/point unfinished 220 70 profile

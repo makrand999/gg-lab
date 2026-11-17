@@ -1,0 +1,68 @@
+# expect: V=80 E=108 F=32 recesses=1 minRecessDepth=20 maxRecessDepth=20 curves=3 surfaces=9 surfaceKinds=cylinder,plane surfaceLoops=11 surfaceShells=1 surfaceOpen=1 surfaceBoundary=1 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component surfaceValidation=issues holes=1 displaySync=ok displaySyncIssues=none diagnostics=point-correspondence-missing,recess-depth-conflict,unresolved-edge unresolved=10 status=partial previewParity=ok surfaceChecks=3 surfaceQueries=ok
+/datum -100 400
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/point h0 20 60 elevation
+/point h1 40 60 elevation
+/point h2 40 40 elevation
+/point h3 20 40 elevation
+/line h0 h1 A elevation
+/line h1 h2 A elevation
+/line h2 h3 A elevation
+/line h3 h0 A elevation
+/circle 30 -15 10 A plan
+/circle 30 -45 10 A plan
+/profile 100 -7 1
+/point sideFaceLeft 100 60 profile
+/point sideFaceRight 170 60 profile
+/line sideFaceLeft sideFaceRight A profile
+/point p1m0 112 60 profile
+/point p1m1 132 60 profile
+/point p1b0 112 40 profile
+/point p1b1 132 40 profile
+/line p1m0 p1m1 A profile
+/line p1m0 p1b0 A profile
+/line p1m1 p1b1 A profile
+/line p1b0 p1b1 A profile
+/point p2m0 142 60 profile
+/point p2m1 162 60 profile
+/point p2b0 142 40 profile
+/point p2b1 162 40 profile
+/point p2partial 152 40 profile
+/line p2m0 p2m1 A profile
+/line p2m0 p2b0 A profile
+/line p2m1 p2b1 A profile
+/line p2b0 p2partial A profile
+# surface-query: {"operation":"display-holes","expect":{"count":1}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":1}}}
+# surface-query: {"operation":"reconstruct","expect":{"status":"ok","recesses":[{"depth":20}]}}

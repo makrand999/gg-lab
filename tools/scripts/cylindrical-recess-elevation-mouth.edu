@@ -1,10 +1,4 @@
-# Cylindrical recess opening through a vertical face: the full mouth circle is
-# in elevation and the depth evidence is in plan. The same inference is used;
-# it is not tied to a plan mouth or to a solid/feature name. The mouth normal is
-# +z, the depth strokes run in -z, and the bottom cap shares the bottom loop.
-# The surrounding plate is not boolean-subtracted, so the display triangle
-# check reports the same expected rim overlap; the analytic certificate is ok.
-# expect: 56V 84E 31F recesses=1 curves=2 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=10 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=issues diagnostics=none unresolved=0 status=inferred
+# expect: 56V 84E 31F recesses=1 minRecessDepth=20 maxRecessDepth=20 curves=2 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=10 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=partial holes=1 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred
 /datum -100 400
 /point v0 0 0 plan
 /point "v0'" 0 0 elevation
@@ -48,7 +42,11 @@
 /line h2 h3 A plan
 /line h3 h0 A plan
 
-# The mouth is z=60 and the shared bottom loop is z=40.
-# expect: surfaceChecks=2 surfaceQueries=ok
+# expect: surfaceChecks=7 surfaceQueries=ok
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":30,"y":30,"z":50},"normal":{"x":0,"y":0,"z":1}},"expect":{"kind":"circle","radius":10,"center":{"x":30,"y":30,"z":50}}}
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","radius":10,"relation":"transverse","center":{"x":30,"y":30,"z":40}}}
+# surface-query: {"operation":"display-holes","expect":{"count":1,"faces":[{"count":1,"vertices":[24]}]}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":1},"features":[{"type":"recess","family":"cylindrical","closure":"host","faces":["surface:0"]}]}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":30,"z":50},"view":"front","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":50,"y":30,"z":50},"view":"front","expect":{"hidden":true}}
+# surface-query: {"operation":"edge-visibility","point":{"x":40,"y":30,"z":40},"view":"front","expect":{"hidden":false}}

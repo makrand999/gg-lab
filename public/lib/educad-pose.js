@@ -6,26 +6,26 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function (Geometry) {
   'use strict';
-  // EduCAD pose mode: grab the 3D model Blender-style and the
-  // already-drawn 2D Monge views ride along in real time. All numbers
-  // here are pure: the page owns the widget, the sheet, and the
-  // events; this module owns the transform, the gestures, the key
-  // map, the per-view follow similarities, and the XY-line clamp.
-  // Zero deps. Dual-env: browser via window.EduCADPose, plain Node via
-  // module.exports. Node-safe. World units mm; widget space is the
-  // locked reconstruct frame (X, Y, Z) = (sheetX, elevY, -planY).
-  //
-  // A pose is {t:[x,y,z], rm:[9 row-major], s:number}: uniform scale
-  // about the model center, then rotation about the center, then
-  // translation. Gestures are pure functions of total mouse travel
-  // from the gesture start, so cancel is just "keep the start pose".
+
+
+
+
+
+
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '1.0.0-educad';
 
   var AXES = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
   var AXIS_COLORS = { X: '#e03232', Y: '#7ac74f', Z: '#3b82f6' };
-  // Datum-line clamp: a posed point may touch the XY line within
-  // CONTACT_EPS but never cross to the other view's side.
+
+
   var CONTACT_EPS = 1e-6;
 
   var RAD_PER_PX = 0.01;
@@ -36,8 +36,8 @@
   var SCALE_MIN = 0.1;
   var SCALE_MAX = 10;
 
-  // Numpad-style view presets (yaw/pitch radians for the glass state).
-  // Top/bottom stop at the widget pitch limit, like the orbit clamp.
+
+
   var VIEW_PRESETS = {
     front: { yaw: 0, pitch: 0 },
     back: { yaw: Math.PI, pitch: 0 },
@@ -134,7 +134,7 @@
     return o;
   }
 
-  // Rodrigues rotation matrix for a unit axis and angle (radians).
+
   function axisAngleMatrix(ax, ay, az, angle) {
     assertFinite(ax, ay, az, angle);
     var len = Math.sqrt(ax * ax + ay * ay + az * az);
@@ -148,8 +148,8 @@
     ];
   }
 
-  // World-frame rotation: premultiply so locked-axis spins stay put no
-  // matter how the model already turned.
+
+
   function rotateAboutAxis(rm, axis, angle) {
     assertMat3(rm, 'rm');
     assertVec3(axis, 'axis');
@@ -157,7 +157,7 @@
     return matMul3(axisAngleMatrix(axis[0], axis[1], axis[2], angle), rm);
   }
 
-  // v' = R * (s * (v - c)) + c + t. Pure: input verts untouched.
+
   function applyPose(verts, pose, center) {
     checkPose(pose);
     if (!Array.isArray(verts)) fail('verts must be an array');
@@ -179,9 +179,9 @@
     return out;
   }
 
-  // Rest-stage mapping: posed mm verts into the widget's stage space
-  // with the ORIGINAL normalize transform, so translation and scale
-  // stay visible instead of being recentered away.
+
+
+
   function stageWithRest(mmVerts, rest) {
     if (!Array.isArray(mmVerts)) fail('verts must be an array');
     if (!rest || typeof rest !== 'object') fail('rest transform needed');
@@ -199,9 +199,9 @@
     return out;
   }
 
-  // Exact inverse of the reconstruct contract: 3D (x, y, z) reads as
-  // elevation (x, y) and plan (x, -z). Points keep vertex order;
-  // segments pass edge indices through.
+
+
+
   function reproject(verts, edges) {
     if (!Array.isArray(verts)) fail('verts must be an array');
     if (!Array.isArray(edges)) fail('edges must be an array');
@@ -226,12 +226,12 @@
     return { elev: { pts: elev, segs: segs }, plan: { pts: plan, segs: segs } };
   }
 
-  // Follow similarities: each drawn view rides the 3D pose by the 2D
-  // similarity (rotation + uniform scale + shift) that best carries
-  // the rest projection to the posed projection (Kabsch, closed
-  // form). Rigid in-plane 3D moves fit exactly; foreshortening moves
-  // fit by least squares, which is the honest "what-if" read for a
-  // viz mode. A sim is {angle, scale, tx, ty}: p' = s*R(a)*p + t.
+
+
+
+
+
+
   function checkSim(sim, what) {
     if (!sim || typeof sim !== 'object') fail(what + ' needs a similarity');
     assertFinite(sim.angle, sim.tx, sim.ty);
@@ -247,8 +247,8 @@
     return sim;
   }
 
-  // Per-axis scales of either sim shape: legacy {scale} reads as
-  // uniform, follow {sx, sy} reads as anisotropic.
+
+
   function scalesOf(sim) {
     checkSim(sim, 'sim');
     if (sim.sx !== undefined || sim.sy !== undefined) {
@@ -303,17 +303,17 @@
     };
   }
 
-  // Follow fit: rotation + INDEPENDENT x/y scales + shift, the
-  // smallest map that foreshortens honestly (a Y spin narrows the
-  // elevation's width while its height stays exact; a uniform
-  // similarity would freeze it or squash it). Returns {angle, sx,
-  // sy, scale, tx, ty} with scale = signed sqrt(|sx*sy|): negative
-  // exactly when the data mirrors (a Z spin past 90 mirrors the
-  // plan's x), in which case the flip is normalized onto x so sy
-  // stays exact and arcs remap deterministically. Falls back to the
-  // legacy similarity (converted) only when the rest set is
-  // degenerate (a point, a horizontal/vertical line). Zero on one
-  // axis is an honest edge-on read (that view is now a line).
+
+
+
+
+
+
+
+
+
+
+
   function follow2D(restPts, posedPts) {
     checkPts2(restPts, 'rest');
     checkPts2(posedPts, 'posed');
@@ -387,19 +387,19 @@
     return applyFollow(sim, x, y);
   }
 
-  // Y half-extent of a unit circle through a sim: exact rim reach
-  // for circles under anisotropic scales (legacy uniform sims read
-  // exactly r * scale, as before; mirrors square away).
+
+
+
   function radiusExtentY(sim) {
     var s = scalesOf(sim);
     var ca = Math.cos(sim.angle), sa = Math.sin(sim.angle);
     return Math.sqrt(sa * s.sx * sa * s.sx + ca * s.sy * ca * s.sy);
   }
 
-  // Image of a rest direction angle through a sim. Exact for
-  // similarities (angle + turn, as before) and for mirror x (which
-  // reads the flipped direction); the best endpoint read under
-  // anisotropic scales, whose true arcs are elliptical.
+
+
+
+
   function followAngle(sim, phi) {
     var s = scalesOf(sim);
     assertFinite(phi);
@@ -407,22 +407,22 @@
       Math.atan2(s.sy * Math.sin(phi), s.sx * Math.cos(phi));
   }
 
-  // View sides of the XY line: world y >= 0 is elevation (VP).
+
   function classifySide(y) {
     assertFinite(y);
     return y >= 0 ? 'elev' : 'plan';
   }
 
-  // Datum routing: which view's sim moves a drawn point. Nonzero y
-  // routes geometrically (a spanning projector stretches instead of
-  // detaching). Points exactly ON the line are ambiguous by
-  // construction — a plan top edge and an elevation bottom edge
-  // coincide there — so ties break by viewRole (PLAN rides plan,
-  // ELEVATION and PROFILE ride elevation, matching the reconstruct
-  // grouping), then by the segment's other endpoint, then elevation
-  // (legacy default). force pins every point to one view; the page
-  // uses it to draw role-less datum geometry in BOTH views (see
-  // routeCopies), which is the only honest read of a shared edge.
+
+
+
+
+
+
+
+
+
+
   function routeSide(y, ent, otherY, force) {
     assertFinite(y);
     if (force === 'elev' || force === 'plan') return force;
@@ -437,12 +437,12 @@
     return 'elev';
   }
 
-  // Copies a datum-ambiguous entity needs: role-less two-point
-  // geometry lying exactly ON the line, and role-less single points
-  // sitting on it, belong to both views at once (their plan and
-  // elevation readings coincide at rest), so they draw and clamp
-  // under each sim. Everything else rides one sim. DATUM_AXIS is
-  // never dual: the line is the fixed reference.
+
+
+
+
+
+
   function routeCopies(ent) {
     if (!ent || typeof ent !== 'object') fail('entity needed');
     if (ent.type === 'DATUM_AXIS') return [undefined];
@@ -465,12 +465,12 @@
     return force;
   }
 
-  // Contact pairs of one entity: rest-y, posed-y, and bound side of
-  // every drawn point the datum clamp watches — anchor, second
-  // endpoint, and the circle rim extremes. DATUM_AXIS yields none:
-  // the XY line is the fixed reference, never a crossing body. Rim
-  // extremes inherit the anchor's side at ties, so a plan circle
-  // touching the line may sink plan-ward without tripping.
+
+
+
+
+
+
   function contactPoints(ent, simElev, simPlan, force) {
     if (!ent || typeof ent !== 'object') fail('entity needed');
     checkSim(simElev, 'simElev');
@@ -500,10 +500,10 @@
     return out;
   }
 
-  // Datum hold: a posed point stays on its bound side of the XY line
-  // (touching within CONTACT_EPS is still holding). The side
-  // defaults to the rest sign, exactly as before; callers pass the
-  // contact pair's side so datum ties bind to their own view.
+
+
+
+
   function holdsSide(restY, posedY, side) {
     assertFinite(restY, posedY);
     var s = (side === undefined || side === null) ? classifySide(restY) : side;
@@ -512,22 +512,22 @@
     return posedY <= CONTACT_EPS;
   }
 
-  // Entity kinds whose second point is drawn geometry (mirrors the
-  // table's two-point rule); every other kind rides on its anchor.
-  // Dummy x2/y2 on single-point entities must stay put, or the XY
-  // clamp would trip on geometry that was never drawn.
+
+
+
+
   var POSE_TWO_POINT_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION',
     'DATUM_AXIS'];
 
-  // Reference ink the sheet holds fixed in pose mode: centre axes and
-  // locus lines are drawing furniture, not part geometry. A spanning
-  // elevation axis ridden endpoint-wise would tilt into a diagonal
-  // across the sheet (each end follows its own view's map), so the
-  // page draws pinned entities unposed, exactly like DATUM_AXIS, and
-  // skips them in the datum clamp. poseCopies/poseEntity stay purely
-  // mechanical (riderless helpers still fit); this predicate is the
-  // page's riding policy, kept here so tests can pin it. Projectors
-  // and hidden edges are NOT pinned: they are live correspondence.
+
+
+
+
+
+
+
+
+
   var POSE_PINNED_KINDS = ['axis', 'locus'];
   function isPosePinned(ent) {
     if (!ent || typeof ent !== 'object') return false;
@@ -535,15 +535,15 @@
     return !!(ent.meta && POSE_PINNED_KINDS.indexOf(ent.meta.kind) !== -1);
   }
 
-  // Posed render copy of one entity: each drawn point rides its own
-  // view's follow map (see routeSide), so a projector spanning the XY
-  // line stretches instead of detaching. Geometric side wins over
-  // viewRole off the line: a point below it rides with plan even on
-  // an ELEVATION entity, so Y slides never drag plan-side geometry
-  // across the datum; on the line the role breaks the tie. force
-  // pins the whole copy to one view for dual-drawn datum geometry.
-  // DATUM_AXIS passes through untouched (the XY line is the fixed
-  // reference). Never mutates the input.
+
+
+
+
+
+
+
+
+
   function copyEntity(ent) {
     var out = {};
     for (var k in ent) {
@@ -552,8 +552,8 @@
     return out;
   }
 
-  // Fresh meta object for a posed copy: rider tags must never leak
-  // back onto the committed entity through the shared reference.
+
+
   function copyMeta(meta) {
     var out = {};
     if (meta && typeof meta === 'object') {
@@ -572,11 +572,11 @@
     return out;
   }
 
-  // Fitted size/angle finish for a posed copy: circle radius keeps its
-  // area under the anchor view's scales, arc angles remap through the
-  // same map (mirrors swap the sweep). Approximate under anisotropic
-  // scales, where true circles image as ellipses; exact for
-  // similarities. Shared by the fitted and exact-riding copies.
+
+
+
+
+
   function finishApprox(out, ent, csim) {
     if (typeof ent.radius === 'number' && ent.radius !== 0) {
       var rs = scalesOf(csim);
@@ -592,7 +592,7 @@
         out.startAngle = angle(ent.startAngle);
         out.endAngle = angle(ent.endAngle);
       }
-      // Retain a normalized positive CCW sweep across the atan2 branch cut.
+
       out.endAngle = out.startAngle + Geometry.arcSweep(out.startAngle, out.endAngle);
     }
     return out;
@@ -619,22 +619,22 @@
     return finishApprox(out, ent, simOf(sa));
   }
 
-  // Exact riding: drawn ink sitting on a solid vertex rides that vertex
-  // instead of the fitted similarity, so dots, labels, and projector
-  // feet stay glued to the exact overlay when a pose splits coincident
-  // geometry (a Z spin parts the prism's plan rings, which no single
-  // similarity can follow). A drawn point rides the vertices whose rest
-  // projection it touches within POSE_SNAP_EPS; anything else keeps the
-  // fitted copy, exactly as before. Rest-anchored (correspondence never
-  // drifts mid-gesture), deduped (coincident points merge, collinear
-  // overlapping segments merge to their union, so rest poses draw
-  // exactly as before).
+
+
+
+
+
+
+
+
+
+
   var POSE_SNAP_EPS = 1e-6;
 
   function edgeKey(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
 
-  // Compact exact-riding lookup: rest and posed per-view projections
-  // (reproject shapes, same vertex order) plus the solid edge set.
+
+
   function exactIndex(rest2D, now2D, edges) {
     if (!rest2D || typeof rest2D !== 'object' ||
         !rest2D.elev || !rest2D.plan) {
@@ -692,9 +692,9 @@
   }
 
   function dedupePoints(copies) {
-    // Merged copies union their rider tags: at rest one copy stands
-    // for every corner still stacked on it, so annotations keep the
-    // full caption until the corners genuinely part.
+
+
+
     var kept = [];
     copies.forEach(function (cp) {
       for (var j = 0; j < kept.length; j++) {
@@ -718,9 +718,9 @@
     return Math.abs((px - ax) * dy - (py - ay) * dx) / len;
   }
 
-  // Near-collinear with overlapping range: the two copies read as one
-  // line (per-corner projectors at rest overlap on the original line;
-  // parted corners fail the distance test and stay split).
+
+
+
   function collinearOverlap(a, b) {
     var eps = POSE_SNAP_EPS;
     if (lineDist(a.x, a.y, b.x, b.y, b.x2, b.y2) > eps) return false;
@@ -742,10 +742,10 @@
     return hi >= lo - eps;
   }
 
-  // Coincident ink draws once: transitively merge near-collinear
-  // overlapping copies, each group redrawn as its bounding union, so a
-  // rest projector renders as its whole original line while parted
-  // corners keep their own readings.
+
+
+
+
   function dedupeSegs(segs) {
     var groups = [];
     segs.forEach(function (sg) {
@@ -796,10 +796,10 @@
     return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
   }
 
-  // Every solid corner a rest segment touches (endpoints and interior
-  // through-points alike, either view): the cross-view correspondence
-  // a spanning line carries. Endpoint riders are always a subset (both
-  // ends lie on the segment).
+
+
+
+
   function touchedBy(index, ent) {
     var out = [];
     var n = index.rest.elev.pts.length;
@@ -813,14 +813,14 @@
     return out;
   }
 
-  // Posed render copies with exact riding (see above). Points emit one
-  // copy per ridden vertex. Spanning two-point entities are cross-view
-  // correspondence: every solid corner the rest line touches gets its
-  // own true projector, endpoints pinned to their own views. Same-view
-  // two-point entities read edge-wise (a drawn outline stands for the
-  // solid edges joining its ridden endpoints). Either falls back to the
-  // single fitted copy when nothing qualifies; index null/omitted
-  // disables snapping entirely. Never mutates inputs.
+
+
+
+
+
+
+
+
   function poseCopies(ent, simElev, simPlan, force, index) {
     if (!ent || typeof ent !== 'object') fail('entity needed');
     checkSim(simElev, 'simElev');
@@ -882,16 +882,16 @@
     return dedupeSegs(segs);
   }
 
-  // Stack-split captions: a multi-part POINT caption ('g,a') names
-  // coincident corners; when the pose parts them, each copy keeps only
-  // the part naming its own corner. Parts resolve through the mate dot
-  // in the other view: a part belongs to the rider whose rest mate
-  // position carries that corner's name. Collaborators arrive via ctx
-  // ({index, restPoints, splitCaption, bareName, cornerOf}) so this
-  // module stays dependency-free; anything missing or unresolvable
-  // keeps the full caption — the worst case is today's duplication,
-  // never a lost name. Mutates copy captions in place, never the
-  // committed entity. Returns copies.
+
+
+
+
+
+
+
+
+
+
   function splitStackCaption(ent, copies, force, ctx) {
     if (!ent || ent.type !== 'POINT' || !Array.isArray(copies) ||
         copies.length < 2) {
@@ -943,11 +943,11 @@
     return copies;
   }
 
-  // Per-view follow maps for a pose: pose the mm verts about the
-  // center, reproject, and fit each rest view to its posed view.
-  // Returns {elev, plan, posed, now} — the two follow maps plus the
-  // posed verts and their exact reprojection, which the datum clamp
-  // measures (drawn entities can only approximate it).
+
+
+
+
+
   function simsForPose(verts, edges, pose, center, rest2D) {
     if (!rest2D || typeof rest2D !== 'object' ||
         !rest2D.elev || !rest2D.plan) {
@@ -963,11 +963,11 @@
     };
   }
 
-  // True-projection contact pairs: every reprojected vertex bound to
-  // its own view's side of the XY line, absolutely — elevation may
-  // sit on the line but never below it, plan never above it. This is
-  // the one datum rule, measured on exact projections rather than
-  // fitted similarities, so no fit can hide a crossing or invent one.
+
+
+
+
+
   function projectionPairs(rest2D, posed2D) {
     if (!rest2D || typeof rest2D !== 'object' ||
         !rest2D.elev || !rest2D.plan) {
@@ -997,8 +997,8 @@
     return out;
   }
 
-  // Gesture clamp: largest fraction f in [0,1] whose pose holds.
-  // poseAt maps a fraction to a pose; isValid answers the XY wall.
+
+
   function limitFraction(poseAt, isValid) {
     if (typeof poseAt !== 'function' || typeof isValid !== 'function') {
       fail('limitFraction needs two functions');
@@ -1013,13 +1013,13 @@
     return lo;
   }
 
-  // Camera basis in world coords from the glass yaw/pitch (inverse of
-  // the widget projector): screen-right, screen-up, and view-forward.
+
+
   function cameraAxes(yaw, pitch) {
     assertFinite(yaw, pitch);
     var cy = Math.cos(yaw), sy = Math.sin(yaw);
     var cp = Math.cos(pitch), sp = Math.sin(pitch);
-    // +0 folds negative zero so rest angles read exactly.
+
     return {
       right: [cy + 0, 0, sy + 0],
       up: [sp * sy + 0, cp + 0, -sp * cy + 0],
@@ -1047,8 +1047,8 @@
 
   function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 
-  // Pure gesture step: start pose + TOTAL mouse travel -> new pose.
-  // camera = {yaw, pitch}; opts = {pxPerMm (>0), snap (bool)}.
+
+
   function applyGesture(startPose, gesture, dxPx, dyPx, camera, opts) {
     checkPose(startPose);
     if (!gesture || GESTURE_OPS.indexOf(gesture.op) === -1) {
@@ -1125,8 +1125,8 @@
     return pose;
   }
 
-  // XYZ-Euler readout (degrees) for the HUD. Display only: the matrix
-  // stays the source of truth.
+
+
   function eulerXYZOf(rm) {
     assertMat3(rm, 'rm');
     var sy = rm[2];
@@ -1145,8 +1145,8 @@
     return [x * d, y * d, z * d];
   }
 
-  // Blender-style key map. key = e.key, code = e.code (may be missing
-  // in old browsers). Returns an action name or null (not ours).
+
+
   function keyAction(key, code, mods) {
     mods = mods || {};
     var k = String(key === undefined || key === null ? '' : key);

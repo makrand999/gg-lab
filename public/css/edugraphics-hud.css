@@ -1,4 +1,4 @@
-/* EduGraphics HUD + 2-option menu only. Dual-layer Canvas2D mount. */
+
 .edugraphics-mount {
   position: relative;
   overflow: hidden;
@@ -51,7 +51,7 @@ button.edugraphics-menu-item {
 }
 .edugraphics-menu-item:focus-visible { outline: 2px solid #0284c7; outline-offset: -2px; }
 .edugraphics-menu-item:hover { background: #eef; }
-/* EduCAD floating 3D wireframe cube: transparent stage sketched on the sheet. */
+
 .educad-solid {
   position: absolute;
   z-index: 5;
@@ -88,12 +88,12 @@ button.edugraphics-menu-item {
 .educad-solid-handle:active {
   opacity: 1;
 }
-/* EduCAD full-screen 3D glass: transparent sheet over the whole window.
-   Ink floats above the 2D layers (later DOM order wins the z-index tie)
-   and below HUD chrome; pointer-events:none everywhere so the sheet
-   keeps every event the wireframe aura does not claim. Critical layout
-   is also set inline at mount, so a missing stylesheet can never block
-   or shift the drawing. */
+
+
+
+
+
+
 .educad-solid-glass {
   position: absolute;
   left: 0;

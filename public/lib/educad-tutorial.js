@@ -6,18 +6,18 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD scripted-user tutorials: stepwise lessons that draw through the
-  // page's own user-action functions (place, select, rename, anchor, lock,
-  // BIS pick) instead of injecting entities. Each step pairs one action
-  // with its explanation. The engine below is pure navigation + script
-  // validation; the page executes actions and resolves '@N' refs (placed
-  // points in creation order) to live ids. Zero deps. Dual-env: browser
-  // via window.EduCADTutorial, plain Node via module.exports. Node-safe.
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '1.1.0-educad';
-  // Mirrors the line tool's offered BIS codes (canvas stays the owner).
+
   var STEP_BIS_CODES = ['A', 'B', 'E', 'G', 'K'];
-  var STEP_OPS = ['setup', 'place', 'rename', 'anchor', 'lock', 'type', 'check'];
+  var STEP_OPS = ['setup', 'place', 'rename', 'anchor', 'lock', 'type', 'note', 'check'];
 
   function assertFinite() {
     for (var i = 0; i < arguments.length; i++) {
@@ -32,11 +32,11 @@
     return typeof s === 'string' && /^@[1-9][0-9]*$/.test(s);
   }
 
-  // Profile Square in 32 steps: furniture, four corner dots, shared
-  // edge-on outlines (drawn BEFORE naming, so no member claim attaches
-  // to shared ink), neutral pair names, one declared projector per
-  // corner, paren verdicts, then Check. Coordinates match profileSquare
-  // (40 mm at x = 0); captions match its stations.
+
+
+
+
+
   var SQUARE_SCRIPT = [
     { say: 'Fresh sheet with the XY ground line. The datum is furniture — everything else you draw.',
       do: { op: 'setup' } },
@@ -104,15 +104,15 @@
       do: { op: 'check' } }
   ];
 
-  // Hexagonal prism in 88 steps: the honest solid. Six plan dots around
-  // a flat-top hexagon (back edge nearest XY, front edge deepest), eight
-  // elevation dots (four lone silhouette corners, four stacked front+back
-  // pairs), shared ink BEFORE naming, four full-height unclaimed projectors (geometry
-  // pairs every corner here, so no member claim is needed — the square's
-  // claims were its rescue, not a ritual), neutral pair names, paren
-  // verdicts, then Check. Coordinates match regularSolid PRISM (35 mm
-  // across corners, 70 mm tall, centred x = 0); captions match its
-  // stations. @1..@6 plan v0..v5, @7..@14 elevation.
+
+
+
+
+
+
+
+
+
   var PRISM_SCRIPT = [
     { say: 'Fresh sheet with the XY ground line. You are drawing a 35 mm hexagonal prism, 70 mm tall.',
       do: { op: 'setup' } },
@@ -292,9 +292,86 @@
       do: { op: 'check' } }
   ];
 
-  // validateScript(script): every step needs a non-empty saying and a
-  // well-formed action; refs must point at dots placed by earlier steps.
-  // Returns {ok, errors[]} — never throws on script shape.
+
+
+
+  var THREE_VIEW_PRISM_SCRIPT = [
+    { say: 'A complete three-view sheet: plan below XY, elevation above, profile right. The 3D panel reconstructs it from the views.',
+      do: { op: 'setup', sheet: 'PRISM' } },
+    { say: 'Plan (below XY): a 35 mm regular hexagon. Corners pair top and bottom members, so each station carries two names.',
+      do: { op: 'note' } },
+    { say: 'Elevation (above XY): the 35 x 70 mm rectangle plus two facet verticals. Outer stations are single corners; inner stations pair front and back.',
+      do: { op: 'note' } },
+    { say: 'Profile (right): the same 70 mm height, width equal to the plan depth. Horizontal projectors and the 45-degree miter carry depth across.',
+      do: { op: 'note' } },
+    { say: 'Looking from above, the bottom hexagon hides under the top one. Mark each plan lower member in parentheses.',
+      do: { op: 'note' } },
+    { say: 'Plan right corner: g visible, a hidden.', do: { op: 'rename', target: 'g,a', name: 'g,(a)' } },
+    { say: 'Plan back-right corner: h,(b).', do: { op: 'rename', target: 'h,b', name: 'h,(b)' } },
+    { say: 'Plan back-left corner: i,(c).', do: { op: 'rename', target: 'i,c', name: 'i,(c)' } },
+    { say: 'Plan left corner: j,(d).', do: { op: 'rename', target: 'j,d', name: 'j,(d)' } },
+    { say: 'Plan front-left corner: k,(e).', do: { op: 'rename', target: 'k,e', name: 'k,(e)' } },
+    { say: 'Plan front-right corner: l,(f).', do: { op: 'rename', target: 'l,f', name: 'l,(f)' } },
+    { say: 'In elevation the front corner covers the back one. Mark the inner-right lower member: f\',(b\').',
+      do: { op: 'rename', target: "f',b'", name: "f',(b')" } },
+    { say: 'Inner-right top station: l\',(h\').', do: { op: 'rename', target: "l',h'", name: "l',(h')" } },
+    { say: 'Inner-left bottom station: e\',(c\').', do: { op: 'rename', target: "e',c'", name: "e',(c')" } },
+    { say: 'Inner-left top station: k\',(i\'). The four outer silhouette corners stay bare.',
+      do: { op: 'rename', target: "k',i'", name: "k',(i')" } },
+    { say: 'Check hidden grades every verdict, then look at the 3D panel: the prism built itself from the three views.',
+      do: { op: 'check' } }
+  ];
+
+  var THREE_VIEW_PYRAMID_SCRIPT = [
+    { say: 'A complete three-view sheet for a 35 mm square pyramid, 70 mm tall: plan below, elevation above, profile right.',
+      do: { op: 'setup', sheet: 'PYRAMID' } },
+    { say: 'Plan: the base square Type A plus the apex s at its centre. Two slants run to the rear corners as hidden ink.',
+      do: { op: 'note' } },
+    { say: 'Elevation: the base edge and both visible slants form a triangle with the apex s\' at 70 mm.',
+      do: { op: 'note' } },
+    { say: 'Profile: the same triangle seen from the side; its width is the base depth and its apex lines up over the centre.',
+      do: { op: 'note' } },
+    { say: 'The three views fix five corners. The 3D panel shows the pyramid; press Check hidden to inspect the sheet.',
+      do: { op: 'check' } }
+  ];
+
+  var THREE_VIEW_CYLINDER_SCRIPT = [
+    { say: 'A complete three-view sheet for a 35 mm diameter cylinder, 70 mm tall: plan below, elevation above, profile right.',
+      do: { op: 'setup', sheet: 'CYLINDER' } },
+    { say: 'Plan: the circular rim. The centre o marks the axis and is not itself a surface corner.',
+      do: { op: 'note' } },
+    { say: 'Elevation: a 35 x 70 mm rectangle. The curved surface projects to two straight generators, and the base edge is hidden ink.',
+      do: { op: 'note' } },
+    { say: 'Profile: the same rectangle; its width equals the diameter. The profile outline is display ink, not extra edges.',
+      do: { op: 'note' } },
+    { say: '3D uses the plan rim and elevation height. The profile stays as a construction view, so the model is the reconstructed cylinder.',
+      do: { op: 'note' } },
+    { say: 'Press Check hidden, then inspect the curved 3D model in the panel.',
+      do: { op: 'check' } }
+  ];
+
+  var THREE_VIEW_CONE_SCRIPT = [
+    { say: 'A complete three-view sheet for a 35 mm diameter cone, 70 mm tall: plan below, elevation above, profile right.',
+      do: { op: 'setup', sheet: 'CONE' } },
+    { say: 'Plan: the base circle with the apex s at its centre. All base rim points share that one projected apex.',
+      do: { op: 'note' } },
+    { say: 'Elevation: the base edge and two slants rise to the apex s\' at 70 mm; the base edge is hidden ink.',
+      do: { op: 'note' } },
+    { say: 'Profile: the same triangle from the side. Its apex sits over the centre and its base width is the diameter.',
+      do: { op: 'note' } },
+    { say: '3D uses the plan base circle and the elevation apex. The profile outline is display/construction ink.',
+      do: { op: 'note' } },
+    { say: 'Press Check hidden, then inspect the reconstructed cone in the 3D panel.',
+      do: { op: 'check' } }
+  ];
+
+  var THREE_VIEW_SCRIPTS = {
+    'three-view-prism': THREE_VIEW_PRISM_SCRIPT,
+    'three-view-pyramid': THREE_VIEW_PYRAMID_SCRIPT,
+    'three-view-cylinder': THREE_VIEW_CYLINDER_SCRIPT,
+    'three-view-cone': THREE_VIEW_CONE_SCRIPT
+  };
+
   function validateScript(script) {
     var errors = [];
     if (!Array.isArray(script)) return { ok: false, errors: ['script must be an array'] };
@@ -316,7 +393,9 @@
           errors.push(tag + ': place needs finite x/y');
         }
       } else if (a.op === 'rename') {
-        if (!isRef(a.ref)) errors.push(tag + ': rename needs a @N ref');
+        if (a.target !== undefined) {
+          if (typeof a.target !== 'string' || a.target === '') errors.push(tag + ': rename target must name a station');
+        } else if (!isRef(a.ref)) errors.push(tag + ': rename needs a @N ref');
         else if (Number(a.ref.slice(1)) > placed) errors.push(tag + ': ref before its place');
         if (typeof a.name !== 'string' || a.name === '') errors.push(tag + ': rename needs a name');
       } else if (a.op === 'anchor') {
@@ -368,6 +447,7 @@
     WORLD_UNITS: WORLD_UNITS, VERSION: VERSION,
     STEP_OPS: STEP_OPS, STEP_BIS_CODES: STEP_BIS_CODES,
     SQUARE_SCRIPT: SQUARE_SCRIPT, PRISM_SCRIPT: PRISM_SCRIPT,
+    THREE_VIEW_SCRIPTS: THREE_VIEW_SCRIPTS,
     validateScript: validateScript,
     createStepper: createStepper, total: total, done: done,
     current: current, advance: advance, back: back, restart: restart

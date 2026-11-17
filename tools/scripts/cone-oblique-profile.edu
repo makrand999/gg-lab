@@ -1,5 +1,3 @@
-# The same inference from a plan/profile pair with a mirrored side frame.
-# The profile tangents still meet the apex on the base-plane normal.
 # expect: 25V 48E 25F curves=1 oblique=1 obliqueReprojection=ok surfaces=2 surfaceKinds=cone,plane surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
 /datum -100 400
 /profile 80 -10 -1

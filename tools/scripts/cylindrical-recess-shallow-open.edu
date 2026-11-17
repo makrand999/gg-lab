@@ -1,10 +1,4 @@
-# Shallow open cylindrical recess: mouth radius 10, depth 8. The elevation
-# face edge covers the mouth but there is no exact mouth stroke, so the cavity
-# is determined and its bottom is capped, while the mouth is retained open.
-# The depth strokes and bottom edge still fix the cylinder and its depth.
-# The plate display overlap is the same non-boolean limitation as the closed
-# case; the analytic certificate records one open cavity component.
-# expect: 56V 84E 31F recesses=1 curves=2 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=9 surfaceShells=1 surfaceOpen=1 surfaceBoundary=1 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component surfaceValidation=issues diagnostics=recess-mouth-unclosed unresolved=1 status=partial
+# expect: 56V 84E 31F recesses=1 curves=2 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=9 surfaceShells=1 surfaceOpen=1 surfaceBoundary=1 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component surfaceValidation=issues holes=0 diagnostics=recess-mouth-unclosed unresolved=1 status=partial
 /datum -100 400
 /point v0 0 0 plan
 /point "v0'" 0 20 elevation
@@ -47,7 +41,9 @@
 /line h2 h3 A elevation
 /line h3 h0 A elevation
 
-# The open cavity keeps the same radius and the shared bottom loop at depth 8.
-# expect: surfaceChecks=2 surfaceQueries=ok
+# expect: surfaceChecks=5 surfaceQueries=ok
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":30,"y":56,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":10,"center":{"x":30,"y":56,"z":30}}}
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","radius":10,"relation":"transverse","center":{"x":30,"y":52,"z":30}}}
+# surface-query: {"operation":"display-holes","expect":{"count":0}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":56,"z":30},"view":"top","expect":{"hidden":true}}
+# surface-query: {"operation":"visibility","point":{"x":50,"y":56,"z":30},"view":"top","expect":{"hidden":true}}

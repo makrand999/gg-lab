@@ -1,5 +1,3 @@
-# Two inclined traces fit the same circular extent. Both levels are retained,
-# and the cut level is reported unresolved instead of choosing one silently.
 # expect: 72V 96E 27F curves=3 surfaces=4 surfaceKinds=cylinder,plane surfaceOpen=1 surfaceModel=partial diagnostics=curve-projection-ambiguous,curve-surface-missing,unresolved-edge unresolved=3 status=partial
 /datum -30 80
 /point o 20 -30 plan

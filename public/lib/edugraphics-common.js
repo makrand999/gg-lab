@@ -7,12 +7,12 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduGraphics minimal container mount bridge. Dual-layer Canvas2D mount:
-  // layer1 static + layer2 dynamic, 3 zoom buttons (zoom-in, zoom-out,
-  // zoom-home), one 2-option menu (Plain (No Mesh), Box Mesh). Nothing else.
-  // World mm only; px is ephemeral render only. Elev x equals plan x.
-  // Dual-env: browser via window.EduGraphicsCommon, Node via module.exports.
-  // Zero deps. Node-safe: without DOM a headless stub is returned.
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '7.0.0-educad';
   var LAYERS = ['layer1', 'layer2'];
@@ -27,13 +27,13 @@
   var BUTTON_LABELS = { 'zoom-in': '+', 'zoom-out': '-', 'zoom-home': 'Home' };
   var MENU_LABELS = { plain: 'Plain (No Mesh)', mesh: 'Box Mesh' };
 
-  // Checked state per spec 4.4: Plain checked iff !showGrid, Mesh iff showGrid.
+
   function menuChecked(showGrid) {
     return { plain: !showGrid, mesh: !!showGrid };
   }
 
-  // Reflect checked state onto a mounted handle's menu items (data-checked).
-  // No-op for headless stubs; returns the applied state.
+
+
   function syncMenuChecked(handle, showGrid) {
     var st = menuChecked(showGrid);
     if (handle && !handle.headless && handle.menuItems) {
@@ -52,8 +52,8 @@
       (typeof document.createElement === 'function');
   }
 
-  // Device pixel ratio: explicit opt wins, else window.devicePixelRatio,
-  // else 1. Node-safe (no window reference unless present).
+
+
   function resolveDpr(optsDpr) {
     if (optsDpr !== undefined && optsDpr !== null) {
       var o = Number(optsDpr);
@@ -67,8 +67,8 @@
     return 1;
   }
 
-  // Backing-store size for crisp HiDPI linework: integer buffer scaled by
-  // dpr, CSS box kept at CSS px. Pure (headless-testable).
+
+
   function hidpiBufferSize(w, h, dpr) {
     var cw = toIntSize(w, 800);
     var ch = toIntSize(h, 600);
@@ -81,8 +81,8 @@
     };
   }
 
-  // Size one canvas element: buffer = css * dpr, style box = css px, and
-  // the 2d context pre-scaled so drawing code keeps using CSS px.
+
+
   function sizeCanvasForDpr(c, size) {
     c.width = size.bufW;
     c.height = size.bufH;
@@ -97,7 +97,7 @@
           ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
         }
       }
-    } catch (e) { /* headless/mock DOM: sizing stands without ctx */ }
+    } catch (e) {                                                    }
     return c;
   }
 
@@ -118,8 +118,8 @@
     };
   }
 
-  // Mount into container (DOM node). opts {w,h}. Returns a handle.
-  // Without DOM, or when container is null, returns a headless stub.
+
+
   function mountContainer(container, opts) {
     opts = opts || {};
     var w = toIntSize(opts.w, 800);
@@ -179,7 +179,7 @@
     }
   }
 
-  // Idempotent unmount: safe to call twice.
+
   function unmountContainer(handle) {
     if (!handle || typeof handle !== 'object') return null;
     if (handle.headless) {

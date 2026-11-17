@@ -1,0 +1,66 @@
+# expect: V=104 E=156 F=56 recesses=2 minRecessDepth=19 maxRecessDepth=20 curves=4 surfaces=10 surfaceKinds=cylinder,plane surfaceLoops=14 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceCertificateScope=none surfaceValidation=partial holes=2 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred previewParity=ok surfaceChecks=5 surfaceQueries=ok
+/datum -100 400
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/point h0 15 60 elevation
+/point h1 35 60 elevation
+/point h2 35 41 elevation
+/point h3 15 41 elevation
+/line h0 h1 A elevation
+/line h1 h2 A elevation
+/line h2 h3 A elevation
+/line h3 h0 A elevation
+/point topP 25 -30 plan
+/point topE 25 60 elevation
+/rename topP top members
+/rename topE top members
+/circle top 10 A plan
+/point bottomP 35 -30 plan
+/point bottomE 35 20 elevation
+/rename bottomP bottom members
+/rename bottomE bottom members
+/circle bottom 10 A plan
+/point b0 25 20 elevation
+/point b1 45 20 elevation
+/point b2 45 40 elevation
+/point b3 25 40 elevation
+/line b0 b1 A elevation
+/line b1 b2 A elevation
+/line b2 b3 A elevation
+/line b3 b0 A elevation
+
+# surface-query: {"operation":"display-holes","expect":{"count":2}}
+# surface-query: {"operation":"cavity","action":"summary","expect":{"volumes":2,"recesses":2,"unions":0,"absorbed":0,"approximate":0,"relations":[{"a":0,"b":1,"relation":"separate"}]}}
+# surface-query: {"operation":"cavity","action":"relations","expect":{"relations":[{"a":0,"b":1,"relation":"separate","clearance":1,"aInsideB":false,"bInsideA":false}]}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":2}}}
+# surface-query: {"operation":"cavity-spec","a":{"kind":"cylinder","origin":{"x":25,"y":60,"z":30},"axis":{"x":0,"y":-1,"z":0},"radius":10,"depth":19,"outward":{"x":0,"y":1,"z":0},"mouthCenter":{"x":25,"y":60,"z":30}},"b":{"kind":"cylinder","origin":{"x":35,"y":20,"z":30},"axis":{"x":0,"y":1,"z":0},"radius":10,"depth":20,"outward":{"x":0,"y":-1,"z":0},"mouthCenter":{"x":35,"y":20,"z":30}},"expect":{"relation":"separate","clearance":1}}

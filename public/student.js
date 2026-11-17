@@ -1,10 +1,10 @@
 'use strict';
-/* EduCAD student workspace: join classes, solve sets, manage drawings,
-   track submissions, grades and auto-check results. Codeforces-clean,
-   link actions only. Students land here after login; the drawing sheet
-   (index.html) opens for solving via ?solve=, ?drawing= and ?submission=
-   deep links. Verify on the sheet checks against the teacher's model
-   answer (strict pass/fail) without ever showing the model drawing. */
+
+
+
+
+
+
 (function () {
   var Saves = window.EduCADSaves;
   if (!Saves) return;
@@ -13,7 +13,7 @@
   function fi() { return window.fetch.bind(window); }
   function session() { return Saves.currentSession(); }
 
-  // Gate: students only.
+
   var s0 = session();
   if (!s0 || Saves.isGuest(s0)) { window.location.replace('login.html'); return; }
   if (s0.role === 'teacher' || s0.role === 'academics') {
@@ -122,14 +122,14 @@
     return row;
   }
 
-  // ---- home: join, classes, feed, drawings, submissions, progress ----
+
   function renderHome() {
     clear(root);
     flash('');
     var s = session();
     if (!s) { window.location.replace('login.html'); return; }
 
-    // Join a class.
+
     root.appendChild(h2('Join a class'));
     var form = el('div', null, 'lab-form');
     var codeIn = document.createElement('input');
@@ -160,7 +160,7 @@
       'Joining lists the class sets below.', 'lab-hint'));
     root.appendChild(form);
 
-    // My classes.
+
     root.appendChild(h2('My classes'));
     var clsBox = el('div', 'Loading…', 'lab-muted');
     root.appendChild(clsBox);
@@ -199,7 +199,7 @@
       apiError(err, 'Classes failed to load');
     });
 
-    // Sets to solve.
+
     root.appendChild(h2('Sets to solve'));
     var open = el('div', null, 'lab-form');
     var openIn = document.createElement('input');
@@ -233,7 +233,7 @@
       apiError(err, 'Sets failed to load');
     });
 
-    // My drawings.
+
     root.appendChild(h2('My drawings'));
     var drawBox = el('div', 'Loading…', 'lab-muted');
     root.appendChild(drawBox);
@@ -271,7 +271,7 @@
       apiError(err, 'Drawings failed to load');
     });
 
-    // My submissions.
+
     root.appendChild(h2('My submissions'));
     var mineBox = el('div', 'Loading…', 'lab-muted');
     root.appendChild(mineBox);
@@ -312,7 +312,7 @@
       apiError(err, 'Submissions failed to load');
     });
 
-    // Progress.
+
     root.appendChild(h2('Tutorial progress'));
     var progBox = el('div', 'Loading…', 'lab-muted');
     root.appendChild(progBox);
@@ -326,7 +326,11 @@
       }
       var lessons = [
         { key: 'square', label: 'Square construction' },
-        { key: 'prism', label: 'Hexagonal prism' }
+        { key: 'prism', label: 'Hexagonal prism' },
+        { key: 'three-view-prism', label: 'Three-view hex prism' },
+        { key: 'three-view-pyramid', label: 'Three-view square pyramid' },
+        { key: 'three-view-cylinder', label: 'Three-view cylinder' },
+        { key: 'three-view-cone', label: 'Three-view cone' }
       ];
       var list = el('div', null, 'lab-list');
       lessons.forEach(function (L) {
@@ -347,7 +351,7 @@
     });
   }
 
-  // ---- class detail: sets to solve ----
+
   function renderClass(code) {
     clear(root);
     flash('');
@@ -390,7 +394,7 @@
     });
   }
 
-  // ---- set detail: questions with solve links ----
+
   function renderSet(code) {
     clear(root);
     flash('');
@@ -455,7 +459,7 @@
         'Submit sends it to your teacher from the sheet\'s Sets panel. ' +
         'When the teacher shares a 3D reference it appears beside the ' +
         'sheet while solving — draw the views from it.', 'lab-hint'));
-      // Overlay my latest status per question.
+
       Saves.listMySubmissions(fi(), session()).then(function (md) {
         var latest = {};
         (md.submissions || []).forEach(function (it) {
@@ -475,7 +479,7 @@
             box.parentNode.insertBefore(r, box.nextSibling);
           }
         });
-      }, function () { /* status overlay is best-effort */ });
+      }, function () {                                     });
     }, function (err) {
       head.textContent = '';
       if (err && err.status === 404) {
@@ -486,26 +490,9 @@
     });
   }
 
-  // ---- manual (inline, student slice) ----
-  function renderManual() {
-    clear(root);
-    flash('');
-    var s = session();
-    if (!s) { window.location.replace('login.html'); return; }
-    if (!window.EduCADLabManual) {
-      window.location.href = 'manual.html';
-      return;
-    }
-    window.EduCADLabManual.show(root, 'student');
-  }
 
-  // ---- routing ----
   function route() {
     var h = String(window.location.hash || '').replace(/^#/, '');
-    if (h === 'manual') {
-      renderManual();
-      return;
-    }
     if (h.indexOf('class/') === 0 && h.length > 6) {
       renderClass(decodeURIComponent(h.slice(6)));
       return;
@@ -517,6 +504,5 @@
     renderHome();
   }
   window.addEventListener('hashchange', route);
-  if (window.EduCADLabManual) window.EduCADLabManual.wireNav();
   route();
 })();

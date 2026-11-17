@@ -1,4 +1,3 @@
-# plate-hole
 # expect: 8V 8E 1F holes=1 open=1 boundary=8
 /datum -100 400
 /point v0 0 -10 plan

@@ -9,16 +9,17 @@
     var rows=entities.filter(function(e){return e.type==='CURVE'&&!(e.meta&&e.meta.reconstructionRole==='construction');});
     var curves=[],issues=[];
     function diag(code,e,message){issues.push({code:code,entityId:e.id,sourceIds:[e.id],message:message});}
-    function stations(e){return (e.meta.throughRefs||[]).map(function(id){return byId.get(id);});}
+    function stations(e){return (Array.isArray((e.meta||{}).throughRefs)?e.meta.throughRefs:[]).map(function(id){return byId.get(id);});}
     function ids(p){return ((p.meta||{}).members||[]).map(function(m){return m.id;});}
-    // Compatibility import reads station labels once at this boundary. A
-    // suffix-stripped base name (a, a', a'') names the same spatial station;
-    // explicit member IDs remain the authoritative identity.
+
+
+
     function names(p){return String(p.caption||p.name||'').split(',').map(function(part){
       return part.trim().replace(/^\((.*)\)$/,'$1').replace(/['′’]+$/,'');
     }).filter(Boolean);}
     function sharedIds(a,b){return ids(a).some(function(id){return ids(b).indexOf(id)!==-1;});}
-    function sharedNames(a,b){return names(a).some(function(name){return names(b).indexOf(name)!==-1;});}
+    function declared(p){return !!(p.meta&&p.meta.membersDeclared);}
+    function sharedNames(a,b){return !declared(a)&&!declared(b)&&names(a).some(function(name){return names(b).indexOf(name)!==-1;});}
     function shared(a,b){return sharedIds(a,b)||sharedNames(a,b);}
     function linkedTo(a,b){return stations(a).some(function(p){return stations(b).some(function(q){return shared(p,q);});});}
     function coords(p,role) {
@@ -33,7 +34,7 @@
       if(n<2||n!==B.length||A.concat(B).some(function(p){return !p;}))return [];
       var aid=new Set(A.flatMap(ids)),bid=new Set(B.flatMap(ids));
       var sharedId=Array.from(aid).some(function(id){return bid.has(id);});
-      var explicit=A.concat(B).some(function(p){return p.meta&&p.meta.membersDeclared;});
+      var explicit=A.concat(B).some(declared);
       var constrainStations=explicit||sharedId||linkedTo(a,b);
       var solutions=[];
       for(var reverse=0;reverse<2;reverse++)for(var offset=0;offset<(closed?n:1);offset++) {
@@ -52,7 +53,7 @@
       }
       return solutions;
     }
-    // A reconstructed point projected back into a drawing view.
+
     function drawing(p,role) {
       if(role==='PLAN') return {x:p.x,y:-p.z};
       if(role==='ELEVATION') return {x:p.x,y:p.y};
@@ -66,12 +67,12 @@
       return a.viewRole!==b.viewRole && a.meta.curve.closed===b.meta.curve.closed &&
         stations(a).length>=2 && stations(a).length===stations(b).length;
     }
-    // Return the station order of c that projects the reconstructed points
-    // back onto c's drawing, or null when c disagrees with the model.
+
+
     function orderFor(points,refs,c) {
       var C=stations(c),n=C.length,closed=c.meta.curve.closed;
       if(n!==points.length)return null;
-      var constrain=c.meta.membersDeclared||refs.some(function(p){return C.some(function(q){return shared(p,q);});});
+      var constrain=refs.concat(C).some(declared)||refs.some(function(p){return C.some(function(q){return shared(p,q);});});
       for(var reverse=0;reverse<2;reverse++)for(var offset=0;offset<(closed?n:1);offset++) {
         var order=C.map(function(_,i){return closed?(offset+(reverse?-i:i)+n)%n:reverse?n-1-i:i;});
         var valid=true;
@@ -85,20 +86,24 @@
       return null;
     }
     rows=rows.filter(function(a) {
-      if(!a.meta || !P.validate(a.meta.curve)||a.meta.curve.parameterization!=='uniform-stations'||!a.meta.throughRefs||stations(a).some(function(p){return !p;})) {
-        diag('curve-definition-unsupported',a,'This curve needs a valid definition and its defining stations for cross-view reconstruction.');return false;
+      if(!a.meta || !P.validate(a.meta.curve)||a.meta.curve.parameterization!=='uniform-stations'||!Array.isArray(a.meta.throughRefs)||stations(a).some(function(p){return !p||p.type!=='POINT'||p.viewRole!==a.viewRole;})) {
+        diag('curve-definition-unsupported',a,'This curve needs a valid definition and an array of defining point stations in the same declared view for cross-view reconstruction.');return false;
       }
       var definition;
       try {definition=P.interpolate(stations(a),a.meta.curve.closed);} catch(error) {diag('curve-definition-conflict',a,error.message);return false;}
-      if(definition.controlPoints.length!==a.meta.curve.controlPoints.length || definition.controlPoints.some(function(p,i){var q=a.meta.curve.controlPoints[i];return Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z)>EPS;})) {
+      var stored=a.meta.curve;
+      var sameBasis=stored.degree===definition.degree&&stored.knots.length===definition.knots.length&&
+        stored.knots.every(function(k,i){return k===definition.knots[i];})&&
+        stored.weights.every(function(w){return Math.abs(w/stored.weights[0]-1)<1e-12;});
+      if(!sameBasis || definition.controlPoints.length!==stored.controlPoints.length || definition.controlPoints.some(function(p,i){var q=stored.controlPoints[i];return Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z)>EPS;})) {
         diag('curve-definition-conflict',a,'The stored curve no longer matches its defining stations. Rebuild the curve from its points.');return false;
       }
       return true;
     });
-    // Curves with the same station count and closure in different views form a
-    // correspondence family. Within a family, match curves into one group per
-    // spatial curve instead of treating the whole family as one curve: two
-    // independent splines in plan and two in elevation must stay separate.
+
+
+
+
     var parent=rows.map(function(_,i){return i;});
     function find(i){while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;}
     function union(i,j){var a=find(i),b=find(j);if(a!==b)parent[b]=a;}
@@ -110,9 +115,9 @@
       components[componentIndex[root]].push(e);
     });
     var rowIndex=new Map(rows.map(function(e,i){return [e,i];}));
-    // Spatial geometry is compared modulo station direction and, for a closed
-    // curve, modulo the starting station. Two different matchings that produce
-    // the same curve are not an ambiguity in the reconstructed geometry.
+
+
+
     function roundedPoints(points) {
       return points.map(function(p){return [p.x,p.y,p.z].map(function(v){return Math.round(v*1e7)/1e7;}).join(',');});
     }
@@ -131,11 +136,11 @@
       return forward<backward?forward:backward;
     }
     function stationKeys(p) {
-      return ids(p).map(function(id){return 'id:'+id;}).concat(names(p).map(function(name){return 'name:'+name;}));
+      return ids(p).map(function(id){return 'id:'+id;}).concat(declared(p)?[]:names(p).map(function(name){return 'name:'+name;}));
     }
-    // A group is identity-consistent when no station identity appears at two
-    // different parameter positions. Shared IDs are authoritative; the
-    // suffix-stripped names are the compatibility fallback.
+
+
+
     function identityConflict(evidence) {
       var seen=Object.create(null),conflict=false;
       evidence.forEach(function(entry) {
@@ -177,8 +182,8 @@
       function diagnose(code,message) {
         component.forEach(function(e){diag(code,e,message);});
       }
-      // Every cross-view pair proposes full 3D station sequences. Each
-      // sequence is then tested against the other curves in the family.
+
+
       var candidates=[];
       for(var ci=0;ci<component.length;ci++)for(var cj=ci+1;cj<component.length;cj++) {
         if(!plausible(component[ci],component[cj]))continue;
@@ -187,10 +192,10 @@
             candidates.push({points:solution.points,refs:stations(component[ci])});
         });
       }
-      // A group is one spatial curve: at most one source curve per view. A
-      // candidate can be shared by several alternative curves in one view;
-      // those alternatives become separate group options, so the partition
-      // below has to choose a mutually consistent matching.
+
+
+
+
       var groups=[];
       candidates.forEach(function(candidate) {
         var support=[],byRole=Object.create(null),roleOrder=[];
@@ -218,7 +223,7 @@
             points:candidate.points,score:identityScore(evidence)});
         });
       });
-      // Deduplicate options identical in row assignment and geometry.
+
       var options=[];
       groups.forEach(function(group) {
         var key=group.evidence.map(function(e){return e.row.id+':'+e.order.join(',');}).join('|')+
@@ -229,12 +234,12 @@
         return b.score-a.score || compareRows(a,b) ||
           (pointsKey(a.points,a.rows[0].meta.curve.closed)<pointsKey(b.points,b.rows[0].meta.curve.closed)?-1:1);
       });
-      // Partition the family into spatial curves. Every source curve belongs
-      // to exactly one group; a full partition is required so a contradictory
-      // third view cannot be dropped in favour of a two-view pair.
-      var solutions=[],cap=512;
+
+
+
+      var solutions=[],cap=512,exhausted=false;
       function walk(remaining,chosen) {
-        if(solutions.length>=cap)return;
+        if(solutions.length>=cap){exhausted=true;return;}
         if(!remaining.length){solutions.push(chosen.slice());return;}
         var first=remaining[0];
         for(var oi=0;oi<options.length;oi++) {
@@ -244,17 +249,21 @@
           chosen.push(group);
           walk(remaining.filter(function(row){return group.rows.indexOf(row)===-1;}),chosen);
           chosen.pop();
-          if(solutions.length>=cap)return;
+          if(solutions.length>=cap){exhausted=true;return;}
         }
       }
       walk(component.slice(),[]);
+      if(exhausted) {
+        diagnose('curve-correspondence-search-limit','Curve matching reached its search limit; link station identities or add a constraining view before selecting a reconstruction.');
+        return;
+      }
       if(!solutions.length) {
         diagnose('curve-projection-conflict','The corresponding views disagree at the defining stations; correct the conflicting projection.');
         return;
       }
-      // Shared member IDs are authoritative, then suffix-stripped names. Only
-      // when identity evidence is equally strong is a remaining difference a
-      // genuine correspondence ambiguity.
+
+
+
       var top=-1;
       solutions.forEach(function(solution){
         var score=solution.reduce(function(sum,group){return sum+group.score;},0);

@@ -6,12 +6,12 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD Phase 7 cold boot + lifecycle. Wires viewport, canvas, entities,
-  // shim, solver, snapping, instruments, curriculum, labels from injected
-  // deps or window globals. Owns no deps. init is O(1) wiring only (no lesson
-  // build) so cold boot stays under 3 ms. World mm only; px is ephemeral
-  // render only. Elev x equals plan x. Node-safe: DOM is touched only via
-  // the common mount bridge when a container is passed.
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '7.0.0-educad';
   var BOOT_BUDGET_MS = 3;
@@ -74,9 +74,9 @@
     throw new Error('educad-boot: entities module has no table factory');
   }
 
-  // init(opts): opts may carry {viewport, canvas, entities, shim, solver,
-  // snapping, instruments, curriculum, labels, common, container, w, h}.
-  // Core trio (viewport, canvas, entities) is required; rest is optional.
+
+
+
   function init(opts) {
     opts = opts || {};
     var V = pick(opts.viewport, 'EduCADViewport');
@@ -135,7 +135,7 @@
     };
   }
 
-  // dispose(handle): clears the table, unmounts, marks disposed. Idempotent.
+
   function dispose(handle) {
     if (!handle || typeof handle !== 'object') {
       throw new Error('educad-boot: dispose needs a boot handle');
@@ -145,13 +145,13 @@
       if (handle.table && typeof handle.table.clear === 'function') {
         handle.table.clear();
       }
-    } catch (e) { /* clear faults never break dispose */ }
+    } catch (e) {                                        }
     try {
       var C = handle.modules && handle.modules.common;
       if (handle.mount && C && typeof C.unmountContainer === 'function') {
         C.unmountContainer(handle.mount);
       }
-    } catch (e2) { /* unmount faults never break dispose */ }
+    } catch (e2) {                                          }
     handle.mount = null;
     handle.disposed = true;
     return handle;
@@ -171,7 +171,7 @@
     };
   }
 
-  // Time one headless init+dispose cycle in ms.
+
   function coldBootMs(opts) {
     var t0 = nowMs();
     var h = init(opts);
@@ -180,7 +180,7 @@
     return t1 - t0;
   }
 
-  // Projector invariant: elevation x equals plan x (mm).
+
   function checkProjector(planMm, elevMm, eps) {
     var e = (eps === undefined) ? VERTICAL_EPS : eps;
     return Math.abs(elevMm.x - planMm.x) <= e;

@@ -6,9 +6,9 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD drawing saves + progress client. DOM-free: the browser UI lives
-  // in index.html; this module only snapshots/restores entity tables and
-  // speaks the /api/* JSON endpoints. Guests never touch the server.
+
+
+
   var SAVE_VERSION = 2;
   var SAVE_FORMAT = 'educad-save-v2';
   var SESSION_KEY = 'educad_session';
@@ -16,7 +16,7 @@
   function defaultStorage() {
     try {
       if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
-    } catch (err) { /* blocked storage */ }
+    } catch (err) {                       }
     return null;
   }
 
@@ -26,12 +26,12 @@
       if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
         return window.fetch.bind(window);
       }
-    } catch (err) { /* no fetch */ }
+    } catch (err) {                }
     return null;
   }
 
-  // Session kept by login.js: {role, username, name, token}. Guests carry
-  // role 'guest' with a dummy token and must stay server-free.
+
+
   function currentSession(storage) {
     var store = (storage === undefined) ? defaultStorage() : storage;
     if (!store) return null;
@@ -51,9 +51,9 @@
       session.token === 'guest';
   }
 
-  // Deep JSON snapshot of every entity in table order. The round-trip
-  // detaches the payload from live table objects (later edits cannot
-  // corrupt an in-flight save) and drops non-JSON values.
+
+
+
   function snapshotTable(table) {
     if (!table || typeof table.list !== 'function') {
       throw new Error('saves: snapshot needs an entity table');
@@ -63,10 +63,10 @@
     return JSON.parse(JSON.stringify(snap));
   }
 
-  // Read older snapshots without mutating the stored payload. Version 1
-  // stored the same entity array without a format tag; unknown additive
-  // fields are preserved. A newer version is refused before any live state
-  // changes.
+
+
+
+
   function migrateSnapshot(data) {
     if (!data || typeof data !== 'object' || !Array.isArray(data.entities)) {
       throw new Error('saves: snapshot needs an entities array');
@@ -87,9 +87,9 @@
     return out;
   }
 
-  // Atomically replace the table with a snapshot: every entity is built
-  // (and validated by E.createEntity) BEFORE the table is touched, so a
-  // malformed payload throws with the live sheet unchanged. Returns count.
+
+
+
   function restoreTable(E, table, data) {
     if (!E || typeof E.createEntity !== 'function' || !Array.isArray(E.ENTITY_TYPES)) {
       throw new Error('saves: restore needs the entities module');
@@ -112,8 +112,8 @@
       seen[e.id] = true;
       return e;
     });
-    // Resolve old name references with the complete snapshot, including
-    // forward references, without changing the caller's saved payload.
+
+
     built.forEach(function (e) { e.meta = E.normalizeMeta(built, e); });
     E.validateIdentityGraph(built);
     if (typeof table.replace === 'function') {
@@ -125,10 +125,10 @@
     return built.length;
   }
 
-  // API paths are mount-relative (no leading slash) so the same code
-  // works on a root-mounted dev server (/api/…) and under a sub-path
-  // mount (/major/api/…). Callers must pass relative paths too.
-  // Thin fetch wrapper: bearer auth, JSON in/out, Error(status) on failure.
+
+
+
+
   function apiRequest(fetchImpl, method, path, session, body) {
     if (typeof fetchImpl !== 'function') {
       return Promise.reject(new Error('saves: fetch unavailable'));
@@ -222,9 +222,9 @@
   }
   function setQuestionModel(fetchImpl, session, code, qi, data, extra) {
     var body = { data: data };
-    // Fresh 3D preview derived from the model by the caller (see
-    // educad-ref3d.js). Omit it and the server erases the stored preview
-    // so students never draw from a stale shape.
+
+
+
     if (extra && typeof extra === 'object') {
       if (extra.model3d !== undefined) body.model3d = extra.model3d;
       if (extra.show_3d !== undefined) body.show_3d = extra.show_3d;
@@ -271,9 +271,9 @@
       { state: state });
   }
 
-  // Fire-and-forget glue for the app shell: resolves {skipped:true} for
-  // guests or when fetch/storage is unavailable instead of rejecting.
-  // deps ({fetch, storage}) is injectable for tests; browser uses globals.
+
+
+
   function recordProgress(lesson, state, deps) {
     var d = deps || {};
     var store = (d.storage === undefined) ? defaultStorage() : d.storage;

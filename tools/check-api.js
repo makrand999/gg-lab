@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
-// Zero-dependency API manifest check: aggregate namespace, contract IDs,
-// declared exports and release identity must agree.
+
+
 var fs = require('fs');
 var path = require('path');
 

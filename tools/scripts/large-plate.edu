@@ -1,4 +1,3 @@
-# large-plate
 # expect: 12V 12E 1F holes=0 open=1 boundary=12
 /datum -100 400
 /point v0 40 -60 plan

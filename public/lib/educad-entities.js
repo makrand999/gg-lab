@@ -6,26 +6,26 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function (Parametric) {
   'use strict';
-  // World coordinates in mm only inside entities and solvers.
-  // Screen px is ephemeral render only (never stored on entities).
-  // Projector invariant: elevation x equals plan x (mm).
+
+
+
   var WORLD_UNITS = 'mm';
   var VERTICAL_EPS = 1e-9;
   var COINCIDENT_TOL_MM = 1e-6;
   var RADIUS_MIN_MM = 0.01;
 
   var ENTITY_TYPES = ['POINT', 'SEGMENT', 'LINE', 'RAY', 'CIRCLE', 'CIRCULAR_ARC', 'CURVE', 'DIMENSION', 'TEXT', 'DATUM_AXIS'];
-  // Core line property: a line-like entity IS two distinct points. These
-  // types can never be created, added, or updated into a coincident
-  // (zero-length) state -- endpoints within COINCIDENT_TOL_MM are one
-  // point, and one point is a POINT, never a line.
+
+
+
+
   var TWO_POINT_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION', 'DATUM_AXIS'];
   var VIEW_ROLES = ['PLAN', 'ELEVATION', 'BOTH', 'PROFILE'];
   var BIS_CODES = ['A', 'B', 'E', 'G', 'H', 'K'];
   var LAYER_STATIC = 'layer1';
   var LAYER_DYNAMIC = 'layer2';
 
-  // BIS SP 46 pipeline: pattern + width in mm. Dash arrays in mm.
+
   var BIS_STYLES = {
     A: { code: 'A', pattern: 'solid', dashMm: [], widthMm: 0.50, width: 'thick', use: 'visible outlines and edges' },
     B: { code: 'B', pattern: 'solid', dashMm: [], widthMm: 0.20, width: 'thin', use: 'dimension extension hatching leaders' },
@@ -35,7 +35,7 @@
     K: { code: 'K', pattern: 'chain-double-dot', dashMm: [12, 3, 2, 3, 2, 3], widthMm: 0.20, width: 'thin', use: 'adjacent parts alternate positions centroids' }
   };
 
-  // Dimension arrowheads: 3-to-1, 3.5mm long x 1.167mm wide; outward flip under 30px.
+
   var ARROW_LEN_MM = 3.5;
   var ARROW_WIDTH_MM = 1.167;
   var ARROW_RATIO = 3;
@@ -78,7 +78,15 @@
     return rMm < RADIUS_MIN_MM ? RADIUS_MIN_MM : rMm;
   }
 
-  // CadEntity: mm-only storage. Never stores px.
+
+
+  function assertThroughRadius(type, radius, meta) {
+    if ((type === 'CIRCLE' || type === 'CIRCULAR_ARC') && meta && meta.throughRefs && radius < RADIUS_MIN_MM) {
+      throw new Error('A circle or arc through points needs a radius of at least ' + RADIUS_MIN_MM + ' mm.');
+    }
+  }
+
+
   function createEntity(type, opts) {
     opts = opts || {};
     if (!isValidType(type)) throw new Error('unknown entity type: ' + String(type));
@@ -95,6 +103,7 @@
     assertTwoPoints(type, x, y, x2, y2);
     var radius = (opts.radius === undefined) ? 0 : opts.radius;
     assertFinite(radius);
+    assertThroughRadius(type, radius, opts.meta);
     if (radius !== 0) radius = clampRadius(radius);
     var sa = (opts.startAngle === undefined) ? 0 : opts.startAngle;
     var ea = (opts.endAngle === undefined) ? 0 : opts.endAngle;
@@ -142,7 +151,7 @@
   function widthMmFor(code) { return bisStyleFor(code).widthMm; }
   function patternFor(code) { return bisStyleFor(code).pattern; }
 
-  // Resolve render style: entity.thickness overrides BIS width when set.
+
   function resolveStyle(entity) {
     var base = bisStyleFor(entity.bisCode);
     if (entity.thickness !== null && entity.thickness !== undefined) {
@@ -169,10 +178,10 @@
     return widthMm * scale;
   }
 
-  // Cosmetic screen weight: zoom-invariant so close vertices stay visible.
-  // Thin (BIS B/G/H/K, 0.20 mm) renders 1 px; thick (A, 0.50 mm) and medium
-  // (E, 0.35 mm, the series midpoint, breaking toward weight) render 2 px.
-  // Physical mm widths apply only to print/export (widthToPx), never here.
+
+
+
+
   var COSMETIC_CUTOFF_MM = 0.35;
 
   function cosmeticWidthPx(widthMm) {
@@ -180,9 +189,9 @@
     return widthMm >= COSMETIC_CUTOFF_MM ? 2 : 1;
   }
 
-  // Cosmetic screen cadence: dash/gap lengths stay constant px at every
-  // zoom (BIS SP 46 screen column: E [8,4], G/H [12,3,2,3],
-  // K [12,3,2,3,2,3]). Scaled mm cadences are export-only (dashToPx).
+
+
+
   function cosmeticDashPx(dashMm) {
     if (!Array.isArray(dashMm)) throw new Error('dashMm must be an array');
     var out = [];
@@ -195,7 +204,7 @@
 
   function arrowheadMm() { return { lenMm: ARROW_LEN_MM, widthMm: ARROW_WIDTH_MM, ratio: ARROW_RATIO }; }
 
-  // Outward flip when dimension screen length is under 30px.
+
   function arrowFlipNeeded(lenPx) {
     assertFinite(lenPx);
     return lenPx < ARROW_FLIP_PX;
@@ -206,7 +215,7 @@
     return { x: x * view.s + view.tx, y: view.ty - y * view.s };
   }
 
-  // Ephemeral px render job. Never mutates the entity (mm-only storage).
+
   function renderEntity(view, entity) {
     assertFinite(view.s, view.tx, view.ty);
     if (!isValidType(entity.type)) throw new Error('unknown entity type: ' + String(entity.type));
@@ -237,7 +246,7 @@
     return job;
   }
 
-  // Projector invariant: elevation x equals plan x (mm).
+
   function checkProjector(planMm, elevMm, eps) {
     assertFinite(planMm.x, planMm.y, elevMm.x, elevMm.y);
     var e = (eps === undefined) ? VERTICAL_EPS : eps;
@@ -258,17 +267,17 @@
     this._mutationGuard = null;
   }
 
-  // IDs own dependencies; names are resolved only at legacy/input boundaries.
-  // Ambiguous names never guess which coincident object the user intended.
+
+
   function resolveReference(entities, ref, type) {
     var exact = entities.find(function (e) { return e.id === ref; });
     if (exact) return !type || exact.type === type ? exact : null;
     var matches = entities.filter(function (e) { return (!type || e.type === type) && (e.name === ref || e.caption === ref); });
     return matches.length === 1 ? matches[0] : null;
   }
-  // Labels are presentation. Members identify spatial points independently of
-  // names, positions and projection roles. Missing members means legacy data;
-  // an explicit empty array means an intentionally unassigned station.
+
+
+
   function parseMembers(caption) {
     return String(caption || '').split(',').map(function (part) {
       var token = part.trim(), hidden = /^\(.*\)$/.test(token);
@@ -295,6 +304,41 @@
       seen[m.id] = true;
     });
   }
+
+
+
+
+
+  function withDeclaredMembers(entities) {
+    if (!Array.isArray(entities)) return entities;
+    var owners = new Map(), declared = new Set(), queue = [];
+    entities.forEach(function(e,i) {
+      if (!e || e.type !== 'POINT') return;
+      var meta=e.meta||{}, members=meta.members;
+      if (meta.membersDeclared === true || members !== undefined &&
+          (!Array.isArray(members) || !members.length || members.some(function(m,j) {return !m || m.id !== 'point:'+e.id+':'+j;}))) {
+        declared.add(i); queue.push(i);
+      }
+      if (Array.isArray(members)) members.forEach(function(m) {
+        if (!m || typeof m.id !== 'string') return;
+        if (!owners.has(m.id)) owners.set(m.id,[]);
+        owners.get(m.id).push(i);
+      });
+    });
+    for (var q=0;q<queue.length;q++) {
+      var members=(entities[queue[q]].meta||{}).members;
+      if (!Array.isArray(members)) continue;
+      members.forEach(function(m) {
+        if (!m || !owners.has(m.id)) return;
+        owners.get(m.id).forEach(function(i) {
+          if (!declared.has(i)) {declared.add(i);queue.push(i);}
+        });
+      });
+    }
+    return entities.map(function(e,i) {
+      return declared.has(i) ? Object.assign({},e,{meta:Object.assign({},e.meta,{membersDeclared:true})}) : e;
+    });
+  }
   function identitySnapshot(entities, namespace) {
     var list = JSON.parse(JSON.stringify(entities));
     var occurrences = Object.create(null);
@@ -306,8 +350,8 @@
         counts[view] = (counts[view] || 0) + 1;
       });
     });
-    // Explicit compatibility import for records predating member identities.
-    // Names are read once here; subsequent changes use stored IDs only.
+
+
     list.forEach(function (e) {
       if (e.type === 'POINT' && !Array.isArray(e.meta && e.meta.members)) {
         e.meta = e.meta || {};
@@ -342,8 +386,8 @@
       });
     });
   }
-  // Adapt explicit identities to the existing mathematical readers. The
-  // adapter is pure: neither display labels nor stored entities are changed.
+
+
   function semanticEntities(entities, ids) {
     var list = identitySnapshot(entities), byId = Object.create(null);
     list.forEach(function (e) { byId[e.id] = e; });
@@ -375,7 +419,7 @@
       if (c && pointsCoincideMm(c.x, c.y, entity.x, entity.y)) m.centerRef = c.id;
     }
     if (CASCADE_LINE_TYPES.indexOf(entity.type) !== -1 && m.refs && m.refs.length > 2 && !m.endpointRefs) {
-      // Old polygon/polyline edges stored the entire chain in refs.
+
       m.endpointRefs = [[entity.x, entity.y], [entity.x2, entity.y2]].map(function (xy) {
         var pts = m.refs.map(function (r) { return resolveReference(entities, r, 'POINT'); }).filter(function (p) { return p && pointsCoincideMm(p.x, p.y, xy[0], xy[1]); });
         return pts.length === 1 ? pts[0].id : null;
@@ -392,7 +436,7 @@
   function endpointReferences(entities, entity, tolMm) {
     var m = normalizeMeta(entities, entity), refs = m.endpointRefs || m.refs;
     if (refs && refs.length) return [resolveReference(entities, refs[0], 'POINT'), resolveReference(entities, refs[1], 'POINT')];
-    if (m.endpointRefs) return [null, null]; // Declared ownership never guesses.
+    if (m.endpointRefs) return [null, null];
     function role(e) { return e.viewRole && e.viewRole !== 'BOTH' ? e.viewRole : e.y < 0 ? 'PLAN' : 'ELEVATION'; }
     return [[entity.x, entity.y], [entity.x2, entity.y2]].map(function (xy) {
       var points = entities.filter(function (p) {
@@ -409,12 +453,12 @@
     if (this._mutationGuard && !this._mutationGuard()) throw new Error('This mode is read-only. Switch to Edit to change the drawing.');
   };
 
-  // Monotonic change counter: every add/remove/update/move/clear bumps it.
+
   CadEntityTable.prototype.revision = function () { return this._rev; };
 
-  // Change subscription for live derived views (3D rebuild). fn(op, entity,
-  // table) fires after the mutation with op in add/remove/update/move/clear
-  // (entity is null for clear). Returns an unsubscribe function.
+
+
+
   CadEntityTable.prototype.subscribe = function (fn) {
     if (typeof fn !== 'function') throw new Error('listener must be a function');
     this._listeners.push(fn);
@@ -458,8 +502,8 @@
     }
     return this.add(e);
   };
-  // Import a complete legacy drawing at an explicit compatibility boundary.
-  // Prepare every row before publishing any of it to subscribers.
+
+
   CadEntityTable.prototype.importEntities = function (entities) {
     this._assertWritable();
     var self = this, seen = Object.create(null);
@@ -475,9 +519,9 @@
     return built;
   };
 
-  // Replace the whole table in one transaction. Every row is validated
-  // before the live map is touched, and subscribers see one `replace` event
-  // (one revision bump), never a clear followed by N adds.
+
+
+
   CadEntityTable.prototype.replace = function (entities) {
     this._assertWritable();
     if (!Array.isArray(entities)) throw new Error('replace needs an entity array');
@@ -538,7 +582,7 @@
     this._emit('clear', null);
   };
 
-  // Locked XY datum: locked entities reject x/y/x2/y2 changes.
+
   CadEntityTable.prototype.update = function (id, patch) {
     this._assertWritable();
     var e = this._map[id];
@@ -555,6 +599,8 @@
       var k = numKeys[i];
       if (patch[k] !== undefined) assertFinite(patch[k]);
     }
+    assertThroughRadius(e.type, patch.radius === undefined ? e.radius : patch.radius,
+      patch.meta === undefined ? e.meta : patch.meta);
     if (patch.thickness !== undefined && patch.thickness !== null) {
       assertFinite(patch.thickness);
       if (patch.thickness <= 0) throw new Error('thickness must be > 0');
@@ -627,8 +673,8 @@
     return this.list().filter(function (e) { return e.visible; });
   };
 
-  // Validate every final entity before committing any change. All observers
-  // see the completed graph, and existing entity objects retain their identity.
+
+
   CadEntityTable.prototype.updateMany = function (patches) {
     this._assertWritable();
     var self = this, temp = createTable(), ids = Object.keys(patches);
@@ -644,13 +690,13 @@
     return ids;
   };
 
-  // Point-cascade delete: a line must not survive its points. Deleting a
-  // POINT also deletes line-like entities (SEGMENT/LINE/RAY/DIMENSION)
-  // that reference it via meta.refs or whose endpoint coincides with it
-  // (within COINCIDENT_TOL_MM), plus any transitive meta.refs/vertices
-  // dependents (midpoints, parallels, polygon heads). Polygon edges follow
-  // their head via meta.polygon. Locked entities and DATUM_AXIS never
-  // auto-delete. Returns doomed ids in deletion order, root first.
+
+
+
+
+
+
+
   var CASCADE_LINE_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION'];
 
   function pointsCoincideMm(ax, ay, bx, by, tolMm) {
@@ -743,6 +789,7 @@
     ARROW_FLIP_THRESHOLD_PX: ARROW_FLIP_PX,
     assertFinite: assertFinite,
     parseMembers: parseMembers, memberCaption: memberCaption, validateMembers: validateMembers, validateIdentityGraph: validateIdentityGraph, identitySnapshot: identitySnapshot, semanticEntities: semanticEntities,
+    withDeclaredMembers: withDeclaredMembers,
     resolveReference: resolveReference, normalizeMeta: normalizeMeta, endpointReferences: endpointReferences,
     resetIdCounter: resetIdCounter, nextId: nextId,
     clampRadius: clampRadius,

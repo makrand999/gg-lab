@@ -1,4 +1,3 @@
-# Hidden strokes constrain the circle only through independent occluding geometry.
 # expect: curves=0 diagnostics=oblique-curve-projection-missing,oblique-visibility-conflict,point-correspondence-missing status=partial
 /datum -100 400
 /point plate0 -30 -20 plan

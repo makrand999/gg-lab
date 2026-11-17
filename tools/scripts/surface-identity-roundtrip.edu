@@ -1,7 +1,3 @@
-# Boundary identity v2: a sphere split by its equatorial plane gives both
-# caps the same analytic section. The identity report serializes the model
-# and re-reads it; the shared seam must keep useCount 2 after the round-trip,
-# and rebuilding from the saved surface records must keep the same seam.
 # expect: 86V 252E 168F spheres=1 surfaces=1 surfaceKinds=sphere surfaceLoops=0 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok unresolved=0 status=inferred
 /datum -100 400
 /circle 20 -30 20 A plan

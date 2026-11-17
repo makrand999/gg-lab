@@ -1,6 +1,6 @@
 'use strict';
-/* EduCAD minimal login: pick a role, POST /api/login, keep the session
-   in localStorage. Guest skips the server entirely. */
+
+
 (function () {
   var KEY = 'educad_session';
   var DEMO = {
@@ -21,8 +21,8 @@
     try { window.localStorage.setItem(KEY, JSON.stringify(s)); return true; }
     catch (err) { return false; }
   }
-  // Role home: teachers and academics get the studio, students the
-  // workspace, guests the bare sheet.
+
+
   function homeFor(role) {
     if (role === 'teacher' || role === 'academics') return 'teacher.html';
     if (role === 'student') return 'student.html';
@@ -94,8 +94,8 @@
       return;
     }
     if (submitBtn) submitBtn.disabled = true;
-    // Relative path: resolves under a sub-path mount (/major/api/…)
-    // as well as a root-mounted dev server (/api/…).
+
+
     window.fetch('api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -127,75 +127,4 @@
     goApp('guest');
   });
 
-  // In-page Manual view toggling within the same UI
-  var menuManual = $('menu-manual');
-  var menuLogin = $('menu-login');
-  var tabManual = $('tab-manual');
-  var tabLogin = $('tab-login');
-  var loginView = $('login-view');
-  var manualView = $('manual-view');
-  var manualContainer = $('manual-content-container');
-  var manualLoaded = false;
-
-  function setView(view) {
-    var isManual = view === 'manual';
-    if (loginView) loginView.hidden = isManual;
-    if (manualView) manualView.hidden = !isManual;
-
-    if (menuManual && menuLogin) {
-      if (isManual) {
-        menuManual.classList.add('current');
-        menuLogin.classList.remove('current');
-      } else {
-        menuLogin.classList.add('current');
-        menuManual.classList.remove('current');
-      }
-      // Re-trigger resize/lava repositioning if menu-lava is active
-      window.dispatchEvent(new Event('resize'));
-    }
-
-    if (isManual && !manualLoaded) {
-      loadManualContent();
-    }
-  }
-
-  function loadManualContent() {
-    if (!manualContainer) return;
-    window.fetch('manual.html')
-      .then(function (res) {
-        if (!res.ok) throw new Error('Network error');
-        return res.text();
-      })
-      .then(function (html) {
-        var parser = new DOMParser();
-        var doc = parser.parseFromString(html, 'text/html');
-        var main = doc.querySelector('main');
-        if (main) {
-          // Remove internal topbar if present
-          var topbar = main.querySelector('.topbar');
-          if (topbar) topbar.remove();
-          manualContainer.innerHTML = main.innerHTML;
-        } else {
-          manualContainer.innerHTML = doc.body.innerHTML;
-        }
-        manualLoaded = true;
-      })
-      .catch(function () {
-        manualContainer.innerHTML = '<p class="cf-error">Failed to load manual content. Please try again.</p>';
-      });
-  }
-
-  if (tabManual) {
-    tabManual.addEventListener('click', function (e) {
-      e.preventDefault();
-      setView('manual');
-    });
-  }
-
-  if (tabLogin) {
-    tabLogin.addEventListener('click', function (e) {
-      e.preventDefault();
-      setView('login');
-    });
-  }
 })();

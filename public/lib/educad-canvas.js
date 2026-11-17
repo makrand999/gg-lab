@@ -6,8 +6,8 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // Dual-layer Canvas2D: Layer1 static + Layer2 dynamic. Zero deps.
-  // World mm only inside entities/solvers; screen px ephemeral render only.
+
+
   var LAYER_STATIC = 'layer1';
   var LAYER_DYNAMIC = 'layer2';
   var SHOW_GRID_DEFAULT = false;
@@ -17,9 +17,9 @@
   var SCALE_MAX = 50;
   var DEFAULT_SCALE = 2.0;
   var BUTTON_IDS = ['zoom-in', 'zoom-out', 'zoom-home'];
-  // Spec 1.1 + 4.4: the ONLY empty-canvas menu. Exactly two options:
-  // 'Plain (No Mesh)' (default, checked when !showGrid) and 'Box Mesh'
-  // (checked when showGrid).
+
+
+
   var MENU_OPTIONS = [
     { id: 'plain', label: 'Plain (No Mesh)' },
     { id: 'mesh', label: 'Box Mesh' }
@@ -48,7 +48,7 @@
     return s;
   }
 
-  // HiDPI: integer backing store from CSS px size and devicePixelRatio.
+
   function computeHiDPISize(cssW, cssH, dpr) {
     assertFinite(cssW, cssH, dpr);
     var w = Math.round(cssW);
@@ -59,15 +59,15 @@
     return { canvasW: Math.round(w * ratio), canvasH: Math.round(h * ratio), scale: ratio };
   }
 
-  // 2-option menu shows on empty right-click only: suppress when an
-  // entity is within 14px (hitDistPx < 14). null/undefined = empty.
+
+
   function shouldShowContextMenu(hitDistPx) {
     if (hitDistPx === null || hitDistPx === undefined) return true;
     assertFinite(hitDistPx);
     return hitDistPx >= ENTITY_SUPPRESS_PX;
   }
 
-  // Clamp menu rect inside container; integer px.
+
   function clampMenuPosition(mx, my, menuW, menuH, containerW, containerH) {
     assertFinite(mx, my, menuW, menuH, containerW, containerH);
     var x = Math.round(mx);
@@ -83,7 +83,7 @@
     return { x: x, y: y };
   }
 
-  // Dismiss menu on pointerdown, Escape, or zoom; nothing else.
+
   function shouldDismissMenu(trigger) {
     var t = trigger;
     if (trigger !== null && typeof trigger === 'object' && trigger.type !== undefined) {
@@ -93,7 +93,7 @@
     return t === 'pointerdown' || t === 'Escape' || t === 'zoom';
   }
 
-  // Cursor cues per interaction state.
+
   function cursorForState(state) {
     if (state === 'panning') return CURSORS.panning;
     if (state === 'pan-ready') return CURSORS.panReady;
@@ -119,7 +119,7 @@
     };
   }
 
-  // Cursor-anchored zoom on a view {s,tx,ty,w,h} with y-flip model.
+
   function zoomViewAt(view, cursorPx, factor) {
     assertFinite(view.s, view.tx, view.ty, cursorPx.x, cursorPx.y, factor);
     if (factor <= 0) throw new Error('zoom factor must be > 0');
@@ -140,7 +140,7 @@
     return { s: DEFAULT_SCALE, tx: iw / 2, ty: ih / 2, w: iw, h: ih };
   }
 
-  // Plus/minus/home buttons. centerPx anchors zoom buttons.
+
   function buttonAction(view, buttonId, centerPx) {
     assertFinite(view.s, view.tx, view.ty, view.w, view.h);
     var c = centerPx || { x: view.w / 2, y: view.h / 2 };
@@ -150,7 +150,7 @@
     throw new Error('unknown button: ' + String(buttonId));
   }
 
-  // Right-click handler: show clamped 2-option menu only on empty space.
+
   function onEmptyRightClick(state, x, y, hitDistPx, container, menuSize) {
     assertFinite(x, y);
     var c = container || { w: state.view.w, h: state.view.h };
@@ -162,7 +162,7 @@
     return { visible: true, x: p.x, y: p.y };
   }
 
-  // Label typography defaults (shared with the label layout module).
+
   var LABEL_FONT = 'italic 13px "Cambria", "Times New Roman", serif';
   var LABEL_HALO_WIDTH_PX = 3.5;
   var LABEL_HALO_STYLE = 'rgba(248, 250, 252, 0.95)';
@@ -170,8 +170,8 @@
   var LABEL_LEADER_WIDTH_PX = 1;
   var LABEL_LEADER_STYLE = '#475569';
 
-  // Tier 3 knockout: halo stroke masks strokes behind the glyphs, then
-  // crisp foreground text. No-op (false) without a 2d context.
+
+
   function drawKnockoutLabel(ctx, text, x, y, o) {
     if (!ctx || typeof ctx.fillText !== 'function') return false;
     o = o || {};
@@ -197,8 +197,8 @@
     return true;
   }
 
-  // Tier 4 leader: thin BIS Type B line from the vertex to the parked
-  // label, with a small dot at the vertex end.
+
+
   function drawLabelLeader(ctx, x1, y1, x2, y2, o) {
     if (!ctx || typeof ctx.beginPath !== 'function') return false;
     o = o || {};
@@ -226,8 +226,8 @@
     return true;
   }
 
-  // Draw one label placement (leader first, then knockout text). The
-  // leader endpoints are converted from mm via forward(view, ...).
+
+
   function drawLabelPlacement(ctx, view, placement, o) {
     if (!ctx || typeof ctx.fillText !== 'function') return false;
     if (!placement || typeof placement !== 'object') return false;
@@ -241,9 +241,9 @@
     return drawKnockoutLabel(ctx, placement.text, placement.xPx, placement.yPx, o.label);
   }
 
-  // In-canvas point selection + on-site rename. Table-agnostic state
-  // machine: the page owns commits (Enter), cancels (Escape/empty click)
-  // only touch this state, so the table is never dirtied by previews.
+
+
+
   var SELECT_TOL_PX = 14;
   var SELECT_RING_R_PX = 7;
   var SELECT_RING_WIDTH_PX = 2;
@@ -253,9 +253,9 @@
   var LINE_TOOL_PHASES = ['idle', 'anchored', 'menu', 'animating'];
   var LINE_BIS_CODES = ['A', 'B', 'E', 'G', 'K'];
   var LINE_STROKE_MS = 300;
-  // Mirrors EduCADEntities.COINCIDENT_TOL_MM (this module stays zero-dep):
-  // endpoints this close are one point, and one point can never commit
-  // a line -- the menu/animating phases always hold two distinct points.
+
+
+
   var LINE_COINCIDENT_TOL_MM = 1e-6;
 
   function lineEndsCoincide(p1Mm, p2Mm) {
@@ -271,7 +271,7 @@
     return !!(sel && sel.editing);
   }
 
-  // Nearest visible POINT within tolPx of the cursor (px). First wins ties.
+
   function hitTestPoint(entities, cursorPx, view, tolPx) {
     assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty);
     if (!Array.isArray(entities)) throw new Error('entities must be an array');
@@ -295,9 +295,9 @@
     return best;
   }
 
-  // Every visible POINT within tolPx of the cursor, nearest first,
-  // table order breaking ties — the head always agrees with
-  // hitTestPoint. The page lists the whole stack for a dot choice.
+
+
+
   function hitTestPointAll(entities, cursorPx, view, tolPx) {
     assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty);
     if (!Array.isArray(entities)) throw new Error('entities must be an array');
@@ -332,8 +332,8 @@
     return sel;
   }
 
-  // Discard the buffer; the table was never touched, so the original name
-  // is preserved by construction. Keeps the selection.
+
+
   function cancelEdit(sel) {
     if (sel) sel.editing = null;
     return sel;
@@ -344,8 +344,8 @@
     return sel;
   }
 
-  // Pure key router. Returns 'commit' | 'cancel' | 'input' | 'noop' and
-  // mutates only the buffer. The caller applies commit/cancel to the table.
+
+
   function handleRenameKey(sel, key) {
     if (!sel || !sel.editing) return 'noop';
     if (key === 'Enter') return 'commit';
@@ -359,8 +359,8 @@
     return 'input';
   }
 
-  // A label edit never deletes geometry. Empty text clears only the display
-  // label; deletion is a separate operation. Null means unchanged.
+
+
   function commitRename(sel) {
     if (!sel || !sel.editing) return null;
     var ed = sel.editing;
@@ -370,9 +370,9 @@
     return { id: ed.id, name: name };
   }
 
-  // Mirrors EduCADLabels.splitCaption/bareName (this module stays
-  // zero-dep): multi-caption parts and hidden-mark parens count toward
-  // the used-letter set, so 'a,(b)' blocks both a and b.
+
+
+
   function captionBareParts(caption) {
     var raw = String(caption === undefined || caption === null ? '' : caption).split(',');
     var out = [];
@@ -386,9 +386,9 @@
     return out;
   }
 
-  // Next unused point letter: a..z, then a1..z1, a2.. Scans live POINT
-  // captions (multi-caption bare parts), so deleted letters are re-used
-  // automatically. Terminates: candidates are infinite, entities finite.
+
+
+
   function nextPointName(entities) {
     if (!Array.isArray(entities)) throw new Error('entities must be an array');
     var used = {};
@@ -408,24 +408,24 @@
     }
   }
 
-  // Blinking caret phase: on for 500 ms, off for 500 ms.
+
   function caretOn(nowMs) {
     assertFinite(nowMs);
     return Math.floor(nowMs / CARET_BLINK_MS) % 2 === 0;
   }
 
-  // True for keys that feed the rename buffer (printables + Backspace).
-  // Enter/Escape/modifier words route elsewhere and must not start edits.
+
+
   function isRenameInputKey(key) {
     if (key === 'Backspace') return true;
     return typeof key === 'string' && key.length === 1 && key >= ' ';
   }
 
-  // Axis-locked placement against a reference point (world mm). Near the
-  // horizontal axis (|dy| <= tol) locks y to y_ref with a dX readout; near
-  // the vertical axis locks x to x_ref with a dY readout; near both takes
-  // the closer axis; far from both places freely with no readout.
-  // Returns {lock: 'x'|'y'|null, xMm, yMm, readout: string|null}.
+
+
+
+
+
   function axisLockState(cursorPx, view, refMm, tolPx) {
     assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty,
       refMm.x, refMm.y);
@@ -454,11 +454,11 @@
     return { lock: null, xMm: wx, yMm: wy, readout: null };
   }
 
-  // Typed axis distance: with a point selected and the axis badge
-  // showing, the user types millimetres and presses Enter to stake a
-  // new point at that distance along the locked axis, on the cursor's
-  // side of the reference. Headless state + parsing only; the page
-  // owns arming (bare selection, no tools/menus) and the commit.
+
+
+
+
+
   var TYPED_DIST_MAX_MM = 10000;
   var TYPED_DIST_MAX_CHARS = 12;
 
@@ -475,10 +475,10 @@
     return !!(state && state.buffer.length > 0);
   }
 
-  // Pure key router for the distance buffer: 'input' when the buffer
-  // changed (digits, one dot, Backspace), 'ignored' otherwise. Enter
-  // and Escape are page-level (commit needs cursor + view + table)
-  // and are always ignored here.
+
+
+
+
   function handleTypedDistKey(state, key) {
     if (!state) throw new Error('typed-dist state required');
     if (key === 'Backspace') {
@@ -499,9 +499,9 @@
     return 'ignored';
   }
 
-  // Strict millimetre parse: {ok, value} or a named rejection
-  // {ok:false, reason, message}. Only what the key router can produce
-  // (digits plus one dot) validates; sign/exponent forms never parse.
+
+
+
   function parseTypedDist(buffer) {
     var s = String(buffer === undefined || buffer === null ? '' :
       buffer).replace(/^\s+|\s+$/g, '');
@@ -529,9 +529,9 @@
     return { ok: true, value: v };
   }
 
-  // Cursor side along the locked axis in world mm: +1 / -1, or 0 when
-  // the cursor sits exactly on the reference (no direction to take).
-  // Lock 'y' walks X (the dX axis); lock 'x' walks Y (the dY axis).
+
+
+
   function typedDistSign(lock, cursorPx, view, refMm) {
     assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty,
       refMm.x, refMm.y);
@@ -550,9 +550,9 @@
     return 0;
   }
 
-  // Target point at distMm from ref along lock toward sign. Null when
-  // there is no direction (sign 0) or no axis (any other lock): the
-  // page warns instead of guessing.
+
+
+
   function typedDistPoint(refMm, lock, sign, distMm) {
     assertFinite(refMm.x, refMm.y, sign, distMm);
     if (sign !== 1 && sign !== -1) return null;
@@ -565,7 +565,7 @@
     return null;
   }
 
-  // Amber selection halo (snap ring owns cyan). No-op without a 2d context.
+
   function drawSelectionRing(ctx, x, y, o) {
     if (!ctx || typeof ctx.beginPath !== 'function') return false;
     o = o || {};
@@ -583,9 +583,9 @@
     return true;
   }
 
-  // Line construction task: idle -> anchored (Ctrl+click P1) -> menu
-  // (click P2, pick BIS type) -> animating (300 ms stroke) -> commit.
-  // Any empty click or Escape aborts back to idle with no creation.
+
+
+
   function createLineToolState() {
     return { phase: 'idle', p1Id: null, p1Mm: null,
       p2Id: null, p2Mm: null, bisCode: null, p1Member: null,
@@ -596,9 +596,9 @@
     return !!ls && ls.phase !== 'idle';
   }
 
-  // Optional member declares which multi-caption part the student draws
-  // for (the projector claim); null for single-caption anchors. The page
-  // commits it into the segment's meta.fromMember.
+
+
+
   function anchorLineTool(ls, id, xMm, yMm, member) {
     assertFinite(xMm, yMm);
     ls.phase = 'anchored';
@@ -614,7 +614,7 @@
     return ls;
   }
 
-  // Lock P2 (must differ from P1). False when not anchorable/selectable.
+
   function lockLineTarget(ls, id, xMm, yMm) {
     if (!ls || ls.phase !== 'anchored') return false;
     if (id === ls.p1Id) return false;
@@ -626,7 +626,7 @@
     return true;
   }
 
-  // Re-point P2 while the type menu is open. False unless in menu phase.
+
   function retargetLineTool(ls, id, xMm, yMm) {
     if (!ls || ls.phase !== 'menu') return false;
     if (id === ls.p1Id) return false;
@@ -637,7 +637,7 @@
     return true;
   }
 
-  // Pick the BIS type; starts the stroke animation on true.
+
   function beginLineStroke(ls, bisCode) {
     if (!ls || ls.phase !== 'menu') return false;
     if (LINE_BIS_CODES.indexOf(bisCode) === -1) return false;
@@ -646,7 +646,7 @@
     return true;
   }
 
-  // Animation progress t in [0,1] for p(t) = P1 + t*(P2-P1).
+
   function lineToolProgress(t0Ms, nowMs, durMs) {
     assertFinite(t0Ms, nowMs);
     var d = (durMs === undefined || durMs === null) ? LINE_STROKE_MS : durMs;
@@ -664,9 +664,9 @@
       y: p1Mm.y + (p2Mm.y - p1Mm.y) * t };
   }
 
-  // Take the commit spec and reset to idle. Null unless animating, and
-  // null (reset to idle) when the pair coincides: one point never
-  // commits a line, so the table's two-point guard is unreachable here.
+
+
+
   function finishLineStroke(ls) {
     if (!ls || ls.phase !== 'animating') return null;
     if (lineEndsCoincide(ls.p1Mm, ls.p2Mm)) {
@@ -695,10 +695,10 @@
     return ls;
   }
 
-  // Polar point construction: idle -> awaitLine (Ctrl+click P0) ->
-  // angle (click a baseline through P0, sweep the protractor) ->
-  // distance (click locks the ray, sweep the scale) -> commit. A
-  // baseline that misses P0 parks in invalid: any click drops it.
+
+
+
+
   var POLAR_TOOL_PHASES = ['idle', 'awaitLine', 'angle', 'distance', 'invalid'];
   var POLAR_ON_LINE_TOL_MM = 0.5;
   var POLAR_SNAP_DETENTS_DEG = [15, 30, 45, 60, 90];
@@ -726,7 +726,7 @@
     return ps;
   }
 
-  // Perpendicular distance from P0 to segment AB (world mm).
+
   function polarDistPointSegmentMm(p0, ax, ay, bx, by) {
     assertFinite(p0.x, p0.y, ax, ay, bx, by);
     var abx = bx - ax, aby = by - ay;
@@ -742,7 +742,7 @@
     return Math.sqrt(cx * cx + cy * cy);
   }
 
-  // Baseline guard: P0 coincides with an endpoint or lies on AB.
+
   function polarOnBaseline(p0Mm, aMm, bMm, tolMm) {
     var tol = (tolMm === undefined || tolMm === null) ? POLAR_ON_LINE_TOL_MM : tolMm;
     assertFinite(tol);
@@ -751,9 +751,9 @@
     return polarDistPointSegmentMm(p0Mm, aMm.x, aMm.y, bMm.x, bMm.y) <= tol;
   }
 
-  // 0-degree baseline direction: from P0 toward the clicked side of AB
-  // (click projected onto the line). Falls back to the A->B direction
-  // when the click sits on P0. Null for a degenerate segment.
+
+
+
   function polarBaseDir(p0Mm, aMm, bMm, clickMm) {
     assertFinite(p0Mm.x, p0Mm.y, aMm.x, aMm.y, bMm.x, bMm.y,
       clickMm.x, clickMm.y);
@@ -768,8 +768,8 @@
     return { x: qx / n, y: qy / n };
   }
 
-  // Accept the clicked baseline: on-line moves to angle sweep with the
-  // 0-degree direction set; off-line (or degenerate) parks in invalid.
+
+
   function acceptPolarBaseline(ps, aMm, bMm, clickMm) {
     if (!ps || ps.phase !== 'awaitLine') return false;
     if (!polarOnBaseline(ps.p0Mm, aMm, bMm)) {
@@ -788,8 +788,8 @@
     return true;
   }
 
-  // Unsigned sweep angle in [0,180] between the baseline and P0->cursor.
-  // A cursor on P0 keeps the fallback (no direction to measure).
+
+
   function polarAngleDeg(baseDir, p0Mm, cursorMm, fallbackDeg) {
     assertFinite(baseDir.x, baseDir.y, p0Mm.x, p0Mm.y,
       cursorMm.x, cursorMm.y);
@@ -807,7 +807,7 @@
     return Math.acos(cos) * 180 / Math.PI;
   }
 
-  // Soft detents at standard drafting angles.
+
   function polarSnapDeg(rawDeg, tolDeg) {
     assertFinite(rawDeg);
     var tol = (tolDeg === undefined || tolDeg === null) ? POLAR_SNAP_TOL_DEG : tolDeg;
@@ -826,9 +826,9 @@
     return best;
   }
 
-  // Locked ray: baseline rotated by theta toward the cursor side
-  // (cross >= 0 keeps +theta in y-up world). A degenerate cursor
-  // keeps the baseline direction.
+
+
+
   function polarRayDir(baseDir, p0Mm, cursorMm, thetaDeg) {
     assertFinite(baseDir.x, baseDir.y, p0Mm.x, p0Mm.y,
       cursorMm.x, cursorMm.y, thetaDeg);
@@ -843,7 +843,7 @@
     return { x: bx * c - by * s, y: bx * s + by * c };
   }
 
-  // Click #1: freeze the (snapped) sweep angle into the ray direction.
+
   function lockPolarAngle(ps, cursorMm) {
     if (!ps || ps.phase !== 'angle' || !ps.baseDir) return false;
     var raw = polarAngleDeg(ps.baseDir, ps.p0Mm, cursorMm, ps.thetaDeg);
@@ -854,8 +854,8 @@
     return true;
   }
 
-  // Scale sweep: projection of P0->cursor on the locked ray, clamped
-  // at P0, plus the target point.
+
+
   function polarTargetFor(p0Mm, rayDir, cursorMm) {
     assertFinite(p0Mm.x, p0Mm.y, rayDir.x, rayDir.y,
       cursorMm.x, cursorMm.y);
@@ -866,8 +866,8 @@
       yMm: p0Mm.y + rayDir.y * r };
   }
 
-  // Click #2: take the commit spec and reset to idle. Null unless the
-  // ray is locked.
+
+
   function commitPolarPoint(ps, cursorMm) {
     if (!ps || ps.phase !== 'distance' || !ps.rayDir) return null;
     var t = polarTargetFor(ps.p0Mm, ps.rayDir, cursorMm);
@@ -889,10 +889,10 @@
     return ps;
   }
 
-  // Line-referenced point plotting: idle -> plotting (click a datum
-  // segment) -> commit (click places the clamped candidate). The foot
-  // slides along AB and sticks at the ends; the candidate keeps the
-  // cursor's perpendicular offset from the clamped foot.
+
+
+
+
   var PLOT_TOOL_PHASES = ['idle', 'plotting'];
 
   function createPlotToolState() {
@@ -912,10 +912,10 @@
     return ps;
   }
 
-  // Ground-fold grab rule (Alt+click): the 14 px corridor plus an mm
-  // ceiling, so full zoom-out cannot grab the fold from ~280 mm away.
-  // min(14/s, 20): default scale behaves exactly as before (7 mm);
-  // the ceiling only binds below s = 0.7 px/mm.
+
+
+
+
   var GROUND_FOLD_MAX_MM = 20;
 
   function groundFoldGrabbed(distMm, scale) {
@@ -924,9 +924,9 @@
     return d * scale <= AXIS_TOL_PX && d <= GROUND_FOLD_MAX_MM;
   }
 
-  // Focus the VP/HP ground fold (the y = 0 decor line, which is never
-  // an entity) as an infinite datum: the foot is the cursor's x on
-  // the fold, so perpendicular and vertical offsets coincide exactly.
+
+
+
   function beginGroundPlot(ps) {
     if (!ps) throw new Error('plot state required');
     ps.phase = 'plotting';
@@ -936,10 +936,10 @@
     return ps;
   }
 
-  // Clamped candidate: foot is the cursor projection on AB stuck to
-  // [A,B]; the point keeps the cursor's perpendicular offset from the
-  // clamped foot; dist is the perpendicular distance. Degenerate AB
-  // pins the foot at A.
+
+
+
+
   function plotCandidateFor(aMm, bMm, cursorMm) {
     assertFinite(aMm.x, aMm.y, bMm.x, bMm.y, cursorMm.x, cursorMm.y);
     var abx = bMm.x - aMm.x, aby = bMm.y - aMm.y;
@@ -960,11 +960,11 @@
       distMm: Math.sqrt(ox * ox + oy * oy) };
   }
 
-  // Typed plot offset: like the click candidate, but the
-  // perpendicular offset length is the typed millimetres instead of
-  // the cursor's. The foot still clamps to [A,B] and the side still
-  // comes from the cursor. Null when the cursor sits on the datum
-  // (no side to take) instead of guessing.
+
+
+
+
+
   var PLOT_ON_LINE_TOL_MM = 1e-6;
 
   function plotTypedPoint(aMm, bMm, cursorMm, distMm) {
@@ -978,9 +978,9 @@
     return { xMm: c.footMm.x + ox * s, yMm: c.footMm.y + oy * s };
   }
 
-  // Ground candidates share the click-candidate shape: the foot is
-  // the cursor's x on the fold, the distance is |y|. The typed form
-  // stakes (x, +/-dist); both are null-safe on the fold itself.
+
+
+
   function plotGroundCandidate(cursorMm) {
     assertFinite(cursorMm.x, cursorMm.y);
     return { footMm: { x: cursorMm.x, y: 0 },
@@ -995,8 +995,8 @@
       yMm: (cursorMm.y > 0 ? 1 : -1) * distMm };
   }
 
-  // Click #2: take the commit spec and reset to idle. Null unless
-  // plotting. A ground focus commits off the fold, never off A/B.
+
+
   function commitPlotPoint(ps, cursorMm) {
     if (!ps || ps.phase !== 'plotting') return null;
     var c = ps.ground ? plotGroundCandidate(cursorMm) :
@@ -1016,10 +1016,10 @@
     return ps;
   }
 
-  // Three-point circle gesture (M3 curves): Ctrl+click toggles points
-  // into an ordered pick list; the third pick auto-commits the circle.
-  // No tool to arm; while line/polar is active, Ctrl+click keeps its
-  // legacy anchor behavior and picks do not grow.
+
+
+
+
   var CIRCLE_PICK_MAX = 3;
 
   function createCirclePickState() {
@@ -1047,10 +1047,10 @@
     return state;
   }
 
-  // Pure circle through three points (mm). Returns {ok, x, y, r, kind}
-  // for the circumcircle (non-collinear) or the centered fallback
-  // (collinear middle equidistant within max(0.5, 2% span)), else a
-  // named rejection {ok:false, reason, message}. NaN-guarded.
+
+
+
+
   function circleFromThreePoints(p1, p2, p3) {
     assertFinite(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
     var minX = Math.min(p1.x, p2.x, p3.x);
@@ -1107,8 +1107,8 @@
         ' within weld ' + tol.toFixed(6) + '); middle not equidistant' };
   }
 
-  // Nearest baseline segment (SEGMENT/LINE/DIMENSION/DATUM_AXIS) within
-  // tolPx of the cursor. First wins ties.
+
+
   function hitTestLine(entities, cursorPx, view, tolPx) {
     assertFinite(cursorPx.x, cursorPx.y, view.s, view.tx, view.ty);
     if (!Array.isArray(entities)) throw new Error('entities must be an array');
@@ -1142,14 +1142,14 @@
     return best;
   }
 
-  // Checked state of the 2-option menu for a given showGrid flag:
-  // Plain is checked by default (no mesh), Box Mesh is checked when set.
+
+
   function menuCheckedState(showGrid) {
     return { plain: !showGrid, mesh: !!showGrid };
   }
 
-  // Apply one of the 2 menu options. 'plain' selects Plain (No Mesh),
-  // 'mesh' selects Box Mesh; anything else throws.
+
+
   function applyMenuAction(state, optionId) {
     if (optionId === 'plain') {
       state.showGrid = false;

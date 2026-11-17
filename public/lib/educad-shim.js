@@ -8,36 +8,36 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function (root) {
   'use strict';
-  // EduCAD Phase 3 GeoGebra shim (Class 4 Monge-first-angle CAD teaching aid).
-  // World coordinates in mm only inside entities and solvers; screen px is
-  // ephemeral render only (exportSVG). Projector invariant: elevation x
-  // equals plan x (mm). Dual-layer Canvas2D model; no 3D, no DOM UI here.
-  // Dual-env: browser via window.ggbApplet (alias window.EduCadGgbShim),
-  // plain Node via module.exports. Zero dependencies (no outside loads).
-  // Reuses window.EduCADEntities / window.EduCADViewport when present, or
-  // injected deps via createApplet({ entities, viewport }); otherwise a small
-  // internal fallback with identical mm-only semantics is used.
-  //
-  // API (39 applet methods, GeoGebra-compatible names, documented below):
-  // evalCommand getValue setValue getXcoord getYcoord setCoords getObjectType
-  // setVisible getVisible setColor getColor setLineThickness setLineStyle
-  // renameObject deleteObject exists getAllObjectNames getXML setXML evalXML
-  // registerAddListener registerUpdateListener registerRemoveListener
-  // unregisterAddListener unregisterUpdateListener unregisterRemoveListener
-  // setMode getMode undo redo clearConstruction setGridVisible getGridVisible
-  // zoomIn zoomOut resetView exportSVG getVersion ping
-  // NOTE: the Phase 3 brief says "36 methods" but enumerates 39 names; all 39
-  // listed names are implemented (see API_METHODS).
-  //
-  // evalCommand grammar: [Name=]Command(arg, ...)  (regex parser, 14 commands)
-  // Point(x,y) Segment(P,Q)|Segment(x1,y1,x2,y2) Line(P,Q)|Line(x1,y1,x2,y2)
-  // Circle(C,r)|Circle(cx,cy,r) Arc(cx,cy,r,a1,a2) Perpendicular(P,L)
-  // Parallel(P,L) Intersect(L1,L2) Midpoint(P,Q) Distance(P,Q)|Distance(coords)
-  // Angle(A,V,B) Polygon(P,Q,R[,...]) Text(x,y,"cap") Dimension(P,Q)|Dim(coords)
-  // Angles in degrees. Malformed input: console.warn with char offset and a
-  // null (evalCommand/getters) or false (setters) return; never throws.
-  // setLineStyle int->BIS: 0:A 1:B 2:E 3:G 4:H 5:K. getValue: meta value, else
-  // radius (circle/arc), else |p2-p1| (segment/line/dimension), else null.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '3.0.0-educad';
   var VERTICAL_EPS = 1e-9;
@@ -48,8 +48,8 @@
   var VIEW_W = 800;
   var VIEW_H = 600;
   var UNDO_MAX = 50;
-  // Primed notation (a', b_1'', ...) is standard in descriptive geometry:
-  // names may carry trailing single-quote primes.
+
+
   var NAME_RE = /^[A-Za-z][A-Za-z0-9_]*'*$/;
   var WORD_RE = /^[A-Za-z]+$/;
   var NUM_RE = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
@@ -112,8 +112,8 @@
 
   function fmtNum(n) { return String(n); }
 
-  // Minimal fallback entity store (mm-only, same field shape as the Phase 2
-  // table). Used only when neither injected deps nor globals are present.
+
+
   var FALLBACK_TYPES = ['POINT', 'SEGMENT', 'LINE', 'RAY', 'CIRCLE',
     'CIRCULAR_ARC', 'CURVE', 'DIMENSION', 'TEXT', 'DATUM_AXIS'];
   var FALLBACK_BIS = ['A', 'B', 'E', 'G', 'H', 'K'];
@@ -186,7 +186,7 @@
     BIS_CODES: FALLBACK_BIS
   };
 
-  // Minimal fallback viewport math (same y-flip model as Phase 1).
+
   var FallbackViewport = {
     clampScale: function (s) {
       if (s < SCALE_MIN) return SCALE_MIN;
@@ -284,8 +284,8 @@
     return null;
   }
 
-  // Regex command parser. Returns { name, nameOffset, cmd, cmdOffset, args }
-  // or { error, offset }. Never throws.
+
+
   function parseCommand(input) {
     try {
       if (typeof input !== 'string') return { error: 'expected string', offset: 0 };
@@ -345,8 +345,8 @@
             quote = null;
           }
         } else if ((ch === '"' || ch === "'") && cur.trim() === '') {
-          // A quote opens a string literal only at argument start, so
-          // primed identifiers (a', b_1'') inside args stay literal.
+
+
           quote = ch;
           cur += ch;
         } else if (ch === ',' || ch === ';') {
@@ -393,7 +393,7 @@
     return out.join(',');
   }
 
-  // Per-command arity + kind checks. Null when ok, else { error, offset }.
+
   function checkArity(cmd, args, innerOff) {
     var n = args.length;
     function bad(msg, i) {
@@ -466,8 +466,8 @@
     return { x: dx / m, y: dy / m, len: m };
   }
 
-  // createApplet({ entities, viewport }): fresh GeoGebra-compatible applet.
-  // Works standalone (fallback) or reusing the Phase 1/2 modules.
+
+
   function createApplet(deps) {
     var R = resolveDeps(deps);
     var E = R.entities;
@@ -543,7 +543,7 @@
 
     function fwdPx(x, y) {
       if (V && typeof V.forward === 'function') {
-        try { return V.forward(view, { x: x, y: y }); } catch (e) { /* fall */ }
+        try { return V.forward(view, { x: x, y: y }); } catch (e) {            }
       }
       return FallbackViewport.forward(view, x, y);
     }
@@ -563,9 +563,9 @@
       return { p: { x: e.x, y: e.y }, d: d };
     }
 
-    // Local cascade for the fallback store (mirrors
-    // EduCADEntities.collectCascadeDeleteIds): point delete drops
-    // referencing/coincident line-likes plus transitive refs dependents.
+
+
+
     var SHIM_CASCADE_LINES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION'];
     var SHIM_COINCIDENT_TOL = 1e-6;
 
@@ -641,7 +641,7 @@
           var ids = E.collectCascadeDeleteIds(list, rootId);
           if (Array.isArray(ids) && ids.length > 0) return ids;
           if (Array.isArray(ids)) return ids;
-        } catch (e) { /* fall through to local */ }
+        } catch (e) {                             }
       }
       return shimCascadeIds(list, rootId);
     }
@@ -661,8 +661,8 @@
         visible: true, locked: false, layer: 'layer1', meta: meta || {} };
     }
 
-    // Build entities for a parsed command. Returns { names:[...] } or
-    // { fail, offset }. Pure checks run before any table insert.
+
+
     function buildParsed(p) {
       var a = p.args;
       var id = (p.name !== null) ? p.name : nextAuto();
@@ -1157,9 +1157,9 @@
       return table.get(name);
     }
 
-    // Viewport corners in world mm, GeoGebra numbering counter-clockwise
-    // from bottom-left: 1 BL, 2 BR, 3 TR, 4 TL. Entity names can never
-    // collide with these (parens fail NAME_RE), so no shadowing is possible.
+
+
+
     var CORNER_RE = /^\s*corner\s*\(\s*([1-4])\s*\)\s*$/i;
     var CORNER_XY_RE = /^\s*([xy])\s*\(\s*corner\s*\(\s*([1-4])\s*\)\s*\)\s*$/i;
 
@@ -1180,8 +1180,8 @@
 
     var applet = {};
 
-    // evalCommand(str): run one builder command. Returns the created object
-    // name (polygon: head name), or null + warn(offset) when malformed.
+
+
     applet.evalCommand = function (cmdStr) {
       var p;
       try {
@@ -1223,8 +1223,8 @@
       return built.names[0];
     };
 
-    // getValue(name): numeric value (meta value, else radius, else |p2-p1|),
-    // or null + warn when unknown / non-numeric.
+
+
     applet.getValue = function (name) {
       try {
         var e = needObj(name);
@@ -1253,7 +1253,7 @@
       }
     };
 
-    // setValue(name, v): store meta numeric value. True/false(+warn).
+
     applet.setValue = function (name, v) {
       try {
         var e = needObj(name);
@@ -1276,7 +1276,7 @@
       }
     };
 
-    // getXcoord/getYcoord(name): base point mm, or null + warn.
+
     applet.getXcoord = function (name) {
       try {
         var e = needObj(name);
@@ -1313,7 +1313,7 @@
       }
     };
 
-    // setCoords(name, x, y): move base point (mm). Locked XY datum rejects.
+
     applet.setCoords = function (name, x, y) {
       try {
         var e = needObj(name);
@@ -1346,7 +1346,7 @@
       }
     };
 
-    // getObjectType(name): GeoGebra type word, or null + warn.
+
     applet.getObjectType = function (name) {
       try {
         var e = needObj(name);
@@ -1362,7 +1362,7 @@
       }
     };
 
-    // setVisible(name, v) / getVisible(name).
+
     applet.setVisible = function (name, v) {
       try {
         var e = needObj(name);
@@ -1402,7 +1402,7 @@
       return h.length === 1 ? '0' + h : h;
     }
 
-    // setColor(name, r, g, b) or setColor(name, "#rrggbb"/"#rgb").
+
     applet.setColor = function (name, r, g, b) {
       try {
         var e = needObj(name);
@@ -1441,7 +1441,7 @@
       }
     };
 
-    // getColor(name): "#rrggbb" (default black), or null + warn.
+
     applet.getColor = function (name) {
       try {
         var e = needObj(name);
@@ -1456,7 +1456,7 @@
       }
     };
 
-    // setLineThickness(name, t): pen width in mm (> 0).
+
     applet.setLineThickness = function (name, t) {
       try {
         var e = needObj(name);
@@ -1478,7 +1478,7 @@
       }
     };
 
-    // setLineStyle(name, s): int 0..5 -> BIS A B E G H K.
+
     applet.setLineStyle = function (name, s) {
       try {
         var e = needObj(name);
@@ -1501,8 +1501,8 @@
       }
     };
 
-    // renameObject(oldName, newName): rename id (moves row to end, fixes
-    // meta refs). True/false(+warn).
+
+
     applet.renameObject = function (oldName, newName) {
       try {
         var e = needObj(oldName);
@@ -1556,9 +1556,9 @@
       }
     };
 
-    // deleteObject(name): remove row (+ cascade: polygon edges, refs
-    // dependents, and line-likes coincident with a deleted point).
-    // True/false(+warn).
+
+
+
     applet.deleteObject = function (name) {
       try {
         var e = needObj(name);
@@ -1578,7 +1578,7 @@
       }
     };
 
-    // exists(name): silent boolean (no warn; it is a query).
+
     applet.exists = function (name) {
       try {
         if (typeof name !== 'string' || name === '') return false;
@@ -1588,7 +1588,7 @@
       }
     };
 
-    // getAllObjectNames(): insertion-ordered id list (copy).
+
     applet.getAllObjectNames = function () {
       try {
         var list = table.list();
@@ -1601,7 +1601,7 @@
       }
     };
 
-    // getXML(): full construction XML (objects + view/grid/mode).
+
     applet.getXML = function () {
       try {
         return serialize(true);
@@ -1611,7 +1611,7 @@
       }
     };
 
-    // setXML(str): replace construction from XML. True/false(+warn).
+
     applet.setXML = function (xml) {
       try {
         if (typeof xml !== 'string' || parseHead(xml) === null) {
@@ -1635,7 +1635,7 @@
       }
     };
 
-    // evalXML(str): upsert <object/> rows; returns last name or null(+warn).
+
     applet.evalXML = function (xml) {
       try {
         if (typeof xml !== 'string') {
@@ -1692,7 +1692,7 @@
       return false;
     }
 
-    // Listener register/unregister (function or global-name string).
+
     applet.registerAddListener = function (cb) {
       try {
         return regListener(addL, cb, 'registerAddListener');
@@ -1739,7 +1739,7 @@
       }
     };
 
-    // setMode(m)/getMode(): tool mode number (default 0) or label string.
+
     applet.setMode = function (m) {
       try {
         if (isFiniteNum(m)) {
@@ -1770,7 +1770,7 @@
       }
     }
 
-    // undo()/redo(): object-history step (view/grid/mode untouched). Bool.
+
     applet.undo = function () {
       try {
         if (undoStack.length === 0) return false;
@@ -1797,7 +1797,7 @@
       }
     };
 
-    // clearConstruction(): drop all objects (keeps view/mode/grid).
+
     applet.clearConstruction = function () {
       try {
         var list = table.list();
@@ -1814,7 +1814,7 @@
       }
     };
 
-    // setGridVisible(v)/getGridVisible(): grid flag (default false).
+
     applet.setGridVisible = function (v) {
       try {
         gridVisible = !!v;
@@ -1829,8 +1829,8 @@
       return !!gridVisible;
     };
 
-    // zoomIn()/zoomOut(): center-anchored x1.25 step, clamped 0.05..50.
-    // resetView(): s=2 centered on kept w/h. All return true.
+
+
     applet.zoomIn = function () {
       try {
         zoomStep(ZOOM_STEP);
@@ -1871,7 +1871,7 @@
           var st = E.bisStyleFor(e.bisCode);
           dash = st.dashMm || [];
           wmm = st.widthMm;
-        } catch (err) { /* keep fallback */ }
+        } catch (err) {                     }
       }
       if (isFiniteNum(e.thickness) && e.thickness > 0) wmm = e.thickness;
       var dp = [];
@@ -1883,7 +1883,7 @@
       return String(Math.round(n * 1000) / 1000);
     }
 
-    // exportSVG(): ephemeral-px SVG snapshot (never mutates entities).
+
     applet.exportSVG = function () {
       try {
         var list = table.list();
@@ -1947,7 +1947,7 @@
       }
     };
 
-    // getVersion(): shim version string. ping(): liveness ("pong").
+
     applet.getVersion = function () {
       return VERSION;
     };
@@ -1956,7 +1956,7 @@
       return 'pong';
     };
 
-    // Test-only introspection (not part of the 39-method API surface).
+
     applet._table = function () { return table; };
     applet._view = function () {
       return { s: view.s, tx: view.tx, ty: view.ty, w: view.w, h: view.h };

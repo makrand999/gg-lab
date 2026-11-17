@@ -1,4 +1,3 @@
-# Projections of a circle with normal (1,2,3); the plane is uniquely determined.
 # expect: 24V 24E 1F curves=1 oblique=1 obliqueReprojection=ok profileInferred=1 unresolved=0 status=inferred
 /datum -100 400
 /point plan0 20.0000000000 -18.9059960755 plan

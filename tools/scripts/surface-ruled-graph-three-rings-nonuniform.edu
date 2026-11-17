@@ -1,0 +1,56 @@
+# expect: 75V 175E 102F rawFaces=102 faceBindings=ok curves=3 surfaces=4 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred previewParity=ok
+# conic-query: {"index":0,"expect":{"analyticVolume":12985.249634837812,"volumePatch":{"kind":"affine-ruled-conic-volume"}}}
+# conic-query: {"index":1,"expect":{"analyticVolume":20525.072003453315}}
+# conic-query: {"index":2,"expect":{"analyticVolume":7539.822368615503,"volumePatch":{"kind":"affine-ruled-conic-volume"}}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":20298.69697240855,"vertices":75,"edges":175,"faces":102,"euler":2,"oriented":true,"sameDirectionEdges":0,"openEdges":0,"nonmanifoldEdges":0,"invalidVertexCount":0,"invalidFaces":0,"missingDisplayEdgeCount":0,"faceComponents":1,"faceEuler":2,"allFaceEdgesOpposite":true,"unusedDisplayEdgeCount":0,"allDisplayEdgesFaceBacked":true}}
+# surface-query: {"operation":"implicit-equation","surface":2,"expect":{"kind":"implicit","degree":4,"paramChart":{"kind":"ruledConic","A2":{"x":0,"y":6,"z":3},"B2":{"x":-10,"y":0,"z":0}}}}
+# surface-query: {"operation":"implicit-equation","surface":3,"expect":{"kind":"implicit","degree":4,"paramChart":{"kind":"ruledConic","A2":{"x":16,"y":0,"z":0},"B2":{"x":0,"y":12,"z":6}}}}
+# surface-query: {"operation":"normal","surface":2,"point":{"x":10,"y":40,"z":40},"expect":{"normal":{"x":0.8728715609439696,"y":-0.2182178902359924,"z":0.4364357804719848}}}
+# surface-query: {"operation":"normal","surface":3,"point":{"x":10,"y":40,"z":40},"expect":{"normal":{"x":0.9480909262799545,"y":0.14221363894199318,"z":-0.28442727788398636}}}
+# surface-query: {"operation":"generator-lines","expect":{"count":7,"checkedEdges":7,"edgeBacked":true,"sourceIntervalError":0,"invalidSourceIntervals":0,"ownershipFailures":0,"ownershipParity":true,"ownerPatchIndices":[2,3],"reprojectionError":0,"surfaceResidual":0,"ok":true}}
+# surface-query: {"operation":"preview-implicit","expect":{"valid":true,"count":4,"missing":0,"declared":0,"inferred":4,"equationParity":"ok","generatorLineCount":7,"generatorLineParity":"ok"}}
+# surface-query: {"operation":"primitive-reconstruct","expect":{"status":"ok","determination":"inferred","vertices":75,"edges":175,"faces":102,"pointEvidence":[3,4,4],"generatorLines":7,"generatorEdgesBacked":true,"generatorOwnership":true,"implicitDegrees":[4,4],"meshVolume":20298.69697240855,"inputUnchanged":true,"diagnostics":[]}}
+# surface-query: {"operation":"primitive-reconstruct","reverse":true,"expect":{"mesh":{"openEdges":0,"nonmanifoldEdges":0,"sameDirectionEdges":0,"faceComponents":1,"faceEuler":2,"allFaceEdgesOpposite":true},"status":"ok","determination":"inferred","vertices":75,"edges":175,"faces":102,"generatorLines":7,"generatorEdgesBacked":true,"generatorOwnership":true,"meshVolume":20298.69697240855,"inputUnchanged":true,"diagnostics":[]}}
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/ellipse 0 -40 10 3 8 A plan
+/ellipse 0 40 10 6 8 A elevation
+/point p 0 -10 plan
+/point "p'" 0 20 elevation
+/point q 0 -43 plan
+/point "q'" 0 46 elevation
+/point a -20 0 plan
+/point "a'" -20 0 elevation
+/point b 20 0 plan
+/point "b'" 20 0 elevation
+/point c -10 -40 plan
+/point "c'" -10 40 elevation
+/point d 10 -40 plan
+/point "d'" 10 40 elevation
+/line a c A plan
+/line b d A plan
+/line "a'" "c'" A elevation
+/line "b'" "d'" A elevation
+/line p q A plan
+/line "p'" "q'" A elevation
+/ellipse 0 -80 16 6 8 A plan
+/ellipse 0 80 16 12 8 A elevation
+/point r 0 -86 plan
+/point "r'" 0 92 elevation
+/point e -16 -80 plan
+/point "e'" -16 80 elevation
+/point f 16 -80 plan
+/point "f'" 16 80 elevation
+/line c e A plan
+/line d f A plan
+/line "c'" "e'" A elevation
+/line "d'" "f'" A elevation
+/line q r A plan
+/line "q'" "r'" A elevation
+/point w 8.253356149097 -41.69392742019 plan
+/point v 13.20536983855 -83.38785484037 plan
+/point "w'" 8.253356149097 43.38785484037 elevation
+/point "v'" 13.20536983855 86.77570968074 elevation
+/line w v A plan
+/line "w'" "v'" A elevation

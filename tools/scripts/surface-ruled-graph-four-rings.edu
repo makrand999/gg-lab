@@ -1,0 +1,61 @@
+# expect: 96V 240E 146F rawFaces=146 faceBindings=ok curves=4 surfaces=5 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred previewParity=ok
+# conic-query: {"index":0,"expect":{"analyticVolume":12985.249634837812}}
+# conic-query: {"index":1,"expect":{"analyticVolume":20525.072003453315}}
+# conic-query: {"index":2,"expect":{"analyticVolume":16420.05760276265}}
+# conic-query: {"index":3,"expect":{"analyticVolume":8880.235234147149}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":29070.555145915136,"vertices":96,"edges":240,"faces":146,"euler":2,"oriented":true,"sameDirectionEdges":0,"openEdges":0,"nonmanifoldEdges":0,"invalidVertexCount":0,"invalidFaces":0,"missingDisplayEdgeCount":0,"faceComponents":1,"faceEuler":2,"allFaceEdgesOpposite":true,"unusedDisplayEdgeCount":0,"allDisplayEdgesFaceBacked":true}}
+# surface-query: {"operation":"generator-lines","expect":{"count":9,"checkedEdges":9,"edgeBacked":true,"sourceIntervalError":0,"invalidSourceIntervals":0,"ownershipFailures":0,"ownershipParity":true,"ownerPatchIndices":[2,3,4],"reprojectionError":0,"surfaceResidual":0,"ok":true}}
+# surface-query: {"operation":"preview-implicit","expect":{"valid":true,"count":5,"missing":0,"declared":0,"inferred":5,"equationParity":"ok","generatorLineCount":9,"generatorLineParity":"ok"}}
+# surface-query: {"operation":"primitive-reconstruct","expect":{"status":"ok","determination":"inferred","vertices":96,"edges":240,"faces":146,"generatorLines":9,"generatorEdgesBacked":true,"generatorOwnership":true,"implicitDegrees":[4,4,4],"meshVolume":29070.555145915136,"inputUnchanged":true,"diagnostics":[]}}
+# surface-query: {"operation":"primitive-reconstruct","reverse":true,"expect":{"mesh":{"openEdges":0,"nonmanifoldEdges":0,"sameDirectionEdges":0,"faceComponents":1,"faceEuler":2,"allFaceEdgesOpposite":true},"status":"ok","determination":"inferred","vertices":96,"edges":240,"faces":146,"generatorLines":9,"generatorEdgesBacked":true,"generatorOwnership":true,"meshVolume":29070.555145915136,"inputUnchanged":true,"diagnostics":[]}}
+/datum -100 500
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/ellipse 0 -40 10 3 8 A plan
+/ellipse 0 40 10 6 8 A elevation
+/point p 0 -10 plan
+/point "p'" 0 20 elevation
+/point q 0 -43 plan
+/point "q'" 0 46 elevation
+/point a -20 0 plan
+/point "a'" -20 0 elevation
+/point b 20 0 plan
+/point "b'" 20 0 elevation
+/point c -10 -40 plan
+/point "c'" -10 40 elevation
+/point d 10 -40 plan
+/point "d'" 10 40 elevation
+/line a c A plan
+/line b d A plan
+/line "a'" "c'" A elevation
+/line "b'" "d'" A elevation
+/line p q A plan
+/line "p'" "q'" A elevation
+/ellipse 0 -80 16 6 8 A plan
+/ellipse 0 80 16 12 8 A elevation
+/point r 0 -86 plan
+/point "r'" 0 92 elevation
+/point e -16 -80 plan
+/point "e'" -16 80 elevation
+/point f 16 -80 plan
+/point "f'" 16 80 elevation
+/line c e A plan
+/line d f A plan
+/line "c'" "e'" A elevation
+/line "d'" "f'" A elevation
+/line q r A plan
+/line "q'" "r'" A elevation
+/ellipse 0 -120 12 4 8 A plan
+/ellipse 0 120 12 8 8 A elevation
+/point s 0 -124 plan
+/point "s'" 0 128 elevation
+/point g -12 -120 plan
+/point "g'" -12 120 elevation
+/point h 12 -120 plan
+/point "h'" 12 120 elevation
+/line e g A plan
+/line f h A plan
+/line "e'" "g'" A elevation
+/line "f'" "h'" A elevation
+/line r s A plan
+/line "r'" "s'" A elevation

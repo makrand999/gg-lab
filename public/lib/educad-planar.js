@@ -4,10 +4,10 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  // Planar arrangement and region Boolean for straight-loop polygons. The
-  // module is deliberately independent of the surface model: callers project
-  // a planar face to (x,y), run the Boolean, and project the result back.
-  // Curved boundaries are not approximated here.
+
+
+
+
   var EPS = 1e-9, TAU = 2 * Math.PI;
 
   function point(p) {
@@ -296,8 +296,8 @@
     }
     cells.forEach(function (cell) {
       addCell(cell.points, add);
-      // Holes are part of the selected boundary only while their interior is
-      // not itself selected; cancellation handles the filled case.
+
+
       cell.holes.forEach(function (hole) { addCell(hole, add); });
     });
     function addCell(points, addEdge) {

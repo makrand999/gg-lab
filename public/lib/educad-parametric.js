@@ -20,8 +20,8 @@
       Array.isArray(k) && k.length===p.length+c.degree+1 && k.every(function(v,i) {return Number.isFinite(v)&&(!i||v>=k[i-1]);}) && k[c.degree]<k[p.length];
   }
   function domain(c) { return c.kind==='nurbs' ? [c.knots[c.degree],c.knots[c.controlPoints.length]] : [0,1]; }
-  // Homogeneous de Boor evaluation; the same evaluator handles every degree
-  // and positive rational weight, rather than recognising named shapes.
+
+
   function point(c,t) {
     if(c.kind!=='nurbs') {
       var a=(c.startAngle||0)+(c.sweepAngle===undefined?TAU:c.sweepAngle)*t;
@@ -55,8 +55,8 @@
     if(n<(closed?3:2)||n>128||!points.every(finite)) throw new Error('A curve needs 2–128 finite points (at least 3 when closed).');
     for(var i=1;i<n;i++) if(norm(sub(points[i],points[i-1]))<EPS) throw new Error('Consecutive curve points must be distinct.');
     if(closed && norm(sub(points[0],points[n-1]))<EPS) throw new Error('Use closed without repeating the first point.');
-    // Natural/periodic cubic interpolation: M[i-1]+4M[i]+M[i+1]
-    // = 6(P[i-1]-2P[i]+P[i+1]) at uniform station parameters.
+
+
     var A=[],rhs=[];
     for(var row=0;row<n;row++) {
       A[row]=Array(n).fill(0);rhs[row]=[0,0,0];
@@ -102,8 +102,8 @@
     return {x:center.x,y:center.y,radius:norm(sub(a,center)),startAngle:arc?(reverse?end:start)*180/Math.PI:0,
       endAngle:arc?(reverse?start:end)*180/Math.PI:0,throughDirection:reverse?-1:1};
   }
-  // Display approximation only. Knot breaks are always retained; quarter
-  // samples avoid the midpoint blind spot of inflection-shaped cubic spans.
+
+
   function tessellate(c,tolerance) {
     tolerance=tolerance||0.1;
     var bounds=domain(c),breaks=c.kind==='nurbs'?c.knots.filter(function(t,i,k){return t>=bounds[0]&&t<=bounds[1]&&(!i||t!==k[i-1]);}):[0,0.25,0.5,0.75,1];

@@ -1,0 +1,8 @@
+# expect: V=1 E=0 F=0 curves=0 surfaces=0 unresolved=2 status=partial diagnostics=conic-lift-ambiguous
+/datum -100 400
+/point cPlan 0 -20 plan
+/point cElev 0 30 elevation
+/rename cPlan centre members
+/rename cElev centre members
+/ellipse centre 20 10 A plan
+/ellipse centre 20 17.320508 A elevation

@@ -1,0 +1,16 @@
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=implicit,plane surfaceModel=ok surfaceValidation=ok surfaceCertificate=ok diagnostics=none unresolved=0 status=inferred
+/datum 99999.9 100000.4
+/circle 100000.02 -100000.03 0.02 A plan
+/circle 100000.02 -100000.03 0.01 A plan
+/point a 100000 100000 elevation
+/point b 100000.04 100000.02 elevation
+/point c 100000.03 100000.055 elevation
+/point d 100000.01 100000.045 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+# surface-query: {"operation":"mesh-audit","expect":{"volume":0.000028987733032518456,"sameDirectionEdges":0,"oppositeEdges":72,"euler":2,"oriented":true}}
+# surface-query: {"operation":"topology","expect":{"summary":{"status":"closed"}}}
+# surface-query: {"operation":"normal","surface":0,"point":{"x":100000.04,"y":100000.02,"z":100000.03},"expect":{"normal":{"x":0.9615239476408232,"y":0.27472112789737796,"z":0}}}
+# expect: surfaceChecks=3 surfaceQueries=ok

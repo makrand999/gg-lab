@@ -1,6 +1,3 @@
-# Exact constraint report over synthetic observations. The report records the
-# projection equations, remaining degrees of freedom and exact conflict sets;
-# it does not run a nonlinear solver.
 # expect: surfaceChecks=2 surfaceQueries=ok
 /datum -100 100
 /point a 0 0 plan

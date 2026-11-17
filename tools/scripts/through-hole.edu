@@ -1,4 +1,3 @@
-# through-hole
 # expect: 16V 24E 10F holes=2 closed=1 boundary=0 surfaces=10 surfaceLoops=12 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok
 /datum -100 400
 /point v0 0 -10 plan

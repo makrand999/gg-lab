@@ -1,6 +1,3 @@
-# Near-degeneracy is a first-class outcome. A positive gap inside the
-# tolerance policy is reported as near-tangent / near-coincident, never as an
-# exact tangency. Exact pairs keep relation "tangent"/"coincident".
 # expect: surfaceChecks=12 surfaceQueries=ok
 /datum -100 100
 /point a 0 0 plan
@@ -12,8 +9,8 @@
 # surface-query: {"operation":"intersect-spec","a":{"kind":"cylinder","id":"c1","origin":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"radius":5},"b":{"kind":"cylinder","id":"c2","origin":{"x":10.00001,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"radius":5},"expect":{"kind":"line","relation":"near-tangent","gap":0.00001,"nearDegenerate":true}}
 # surface-query: {"operation":"intersect-spec","a":{"kind":"plane","id":"p1","origin":{"x":0,"y":5.0000002,"z":0},"normal":{"x":0,"y":1,"z":0}},"b":{"kind":"sphere","id":"s1","center":{"x":0,"y":0,"z":0},"radius":5},"expect":{"kind":"none","relation":"near-tangent","gap":0.0000002,"nearDegenerate":true}}
 # surface-query: {"operation":"intersect-spec","a":{"kind":"plane","id":"p1","origin":{"x":0,"y":0,"z":0},"normal":{"x":0,"y":1,"z":0}},"b":{"kind":"plane","id":"p2","origin":{"x":0,"y":0.0000002,"z":0},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"plane-overlap","relation":"near-coincident","gap":0.0000002,"nearDegenerate":true}}
-# surface-query: {"operation":"intersect-spec","a":{"kind":"plane","id":"p1","origin":{"x":0,"y":0,"z":0},"normal":{"x":0,"y":1,"z":0}},"b":{"kind":"plane","id":"p2","origin":{"x":0,"y":1,"z":0},"normal":{"x":0,"y":1,"z":0.0000005}},"expect":{"kind":"unsupported","relation":"near-parallel","angle":0.0000005}}
-# surface-query: {"operation":"intersect-spec","a":{"kind":"cylinder","id":"c1","origin":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"radius":5},"b":{"kind":"cylinder","id":"c2","origin":{"x":20,"y":0,"z":0},"axis":{"x":0.0000005,"y":0,"z":1},"radius":5},"expect":{"kind":"unsupported","relation":"near-parallel","angle":0.0000005}}
+# surface-query: {"operation":"intersect-spec","a":{"kind":"plane","id":"p1","origin":{"x":0,"y":0,"z":0},"normal":{"x":0,"y":1,"z":0}},"b":{"kind":"plane","id":"p2","origin":{"x":0,"y":1,"z":0},"normal":{"x":0,"y":1,"z":0.0000005}},"expect":{"kind":"implicit-intersection","relation":"algebraic","surfaceKinds":["plane","plane"],"legacy":{"kind":"unsupported","relation":"near-parallel"}}}
+# surface-query: {"operation":"intersect-spec","a":{"kind":"cylinder","id":"c1","origin":{"x":0,"y":0,"z":0},"axis":{"x":0,"y":0,"z":1},"radius":5},"b":{"kind":"cylinder","id":"c2","origin":{"x":20,"y":0,"z":0},"axis":{"x":0.0000005,"y":0,"z":1},"radius":5},"expect":{"kind":"implicit-intersection","relation":"algebraic","surfaceKinds":["cylinder","cylinder"],"legacy":{"kind":"unsupported","relation":"near-parallel"}}}
 # surface-query: {"operation":"intersect-spec","a":{"kind":"sphere","id":"s1","center":{"x":0,"y":0,"z":0},"radius":5},"b":{"kind":"sphere","id":"s2","center":{"x":0.0000002,"y":0,"z":0},"radius":5},"expect":{"kind":"coincident","relation":"near-coincident","gap":0.0000002,"nearDegenerate":true}}
 # surface-query: {"operation":"intersect-spec","a":{"kind":"sphere","id":"s1","center":{"x":0,"y":0,"z":0},"radius":5},"b":{"kind":"cylinder","id":"c1","origin":{"x":0,"y":0,"z":-10},"axis":{"x":0,"y":0,"z":1},"radius":5.0000002},"expect":{"kind":"circle","relation":"near-tangent","gap":0.0000002,"nearDegenerate":true}}
 # surface-query: {"operation":"predicate","predicate":"orient3d","points":[{"x":0,"y":0,"z":0},{"x":1,"y":0,"z":0},{"x":0,"y":1,"z":0},{"x":0,"y":0,"z":1}],"expect":{"sign":-1}}

@@ -1,7 +1,3 @@
-# Correspondence audit: unique, missing, conflicting and ambiguous bases.
-# The audit is read-only; it reports alternatives instead of picking one.
-# Synthetic rows exercise conflicts that a clean sheet would reject as a
-# projector error, without mutating the drawing.
 # expect: surfaceChecks=1 surfaceQueries=ok
 /datum -100 100
 /point a 0 0 plan

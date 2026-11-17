@@ -1,4 +1,4 @@
-# expect: diagnostics=oblique-curve-conflict,oblique-curve-projection-missing status=oblique-curve-conflict
+# expect: curves=0 diagnostics=conic-lift-ambiguous status=conic-lift-ambiguous
 /datum -100 400
 /ellipse 0 -30 20 10 A plan
 /ellipse 0 40 20 10 A elevation

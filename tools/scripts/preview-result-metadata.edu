@@ -1,0 +1,8 @@
+# expect: surfaceChecks=6 surfaceQueries=ok
+/datum -60 180
+# surface-query: {"operation":"preview-spec","preview":{"status":"ok","geometry":{"name":"legacy point","vertices":[{"x":0,"y":0,"z":0}],"edges":[],"faces":[]}},"expect":{"valid":true}}
+# surface-query: {"operation":"preview-spec","preview":{"status":"ok","geometry":{"name":"legacy point","vertices":[{"x":0,"y":0,"z":0}],"edges":[],"faces":[]},"determination":"partial","issues":[{"code":"example-missing","message":"Add a second view."}]},"expect":{"valid":true}}
+# surface-query: {"operation":"preview-spec","preview":{"status":"ok","geometry":{"name":"legacy point","vertices":[{"x":0,"y":0,"z":0}],"edges":[],"faces":[]},"determination":"inconsistent"},"expect":{"valid":false}}
+# surface-query: {"operation":"preview-spec","preview":{"status":"ok","geometry":{"name":"legacy point","vertices":[{"x":0,"y":0,"z":0}],"edges":[],"faces":[]},"issues":"missing"},"expect":{"valid":false}}
+# surface-query: {"operation":"preview-spec","preview":{"status":"ok","geometry":{"name":"legacy point","vertices":[{"x":0,"y":0,"z":0}],"edges":[],"faces":[]},"issues":[{"code":"missing"}]},"expect":{"valid":false}}
+# surface-query: {"operation":"preview-spec","preview":{"status":"unavailable","reason":"coordinate-conflict","label":"Conflicting coordinates.","determination":"inconsistent","issues":[]},"expect":{"valid":true}}

@@ -4,11 +4,11 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  // Exact geometric predicates for kernel decisions. A floating-point filter
-  // answers the easy cases; near-degenerate inputs fall back to exact decimal
-  // rationals (the stored JSON numbers are the input, not an approximation).
-  // The exact path is intentionally small: orientation, coplanarity and
-  // point-on-plane.
+
+
+
+
+
   var EPS = Number.EPSILON;
   var FILTER = 32 * EPS;
 
@@ -36,8 +36,8 @@
     while (b) { var t = a % b; a = b; b = t; }
     return a;
   }
-  // Exact decimal value of a finite double, as a reduced fraction. This is
-  // exact with respect to the number the program stored and serialized.
+
+
   function fraction(value) {
     if (!Number.isFinite(value)) throw new Error('predicates: non-finite number');
     var s = String(value);

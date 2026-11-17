@@ -1,0 +1,19 @@
+# expect: rejected=7
+/datum -100 400
+/point a 0 -10 plan
+/point b 20 -10 plan
+/point c 0 20 elevation
+/point d 20 20 elevation
+/point lone 100 -10 plan
+/point p1 140 -10 plan
+/point p2 140 -10 plan
+/rename p1 dup members
+/rename p2 dup members
+/circle lone 10
+# reject: {"command":"/circle a 10 A elevation","contains":"not ELEVATION"}
+# reject: {"command":"/arc a 10 0 180 A profile","contains":"not PROFILE"}
+# reject: {"command":"/ellipse a 10 5 A elevation","contains":"not ELEVATION"}
+# reject: {"command":"/line a b A elevation","contains":"not ELEVATION"}
+# reject: {"command":"/curve-through a b c plan","contains":"same declared view"}
+# reject: {"command":"/circle dup 10 A plan","contains":"more than one point"}
+# reject: {"command":"/circle E2 10 A elevation","contains":"not ELEVATION"}

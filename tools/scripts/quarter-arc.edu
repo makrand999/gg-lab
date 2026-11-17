@@ -1,4 +1,3 @@
-# Quarter-circle curve lifted into a horizontal plane; no spanning surface assumed.
 # expect: 7V 6E 0F curves=1 unresolved=0 status=inferred
 /datum -30 70
 /arc 20 -30 20 0 90 A plan

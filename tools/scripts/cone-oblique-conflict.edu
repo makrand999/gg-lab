@@ -1,6 +1,3 @@
-# The base is consistent, but the two tangent generators meet off the
-# base normal: an oblique cone is outside the supported surface family. The
-# drawing reports the conflict and keeps the boundary as a planar cap.
 # expect: 24V 24E 1F curves=1 oblique=1 obliqueReprojection=ok surfaces=1 surfaceKinds=plane surfaceShells=0 surfaceOpen=1 surfaceBoundary=24 surfaceModel=partial diagnostics=cone-apex-conflict unresolved=1 status=partial
 /datum -100 400
 /profile 100 0 1

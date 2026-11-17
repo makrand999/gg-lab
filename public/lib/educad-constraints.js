@@ -4,9 +4,9 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  // Exact observation report for 2D -> 3D correspondence. This is not a
-  // nonlinear solver: it records the projection equations that a group fixes,
-  // the remaining degrees of freedom, and exact conflict sets.
+
+
+
   var EPS = 1e-6;
   function names(caption) {
     return String(caption || '').split(',').map(function (part) {

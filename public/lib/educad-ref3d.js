@@ -6,15 +6,15 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function (Parametric) {
   'use strict';
-  // EduCAD reference-3D previews: the teacher's browser derives a small 3D
-  // shape from the 2D model answer and stores it on the question; students
-  // receive that shape (never the 2D ink) while the per-question show_3d
-  // toggle is on, and draw the 2D views from it. Zero deps. Dual-env:
-  // browser via window.EduCADRef3d, plain Node via module.exports.
-  //
-  // A preview is {status:'ok', geometry:{name, vertices, edges, faces}} or
-  // {status:'unavailable', reason, label}, mirroring the shared pipeline but
-  // detached to plain JSON the server stores opaquely.
+
+
+
+
+
+
+
+
+
   var VERSION = '1.0.0-educad';
 
   function isFiniteNumber(v) {
@@ -51,11 +51,11 @@
     return loop;
   }
 
-  // Derive a storable preview from model-ink entity rows. R is the
-  // reconstruct module (passed in so Node callers control the dep).
-  // Returns null when there is nothing to derive from (no rows, no
-  // module); a model that reconstructs to nothing yields an honest
-  // {status:'unavailable'} preview instead of nothing.
+
+
+
+
+
   function buildPreview(entities, R) {
     if (!Array.isArray(entities) || !R ||
         typeof R.reconstruct !== 'function') {
@@ -72,7 +72,10 @@
       return {
         status: 'unavailable',
         reason: (res && res.reason) || 'preview-failed',
-        label: (res && res.label) || 'could not build 3D preview'
+        label: (res && res.label) || 'could not build 3D preview',
+        determination: res && res.determination,
+        pipeline: res && res.pipeline,
+        issues: JSON.parse(JSON.stringify(res && res.issues || []))
       };
     }
     try {
@@ -87,20 +90,30 @@
       });
       var preview = {
         status: 'ok',
+        determination: res.determination,
+        label: res.label || '',
+        issues: res.issues || [],
         pipeline: res.pipeline,
         geometry: {
           name: String(g.name === undefined ? 'wireframe' : g.name),
           vertices: verts, edges: edges, faces: faces,
           curves: g.curves || [], surfacePatches: g.surfacePatches || [],
           surfaces: g.surfaces || [], surfaceModel: g.surfaceModel || null,
+          generatorLines: g.generatorLines || [],
           recesses: g.recesses || [], fillets: g.fillets || [],
+          cavityVolumes: g.cavityVolumes || [], cavityRelations: g.cavityRelations || [],
+          cavityUnions: g.cavityUnions || [],
+          cavityTrims: g.cavityTrims || null,
           analyticSurfaceValidation: g.analyticSurfaceValidation || null,
           analyticCertificate: g.analyticCertificate || null,
           smoothSideFaces: g.smoothSideFaces, topologyStatus: g.topologyStatus,
+          partialSubset: g.partialSubset === true,
+          profileMap: g.profileMap, profileInferred: g.profileInferred,
+          surfaceValidation: g.surfaceValidation, displaySync: g.displaySync || null,
           faceHoles: (g.faceHoles || faces.map(function() { return []; })).map(function(holes) { return holes.map(function(hole) { return copyFace(hole, verts.length); }); })
         }
       };
-      // Detach from live objects; the payload must survive JSON storage.
+
       return JSON.parse(JSON.stringify(preview));
     } catch (err) {
       return { status: 'unavailable', reason: 'preview-failed',
@@ -108,10 +121,17 @@
     }
   }
 
-  // Shape check for previews arriving over the wire. Never throws.
+
   function validPreview(p) {
     try {
       if (!p || typeof p !== 'object') return false;
+
+
+      if (p.determination !== undefined && ['determined','inferred','partial','underdetermined','inconsistent','unsupported'].indexOf(p.determination) === -1) return false;
+      if (p.issues !== undefined && (!Array.isArray(p.issues) || !p.issues.every(function(issue) {
+        return issue && typeof issue.code === 'string' && typeof issue.message === 'string';
+      }))) return false;
+      if (p.status === 'ok' && (p.determination === 'inconsistent' || p.determination === 'underdetermined' || p.determination === 'unsupported')) return false;
       if (p.status === 'unavailable') {
         return typeof p.reason === 'string' && p.reason !== '' &&
           typeof p.label === 'string' && p.label !== '';
@@ -136,6 +156,15 @@
           if (!Array.isArray(holes)) throw new Error('invalid face holes');
           holes.forEach(function(hole) { copyFace(hole, g.vertices.length); });
         });
+      }
+      if (g.displaySync !== undefined && g.displaySync !== null) {
+        if (typeof g.displaySync !== 'object' ||
+            ['ok','issues'].indexOf(g.displaySync.status) === -1 ||
+            !Array.isArray(g.displaySync.diagnostics) ||
+            !g.displaySync.diagnostics.every(function (diagnostic) {
+              return diagnostic && typeof diagnostic.code === 'string' &&
+                typeof diagnostic.message === 'string';
+            })) return false;
       }
       function indices(values, count) {
         return Array.isArray(values) && values.every(function(v) {return Number.isInteger(v) && v>=0 && v<count;});
@@ -169,12 +198,25 @@
         if (typeof g.analyticCertificate !== 'object') return false;
         if (['ok','partial','issues'].indexOf(g.analyticCertificate.status) === -1) return false;
       }
+      if (g.cavityTrims !== undefined && g.cavityTrims !== null) {
+        if (typeof g.cavityTrims !== 'object' ||
+            g.cavityTrims.contract !== 'cavity-analytic-trim-v1' ||
+            !Array.isArray(g.cavityTrims.pairs) ||
+            !Array.isArray(g.cavityTrims.boundaries) ||
+            ['none','partial','unsupported'].indexOf(g.cavityTrims.status) === -1) return false;
+      }
       if (g.curves !== undefined) {
         if (!Array.isArray(g.curves)) return false;
         for (var ci=0;ci<g.curves.length;ci++) {
           var c=g.curves[ci];
           if(c && c.kind==='nurbs') {
             if(!Parametric.validate(c)||!indices(c.displayVertices,g.vertices.length)||!indices(c.displayEdges,g.edges.length))return false;
+            continue;
+          }
+          if(c && c.kind==='polyline') {
+            if(!Array.isArray(c.points)||c.points.length<2)return false;
+            c.points.forEach(copyVertex);
+            if(!indices(c.displayVertices,g.vertices.length)||!indices(c.displayEdges,g.edges.length))return false;
             continue;
           }
           if (!c || ['circle','circular-arc','ellipse','arc'].indexOf(c.kind)===-1 ||

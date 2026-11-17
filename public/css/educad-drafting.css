@@ -1,4 +1,4 @@
-/* Text controls sit on the paper: no cards, button boxes or floating palettes. */
+
 .drafting-controls { position: absolute; z-index: 11; top: 12px; left: 12px; width: max-content; max-width: calc(100vw - 24px); color: #64748b; font: 12px/1.6 system-ui,sans-serif; }
 .drafting-tools, .drafting-options, .drafting-editor, .drafting-selection, .drafting-history { display: flex; align-items: center; flex-wrap: wrap; column-gap: 15px; row-gap: 3px; min-height: 28px; }
 .drafting-controls [hidden], .drafting-status[hidden] { display: none !important; }

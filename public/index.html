@@ -106,10 +106,10 @@
       font-weight: 600;
       text-decoration: underline;
       text-underline-offset: 3px;
-      /* test active anchor: background: #0284c7 */
+
     }
-    /* Edit/View mode pair: same chrome as demo buttons, own class so the
-       demo active-sweep never touches the mode indicator. */
+
+
     .mode-btn {
       background: transparent;
       border: none;
@@ -153,15 +153,15 @@
     #session-bar .demo-btn { box-shadow: none; }
     body.mobile-inspect #btn-attach-reviewed-model { display: none !important; }
 
-    /* Mobile inspection replaces the retired desktop-only overlay:
-       touch-only devices get View + Pose in split panes (see
-       css/educad-mobile.css), enforced centrally in the app script. */
-  </style>
+
+
+
+</style>
   <style id="cf-panels">
-    /* Account panels (Drawings, Sets): same clean Codeforces look as the
-       login page — Verdana, square grey buttons, blue links. Strictly
-       scoped: the canvas chrome (.demo-btn et al) outside .cf-panel is
-       untouched. */
+
+
+
+
     .cf-panel {
       position: absolute;
       left: 0;
@@ -243,10 +243,10 @@
       outline: none;
     }
     .cf-panel input[type="checkbox"] { margin-right: 4px; }
-  </style>
+</style>
   <style id="cmd-styles">
-    /* Slash command line (bottom-center) + Settings panel (top-right).
-       Scoped to #cmd-bar / #settings-panel: canvas chrome untouched. */
+
+
     #cmd-bar[hidden] { display: none; }
     #cmd-bar {
       position: fixed;
@@ -383,10 +383,10 @@
       margin-top: 8px;
     }
     #settings-panel #settings-reset:hover { background: #e2e2e2; }
-    /* Pose mode HUD: plain canvas ink, no box. Everything reads as text
-       written on the sheet itself: serif italic like the sheet labels, a
-       soft knockout halo for legibility, click-through except the two
-       text actions. Scoped to #pose-panel: canvas chrome untouched. */
+
+
+
+
     #pose-panel[hidden] { display: none; }
     #pose-panel {
       position: fixed;
@@ -451,15 +451,15 @@
       pointer-events: auto;
     }
     #pose-panel .pose-actions button:hover { text-decoration: underline; }
-  </style>
+</style>
   <link rel="stylesheet" href="css/educad-drafting.css?v=drawing-method-20261007-1">
 </head>
 <body>
   <script>
-    // Login gate: no session -> login page. Runs before the CAD modules
-    // load so logged-out users never flash the canvas. Teachers and
-    // academics live in the studio: they reach the sheet only through an
-    // explicit deep link (submission review, starter drawing).
+
+
+
+
     (function gateLogin() {
       try {
         if (!window.localStorage) return;
@@ -476,14 +476,14 @@
             window.location.replace('teacher.html');
           }
         }
-      } catch (err) { /* storage blocked: fail open to avoid a redirect loop */ }
+      } catch (err) {                                                           }
     })();
-  </script>
+</script>
   <script>
-    // Early mobile verdict: marks inspection-only input before the app
-    // loads so phones never flash desktop chrome. No blocking, no
-    // reload: the mobile shell refines layout after load and preserves
-    // the model and view across input or orientation changes.
+
+
+
+
     (function classifyMobile() {
       try {
         var coarse = false, fine = false;
@@ -500,11 +500,11 @@
           touchOnly = touch && small;
         }
         if (touchOnly) document.body.classList.add('mobile-inspect');
-      } catch (err) { /* the shell classifies again after load */ }
+      } catch (err) {                                             }
     })();
-  </script>
+</script>
   <div id="app-container"></div>
-  
+
   <div class="coords-hud" id="coords-display">X: 0.00 mm &bull; Y: 0.00 mm (Ground Line XY)</div>
   <span id="plane-indicator" class="plane-tag" style="display:none;"></span>
 
@@ -523,6 +523,10 @@
         <option value="" selected>Tutorial Option...</option>
         <option value="square">Square</option>
         <option value="prism">Prism</option>
+        <option value="three-view-prism">3-View Hex Prism</option>
+        <option value="three-view-pyramid">3-View Square Pyramid</option>
+        <option value="three-view-cylinder">3-View Cylinder</option>
+        <option value="three-view-cone">3-View Cone</option>
       </select>
     </label>
     <span class="demo-bridge" style="display:none;">
@@ -533,6 +537,10 @@
       <button class="demo-btn" id="btn-demo-square">Profile Square (40mm)</button>
       <button class="demo-btn" id="btn-tut-square">Tutorial: Square</button>
       <button class="demo-btn" id="btn-tut-prism">Tutorial: Prism</button>
+      <button class="demo-btn" id="btn-tut-3v-prism">Tutorial: 3-View Prism</button>
+      <button class="demo-btn" id="btn-tut-3v-pyramid">Tutorial: 3-View Pyramid</button>
+      <button class="demo-btn" id="btn-tut-3v-cylinder">Tutorial: 3-View Cylinder</button>
+      <button class="demo-btn" id="btn-tut-3v-cone">Tutorial: 3-View Cone</button>
     </span>
     <span class="bar-divider"></span>
     <button class="demo-btn" id="btn-clear">Clear Sheet</button>
@@ -543,7 +551,6 @@
     <button class="mode-btn" id="btn-mode-pose" title="Pose mode: move the 3D model, watch the 2D views follow">Pose</button>
     <span class="bar-divider"></span>
     <button class="demo-btn" id="btn-settings" title="Settings: command line and sheet preferences">Settings</button>
-    <a class="demo-btn" id="btn-manual" href="manual.html" target="_blank" rel="noopener">Manual</a>
   </div>
 
   <div id="session-bar">
@@ -593,9 +600,9 @@
     </div>
   </div>
   <script>
-    // Session chip: shows who is logged in; Logout clears the session.
-    // Kept outside .demo-bar (tests pin the Manual link as its last child)
-    // and stops canvas gestures so clicks here never draw.
+
+
+
     (function sessionBar() {
       function current() {
         try { return JSON.parse(window.localStorage.getItem('educad_session') || 'null'); }
@@ -627,14 +634,15 @@
         window.location.replace('login.html');
       });
     })();
-  </script>
+</script>
 
-  <!-- Core Modules -->
+
   <script src="lib/educad-parametric.js"></script>
   <script src="lib/educad-geometry.js"></script>
   <script src="lib/educad-viewport.js"></script>
   <script src="lib/educad-canvas.js"></script>
   <script src="lib/educad-entities.js"></script>
+  <script src="lib/educad-conic.js"></script>
   <script src="lib/educad-shim.js"></script>
   <script src="lib/educad-solver.js"></script>
   <script src="lib/edugraphics-snapping.js"></script>
@@ -646,12 +654,15 @@
   <script src="lib/educad-spatial.js?v=inspect-20261007-1"></script>
   <script src="lib/educad-strict.js"></script>
   <script src="lib/educad-vec3.js"></script>
+  <script src="lib/educad-planar.js"></script>
+  <script src="lib/educad-cavity-boolean.js"></script>
   <script src="lib/educad-curve-reconstruct.js"></script>
   <script src="lib/educad-oblique-kernel.js"></script>
   <script src="lib/educad-predicates.js"></script>
-  <script src="lib/educad-planar.js"></script>
+  <script src="lib/educad-implicit.js"></script>
   <script src="lib/educad-surfaces.js"></script>
   <script src="lib/educad-parametric-reconstruct.js"></script>
+  <script src="lib/educad-surface-infer.js"></script>
   <script src="lib/educad-reconstruct.js?v=quiet-20261006-2"></script>
   <script src="lib/educad-correspondence.js"></script>
   <script src="lib/educad-constraints.js"></script>
@@ -678,18 +689,18 @@
       var coordsDisp = document.getElementById('coords-display');
       var planeInd = document.getElementById('plane-indicator');
 
-      // Initialize EduCAD Bootloader
+
       var handle = EduCADBoot.init({
         container: container,
         w: window.innerWidth,
         h: window.innerHeight
       });
-      // Saves UI bridge: the session-bar script below is a separate block
-      // and reaches the live table only through this handle.
+
+
       window.educadHandle = handle;
-      // Mobile inspection verdict (input-based, fixed for the session):
-      // touch-only devices default to View, may enter Pose, and never
-      // enter Edit. mobileShell owns the split layout once mounted.
+
+
+
       var mobileInspection = (typeof EduCADMobile !== 'undefined') ?
         EduCADMobile.detectFromWindow(window).touchOnly : false;
       var mobileShell = null;
@@ -707,27 +718,27 @@
         return (typeof EduCADMobile !== 'undefined') &&
           EduCADMobile.clickSuppressed();
       }
-      // Privileged sheet replacement: demos and saved sheets load while
-      // the sheet stays in View. Synchronous only; user gestures never
-      // set this flag, so authoring stays refused.
+
+
+
       function withMobilePrivileged(fn) {
         mobilePrivileged = true;
         try { return fn(); }
         finally { mobilePrivileged = false; }
       }
-      // Settings store, owned by the commandLine block below. Hoisted
-      // here so renderLayer1 can honor display prefs (locus lines).
-      // Null until Settings loads; renderers treat null as defaults.
+
+
+
       var settingsStore = null;
       var drafting = null;
-      // Pinned loci: pointId -> true. L toggles the selected point's
-      // entry; renderers draw one ephemeral Type K line per pinned
-      // point (locus of <name>) plus its snaps. Dangling ids (deleted
-      // points, cleared sheets, undo restores) are pruned lazily on
-      // read, so no other flow needs to maintain this map.
+
+
+
+
+
       var pinnedLocus = {};
 
-      // Snapshot history groups complete gestures, including drag previews.
+
       var history = EduCADDrafting.createHistory(handle.table, function (snapshot) {
         EduCADSaves.restoreTable(EduCADEntities, handle.table, { entities: snapshot });
         cancelAuthoring();
@@ -761,8 +772,8 @@
       var ctx1 = c1.getContext('2d');
       var ctx2 = c2.getContext('2d');
       var dpr = mount.dpr || window.devicePixelRatio || 1;
-      // Pane-relative cursor math: each canvas fills the window on
-      // desktop (identical values) and one split pane on mobile.
+
+
       function sheetCursorFromClient(x, y) {
         try {
           var r = c2.getBoundingClientRect();
@@ -778,7 +789,7 @@
         } catch (err) { return { x: x, y: y }; }
       }
 
-      // In-canvas selection + on-site rename (no DOM inputs; Layer 2 only).
+
       handle.sel = EduCADCanvas.createSelectionState();
       var lastLabelResult = { placements: [] };
       var labelCache = { key: null, result: null };
@@ -801,9 +812,9 @@
         return null;
       }
 
-      // Line construction task (bank P1, click P2, pick BIS type). The
-      // tool only ever parks in menu/animating: P1 arrives banked and
-      // the finalizer locks P2 in the same click.
+
+
+
       handle.line = EduCADCanvas.createLineToolState();
       var lineMenu = null;
       var lineAnim = null;
@@ -817,7 +828,7 @@
       function setLineCursor(on) {
         c2.style.cursor = on ? 'crosshair' : '';
       }
-      // Preview-only rows: each shows its rendered dash sample, no text.
+
       function ensureLineMenu() {
         if (lineMenu) return lineMenu;
         var m = document.createElement('div');
@@ -849,7 +860,7 @@
               g.lineTo(lw - 4, 7);
               g.stroke();
             }
-          } catch (err) { /* headless: row keeps data-bis, preview skipped */ }
+          } catch (err) {                                                     }
         });
         m.addEventListener('click', function (e) {
           var row = (e.target && typeof e.target.closest === 'function') ?
@@ -878,8 +889,8 @@
         pendingMember = null;
         setLineCursor(false);
       }
-      // A hit may contain separate stations or several members at one station.
-      // Keep the chosen member identity with the bank until line creation.
+
+
       var dotMenu = null;
       var pendingMember = null;
       function hideDotMenu() {
@@ -952,9 +963,9 @@
         dotMenu.style.top = Math.max(4, Math.min(px.y + 10, handle.view.h - 170)) + 'px';
         dotMenu.classList.add('open');
       }
-      // User actions: every click/key gesture funnels through these named
-      // functions, and the tutorial stepper calls the same ones — one
-      // implementation serves the hand and the script.
+
+
+
       function drawingWarning(message) {
         if (typeof console !== 'undefined' && console.warn) console.warn(message);
         if (drafting) drafting.notify(message.replace(/^EduCAD (?:distance|plot|circle|bank): /, ''));
@@ -981,19 +992,19 @@
         renderLayer1();
         renderLayer2(cursorPx || null, null);
       }
-      // Locus system master switch: the Settings preference. Off (or
-      // Settings not yet loaded) means no locus lines and no locus
-      // snaps anywhere, and the L key stays inert.
+
+
+
       function locusSystemOn() {
         return settingsStore !== null &&
           typeof EduCADSettings !== 'undefined' &&
           EduCADSettings.get(settingsStore, 'showLocusLines');
       }
-      // Ephemeral pinned loci: one Type K LINE per pinned point at the
-      // point's own height, shaped exactly like curriculum loci so the
-      // geometry loop, pose copies, and label pass treat them alike.
-      // Never written to the table: no saves, undo, verify, or 3D
-      // impact. Points on XY are skipped (the datum is their line).
+
+
+
+
+
       function pinnedLocusLines() {
         if (!locusSystemOn()) return [];
         var out = [];
@@ -1012,20 +1023,20 @@
         }
         return out;
       }
-      // Table entities minus stored locus lines. Stored loci are
-      // display-dead data (demos and saves keep them, but the sheet
-      // only ever shows pinned ones), so interaction inputs must not
-      // see them either otherwise invisible lines stay pickable and
-      // their crossings stay snappable.
+
+
+
+
+
       function liveEntities() {
         return handle.table.list().filter(function (e) {
           return e.visible !== false && !(e.meta && e.meta.kind === 'locus') && (!drafting || drafting.isVisible(e));
         });
       }
-      // Snap inputs: live entities plus pinned loci (their projector
-      // crossings snap at INTERSECTION tier), with the pinned heights
-      // as the LOCUS tier list. LINEs contribute no endpoints, so the
-      // pinned extent ends never become snap points.
+
+
+
+
       function snapOptions() {
         var pins = pinnedLocusLines();
         return {
@@ -1033,9 +1044,9 @@
           locusYMmList: pins.map(function (l) { return l.y; })
         };
       }
-      // L key: pin or unpin the selected point's locus line. Returns
-      // false (key ignored) with the system off, nothing selected, or
-      // a non-point selected.
+
+
+
       function togglePinnedLocus() {
         if (!locusSystemOn()) return false;
         if (handle.sel.selectedId === null) return false;
@@ -1047,8 +1058,8 @@
         renderLayer2(lastCursor, { snap: handle.snapCurrent });
         return true;
       }
-      function userAssignMembers(id, caption) {
-        EduCADDrafting.assignMembers(handle.table, id, caption);
+      function userAssignMembers(id, caption, labelOnly) {
+        EduCADDrafting.assignMembers(handle.table, id, caption, { labelOnly: !!labelOnly });
         renderLayer1(); renderLayer2(null, null);
       }
       function userRenamePoint(id, newName) {
@@ -1102,9 +1113,9 @@
         showLineMenu(cursor);
         renderLayer2(cursor, null);
       }
-      // Circle finalizer: two banked points plus the clicked third draw
-      // the circle (a banked corner claim applies to lines only).
-      // Rejected triples warn and drop the bank; nothing stays armed.
+
+
+
       function userCommitCircle(id, cursor) {
         var bank = handle.circlePicks.picks;
         if (bank.length !== 2) return false;
@@ -1130,9 +1141,9 @@
         renderLayer2(cursor, null);
         return cres.ok;
       }
-      // Typed-distance arming: exactly one visible point selected and no
-      // other gesture owning the keyboard. Returns the reference entity
-      // or null. Rename editing always wins over typing while it runs.
+
+
+
       function typedDistRef() {
         if (handle.sel.editing !== null) return null;
         if (handle.sel.selectedId === null) return null;
@@ -1147,11 +1158,11 @@
         }
         return ref;
       }
-      // Enter with a typed buffer stakes the point at that distance from
-      // the selection along the locked axis, on the cursor's side. A
-      // missing aim, direction, or value warns and keeps the buffer so
-      // the user can fix it and press Enter again. The selection stays
-      // on the reference for repeat entry.
+
+
+
+
+
       function commitTypedDistAt(cursorPx) {
         var ref = typedDistRef();
         var buf = handle.typedDist.buffer;
@@ -1201,19 +1212,19 @@
         userPlacePoint(tgt.xMm, tgt.yMm, cursorPx);
         return true;
       }
-      // Typed-plot arming: a datum is focused and rename is not running.
-      // Plotting is exclusive (arming it aborts every other tool), so no
-      // further gates are needed. Returns {aMm, bMm} or null.
+
+
+
       function typedPlotAB() {
         if (handle.sel.editing !== null) return null;
         if (!EduCADCanvas.isPlotToolActive(handle.plot)) return null;
         if (handle.plot.ground) return { ground: true, aMm: null, bMm: null };
         return { aMm: handle.plot.aMm, bMm: handle.plot.bMm };
       }
-      // Enter while plotting stakes the point at the typed perpendicular
-      // offset on the cursor's side of the datum, then ends plotting
-      // (one-shot, like the click commit). Failures warn and keep the
-      // buffer for a retry.
+
+
+
+
       function commitPlotTypedAt(cursorPx) {
         var dab = typedPlotAB();
         var buf = handle.typedDist.buffer;
@@ -1246,8 +1257,8 @@
         return true;
       }
       function userSetupSquare() {
-        // loadDemo tears the stepper down (right for real demo switches);
-        // the tutorial's own setup step restores it right after.
+
+
         var keepTut = tutStepper;
         loadDemo('clear');
         tutStepper = keepTut;
@@ -1274,8 +1285,39 @@
         renderLayer1();
         return datum;
       }
-      // Revision wait: line commits land ~300 ms after the BIS pick via
-      // rAF; the tutorial pauses Next until the table bumps (or 2 s pass).
+      function userSetupThreeView(solid) {
+        var keepTut = tutStepper;
+        var keepLesson = tutLesson;
+        loadDemo('clear');
+        tutStepper = keepTut;
+        tutLesson = keepLesson;
+        var sheet = EduCADCurriculum.threeViewSheet({
+          solid: solid, sizeMm: 35, heightMm: 70, xMm: 0
+        });
+        handle.table.importEntities(sheet.entities);
+        var patches = {};
+        handle.table.list().forEach(function (e) {
+          var meta = Object.assign({}, e.meta);
+          if (e.viewRole === 'PROFILE' || e.bisCode === 'G' ||
+              (e.type === 'POINT' && e.caption === 'o') ||
+              (solid === 'CONE' && e.type === 'POINT' && e.viewRole === 'PLAN' && e.caption === 's')) {
+            meta.reconstructionRole = 'construction';
+          }
+          if (e.type === 'POINT') {
+            meta.members = (meta.members || []).map(function (m, i) {
+              return { id: 'point:' + e.id + ':' + i, name: m.name, hidden: !!m.hidden };
+            });
+            delete meta.membersDeclared;
+          }
+          patches[e.id] = { meta: meta };
+        });
+        handle.table.updateMany(patches);
+        demoTruth = sheet.corners || null;
+        if (handle.rebuildSolid) handle.rebuildSolid();
+        renderLayer1();
+      }
+
+
       function waitTableRevision(done, timeoutMs) {
         var rev0 = handle.table.revision();
         var t0 = Date.now();
@@ -1288,10 +1330,10 @@
           setTimeout(poll, 50);
         })();
       }
-      // Banking: Ctrl+click toggles a point into the two-slot bank. No
-      // tool arms here — the bank only resolves on a plain-click
-      // finalizer. The crosshair marks a non-empty bank (multi-select
-      // in progress), never an armed line.
+
+
+
+
       function bankHas(cid) {
         var bk = handle.circlePicks.picks;
         for (var i = 0; i < bk.length; i++) {
@@ -1345,8 +1387,8 @@
         renderLayer1();
         renderLayer2(pick.cursor, null);
       }
-      // Polar point construction starts from one banked point plus a
-      // segment click; the baseline, angle, and distance sweeps follow.
+
+
       handle.polar = EduCADCanvas.createPolarToolState();
       var POLAR_ARC_R_PX = 28;
       function abortPolarTask() {
@@ -1368,18 +1410,18 @@
         renderLayer1();
         renderLayer2(cursorPx, null);
       }
-      // Line-referenced plotting: first click on a datum segment arms
-      // the perpendicular preview, second click commits the candidate.
+
+
       handle.plot = EduCADCanvas.createPlotToolState();
-      // Pick bank: ordered Ctrl+click list (two slots) behind every
-      // multi-point gesture. Banking arms nothing; a plain-click
-      // finalizer resolves one banked pick to a line and two to a
-      // circle. Amber ring + numeral per banked point.
+
+
+
+
       handle.circlePicks = EduCADCanvas.createCirclePickState();
-      // Typed axis distance: digits while a point is selected fill this
-      // buffer; Enter stakes the point along the locked axis (§6.2).
+
+
       handle.typedDist = EduCADCanvas.createTypedDistState();
-      // Edit/View mode + inspected pick (View is read-only measuring).
+
       handle.measure = EduCADMeasure.createViewState();
       handle.table.setMutationGuard(function () {
         return mobilePrivileged || (!mobileInspection && EduCADMeasure.isEdit(handle.measure));
@@ -1390,20 +1432,20 @@
         EduCADCanvas.abortPlotTool(handle.plot);
         EduCADCanvas.clearTypedDist(handle.typedDist);
       }
-      // Edit/View switch. Entering View parks every authoring gesture
-      // (selection, rename, line menu, polar sweep, plotting, bank,
-      // typed buffer, popups) so inspection starts from idle; entering
-      // Edit only drops the readout. Pan, zoom, and 3D orbit work in
-      // both modes; the mode buttons use their own class so the demo
-      // active-sweep never touches the mode indicator.
-      // Pose mode: grab the 3D model Blender-style and the
-      // already-drawn 2D Monge views ride along in real time.
-      // Visualization only: the table is never written here, so there
-      // is nothing to undo. poseState is null outside pose mode.
+
+
+
+
+
+
+
+
+
+
       var poseState = null;
       var poseSavedMode = 'edit';
-      // Riding ink fades under the exact projection overlay so the
-      // true stance reads first; annotations keep their context.
+
+
       var POSE_FADE = 0.35;
 
       function poseStatus(msg) {
@@ -1486,25 +1528,25 @@
           EduCADSolid.projectionRadius(st) * poseState.rest.scale);
       }
 
-      // Per-view follow maps for a pose: the best 2D carry from
-      // each rest projection to the posed one, plus the posed verts
-      // and their exact reprojection for the datum clamp.
+
+
+
       function poseSimsFor(pose) {
         return EduCADPose.simsForPose(poseState.mm.vertices,
           poseState.mm.edges, pose, poseState.center, poseState.rest2D);
       }
 
-      // Render copies of one entity: datum-ambiguous geometry draws
-      // once per view (its plan and elevation readings coincide at
-      // rest), everything else draws once. Ink sitting on solid
-      // vertices rides those vertices exactly (splitting across
-      // coincident vertices when the pose separates them), so dots,
-      // labels, and projector feet stay glued to the exact overlay;
-      // all other ink rides the fitted similarities as before.
+
+
+
+
+
+
+
       function poseDrawCopies(ent) {
-        // Pinned reference ink (datum, centre axes, loci) draws unposed:
-        // a spanning elevation axis ridden endpoint-wise would tilt into
-        // a diagonal across the sheet, and loci are rest-height rules.
+
+
+
         if (!poseState || !poseState.sims || ent.type === 'DATUM_AXIS' ||
             EduCADPose.isPosePinned(ent)) {
           return [ent];
@@ -1518,9 +1560,9 @@
             EduCADPose.poseCopies(ent, sims.elev, sims.plan, force,
               poseState.exactIndex) :
             [EduCADPose.poseEntity(ent, sims.elev, sims.plan, force)];
-          // Stack-split captions ride with the distribution: each parted
-          // copy keeps only the corner name it stands on (mate-matched
-          // through the other view; unresolvable keeps the full stack).
+
+
+
           if (poseState.exactIndex &&
               typeof EduCADPose.splitStackCaption === 'function' &&
               typeof EduCADLabels !== 'undefined' &&
@@ -1541,15 +1583,15 @@
         return out;
       }
 
-      // Every contact pair a pose is measured against: the exact
-      // reprojected vertices bound to their own view's side, plus
-      // every drawn copy's anchor, second endpoint, and rim extremes.
+
+
+
       function posePairsFor(pose) {
         var sims = poseSimsFor(pose);
         var pairs = EduCADPose.projectionPairs(poseState.rest2D, sims.now);
         var list = handle.table.visibleEntities();
         for (var i = 0; i < list.length; i++) {
-          // Pinned ink never moves, so its ghost must not clamp gestures.
+
           if (EduCADPose.isPosePinned(list[i]) || list[i].viewRole === 'PROFILE') continue;
           var forces = EduCADPose.routeCopies(list[i]);
           for (var k = 0; k < forces.length; k++) {
@@ -1561,11 +1603,11 @@
         return { sims: sims, pairs: pairs };
       }
 
-      // Datum wall: VP stays above the XY line, HP below — no exact
-      // projection point and no drawn point may cross to the other
-      // view's side, so the projections can never crash into each
-      // other. Gain room for big rotations by sliding up in Y first
-      // (and sinking the plan in Z for out-of-plane spins).
+
+
+
+
+
       function poseHoldsSides(pose) {
         var found = posePairsFor(pose);
         for (var i = 0; i < found.pairs.length; i++) {
@@ -1575,8 +1617,8 @@
         return true;
       }
 
-      // Clearance in mm: how close either projection body comes to
-      // the XY line under a pose (Infinity when nothing is drawn).
+
+
       function poseClearance(pose) {
         var found = posePairsFor(pose);
         var gap = Infinity;
@@ -1587,12 +1629,12 @@
         return gap;
       }
 
-      // Exact per-view projection of the posed solid: fitted maps
-      // move existing ink but can never split coincident geometry
-      // (the two hexagons of a spun prism), so the overlay projects
-      // the solid itself — visible solid, hidden dashed. Ephemeral:
-      // the table never sees it, and its endpoints are clamped posed
-      // verts, so it needs no clamp of its own.
+
+
+
+
+
+
       function poseProjectedEdges(posed) {
         var shape = {name:poseState.mm.name,vertices:posed,edges:poseState.mm.edges,
           faces:poseState.mm.faces || [],faceHoles:poseState.mm.faceHoles || [],
@@ -1649,11 +1691,11 @@
           op;
         if (mobileShell) mobileShell.updatePoseReadout(el.textContent);
       }
-      // Touchscreen pose control: one op + axis per call, exact
-      // EduCADPose math with the same datum clamp as drag gestures.
-      // Move/scale set absolute values; rotate applies the commanded
-      // delta about the world axis. Returns the applied value (the
-      // clamp may shorten it) or null outside pose mode.
+
+
+
+
+
       function mobilePoseSync() {
         if (!poseState) return null;
         return { t: poseState.pose.t.slice(), s: poseState.pose.s };
@@ -1833,16 +1875,16 @@
       var sheetModeRevision = 0;
       function setSheetMode(mode) {
         if (['edit', 'view', 'pose'].indexOf(mode) === -1) return handle.measure.mode;
-        // Central inspection-only enforcement: touch-only devices never
-        // enter Edit, whatever asked (buttons, commands, deep links,
-        // tutorials, programmatic bridges). View and Pose stay open.
+
+
+
         if (mobileInspection && mode === 'edit') {
           poseStatus('Inspection-only on this device — the sheet stays in View.');
           if (mobileShell) mobileShell.setMode(handle.measure.mode);
           return handle.measure.mode;
         }
-        // A preview must roll back while the table is still editable, before
-        // the new mode freezes it or captures its reconstructed pose source.
+
+
         if (drafting) drafting.cancel();
         cancelAuthoring();
         if (mode === 'pose' && handle.measure.mode !== 'pose' && handle.rebuildSolid) handle.rebuildSolid();
@@ -1889,8 +1931,8 @@
         ['btn-clear', 'sel-demo', 'sel-tut'].forEach(function (id) {
           var control = document.getElementById(id);
           if (!control) return;
-          // Inspection devices load demos into View; tutorials and Clear
-          // stay Edit-only everywhere.
+
+
           if (id === 'sel-demo' && mobileInspection) control.disabled = false;
           else control.disabled = next !== 'edit';
         });
@@ -1902,15 +1944,15 @@
         }
         return next;
       }
-      // Inspection devices start in View; demos load into it below.
+
       if (mobileInspection) setSheetMode('view');
-      // View-mode click: inspect the topmost measurable entity under
-      // the cursor, or clear the readout on empty sheet. Read-only:
-      // no placement, no selection, no banking, no menus. The cursor's
-      // side of the span is stored so the dimension opens toward it.
+
+
+
+
       function viewClickInspect(cursor, sheetOnly, tolPx) {
-        // Split panes own their picks: a 2D tap never reaches the 3D
-        // model (and sheet/glass coordinates differ there anyway).
+
+
         if (!sheetOnly && !mobileSplitActive() && spatialView &&
             handle.measure.mode === 'view' &&
             spatialView.inspectAt(cursor.x, cursor.y)) return;
@@ -1929,7 +1971,7 @@
         renderLayer2(cursor, null);
         updateMobileInspect();
       }
-      // Mirror the 2D inspect pick into the mobile bottom sheet.
+
       function updateMobileInspect() {
         if (orthographicView) {
           if (handle.measure.inspectId !== null) orthographicView.selectionChanged();
@@ -1955,8 +1997,8 @@
         mobileShell.setInspect(rep.title,
           rep.title + '\n' + rep.rows.join('\n'));
       }
-      // Mobile 2D Fit: frame live ink plus the XY datum in the sheet
-      // pane; empty sheets center the origin with the datum across it.
+
+
       function fitSheetMobile() {
         if (typeof EduCADMobile === 'undefined') return;
         var bbox = EduCADMobile.extentOf(liveEntities());
@@ -1972,10 +2014,10 @@
         return (typeof EduCADMobile !== 'undefined') ?
           EduCADMobile.TOUCH_TOL_PX : 24;
       }
-      // Touch tap on the sheet: stacked points open the chooser, one
-      // pick inspects, Edit taps (narrow desktop + touch) run the full
-      // click flow at the tap point. Returns 'chooser' when the shell
-      // should list candidates.
+
+
+
+
       function mobilePressSheet(x, y) {
         if (handle.measure.mode === 'pose') return 'done';
         if (EduCADMeasure.isView(handle.measure)) {
@@ -2049,13 +2091,13 @@
       function mobilePinchGlass(factor, cx, cy) {
         if (!(factor > 0)) return;
         if (handle.solid && typeof handle.solid.zoomAt === 'function') {
-          // zoomAt takes window coords and subtracts its own canvas rect.
+
           var ox = 0, oy = 0;
           try {
             var r = handle.solid.canvas.getBoundingClientRect();
             ox = r.left;
             oy = r.top;
-          } catch (err) { /* glass fills the window */ }
+          } catch (err) {                              }
           handle.solid.zoomAt(cx + ox, cy + oy, factor);
         }
       }
@@ -2092,12 +2134,12 @@
         }
         if (spatialView && handle.measure.mode === 'view') spatialView.fit();
       }
-      // View-mode readout, drafting style: a linear dimension
-      // (extension lines, arrows, centered value) for spans, a radius
-      // leader for rounds, a witness to the XY fold for points. Layer 2
-      // only: the readout is never an entity and never reaches the
-      // table, the 3D bridge, or a saved file. Anything the layouts
-      // refuse falls through to the plain badge below.
+
+
+
+
+
+
       function drawInspectOverlay(cursorPx) {
         if (!EduCADMeasure.isView(handle.measure)) return;
         if (orthographicView && handle.measure.mode === 'view') {
@@ -2152,8 +2194,8 @@
         }
         ctx2.restore();
       }
-      // One sky path through every segment pair (extension lines,
-      // dimension lines, leaders, witnesses, center marks).
+
+
       function strokeDimSegs(segs) {
         ctx2.save();
         ctx2.strokeStyle = '#0284c7';
@@ -2166,9 +2208,9 @@
         ctx2.stroke();
         ctx2.restore();
       }
-      // Linear dimension: extension lines, the dimension line with an
-      // outward arrow tip at each end, the centered value, and the
-      // secondary rows (deltas, angle) stacked past it.
+
+
+
       function drawLinearDim(lay, secondary) {
         strokeDimSegs(lay.ext);
         strokeDimSegs([[lay.d1, lay.d2]]);
@@ -2194,9 +2236,9 @@
             { font: '12px sans-serif', fillStyle: '#0284c7' });
         }
       }
-      // Radius leader: center mark, rim-to-elbow leader with an arrow
-      // tip on the rim, a horizontal shelf carrying R + value, and the
-      // diameter (plus arc length) beneath it.
+
+
+
       function drawRadiusLeader(ent, rl, rep) {
         strokeDimSegs(rl.centerMark);
         strokeDimSegs([[rl.rim, rl.elbow], [rl.elbow, rl.shelfEnd]]);
@@ -2219,18 +2261,18 @@
             { font: '12px sans-serif', fillStyle: '#0284c7' });
         }
       }
-      // Point witness: thin line from the point straight to the XY
-      // fold with the |Y| height at its middle — the point's distance
-      // to its own plane.
+
+
+
       function drawWitnessDim(wit) {
         strokeDimSegs([[wit.pt, wit.foot]]);
         EduCADCanvas.drawKnockoutLabel(ctx2, wit.text,
           wit.textPos.x, wit.textPos.y,
           { font: '12px sans-serif', fillStyle: '#0f172a' });
       }
-      // Cascade cleanup: drop banked picks on deleted points and disarm
-      // line/polar endpoints that referenced a deleted point, so no tool
-      // keeps a dangling preview after blank-delete removes its segments.
+
+
+
       function cleanupAfterPointDelete(goneIds) {
         if (!goneIds || goneIds.length === 0) return;
         var gone = {};
@@ -2331,8 +2373,8 @@
         }
       }
 
-      // Pane-aware resize: the mobile shell measures the real pane
-      // rectangles and calls back here; desktop keeps fullscreen math.
+
+
       function applyMobileSizes(sizes) {
         if (!sizes) {
           var w = window.innerWidth, h = window.innerHeight;
@@ -2348,9 +2390,9 @@
           renderLayer1();
           return;
         }
-        // Split: keep the 2D world center and the 3D framing fixed, so
-        // orientation changes preserve the model and view. No auto-fit
-        // here; the explicit Fit buttons own the framing.
+
+
+
         var vw = handle.view;
         if (sizes.sheetVisible === false) {
           sizes.sheetW = vw.w;
@@ -2386,7 +2428,7 @@
         renderLayer1();
         renderLayer2(null, null);
       }
-      // Handle window resizing
+
       window.addEventListener('resize', function () {
         if (mobileShell) {
           mobileShell.scheduleSync();
@@ -2395,7 +2437,7 @@
         applyMobileSizes(null);
       });
 
-      // Render Base Layer 1 (Static: Grid, Datum Ground Line XY, Committed CAD Entities)
+
       function renderLayer1() {
         ctx1.save();
         ctx1.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2404,10 +2446,10 @@
         var v = handle.view;
         var s = v.s;
 
-        // Visible entities up front: geometry loop, datum check, label pass.
-        // Stored locus lines never draw (demos and saves keep them as
-        // data, but the sheet only shows pinned ones); pinned loci join
-        // here so they ride the pose copies and label pass like ink.
+
+
+
+
         var entities = handle.table.list();
         var visible = [];
         for (var vi = 0; vi < entities.length; vi++) {
@@ -2423,7 +2465,7 @@
           if (visible[di].type === 'DATUM_AXIS') { hasDatum = true; break; }
         }
 
-        // 1. Grid (if enabled via context menu)
+
         if (handle.canvasState.showGrid) {
           ctx1.save();
           var stepMm = s < 1.0 ? 50 : (s < 4.0 ? 10 : 5);
@@ -2449,7 +2491,7 @@
           ctx1.restore();
         }
 
-        // 2. Reference Datum Ground Line XY (y = 0 mm)
+
         var xyScreen = EduCADViewport.forward(v, { x: 0, y: 0 });
         var xyY = Math.floor(xyScreen.y) + 0.5;
         if (xyY >= 0 && xyY <= v.h) {
@@ -2457,13 +2499,13 @@
           ctx1.lineWidth = 1.5;
           ctx1.strokeStyle = '#334155';
           ctx1.beginPath();
-          // In View mode the datum breaks where inspection content
-          // covers it: the Spatial card, the translucent HP/VP fills,
-          // wire edges, vertices, and overlay text. One path with no
-          // gaps draws exactly the original full-width stroke.
-          // Split panes never overlap, so the 3D model cannot cover the
-          // 2D datum there: no gaps needed (and the panel/window boxes
-          // would be in the wrong coordinate space anyway).
+
+
+
+
+
+
+
           var datumGaps = (EduCADMeasure.isView(handle.measure) && spatialView &&
               typeof spatialView.datumGaps === 'function' && !mobileSplitActive()) ?
             spatialView.datumGaps(xyY, function (text) {
@@ -2487,8 +2529,8 @@
           }
           ctx1.stroke();
 
-          // Sheet X/Y end marks (knockout halo). Skipped when a datum
-          // entity is present: it owns the X/Y labels via the label pass.
+
+
           if (!hasDatum) {
             EduCADCanvas.drawKnockoutLabel(ctx1, 'X', 16, xyY - 6,
               { font: 'bold 13px serif' });
@@ -2496,7 +2538,7 @@
               { font: 'bold 13px serif' });
           }
 
-          // VP & HP Watermark Labels
+
           ctx1.font = '11px sans-serif';
           ctx1.fillStyle = '#64748b';
           ctx1.fillText('V.P. (Front View / Elevation)', 40, xyY - 8);
@@ -2506,11 +2548,11 @@
 
         if (drafting) drafting.drawSheet(ctx1, v);
 
-        // 3. Render Committed Entities from CadEntityTable (geometry
-        // only). In pose mode the already-drawn views ride the 3D pose:
-        // each entity draws from a posed copy (datum pinned), so
-        // projectors, hidden lines, and dimensions move with their
-        // view while the table underneath never changes.
+
+
+
+
+
         var drawList = visible;
         if (poseState && poseState.sims && typeof EduCADPose !== 'undefined') {
           drawList = [];
@@ -2549,15 +2591,15 @@
           }
         }
 
-        // 4. Label pass: 3-tier layout (Tier 1 semantic filter, Tier 2
-        // 8-sector optimizer) + Tier 3 knockout halo / Tier 4 leaders.
-        // The edited point keeps its placement (so the Layer 2 preview
-        // sits at the true label position) but is not drawn here.
+
+
+
+
         if (typeof EduCADLabels !== 'undefined') {
           ctx1.font = EduCADCanvas.LABEL_FONT;
-          // Label layout is the expensive part of a sheet redraw. Orbit and
-          // pose frames only change the 3D camera, so reuse the placement
-          // when the table, viewport, font and visible entity list agree.
+
+
+
           var labelKey = [handle.table.revision(), v.s, v.tx, v.ty, v.w, v.h,
             EduCADCanvas.LABEL_FONT, drawList.length,
             drawList.map(function (ent) { return ent.id; }).join('|')].join('/');
@@ -2585,7 +2627,7 @@
         ctx1.restore();
       }
 
-      // Render Single Entity on Canvas2D with BIS SP 46 Linestyle
+
       function renderEntity(ctx, v, ent) {
         if (drafting && ent.type === 'DIMENSION') { drafting.drawDimension(ctx, v, ent); return; }
         var style = EduCADEntities.resolveStyle(ent);
@@ -2597,8 +2639,8 @@
         ctx.save();
         ctx.strokeStyle = strokeColor;
         ctx.fillStyle = strokeColor;
-        // Cosmetic screen weight: 1 px thin / 2 px thick at every zoom,
-        // so vertices stay visible. Physical mm widths are export-only.
+
+
         ctx.lineWidth = EduCADEntities.cosmeticWidthPx(style.widthMm);
         var dash = EduCADEntities.cosmeticDashPx(style.dashMm);
         if (dash.length > 0) ctx.setLineDash(dash);
@@ -2607,11 +2649,11 @@
             ent.type === 'RAY' || ent.type === 'DIMENSION') {
           var p1 = EduCADViewport.forward(v, { x: ent.x, y: ent.y });
           var p2 = EduCADViewport.forward(v, { x: ent.x2, y: ent.y2 });
-          // Construction geometry spans the sheet: LINE extends both
-          // ways, RAY extends past its second point (the canvas clips
-          // the excess, so one long stroke covers every viewport).
-          // Tagged centre axes use their stored extent so they stay beside
-          // their views instead of running through the controls.
+
+
+
+
+
           if ((ent.type === 'LINE' || ent.type === 'RAY') && !(ent.meta && ent.meta.kind === 'axis')) {
             var rdx = p2.x - p1.x, rdy = p2.y - p1.y;
             var rlen = Math.sqrt(rdx * rdx + rdy * rdy);
@@ -2629,7 +2671,7 @@
           ctx.lineTo(p2.x, p2.y);
           ctx.stroke();
 
-          // Dimension lines carry 3:1 arrowheads at both ends.
+
           if (ent.type === 'DIMENSION' || (ent.meta && ent.meta.dimension)) {
             drawArrowhead(ctx, p1, p2);
             drawArrowhead(ctx, p2, p1);
@@ -2654,10 +2696,10 @@
           if (ent.type === 'CIRCLE') {
             ctx.arc(center.x, center.y, rPx, 0, 2 * Math.PI);
           } else {
-            // Y-flip angle inversion for Cartesian upward Y. Stored
-            // angles are degrees CCW (y-up); canvas wants radians
-            // clockwise (y-down), so negate and convert. Drawing from
-            // -a2 to -a1 CCW on screen matches a1-to-a2 CCW in world.
+
+
+
+
             var sa = -ent.endAngle * Math.PI / 180;
             var ea = -ent.startAngle * Math.PI / 180;
             ctx.arc(center.x, center.y, rPx, sa, ea, false);
@@ -2665,9 +2707,9 @@
           ctx.stroke();
         }
 
-        // Labels are NOT drawn here: the Tier 1-4 label pass in
-        // renderLayer1 owns all annotation (no raw internal captions,
-        // no hardcoded offsets).
+
+
+
 
         ctx.restore();
       }
@@ -2689,7 +2731,7 @@
         ctx.fill();
       }
 
-      // Render Dynamic Layer 2 (Cursor Snapping, Rings, Instruments)
+
       function renderLayer2(cursorPx, snapResult) {
         ctx2.save();
         ctx2.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2697,7 +2739,7 @@
 
         if (snapResult && snapResult.snap) {
           var sp = snapResult.snap;
-          // Animated Turquoise Snap Ring
+
           ctx2.save();
           ctx2.strokeStyle = '#06b6d4';
           ctx2.lineWidth = 2;
@@ -2707,7 +2749,7 @@
           ctx2.restore();
         }
 
-        // Selection ring + on-site rename preview (amber; snap owns cyan).
+
         var refMm = null;
         var refPx = null;
         if (handle.sel.selectedId !== null) {
@@ -2730,7 +2772,7 @@
           }
         }
 
-        // Circle picks: amber ring plus order numeral per picked point.
+
         var cpicks = handle.circlePicks.picks;
         for (var cpi = 0; cpi < cpicks.length; cpi++) {
           var cpEnt = handle.table.get(cpicks[cpi].id);
@@ -2742,10 +2784,10 @@
           }
         }
 
-        // Axis-lock distance readout at the cursor tip (no guidelines).
-        // Suppressed on the reference vertex itself (a click, not a place).
-        // A typed buffer replaces the live readout and gains a sky preview
-        // ring on the staked target (§6.2).
+
+
+
+
         if (refMm && cursorPx && refPx) {
           var rdx = cursorPx.x - refPx.x, rdy = cursorPx.y - refPx.y;
           var onRef = (rdx * rdx + rdy * rdy) <
@@ -2780,8 +2822,8 @@
           }
         }
 
-        // Line tool: P1 ring plus the locked P1-P2 preview while the
-        // BIS popup is open (no cursor-following rubberband by design).
+
+
         var lt = handle.line;
         if (lt.phase === 'menu') {
           var ap1 = EduCADViewport.forward(handle.view, lt.p1Mm);
@@ -2806,9 +2848,9 @@
           }
         }
 
-        // Polar tool: cyan ring once a baseline resolves the shared
-        // anchor; protractor arc + badge on angle sweep; locked-ray
-        // guideline + badge on distance sweep.
+
+
+
         var pl = handle.polar;
         if (pl.phase === 'angle' || pl.phase === 'distance' || pl.phase === 'invalid') {
           var pp0 = EduCADViewport.forward(handle.view, pl.p0Mm);
@@ -2859,8 +2901,8 @@
           }
         }
 
-        // Line-referenced plotting: thin perpendicular foot->candidate
-        // plus distance badge. The datum segment itself is never marked.
+
+
         var pt = handle.plot;
         if (pt.phase === 'plotting' && cursorPx) {
           var pw = EduCADViewport.inverse(handle.view, cursorPx);
@@ -2901,24 +2943,24 @@
             { font: '12px sans-serif', fillStyle: '#0284c7' });
         }
 
-        // View-mode inspect readout (no-op unless View has a pick).
+
         drawInspectOverlay(cursorPx);
         if (drafting) drafting.drawDynamic(ctx2, handle.view);
 
         ctx2.restore();
       }
 
-      // Pointer & Mouse Interaction
+
       var isPanning = false;
       var panStart = { x: 0, y: 0 };
       var viewStart = { tx: 0, ty: 0 };
 
-      // Full-screen 3D glass routing. The glass canvas never takes
-      // pointer events itself (pointer-events:none); these window
-      // handlers consult the wireframe aura and steer each gesture to
-      // the 3D model or the 2D sheet. On ink: drag orbits, wheel zooms,
-      // middle-drag pans. Off ink: everything reaches the sheet as if
-      // the glass were not there.
+
+
+
+
+
+
       var solidOrbiting = false;
       var solidPanning = false;
       var solidLast = { x: 0, y: 0 };
@@ -2944,11 +2986,11 @@
           return false;
         }
       }
-      // An explicit 2D construction gesture owns clicks and wheel even
-      // on 3D ink, so points stay clickable through the glass mid-task.
-      // Middle-drag pan always routes by aura (it commits nothing).
-      // Shift+left always pans the sheet; Alt+click always clicks
-      // through to the sheet. Both are escape hatches from the aura.
+
+
+
+
+
       function sheetToolActive() {
         if (drafting && drafting.active()) return true;
         return handle.sel.editing !== null ||
@@ -2959,23 +3001,23 @@
       }
 
       window.addEventListener('pointerdown', function (e) {
-        // Touch on a split layout belongs to the pane gesture
-        // controllers; the mouse path below is untouched.
+
+
         if (mobileIgnore(e)) return;
         if (e.target.closest('.edugraphics-hud') || e.target.closest('.demo-bar') || e.target.closest('.edugraphics-menu')) return;
-        // A live pose gesture owns the press: no orbit, no pan, no
-        // sheet tool starts under it (click confirms, menu cancels).
+
+
         if (poseState && poseState.gesture) {
           e.preventDefault();
           return;
         }
-        // Dismiss menu
+
         if (EduCADCanvas.shouldDismissMenu(e)) {
           mount.menu.classList.remove('open');
         }
         if (e.button === 0) solidSuppressClick = false;
         var cursor = { x: e.clientX, y: e.clientY };
-        if (e.button === 1) { // Middle-drag: 3D pan on ink, sheet pan elsewhere
+        if (e.button === 1) {
           if (solidAt(cursor)) {
             solidPanning = true;
             solidPanStart = { x: e.clientX, y: e.clientY };
@@ -2990,7 +3032,7 @@
           e.preventDefault();
           return;
         }
-        if (e.button === 0 && e.shiftKey) { // Shift+left always pans the sheet
+        if (e.button === 0 && e.shiftKey) {
           isPanning = true;
           panStart = { x: e.clientX, y: e.clientY };
           viewStart = { tx: handle.view.tx, ty: handle.view.ty };
@@ -3000,10 +3042,10 @@
         }
         if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.altKey &&
             !sheetToolActive() && solidAt(cursor)) {
-          // Double-tap resets the model pose. Detected here (not via
-          // the dblclick event) because the orbit press below calls
-          // preventDefault, which suppresses the browser's
-          // compatibility mouse events including dblclick.
+
+
+
+
           if (typeof EduCADSolid.tapHit === 'function' &&
               EduCADSolid.tapHit(solidTap, solidNowMs(), e.clientX, e.clientY)) {
             handle.solid.resetView();
@@ -3031,7 +3073,7 @@
         lastCursor = cursor;
         var wPt = EduCADViewport.inverse(handle.view, cursor);
 
-        // Update HUD
+
         coordsDisp.textContent = 'X: ' + wPt.x.toFixed(2) + ' mm • Y: ' + wPt.y.toFixed(2) + ' mm';
         if (wPt.y >= 0) {
           planeInd.textContent = 'V.P. (Elevation / Front)';
@@ -3041,7 +3083,7 @@
           planeInd.className = 'plane-tag plane-hp';
         }
 
-        // Pose gesture: bare mouse motion drives the live transform.
+
         if (poseState && poseState.gesture) {
           poseGestureMove(e.clientX, e.clientY, e.ctrlKey || e.metaKey);
           c2.style.cursor = 'move';
@@ -3051,7 +3093,7 @@
           if (Math.hypot(e.clientX - solidPress.x, e.clientY - solidPress.y) > 4) solidDragged = true;
           var odx = e.clientX - solidLast.x, ody = e.clientY - solidLast.y;
           if (odx !== 0 || ody !== 0) {
-            // Moved: a drag, not a tap (mirrors OS click semantics).
+
             if (typeof EduCADSolid.invalidateTap === 'function') {
               EduCADSolid.invalidateTap(solidTap);
             } else {
@@ -3077,8 +3119,8 @@
           return;
         }
 
-        // Hover on 3D ink: grab cursor, snap preview off (3D owns this
-        // spot). UI chrome never triggers the aura.
+
+
         if (!sheetToolActive() &&
             !e.target.closest('.edugraphics-hud') &&
             !e.target.closest('.demo-bar') &&
@@ -3093,7 +3135,7 @@
           c2.style.cursor = '';
         }
 
-        // Snapping candidate check
+
         var snapResult = EduCADSnapping.snapAt(cursor, handle.view, snapOptions(), handle.snapCurrent);
         handle.snapCurrent = snapResult.snap;
         renderLayer2(cursor, snapResult);
@@ -3129,7 +3171,7 @@
         }
       });
 
-      // Wheel Zoom anchored at cursor
+
       window.addEventListener('wheel', function (e) {
         if (e.target.closest('.demo-bar')) return;
         var winCursor = { x: e.clientX, y: e.clientY };
@@ -3137,8 +3179,8 @@
             !e.target.closest('.edugraphics-hud') &&
             !e.target.closest('.edugraphics-menu') &&
             solidAt(winCursor)) {
-          // Smooth 3D zoom into the ink: continuous exponential step
-          // (trackpad-friendly), clamped per event against jumps.
+
+
           var dy = e.deltaY;
           if (e.deltaMode === 1) dy *= 16;
           var zf = Math.exp(-dy * 0.0016);
@@ -3160,10 +3202,10 @@
         renderLayer2(cursor, null);
       }, { passive: false });
 
-      // Right-click anywhere (canvas, HUD buttons, open menu) first undoes
-      // an active selection/rename. Capture phase + stopPropagation keeps
-      // this authoritative; the canvas menu below then sees idle clicks only.
-      // The native menu never appears anywhere on the sheet.
+
+
+
+
       window.addEventListener('contextmenu', function (e) {
         if (poseState && poseState.gesture) { e.preventDefault(); e.stopPropagation(); cancelPoseGesture(); return; }
         if (EduCADMeasure.isView(handle.measure)) {
@@ -3197,8 +3239,8 @@
         }
       }, true);
 
-      // Right-Click: with a selection, undo it (reference cleared, any
-      // rename buffer discarded, original kept); otherwise the 2-option menu.
+
+
       c2.addEventListener('contextmenu', function (e) {
         e.preventDefault();
         if (EduCADMeasure.isView(handle.measure)) {
@@ -3239,7 +3281,7 @@
         }
       });
 
-      // Context menu selection
+
       mount.menu.addEventListener('click', function (e) {
         var item = e.target.closest('.edugraphics-menu-item');
         if (!item) return;
@@ -3250,40 +3292,40 @@
         renderLayer1();
       });
 
-      // Left click: Ctrl banks points, plain clicks finalize. Empty
-      // canvas places a new point (axis-locked when a reference is
-      // active); an existing point selects, or finalizes the bank.
+
+
+
       c2.addEventListener('click', function (e) {
-        // A press that started on 3D ink belongs to the model (orbit),
-        // never to the sheet: swallow the click it trails.
+
+
         if (solidSuppressClick) { solidSuppressClick = false; return; }
-        // Synthetic clicks trailing a handled touch gesture are dead.
+
         if (mobileClickEaten()) return;
         if (e.button !== 0 || e.shiftKey) return;
-        // Pose gesture: click confirms the live transform.
+
         if (poseState && poseState.gesture) { confirmPoseGesture(); return; }
         var cursor = sheetCursorFromClient(e.clientX, e.clientY);
-        // View mode owns the whole click: inspect, never edit. Placed
-        // before banking so Ctrl+click is read-only here too.
+
+
         if (EduCADMeasure.isView(handle.measure)) {
           viewClickInspect(cursor, e.altKey);
           return;
         }
         handleSheetClick(cursor, e);
       });
-      // Touch taps in Edit run the same flow through this function: the
-      // cursor is pane-relative sheet coords, e carries the modifiers.
-      // (The mouse listener above already claimed View clicks.)
+
+
+
       function handleSheetClick(cursor, e) {
-        // View mode owns the whole click: inspect, never edit. Placed
-        // before banking so Ctrl+click is read-only here too.
+
+
         if (EduCADMeasure.isView(handle.measure)) {
           viewClickInspect(cursor, e.altKey);
           return;
         }
-        // Banking: Ctrl+click toggles a point into the two-slot bank
-        // and arms nothing. Anything parked (line menu, polar sweep,
-        // plotting) is preempted first, so banking starts from idle.
+
+
+
         if (e.ctrlKey || e.metaKey) {
           EduCADCanvas.clearTypedDist(handle.typedDist);
           if (pendingMember !== null) {
@@ -3335,9 +3377,9 @@
         }
         if (handle.line.phase === 'animating') return;
         var id = EduCADCanvas.hitTestPoint(handle.table.list(), cursor, handle.view);
-        // Polar task owns the click once bank+segment starts it:
-        // invalid drops on any click, distance commits anywhere, angle
-        // locks on any left-click (right-click / Escape aborts).
+
+
+
         if (handle.polar.phase === 'invalid' || handle.polar.phase === 'distance') {
           if (handle.polar.phase === 'distance') {
             commitPolarAt(cursor);
@@ -3358,10 +3400,10 @@
           commitPlotAt(cursor);
           return;
         }
-        // Finalizer: a plain click resolves the bank by count. One
-        // banked point plus a second point draws the line; one banked
-        // point plus a segment starts polar from the bank; two banked
-        // plus a third draws the circle. Anything else aborts the bank.
+
+
+
+
         var bank = handle.circlePicks.picks;
         if (bank.length === 1) {
           if (id !== null) {
@@ -3425,11 +3467,11 @@
             renderLayer2(cursor, null);
             return;
           }
-          // Alt+click near the VP/HP fold focuses the ground line as an
-          // infinite datum. Plain clicks keep placing points: grabbing
-          // the fold on a plain click would deaden on-line placement
-          // across the whole sheet width. The grab helper caps the 14 px
-          // corridor at 20 mm, so far zoom-out cannot grab from ~280 mm.
+
+
+
+
+
           if (e.altKey) {
             var walt = EduCADViewport.inverse(handle.view, cursor);
             if (EduCADCanvas.groundFoldGrabbed(walt.y, handle.view.s)) {
@@ -3469,10 +3511,10 @@
           px = lock.xMm;
           py = lock.yMm;
         }
-        // Magnetic placement: a locked snap constrains its tier's axes
-        // (a locus pulls height, a projector pulls station, point tiers
-        // pin both), except on the axis lock's own axis, which always
-        // wins. Fresh reading seeded with the live snap keeps hysteresis.
+
+
+
+
         var placeSnap = EduCADSnapping.snapAt(cursor, handle.view,
           snapOptions(), handle.snapCurrent).snap;
         handle.snapCurrent = placeSnap;
@@ -3484,15 +3526,15 @@
         userPlacePoint(px, py, cursor);
       }
 
-      // Double-click a point starts on-site renaming (single click only
-      // selects). The two preceding clicks harmlessly re-select first.
+
+
       c2.addEventListener('dblclick', function (e) {
-        // Fallback reset for browsers that still deliver a dblclick
-        // after a preventDefaulted press (Chrome suppresses it; the
-        // press-path double-tap above is the primary reset, and a
-        // second reset here is idempotent). Anywhere else keeps the
-        // rename behavior.
-        // Synthetic double-taps trailing touch gestures are dead.
+
+
+
+
+
+
         if (mobileClickEaten()) return;
         var dcur = { x: e.clientX, y: e.clientY };
         if (!e.altKey && !sheetToolActive() && solidAt(dcur)) {
@@ -3501,7 +3543,7 @@
           e.preventDefault();
           return;
         }
-        // View mode never renames (3D reset above still works).
+
         if (EduCADMeasure.isView(handle.measure)) return;
         if (EduCADCanvas.isLineToolActive(handle.line) ||
             EduCADCanvas.isPolarToolActive(handle.polar)) return;
@@ -3517,25 +3559,25 @@
         renderLayer2(cursor, null);
       });
 
-      // Rename keys: Enter commits to the table, Escape cancels. Handled
-      // keys are captured so Backspace/Space never leak to the browser.
-      // With no edit running, digits feed the typed axis distance (§6.2)
-      // and Enter stakes the point; the first Escape clears the buffer.
+
+
+
+
       window.addEventListener('keydown', function (e) {
         if (e.defaultPrevented) return;
-        // Real form fields and focusable controls own their keys. This
-        // includes numeric Pose entry and ordinary Tab navigation.
+
+
         var target = e.target;
         if (target && typeof target.closest === 'function' &&
             target.closest('input, textarea, select, button, summary, a, [contenteditable="true"]')) return;
         if (mobileSplitActive() && e.key === 'Tab') return;
-        // Pose mode owns the keyboard: Blender map, nothing else.
+
         if (EduCADMeasure.isPose(handle.measure)) {
           poseKey(e);
           return;
         }
-        // View mode owns the keyboard: nothing to type, nothing to
-        // rename. Escape only clears the readout; Tab steps into pose.
+
+
         if (EduCADMeasure.isView(handle.measure)) {
           if (e.key === 'Tab') {
             e.preventDefault();
@@ -3549,8 +3591,8 @@
           }
           return;
         }
-        // Tab steps into pose mode from edit (never from inside a real
-        // field; the command bar stops its own Tab first).
+
+
         if (e.key === 'Tab') {
           var tae = (typeof document !== 'undefined') ? document.activeElement : null;
           if (tae !== null && tae !== undefined &&
@@ -3594,11 +3636,11 @@
           mount.menu.classList.remove('open');
           return;
         }
-        // Ctrl+Z / Cmd+Z: undo the last sheet change. Edit mode only
-        // (the view-mode guard above already returned); never steals
-        // keystrokes from real text fields, and never fires mid-rename
-        // (Escape exits the editor first). Shift is excluded: undo
-        // only, no redo.
+
+
+
+
+
         if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey &&
             (e.key === 'z' || e.key === 'Z' ||
              (e.code !== undefined && e.code === 'KeyZ'))) {
@@ -3614,10 +3656,10 @@
           userUndo();
           return;
         }
-        // L: pin or unpin the selected point's locus line (a labeled
-        // Type K guide plus its snaps). Bare key, edit mode only: never
-        // steals from fields or mid-rename typing, and stays inert with
-        // the locus system off or nothing selected.
+
+
+
+
         if ((e.key === 'l' || e.key === 'L') &&
             !e.ctrlKey && !e.metaKey && !e.altKey) {
           var lae = (typeof document !== 'undefined') ?
@@ -3689,7 +3731,7 @@
         }
       });
 
-      // Zoom Buttons Click Handlers
+
       mount.buttons['zoom-in'].addEventListener('click', function () {
         var nv = EduCADCanvas.buttonAction(handle.view, 'zoom-in');
         handle.view.s = nv.s; handle.view.tx = nv.tx; handle.view.ty = nv.ty;
@@ -3706,17 +3748,17 @@
         renderLayer1();
       });
 
-      // Demo Problem Loaders. demoTruth carries the loaded sheet's
-      // corner map for the Check button (null = hand drawing: claims and
-      // verdicts report unverifiable). Positional truth survives student
-      // edits; only loading another sheet replaces it.
+
+
+
+
       var demoTruth = null;
       var DEMO_TITLES = { line: 'Line Rotation', points: 'Quadrant Points',
         prism: 'Hex Prism', '3view': '3-View Prism', square: 'Profile Square',
         clear: 'Blank sheet' };
       function loadDemo(type) {
         if (!EduCADMeasure.isEdit(handle.measure) && !mobileInspection) { drawingWarning('Switch to Edit to replace the drawing.'); return; }
-        // Inspection devices load demos into View; Clear stays refused.
+
         if (mobileInspection && type === 'clear') { drawingWarning('Inspection-only: the sheet cannot be cleared here.'); return; }
         if (mobileInspection && handle.measure.mode !== 'view') setSheetMode('view');
         if (mobileInspection) mobilePrivileged = true;
@@ -3787,7 +3829,7 @@
           mobileShell.setTitle(lastDemoTitle);
           mobileShell.setInspect('', null);
         }
-        // Fresh content frames itself; later resizes preserve the view.
+
         if (mobileSplitActive()) fitSheetMobile();
       }
 
@@ -3798,6 +3840,10 @@
       document.getElementById('btn-demo-square').addEventListener('click', function () { loadDemo('square'); });
       document.getElementById('btn-tut-square').addEventListener('click', function () { startTutorial('square'); });
       document.getElementById('btn-tut-prism').addEventListener('click', function () { startTutorial('prism'); });
+      document.getElementById('btn-tut-3v-prism').addEventListener('click', function () { startTutorial('three-view-prism'); });
+      document.getElementById('btn-tut-3v-pyramid').addEventListener('click', function () { startTutorial('three-view-pyramid'); });
+      document.getElementById('btn-tut-3v-cylinder').addEventListener('click', function () { startTutorial('three-view-cylinder'); });
+      document.getElementById('btn-tut-3v-cone').addEventListener('click', function () { startTutorial('three-view-cone'); });
       document.getElementById('btn-clear').addEventListener('click', function () { loadDemo('clear'); });
       document.getElementById('btn-check').addEventListener('click', function () { runVerify(); });
       document.getElementById('btn-mode-edit').addEventListener('click', function () { setSheetMode('edit'); });
@@ -3833,12 +3879,12 @@
           bClose.addEventListener('click', function () { setSheetMode(poseSavedMode); });
         }
       })();
-      // Deep-link bridge: the query handler below forces view mode for
-      // submission review through this handle.
+
+
       window.educadSetSheetMode = setSheetMode;
-      // Explicit sheet loads validate before leaving inspection/pose, then
-      // replace in Edit — or, on inspection devices, replace while
-      // staying in View. No loader can retain an old pose source.
+
+
+
       window.educadReplaceSheet = function (data) {
         var staging = EduCADEntities.createTable();
         var count = EduCADSaves.restoreTable(EduCADEntities, staging, data);
@@ -3859,13 +3905,13 @@
         renderLayer1(); renderLayer2(null, null);
         return count;
       };
-      // Mobile title bridge for the saves/deep-link blocks below.
+
       window.educadMobileTitle = function (t) {
         lastDemoTitle = String(t || lastDemoTitle);
         if (mobileShell) mobileShell.setTitle(lastDemoTitle);
       };
 
-      // Inline selects for Demo & Tutorial options
+
       (function initInlineSelects() {
         var selDemo = document.getElementById('sel-demo');
         var selTut = document.getElementById('sel-tut');
@@ -3886,8 +3932,8 @@
         }
       })();
 
-      // Verify panel: grades hidden verdicts + projector claims against
-      // the loaded demo's corner truth. Dismissed by × or loading a demo.
+
+
       var verifyPanel = null;
       function hideVerifyPanel() {
         if (verifyPanel) verifyPanel.style.display = 'none';
@@ -3935,9 +3981,9 @@
         if (x) x.addEventListener('click', function () { hideVerifyPanel(); });
       }
 
-      // Tutorial stepper: runs a lesson script through the user actions, one
-      // Next per step. '@N' refs resolve to placed dots in creation order.
-      // Back re-reads only (nothing undraws); Restart replays from step 1.
+
+
+
       var tutPanel = null;
       var tutStepper = null;
       var tutLesson = 'square';
@@ -3951,6 +3997,12 @@
         var k = parseInt(String(ref).slice(1), 10) - 1;
         if (!(k >= 0) || k >= tutRefs.length) return null;
         return handle.table.get(tutRefs[k]);
+      }
+      function tutFindStation(target) {
+        var found = handle.table.list().filter(function (e) {
+          return e.type === 'POINT' && (e.caption === target || e.name === target);
+        });
+        return found.length === 1 ? found[0] : null;
       }
       function tutCursor(ent) {
         return EduCADViewport.forward(handle.view, { x: ent.x, y: ent.y });
@@ -3973,11 +4025,13 @@
         var a = step.do;
         var ent;
         if (a.op === 'setup') {
-          if (tutLesson === 'prism') userSetupPrism(); else userSetupSquare();
+          if (a.sheet) userSetupThreeView(a.sheet);
+          else if (tutLesson === 'prism') userSetupPrism(); else userSetupSquare();
           tutRefs = [];
           done(true, '');
           return;
         }
+        if (a.op === 'note') { done(true, ''); return; }
         if (a.op === 'place') {
           var placed = userPlacePoint(a.x, a.y, null);
           tutRefs.push(placed.id);
@@ -3985,9 +4039,9 @@
           return;
         }
         if (a.op === 'rename') {
-          ent = tutResolve(a.ref);
+          ent = a.target ? tutFindStation(a.target) : tutResolve(a.ref);
           if (ent === null) { done(false, 'A tutorial dot is gone — press Restart.'); return; }
-          try { userAssignMembers(ent.id, a.name); done(true, ''); }
+          try { userAssignMembers(ent.id, a.name, true); done(true, ''); }
           catch (error) { done(false, error.message); }
           return;
         }
@@ -4013,8 +4067,8 @@
           return;
         }
         if (a.op === 'type') {
-          // startLineStroke returns nothing either way; success reads off
-          // the tool phase (a disarmed line never reaches 'animating').
+
+
           startLineStroke(a.bis);
           if (handle.line.phase !== 'animating') {
             done(false, 'The line disarmed (a stray click?) — press Restart.');
@@ -4083,7 +4137,7 @@
             tutError = ok ? '' : err;
             if (ok) EduCADTutorial.advance(tutStepper);
             if (ok && window.EduCADSaves && EduCADTutorial.done(tutStepper)) {
-              // Lesson complete: record progress server-side (guests skip).
+
               window.EduCADSaves.recordProgress(tutLesson, {
                 done: true, at: Date.now()
               }).catch(function () {});
@@ -4109,27 +4163,38 @@
         if (bk && (tutBusy || tutStepper.i === 0)) bk.setAttribute('disabled', 'true');
       }
       function tutLessonTitle() {
-        return tutLesson === 'prism' ? 'Tutorial: Hex Prism' : 'Tutorial: Profile Square';
+        if (tutLesson === 'prism') return 'Tutorial: Hex Prism';
+        if (tutLesson === 'three-view-prism') return 'Tutorial: 3-View Hex Prism';
+        if (tutLesson === 'three-view-pyramid') return 'Tutorial: 3-View Square Pyramid';
+        if (tutLesson === 'three-view-cylinder') return 'Tutorial: 3-View Cylinder';
+        if (tutLesson === 'three-view-cone') return 'Tutorial: 3-View Cone';
+        return 'Tutorial: Profile Square';
       }
       function startTutorial(which) {
         if (typeof EduCADTutorial === 'undefined') return;
-        // Tutorials draw step by step, so they need Edit (desktop).
+
         if (mobileInspection) { drawingWarning('Tutorials draw step by step, so they need a desktop. Demos are ready under More.'); return; }
         if (!EduCADMeasure.isEdit(handle.measure)) { drawingWarning('Switch to Edit to start a drawing tutorial.'); return; }
-        // Tutorials draw, so they always run in Edit.
+
         setSheetMode('edit');
         tutRefs = [];
         tutError = '';
         tutBusy = false;
-        tutLesson = (which === 'prism') ? 'prism' : 'square';
-        var script = (tutLesson === 'prism') ?
-          EduCADTutorial.PRISM_SCRIPT : EduCADTutorial.SQUARE_SCRIPT;
+        var script;
+        if (EduCADTutorial.THREE_VIEW_SCRIPTS && EduCADTutorial.THREE_VIEW_SCRIPTS[which]) {
+          tutLesson = which;
+          script = EduCADTutorial.THREE_VIEW_SCRIPTS[which];
+        } else {
+          tutLesson = (which === 'prism') ? 'prism' : 'square';
+          script = (tutLesson === 'prism') ?
+            EduCADTutorial.PRISM_SCRIPT : EduCADTutorial.SQUARE_SCRIPT;
+        }
         tutStepper = EduCADTutorial.createStepper(script);
         hideVerifyPanel();
         renderTutorialPanel();
       }
 
-      // Check URL hash
+
       var hash = window.location.hash;
       if (hash === '#points') {
         loadDemo('points');
@@ -4154,22 +4219,22 @@
       }
       renderLayer1();
 
-      // Full-screen 3D glass: the model floats on a transparent sheet
-      // over the whole window (no widget box). The sheet edge is the
-      // only zoom bound; middle-drag pans any part back into view. The
-      // glass captures the mouse only in the wireframe aura (see the
-      // window pointer/wheel routing above); everywhere else the 2D
-      // sheet works exactly as before.
+
+
+
+
+
+
       if (typeof EduCADSolid !== 'undefined' &&
           typeof EduCADSolid.mountSolidGlass === 'function') {
         handle.solid = EduCADSolid.mountSolidGlass(container, {
           w: window.innerWidth, h: window.innerHeight, dpr: dpr,
           drawUnderlay: function (ctx) { if (spatialView) spatialView.underlay(ctx); },
           drawOverlay: function (ctx) { if (spatialView) spatialView.overlay(ctx); if (drafting) drafting.drawSolid(ctx, handle.solid.state); },
-          // Every glass frame re-cuts the layer-1 datum: orbit, pan,
-          // zoom, reset, fit, and selection redraw the glass only, so
-          // without this the datum gaps freeze wherever the model was.
-          // Split panes never overlap, so they skip the re-cut.
+
+
+
+
           afterDraw: function () {
             if (spatialView && EduCADMeasure.isView(handle.measure) && !mobileSplitActive()) renderLayer1();
           }
@@ -4201,8 +4266,8 @@
         spatialView.setEnabled(handle.measure.mode === 'view');
       }
 
-      // Shared primitive 2D -> 3D pipeline. Visibility is presentation;
-      // unsupported evidence and inferred surfaces remain explicit in diagnostics.
+
+
       if (handle.solid && typeof EduCADReconstruct !== 'undefined' &&
           typeof EduCADSolid.setGeometry === 'function') {
         (function () {
@@ -4211,14 +4276,14 @@
           var builtRevision = -1, builtResult = null;
           function rebuildSolid() {
             rebuildQueued = false;
-            // Pose mode owns the widget: the table cannot change under
-            // it, and rebuilds must not wipe the live pose.
+
+
             if (EduCADMeasure.isPose(handle.measure)) return;
             var revision = handle.table.revision();
             if (revision === builtRevision && builtResult) return;
             var list = handle.table.list();
-            // One pipeline: identities constrain correspondence; geometry
-            // families and surface inference are shared across all sheets.
+
+
             var res = EduCADReconstruct.reconstruct(list, {deferValidation:true});
             builtRevision = revision;
             builtResult = res;
@@ -4292,10 +4357,10 @@
       drafting.refresh();
       renderLayer1();
 
-      // Slash command line + Settings. Users and agents draw without the
-      // mouse via Minecraft-style /<cmd> with autocomplete; Settings holds
-      // the Preferences that tune the bar and the sheet. Guarded: the sheet
-      // works untouched when either module failed to load.
+
+
+
+
       (function commandLine() {
         if (typeof EduCADSettings === 'undefined' ||
             typeof EduCADCommand === 'undefined') {
@@ -4317,10 +4382,10 @@
         var histIdx = -1;
         var statusTimer = null;
 
-        // applySettings: every preference takes effect immediately and is
-        // persisted. Demos/tutorials hide their pickers; the command
-        // executor reads the same store through its gates; the sheet
-        // repaints so display prefs (locus lines) apply at once.
+
+
+
+
         function applySettings() {
           var demos = EduCADSettings.get(settingsStore, 'showDemos');
           var tuts = EduCADSettings.get(settingsStore, 'showTutorials');
@@ -4352,7 +4417,7 @@
             if (typeof window.localStorage !== 'undefined') {
               EduCADSettings.save(window.localStorage, settingsStore);
             }
-          } catch (err) { /* private mode: prefs stay session-only */ }
+          } catch (err) {                                             }
           refreshCmdAssist();
           renderLayer1();
           renderLayer2(null, null);
@@ -4486,9 +4551,9 @@
         }
         buildSettingsRows();
 
-        // cmdPoints: display-name -> {x,y} over live POINTs for
-        // completion, length readouts, and unknown-point hints. Labels
-        // come from captions (the letters on the sheet), never E-ids.
+
+
+
         function cmdPoints() {
           return EduCADCommand.pointMap(handle.table.list());
         }
@@ -4502,9 +4567,9 @@
             statusTimer = null;
           }
         }
-        // The bar stays hidden until / opens it (Minecraft chat). Enter
-        // dismisses wins, Escape dismisses everything, errors keep the
-        // bar open with the line intact for fixing.
+
+
+
         function openCmdBar() {
           if (!cmdBar || !cmdInput) return;
           cmdBar.hidden = false;
@@ -4512,7 +4577,7 @@
           cmdInput.focus();
           try {
             cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length);
-          } catch (err) { /* headless: caret ops unsupported */ }
+          } catch (err) {                                       }
           refreshCmdAssist();
         }
         function closeCmdBar() {
@@ -4533,7 +4598,7 @@
           cmdStatus.className = ok ? 'ok' : 'err';
           cmdStatus.id = 'cmd-status';
           cmdStatus.hidden = false;
-          // Short wins fade; errors and long reads (/help) stay put.
+
           if (ok && message.length < 120) {
             statusTimer = setTimeout(hideCmdStatus, 5000);
           }
@@ -4574,7 +4639,7 @@
               g.lineTo(lw - 2, 6);
               g.stroke();
             }
-          } catch (err) { /* headless: letter + name still show */ }
+          } catch (err) {                                          }
           return cv;
         }
         function paintSuggest() {
@@ -4591,9 +4656,9 @@
               var name = document.createElement('span');
               name.textContent = entry.display;
               row.appendChild(name);
-              // BIS rows draw the style's dash sample next to its letter,
-              // same ink as the line-type popup, so the letter means
-              // something before it is picked.
+
+
+
               if (entry.kind === 'bis-code' && typeof EduCADEntities !== 'undefined') {
                 row.appendChild(bisSampleCanvas(entry.display));
               }
@@ -4621,10 +4686,10 @@
           cmdInput.focus();
           try {
             cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length);
-          } catch (err) { /* headless: caret ops unsupported */ }
+          } catch (err) {                                       }
         }
-        // refreshCmdAssist: recompute suggestions + preview for the current
-        // line. Each half obeys its own preference switch.
+
+
         function refreshCmdAssist() {
           if (!cmdInput) return;
           var line = cmdInput.value;
@@ -4635,8 +4700,8 @@
             } catch (err) {
               sugOpen = [];
             }
-            // /auto lives outside the sync registry (it draws over the
-            // network): complete its name by hand when nothing else fits.
+
+
             var one = /^\/(\S*)$/.exec(line);
             if (one && one[1].length >= 1 && sugOpen.length === 0 &&
                 '/auto'.indexOf('/' + one[1]) === 0) {
@@ -4686,8 +4751,8 @@
             mobileDemoLoad: mobileInspection
           };
         }
-        // Mobile display bridges: the overflow menu reads and flips
-        // preferences without opening the desktop Settings panel.
+
+
         window.educadGetSetting = function (key) {
           try {
             return EduCADSettings.get(settingsStore, key);
@@ -4736,7 +4801,7 @@
               var s = window.EduCADSaves.currentSession();
               return (s && s.role) || 'guest';
             }
-          } catch (err) { /* logged out reads as guest */ }
+          } catch (err) {                                 }
           return 'guest';
         }
         function isAutoLine(line) {
@@ -4765,9 +4830,9 @@
           if (m === 'unauthorized') return 'Your session expired — log in again.';
           return 'Could not interpret that (' + m + ').';
         }
-        // runInterpret: plain words to drawn steps. Students describe after
-        // '/ '; teachers auto-draw models with /auto. Unusable answers and
-        // honest refusals keep the bar open with the reason shown.
+
+
+
         var interpretRunner = EduCADAuto.createRunner({
           table: handle.table,
           maxAttempts: 2,
@@ -4798,12 +4863,12 @@
             return res;
           });
         }
-        // Teacher bridge for the model deep link: replace only after validation.
+
         window.educadAutoDraw = function (text, replace) {
           return runInterpret(text, 'auto', replace === true);
         };
-        // Console/agent bridge: window.educadRunCommand('/point a 10 20')
-        // runs a line headlessly and mirrors the result onto the bar.
+
+
         window.educadRunCommand = function (line) {
           var res = runCmdLine(line);
           if (cmdBar) cmdBar.hidden = false;
@@ -4814,10 +4879,10 @@
           }
           return res;
         };
-        // Console/agent bridge: window.educadPoseViews() returns the
-        // live per-view follow similarities, the datum clearance in
-        // mm, plus every drawn anchor at rest and posed (world mm) —
-        // or null outside pose mode. Read-only probe.
+
+
+
+
         window.educadPoseViews = function () {
           if (!poseState || !poseState.sims) return null;
           var pts = [];
@@ -4911,7 +4976,7 @@
                 cmdInput.value = (histIdx === cmdHistory.length) ? '' : cmdHistory[histIdx];
                 try {
                   cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length);
-                } catch (errHist) { /* headless: caret ops unsupported */ }
+                } catch (errHist) {                                       }
                 refreshCmdAssist();
               }
               return;
@@ -4928,8 +4993,8 @@
             cmdBar.addEventListener(t, function (e) { e.stopPropagation(); });
           });
         }
-        // Minecraft opener: bare / on the sheet jumps to the command
-        // line. Never steals from rename, fields, or modified combos.
+
+
         window.addEventListener('keydown', function (e) {
           if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
           if (handle.sel.editing !== null) return;
@@ -4942,9 +5007,9 @@
           if (!cmdInput) return;
           e.preventDefault();
           openCmdBar();
-          // Some browsers commit the key's character after keydown
-          // despite the preventDefault above; collapse that race
-          // ('//' -> '/') once the character has landed.
+
+
+
           setTimeout(function () {
             if (cmdInput.value.slice(0, 2) === '//') {
               cmdInput.value = cmdInput.value.slice(1);
@@ -4955,9 +5020,9 @@
         applySettings();
       })();
 
-      // Mobile inspection shell: split panes, compact header, pane
-      // gestures, touchscreen pose dock, bottom sheet, overflow menu.
-      // Null-safe without the module; desktop keeps fullscreen math.
+
+
+
       if (typeof EduCADMobile !== 'undefined' &&
           typeof EduCADMobile.mount === 'function') {
         try {
@@ -5056,14 +5121,14 @@
 
       console.log('EduCAD Web App initialized successfully!');
     })();
-  </script>
+</script>
 
   <script>
-    // Drawing saves UI: Save/Drawings buttons in the session bar plus
-    // tutorial completion badges. Separate from the main app block: it
-    // reaches the live sheet only via window.educadHandle. Guests stay
-    // server-free (the module short-circuits without a token). Panel and
-    // status styling is inline so no head CSS changes are needed.
+
+
+
+
+
     (function savesUI() {
       if (typeof window.EduCADSaves === 'undefined') return;
       var Saves = window.EduCADSaves;
@@ -5079,8 +5144,8 @@
       }
 
       var current = { id: null, title: '' };
-      // Inspection devices load but never write: saves, deletes, and
-      // submits stay refused with a visible reason.
+
+
       function mobileWriteBlocked(msg) {
         var blocked = false;
         try { blocked = document.body.classList.contains('mobile-inspect'); } catch (err) {}
@@ -5090,8 +5155,8 @@
         }
         return blocked;
       }
-      // Deep-link bridge: ?drawing= notes the open drawing so the next
-      // Save updates it instead of posting a copy.
+
+
       window.educadNoteDrawing = function (id, title) {
         current.id = id;
         current.title = title || '';
@@ -5111,8 +5176,8 @@
         function p(x) { return (x < 10 ? '0' : '') + x; }
         return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
       }
-      // A cleared sheet is a new drawing: the next save POSTs instead of
-      // overwriting (demos, tutorials, and Clear all clear first).
+
+
       var t0 = table();
       if (t0 && typeof t0.subscribe === 'function') {
         t0.subscribe(function (op) {
@@ -5261,26 +5326,32 @@
         else hidePanel();
       });
 
-      // Completion badges: lessons recorded done get a ✓ on their buttons.
+
       Saves.fetchProgress().then(function (r) {
         if (r.skipped) return;
+        var buttons = {
+          square: 'btn-tut-square', prism: 'btn-tut-prism',
+          'three-view-prism': 'btn-tut-3v-prism',
+          'three-view-pyramid': 'btn-tut-3v-pyramid',
+          'three-view-cylinder': 'btn-tut-3v-cylinder',
+          'three-view-cone': 'btn-tut-3v-cone'
+        };
         (r.progress || []).forEach(function (p) {
           if (!p || !p.state || p.state.done !== true) return;
-          var b = p.lesson === 'prism' ? $('btn-tut-prism') :
-            (p.lesson === 'square' ? $('btn-tut-square') : null);
+          var b = buttons[p.lesson] ? $(buttons[p.lesson]) : null;
           if (b && b.textContent.indexOf('✓') === -1) b.textContent += ' ✓';
         });
       }, function () {});
     })();
-  </script>
+</script>
 
   <script>
-    // Question sets UI: teachers post coded sets, students solve by drawing
-    // and submit, teachers inspect submissions on the sheet. Role-driven
-    // panel; guests stay server-free. Form keys never leak to the canvas:
-    // the window keydown handler drives rename/typed-distance, so the panel
-    // swallows all key events (pointer events are already stopped by the
-    // session bar). All server/user text goes through textContent.
+
+
+
+
+
+
     (function setsUI() {
       if (typeof window.EduCADSaves === 'undefined') return;
       var Saves = window.EduCADSaves;
@@ -5302,8 +5373,8 @@
           status(msg + (err && err.message ? ': ' + err.message : ''));
         };
       }
-      // Inspection devices load starters, models, and submissions but
-      // never write: creates, deletes, grades, and submits stay refused.
+
+
       function mobileWriteBlocked(msg) {
         var blocked = false;
         try { blocked = document.body.classList.contains('mobile-inspect'); } catch (err) {}
@@ -5380,7 +5451,7 @@
           try { window.EduCADCanvas.deselect(h.sel); } catch (err) {}
         }
       }
-      // Restore a snapshot onto the live sheet (caller confirms first).
+
       function loadOntoSheet(data, what) {
         var t = table();
         if (!t || !window.EduCADEntities) {
@@ -5401,7 +5472,7 @@
         return s && (s.role === 'teacher' || s.role === 'academics');
       }
 
-      // ---- teacher views ----
+
       function teacherHome(s) {
         clearPanel();
         header('Question sets');
@@ -5706,7 +5777,7 @@
                   var pv = EduCADRef3d.buildPreview((snap.entities || []),
                     EduCADReconstruct);
                   if (pv) extra.model3d = pv;
-                } catch (err) { /* stored without a preview */ }
+                } catch (err) {                                }
               }
               attachButton.disabled = true;
               Saves.setQuestionModel(fi(), s, code, i, snap, extra).then(function () {
@@ -5822,7 +5893,7 @@
         }, fail('Load failed'));
       }
 
-      // ---- student views ----
+
       function studentHome(s) {
         clearPanel();
         header('Question sets');
@@ -6061,13 +6132,13 @@
         else studentHome(s);
       });
     })();
-  </script>
+</script>
 
   <script>
-    // Reference 3D card (window.educadRef3d): while solving, students see
-    // the teacher model's 3D preview in a small floating card beside the
-    // sheet and draw the 2D views from it. An independent boxed widget —
-    // the student's own live 3D glass is untouched.
+
+
+
+
     (function ref3dCard() {
       var CARD_ID = 'ref3d-card';
       var SIZE = 220;
@@ -6075,7 +6146,7 @@
 
       function hide() {
         if (widget && typeof widget.dispose === 'function') {
-          try { widget.dispose(); } catch (err) { /* already gone */ }
+          try { widget.dispose(); } catch (err) {                    }
         }
         widget = null;
         var card = document.getElementById(CARD_ID);
@@ -6132,6 +6203,16 @@
         head.appendChild(title);
         head.appendChild(x);
         card.appendChild(head);
+        if (okPreview && (preview.determination === 'partial' || preview.geometry.topologyStatus === 'partial')) {
+          var note = document.createElement('div');
+          note.setAttribute('role', 'status');
+          note.style.maxWidth = SIZE + 'px';
+          note.style.marginBottom = '6px';
+          note.style.fontSize = '11px';
+          note.style.color = '#795000';
+          note.textContent = 'Partial reference: ' + (preview.label || 'Some drawing geometry remains unresolved.');
+          card.appendChild(note);
+        }
         var host = document.createElement('div');
         host.style.position = 'relative';
         host.style.width = SIZE + 'px';
@@ -6148,9 +6229,9 @@
         try {
           widget = EduCADSolid.mountSolidWidget(host, { size: SIZE, x: 0, y: 0 });
           if (widget && widget.el && widget.el.style) {
-            // The boxed widget leaves positioning to the page: pin it to
-            // the card corner. The grip pill is hidden — the card stays
-            // put; orbit, zoom, and double-click reset still work.
+
+
+
             widget.el.style.position = 'absolute';
             widget.el.style.left = '0px';
             widget.el.style.top = '0px';
@@ -6169,17 +6250,17 @@
 
       window.educadRef3d = { show: show, hide: hide };
     })();
-  </script>
+</script>
 
   <script>
-    // Deep links from the studio and workspace. ?submission=<id> reviews
-    // a submission (teachers and academics land in read-only View mode,
-    // students get an editable copy); ?solve=<code>&q=<i> loads a
-    // question starter for solving plus the teacher's 3D reference card
-    // when shared; ?drawing=<id> opens a saved drawing;
-    // ?model=<code>&q=<i> loads the model answer for editing (teachers
-    // only — students never receive the model payload).
-    // ?draw=1 is a bare sheet (lets teachers past the studio gate).
+
+
+
+
+
+
+
+
     (function deepLink() {
       if (typeof window.EduCADSaves === 'undefined') return;
       var Saves = window.EduCADSaves;
@@ -6194,7 +6275,7 @@
           var v = i === -1 ? '' : kv.slice(i + 1);
           try {
             out[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, ' '));
-          } catch (err) { /* keep going on bad escapes */ }
+          } catch (err) {                                 }
         });
         return out;
       }
@@ -6203,8 +6284,8 @@
         return (h && h.table) || null;
       }
       function setMode(mode) {
-        // Deep links land in View on inspection devices (the sheet
-        // loader would refuse Edit anyway; this skips the noise).
+
+
         if (mobileInspect() && mode === 'edit') mode = 'view';
         if (typeof window.educadSetSheetMode === 'function') {
           window.educadSetSheetMode(mode);
@@ -6243,8 +6324,8 @@
         return count;
       }
 
-      // Keep the review-to-attachment journey on the intended question.
-      // An explicit teacher click attaches the reviewed snapshot.
+
+
       function modelReviewActions(data, index) {
         var home = $('btn-home');
         if (home) {
@@ -6279,7 +6360,7 @@
               try {
                 var preview = window.EduCADRef3d.buildPreview(snapshot.entities, window.EduCADReconstruct);
                 if (preview) extra.model3d = preview;
-              } catch (err) { /* The model remains usable without a 3D preview. */ }
+              } catch (err) {                                                      }
             }
             status('Attaching model to ' + data.code + ' Q' + (index + 1) + '…');
             return Saves.setQuestionModel(fi, active, data.code, index, snapshot, extra).then(function () { return true; });
@@ -6383,8 +6464,8 @@
               status('Auto-draw needs a desktop.');
               return;
             }
-            // Draft a replacement from the question words. The current
-            // sheet stays intact until the complete plan passes validation.
+
+
             var aq = qs[mqi];
             var words = aq.prompt + (aq.hint ? ' Hint: ' + aq.hint : '');
             setMode('edit');
@@ -6451,6 +6532,6 @@
         });
       }
     })();
-  </script>
+</script>
 </body>
 </html>

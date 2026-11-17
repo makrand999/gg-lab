@@ -4,10 +4,10 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  // Read-only correspondence audit. This mirrors the auto-member rule used by
-  // the reconstruction pipeline (same base name plus the shared orthographic
-  // station) while also reporting alternatives and conflicts. It never edits
-  // the drawing and never averages stations.
+
+
+
+
   var EPS = 1e-6;
   function names(caption) {
     return String(caption || '').split(',').map(function (part) {

@@ -1,4 +1,3 @@
-# collinear-overlap
 # expect: 5V 5E 1F open=1 boundary=5
 /datum -100 400
 /point v0 0 -10 plan

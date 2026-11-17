@@ -1,13 +1,13 @@
 'use strict';
-/* EduCAD teacher studio: classes, class-scoped question sets, model
-   answers, submission review with remarks and pass/fail. Codeforces-clean,
-   link actions only. Teachers (and academics) land here after login; the
-   drawing sheet opens in view mode to inspect a submission
-   (index.html?submission=<id>). Model answers open as editable copies
-   for review (index.html?model=<code>).
-   Model drawings are never sent to students: the auto-check toggle only
-   switches strict checking on or off, while a separate toggle serves the
-   model's 3D preview as a drawing reference. */
+
+
+
+
+
+
+
+
+
 (function () {
   var Saves = window.EduCADSaves;
   if (!Saves) return;
@@ -16,7 +16,7 @@
   function fi() { return window.fetch.bind(window); }
   function session() { return Saves.currentSession(); }
 
-  // Gate: teachers and academics only.
+
   var s0 = session();
   if (!s0 || Saves.isGuest(s0)) { window.location.replace('login.html'); return; }
   if (s0.role === 'student') { window.location.replace('student.html'); return; }
@@ -48,7 +48,7 @@
       window.location.replace('login.html');
       return;
     }
-    // Without the app server there is no lab API at all.
+
     if (/failed to fetch|load failed/i.test(msg) || !(err && err.status)) {
       flash(what + ': ' + (/failed to fetch|load failed|request failed/i.test(msg) ? 'Could not reach the server. Your work is kept here; try again.' : msg), 'error');
       return;
@@ -82,8 +82,8 @@
     return function () {
       controls.forEach(function (control, i) { control.disabled = states[i]; });
       container.removeAttribute('aria-busy');
-      // A drawing lookup may finish while this form is busy. Restore its
-      // current loading state instead of the state before the request.
+
+
       controls.forEach(function (control) {
         if (control.dataset.modelsReady !== undefined) {
           control.disabled = control.dataset.modelsReady !== 'true';
@@ -146,8 +146,8 @@
     if (!a || !a.checked) return 'auto: off';
     return a.pass ? 'auto: PASS' : 'auto: FAIL';
   }
-  // Bulk format: questions separated by a blank line. Within a block,
-  // a line starting with "Hint:" (case-insensitive) becomes the hint.
+
+
   function parseBulk(text) {
     var out = [];
     var blocks = String(text || '').split(/\n\s*\n/);
@@ -170,8 +170,8 @@
     });
     return out;
   }
-  // Derive the student-visible 3D preview from model-ink rows. Null
-  // when the libs are unavailable — the question is stored without one.
+
+
   function buildModelPreview(entities) {
     try {
       if (!window.EduCADRef3d) return null;
@@ -182,7 +182,7 @@
     }
   }
 
-  // Cached drawing list for "model from drawing" selects.
+
   var drawingCache = null;
   var drawingRequest = null;
   function loadDrawings() {
@@ -259,7 +259,7 @@
     return row;
   }
 
-  // Drafts survive navigation and reloads in this tab, scoped to the teacher.
+
   var draftKey = 'educad_teacher_draft_v1:' + s0.role + ':' + s0.username;
   var draftState = { questions: [], code: '', title: '', classCode: '', prompt: '', hint: '', bulk: '', modelId: '', check: true, show3d: true, editIndex: -1 };
   try {
@@ -422,7 +422,7 @@
     function capture() {
       draftState.code = scode.value; draftState.title = stitle.value;
       if (classesReady) draftState.classCode = sclass.value;
-      // Keep pending edits separately; posting requires explicit Save changes.
+
       draftState.editIndex = editing;
       draftState.prompt = promptIn.value; draftState.hint = hintIn.value;
       if (!modelIn.disabled) draftState.modelId = modelIn.value;
@@ -549,7 +549,7 @@
       }).then(function (data) {
         draftPosting = false; draft = [];
         Object.assign(draftState, { code: '', title: '', classCode: '', prompt: '', hint: '', bulk: '', modelId: '', check: true, show3d: true, editIndex: -1 }); keepDraft();
-        // Only navigate if the teacher is still on the posting screen.
+
         if (sform.isConnected) { window.history.replaceState(null, '', '#set/' + encodeURIComponent(data.code)); renderSet(data.code); window.scrollTo(0, 0); flash('Set ' + data.code + ' posted. Add or review its model answers below.', 'ok'); }
         else if (!window.location.hash) renderHome();
       }, function (err) {
@@ -568,7 +568,7 @@
     if (presetClass) { secSet.scrollIntoView({ block: 'start' }); presetClass = ''; }
   }
 
-  // ---- class detail ----
+
   function renderClass(code) {
     clear(root);
     flash('');
@@ -648,7 +648,7 @@
     });
   }
 
-  // Inline grading form under a submission row.
+
   function renderGradeForm(row, sub, onGraded) {
     var old = row.querySelector('.lab-gradeform');
     if (old) { old.querySelector('select').focus(); return; }
@@ -692,7 +692,7 @@
     row.appendChild(form); sel.focus();
   }
 
-  // ---- set detail + submissions ----
+
   function renderSet(code) {
     drawingCache = null;
     clear(root);
@@ -783,14 +783,14 @@
             };
           })(i), 'lab-danger'));
         }
-        // Auto-draw the model from the question words on the sheet.
+
         var auto = link(has ? 'Auto-draw replacement' : 'Auto-draw model',
           'index.html?model=' + encodeURIComponent(data.code) + '&q=' + i +
           '&autodraw=1');
         auto.target = '_blank';
         auto.rel = 'noopener';
         acts.appendChild(auto);
-        // Attach / replace the model from a saved drawing.
+
         var sel = modelSelect('');
         sel.style.maxWidth = '220px';
         acts.appendChild(sel);
@@ -867,7 +867,7 @@
           sub.querySelectorAll('.lab-gradeform').forEach(function (form) { form.remove(); });
           filter.dataset.previous = filter.value; updateQueue();
         });
-        // Group by question index, in question order.
+
         var groups = {};
         items.forEach(function (it) {
           var k = it.question_index;
@@ -924,28 +924,11 @@
     });
   }
 
-  // ---- manual (inline, teacher slice) ----
-  function renderManual() {
-    clear(root);
-    flash('');
-    var s = session();
-    if (!s) { window.location.replace('login.html'); return; }
-    if (!window.EduCADLabManual) {
-      window.location.href = 'manual.html';
-      return;
-    }
-    window.EduCADLabManual.show(root, 'teacher');
-  }
 
-  // ---- routing ----
   function route() {
     window.scrollTo(0, 0);
     var h = String(window.location.hash || '').replace(/^#/, '');
     try { h = decodeURIComponent(h); } catch (err) { renderHome(); flash('That studio link is invalid. Choose a class or set below.', 'error'); return; }
-    if (h === 'manual') {
-      renderManual();
-      return;
-    }
     if (h.indexOf('class/') === 0 && h.length > 6) {
       renderClass(h.slice(6));
       return;
@@ -966,6 +949,5 @@
     renderHome();
   }
   window.addEventListener('hashchange', route);
-  if (window.EduCADLabManual) window.EduCADLabManual.wireNav();
   route();
 })();

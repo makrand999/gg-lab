@@ -1,0 +1,40 @@
+# expect: 48V 96E 50F rawFaces=50 faceBindings=ok curves=2 surfaces=3 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred previewParity=ok
+# conic-query: {"index":0,"expect":{"analyticVolume":12985.249634837812,"volumePatch":{"kind":"affine-ruled-conic-volume","d0":447.21359549995793,"d1":-536.656314599949,"d2":156.524758424985}}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":12837.424637085029,"vertices":48,"edges":96,"faces":50,"euler":2,"oriented":true,"sameDirectionEdges":0}}
+# surface-query: {"operation":"implicit-equation","surface":2,"expect":{"contract":"implicit-surface-v1","kind":"implicit","degree":4,"paramChart":{"kind":"ruledConic","A2":{"x":0,"y":6,"z":3},"B2":{"x":-10,"y":0,"z":0}},"domain":{"compiled":["parameter-range"],"unresolved":[]}}}
+# surface-query: {"operation":"normal","surface":2,"point":{"x":20,"y":0,"z":0},"expect":{"normal":{"x":0.8728715609439699,"y":-0.2182178902359921,"z":0.4364357804719842}}}
+# surface-query: {"operation":"section","surface":2,"plane":{"origin":{"x":0,"y":20,"z":20},"normal":{"x":0,"y":-0.4472135954999579,"z":0.8944271909999159}},"expect":{"kind":"ellipse","center":{"x":0,"y":20,"z":20},"radiusU":15,"radiusV":14.534441853748628,"sectionType":"parallel-affine-conic","conicMatrix":{"exact":true}}}
+# surface-query: {"operation":"generator-lines","expect":{"count":3,"checkedEdges":3,"edgeBacked":true,"reprojectionError":0,"surfaceResidual":0,"ok":true}}
+# surface-query: {"operation":"implicit-evaluate","surface":2,"point":{"x":20,"y":0,"z":0},"expect":{"value":0,"residual":0}}
+# surface-query: {"operation":"classify","surface":2,"point":{"x":20,"y":40,"z":20},"expect":{"status":"outside"}}
+# surface-query: {"operation":"primitive-reconstruct","expect":{"status":"ok","determination":"inferred","vertices":48,"edges":96,"faces":50,"curves":2,"analyticCurves":2,"pointEvidence":[3,3],"generatorLines":3,"generatorEdgesBacked":true,"implicitKinds":["ruledConic"],"implicitDegrees":[4],"meshVolume":12837.424637085029,"surfaces":["plane","plane","implicit"],"inputUnchanged":true,"diagnostics":[]}}
+# surface-query: {"operation":"preview-implicit","expect":{"valid":true,"count":3,"missing":0,"declared":0,"inferred":3,"equationParity":"ok","generatorLineCount":3,"generatorSourceIds":["E46","E47","E48","E49","E50","E51"],"generatorLineParity":"ok"}}
+# surface-query: {"operation":"section","surface":{"kind":"implicit","generator":{"C":{"x":0,"y":0,"z":0},"A":{"x":1000000,"y":0,"z":0},"B":{"x":0,"y":0.01,"z":0},"D":{"x":0,"y":0,"z":40},"k":1,"n":{"x":0,"y":0,"z":1}}},"plane":{"origin":{"x":0,"y":0,"z":20},"normal":{"x":0,"y":0,"z":1}},"expect":{"kind":"ellipse","radiusU":1000000,"radiusV":0.01,"sectionType":"parallel-homothetic-conic"}}
+# surface-query: {"operation":"param-partial","chart":{"kind":"ruledConic","C":{"x":0,"y":0,"z":0},"A":{"x":0,"y":20,"z":10},"B":{"x":-20,"y":0,"z":0},"D":{"x":0,"y":40,"z":40},"k":0.5},"u":0.7,"v":0.3,"expect":{"maxError":0,"normalError":0,"ok":true}}
+# surface-query: {"operation":"param-partial","chart":{"kind":"ruledConic","C":{"x":0,"y":0,"z":0},"A":{"x":0,"y":20,"z":10},"B":{"x":-20,"y":0,"z":0},"D":{"x":0,"y":40,"z":40},"k":0.5},"u":0.7,"v":0.7,"expect":{"maxError":0,"normalError":0,"ok":true}}
+# surface-query: {"operation":"param-partial","chart":{"kind":"ruledConic","C":{"x":0,"y":0,"z":0},"A":{"x":0,"y":20,"z":10},"B":{"x":-20,"y":0,"z":0},"D":{"x":0,"y":40,"z":40},"k":2},"u":0.7,"v":0.3,"expect":{"maxError":0,"normalError":0,"ok":true}}
+# surface-query: {"operation":"param-partial","chart":{"kind":"ruledConic","C":{"x":0,"y":0,"z":0},"A":{"x":0,"y":20,"z":10},"B":{"x":-20,"y":0,"z":0},"D":{"x":0,"y":40,"z":40},"k":2},"u":0.7,"v":0.7,"expect":{"maxError":0,"normalError":0,"ok":true}}
+# surface-query: {"operation":"reconstruct","entityPatches":[{"entityId":"E34","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:p","name":"p","hidden":false}]}}},{"entityId":"E35","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:p","name":"p","hidden":false}]}}},{"entityId":"E36","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:q","name":"q","hidden":false}]}}},{"entityId":"E37","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:q","name":"q","hidden":false}]}}},{"entityId":"E38","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:a","name":"a","hidden":false}]}}},{"entityId":"E39","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:a","name":"a","hidden":false}]}}},{"entityId":"E40","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:b","name":"b","hidden":false}]}}},{"entityId":"E41","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:b","name":"b","hidden":false}]}}},{"entityId":"E42","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:c","name":"c","hidden":false}]}}},{"entityId":"E43","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:c","name":"c","hidden":false}]}}},{"entityId":"E44","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:d","name":"d","hidden":false}]}}},{"entityId":"E45","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:d","name":"d","hidden":false}]}}}],"expect":{"status":"ok","determination":"inferred","vertices":48,"identity":"explicit","surfaceKinds":["implicit","plane"],"surfaceCertificateStatus":"ok","curves":2,"diagnostics":[],"previewStatus":"ok","previewIdentity":"explicit","previewVertices":48,"sourceUnchanged":true,"previewValid":true}}
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/ellipse 0 -40 10 3 8 A plan
+/ellipse 0 40 10 6 8 A elevation
+/point p 0 -10 plan
+/point "p'" 0 20 elevation
+/point q 0 -43 plan
+/point "q'" 0 46 elevation
+/point a -20 0 plan
+/point "a'" -20 0 elevation
+/point b 20 0 plan
+/point "b'" 20 0 elevation
+/point c -10 -40 plan
+/point "c'" -10 40 elevation
+/point d 10 -40 plan
+/point "d'" 10 40 elevation
+/line a c A plan
+/line b d A plan
+/line "a'" "c'" A elevation
+/line "b'" "d'" A elevation
+/line p q A plan
+/line "p'" "q'" A elevation

@@ -6,9 +6,9 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // World coordinates in mm only inside entities and solvers.
-  // Screen px is ephemeral render only (never stored on entities).
-  // Projector invariant: elevation x equals plan x (mm).
+
+
+
   var WORLD_UNITS = 'mm';
   var SCALE_MIN = 0.05;
   var SCALE_MAX = 50;
@@ -49,19 +49,19 @@
     return { s: clampScale(s), tx: tx, ty: ty, w: w, h: h };
   }
 
-  // Forward: px = x*s + tx, py = ty - y*s (world mm y-up -> screen px y-down).
+
   function forward(view, ptMm) {
     assertFinite(view.s, view.tx, view.ty, ptMm.x, ptMm.y);
     return { x: ptMm.x * view.s + view.tx, y: view.ty - ptMm.y * view.s };
   }
 
-  // Inverse: x = (px - tx)/s, y = (ty - py)/s.
+
   function inverse(view, ptPx) {
     assertFinite(view.s, view.tx, view.ty, ptPx.x, ptPx.y);
     return { x: (ptPx.x - view.tx) / view.s, y: (view.ty - ptPx.y) / view.s };
   }
 
-  // Cursor-anchored zoom: world point under cursor stays fixed.
+
   function zoomAt(view, cursorPx, factor) {
     assertFinite(view.s, view.tx, view.ty, cursorPx.x, cursorPx.y, factor);
     if (factor <= 0) throw new Error('zoom factor must be > 0');
@@ -89,13 +89,13 @@
     return { s: view.s, tx: view.tx + dxPx, ty: view.ty + dyPx, w: view.w, h: view.h };
   }
 
-  // Integer resize: w/h rounded to ints >= 1, view otherwise unchanged.
+
   function resize(view, w, h) {
     assertFinite(view.s, view.tx, view.ty);
     return { s: view.s, tx: view.tx, ty: view.ty, w: toIntSize(w), h: toIntSize(h) };
   }
 
-  // Half-pixel align for crisp Canvas2D strokes.
+
   function alignHalfPixel(v) {
     assertFinite(v);
     return Math.floor(v) + 0.5;
@@ -106,7 +106,7 @@
     return { x: alignHalfPixel(ptPx.x), y: alignHalfPixel(ptPx.y) };
   }
 
-  // Projector invariant: elevation x equals plan x (mm).
+
   function checkProjector(planMm, elevMm, eps) {
     assertFinite(planMm.x, planMm.y, elevMm.x, elevMm.y);
     var e = (eps === undefined) ? VERTICAL_EPS : eps;

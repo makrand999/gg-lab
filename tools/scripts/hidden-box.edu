@@ -1,4 +1,3 @@
-# hidden-box
 # expect: 8V 12E 6F closed=1 boundary=0 surfaceValidation=ok surfaceCertificate=ok surfaceCertificateIssues=none
 /datum -100 400
 /point v0 0 -10 plan

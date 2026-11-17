@@ -7,13 +7,13 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD Phase 5: 6-tier object snap (ENDPOINT over INTERSECTION over
-  // MIDPOINT over CENTER over PROJECTOR over LOCUS). World mm only inside
-  // entities and solvers; screen px is ephemeral render only. Projector
-  // invariant: elevation x equals plan x (mm). Hysteresis: lock 14px,
-  // release 22px. Endpoint dedup rebind within 1.0 mm. Angle detents
-  // 15/30/45 deg (15-deg steps, majors 15/30/45). Zero deps. Dual-env:
-  // browser via window.EduGraphicsSnapping, Node via module.exports.
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '5.0.0-edugraphics';
   var SNAP_TIERS = ['ENDPOINT', 'INTERSECTION', 'MIDPOINT', 'CENTER', 'PROJECTOR', 'LOCUS'];
@@ -87,11 +87,11 @@
     return compareTiers(a, b) < 0;
   }
 
-  // Axes a locked snap of one tier constrains: point tiers pin both
-  // coordinates, LOCUS pins height only (its xMm is the cursor's x),
-  // PROJECTOR pins the station only (its yMm is the cursor's y).
-  // Placement merges these per axis with the axis lock. Unknown tiers
-  // throw, like tierRank.
+
+
+
+
+
   function snapTierAxes(tier) {
     tierRank(tier);
     if (tier === 'LOCUS') return { x: false, y: true };
@@ -104,7 +104,7 @@
     return c.tier + ':' + c.xMm + ',' + c.yMm;
   }
 
-  // Best = lowest tier rank, tie-broken by smallest distPx.
+
   function pickBest(candidates) {
     if (!Array.isArray(candidates)) throw new Error('candidates must be an array');
     var best = null;
@@ -127,9 +127,9 @@
   function shouldLock(distPxVal) { assertFinite(distPxVal); return distPxVal <= SNAP_LOCK_PX; }
   function shouldRelease(distPxVal) { assertFinite(distPxVal); return distPxVal > SNAP_RELEASE_PX; }
 
-  // Hysteresis: keep current lock while its live distance is <= 22px,
-  // unless a strictly higher-tier candidate is within 14px. When idle,
-  // lock the best candidate within 14px, else null.
+
+
+
   function updateSnap(current, candidates) {
     if (current !== null && current !== undefined) tierRank(current.tier);
     if (!Array.isArray(candidates)) throw new Error('candidates must be an array');
@@ -159,7 +159,7 @@
     return pickBest(challengers);
   }
 
-  // Endpoint dedup: rebind to an existing point within 1.0 mm.
+
   function rebindEndpoint(ptMm, existingList) {
     assertFinite(ptMm.x, ptMm.y);
     if (!Array.isArray(existingList)) throw new Error('existingList must be an array');
@@ -226,7 +226,7 @@
     return b;
   }
 
-  // Ephemeral px ring on Layer2 only (never stored on entities).
+
   function ringForSnap(snapPx, tier, opts) {
     opts = opts || {};
     assertFinite(snapPx.x, snapPx.y);
@@ -299,11 +299,11 @@
     return { x: a.x + t * rX, y: a.y + t * rY };
   }
 
-  // AABB proximity prefilter: an intersection within snap range of the
-  // cursor must lie on BOTH parents, so any parent whose geometry stays
-  // farther than the release radius from the cursor cannot contribute a
-  // lockable (or even releasable) candidate. Conservative: keeps every
-  // pair that could matter, skips the rest before the O(N^2) loop.
+
+
+
+
+
   function segNearCursorMm(e, w, padMm) {
     var minX = Math.min(e.x, e.x2) - padMm, maxX = Math.max(e.x, e.x2) + padMm;
     var minY = Math.min(e.y, e.y2) - padMm, maxY = Math.max(e.y, e.y2) + padMm;
@@ -311,7 +311,7 @@
   }
 
   function lineNearCursorMm(e, w, padMm) {
-    // Infinite LINE: perpendicular distance, never the finite AABB.
+
     var dx = e.x2 - e.x, dy = e.y2 - e.y;
     var len2 = dx * dx + dy * dy;
     if (!(len2 > 0)) {
@@ -342,7 +342,7 @@
     return out;
   }
 
-  // Projector: vertical lines x = planX (mm); elev.x forced equal.
+
   function projectorCandidates(planXListMm, cursorPx, view) {
     if (!Array.isArray(planXListMm)) throw new Error('planXListMm must be an array');
     var w = inverse(view, cursorPx);
@@ -358,7 +358,7 @@
     return out;
   }
 
-  // Locus: horizontal lines y = locusY (mm).
+
   function locusCandidates(locusYListMm, cursorPx, view) {
     if (!Array.isArray(locusYListMm)) throw new Error('locusYListMm must be an array');
     var w = inverse(view, cursorPx);
@@ -388,7 +388,7 @@
     return out;
   }
 
-  // One-call snap: mm world in, ephemeral px ring out.
+
   function snapAt(cursorPx, view, o, current) {
     assertFinite(cursorPx.x, cursorPx.y);
     var cands = collectCandidates(o || {}, cursorPx, view);

@@ -1,5 +1,3 @@
-# One plan projection supporting two elevation levels is a real multi-level
-# reconstruction; it is not the cross-product ambiguity above.
 # expect: 48V 48E 2F curves=2 unresolved=0 status=inferred
 /datum -30 180
 /circle 20 -30 20 A plan

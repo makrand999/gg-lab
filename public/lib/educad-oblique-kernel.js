@@ -3,10 +3,10 @@
   else root.EduCADObliqueKernel = factory();
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // Oblique circle kernel: a circle in a general plane projects to an ellipse
-  // in each principal view. Fit each projected ellipse, recover the plane
-  // normal from its major/minor axes, then combine centres from two views.
-  // This is deliberately separate from the true-shape/edge-on curve stage.
+
+
+
+
   var EPS = 1e-6, TAU = 2 * Math.PI, TOL = 0.5, MIN_SEGS = 12, MIN_LINE_SEGS = 32;
   function near(a, b, tol) { return Math.abs(a - b) <= (tol === undefined ? EPS : tol); }
   function helper(e) {
@@ -35,8 +35,8 @@
     var l1 = tr / 2 + disc, l2 = tr / 2 - disc;
     if (!(l1 > EPS * EPS) || !(l2 > 0)) return null;
     var a = Math.sqrt(2 * l1), b = Math.sqrt(2 * l2);
-    // A near-axis-aligned ellipse has a tiny but nonzero xy from rounding.
-    // Compare it relatively, or the eigenvector above collapses to noise.
+
+
     var mx = 1, my = 0;
     if (Math.abs(xy) > 1e-12 * Math.max(1, xx + yy)) { mx = l1 - yy; my = xy; }
     else if (xx < yy) { mx = 0; my = 1; }
@@ -55,8 +55,8 @@
     if (maxErr > 0.08) return null;
     return {center:{x:cx,y:cy}, a:a, b:b, major:{x:mx,y:my}, maxError:maxErr};
   }
-  // Partial ellipses are not uniformly sampled full rings. Fit a normalized
-  // conic instead of estimating its axes from sample covariance.
+
+
   function fitArcEllipse(points) {
     var cx=0,cy=0;
     points.forEach(function(p) {cx+=p.x;cy+=p.y;});cx/=points.length;cy/=points.length;
@@ -144,9 +144,9 @@
     });
     return loops;
   }
-  // Edge-on traces of a circle are straight runs, including split/overlapping
-  // strokes. Keep each run's midpoint, direction and full covered interval so
-  // an ellipse in one view can be paired with its line projection in another.
+
+
+
   function lineRunsInView(list, role) {
     var segs = list.filter(function (e) { return e.type === 'SEGMENT' && viewOf(e) === role && !helper(e); });
     var rows = [];
@@ -175,7 +175,7 @@
       });
       merged.forEach(function (r) {
         var t = (r.min+r.max)/2;
-        // Anchor the line at the point nearest the sheet origin.
+
         var anchorX = row.dx*t - row.dy*row.c;
         var anchorY = row.dy*t + row.dx*row.c;
         runs.push({role:role, dx:row.dx, dy:row.dy, c:row.c,
@@ -213,9 +213,9 @@
   function runPoint(run,t) {
     return {x:run.dx*t - run.dy*run.c, y:run.dy*t + run.dx*run.c};
   }
-  // For an open projected arc the run's midpoint is not the circle centre.
-  // Solve the missing centre coordinate from the run's supporting line, then
-  // keep endpoint/radius evidence as a fallback for a degenerate line equation.
+
+
+
   function centersFromLoopAndArcLine(loop, run, profile) {
     var base = centerFromLoop(loop, profile);
     if (!base) return [];
@@ -230,9 +230,9 @@
       if (!p || Math.abs(run.dx*p.y - run.dy*p.x - run.c) > tol) return;
       if (!out.some(function(q) { return Math.hypot(q.x-center.x,q.y-center.y,q.z-center.z) < TOL; })) out.push(center);
     }
-    // The run's supporting line is affine in the missing centre coordinate.
-    // Solve it first; this is the robust path for major arcs whose run ends
-    // are extrema inside the arc rather than the arc endpoints.
+
+
+
     var p0 = Object.assign({}, base), p1 = Object.assign({}, base);
     p0[axis] = 0; p1[axis] = 1;
     var q0 = project(p0, run.role, profile), q1 = project(p1, run.role, profile);
@@ -242,8 +242,8 @@
         var center = Object.assign({}, base); center[axis] = -off0/(off1-off0); add(center);
       }
     }
-    // Fall back to endpoint/radius evidence when the run is parallel to the
-    // missing axis, so the line equation alone cannot locate the centre.
+
+
     for (var reverse=0; reverse<2; reverse++) {
       var P = mergeCenter(partialFromPoint(first,loop.role,profile), partialFromPoint(reverse?ends[1]:ends[0],run.role,profile));
       var Q = mergeCenter(partialFromPoint(last,loop.role,profile), partialFromPoint(reverse?ends[0]:ends[1],run.role,profile));
@@ -260,15 +260,15 @@
     }
     return out;
   }
-  // A circle is edge-on in a view exactly when its normal has no component
-  // along that view's projection axis.
+
+
   function edgeOnInRole(n, role) {
     var axis = role === 'PLAN' ? 'y' : role === 'ELEVATION' ? 'z' : 'x';
     return Math.abs(n[axis]) <= 1e-6;
   }
-  // Compare a candidate curve's projection with a straight edge-on run,
-  // including the run's supporting line and its covered interval. The run is
-  // not assumed to be centred on the circle, so this also supports arcs.
+
+
+
   function lineRunMatchesCurve(curve, run, profile) {
     var start = curve.kind === 'arc' ? curve.startAngle : 0;
     var sweep = curve.kind === 'arc' ? curve.sweepAngle : TAU;
@@ -324,8 +324,8 @@
   }
   function dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
   function cross(a, b) { return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x}; }
-  // A single ellipse leaves the sign of the viewing-axis component open.
-  // Plane normals n and -n describe the same circle, not two alternatives.
+
+
   function normalCandidates(loop, profile) {
     var n = normalFromLoop(loop, profile);
     if (!n) return [];
@@ -363,8 +363,8 @@
     var t=range?wrap(angleOf(p)-range.start):0;
     return !!range && (t<=range.sweep+0.02 || t>=TAU-0.02);
   }
-  // Only corresponding boundary stations constrain the plane. Unlinked
-  // points, centres, and unrelated geometry cannot select a mirror.
+
+
   function boundaryPoints(list, a, b, profile) {
     var groups=new Map(), out=[];
     list.forEach(function(p) {
@@ -403,6 +403,7 @@
     return {kind:'circle',center:{x:center.x,y:center.y,z:center.z},u:b.u,v:b.v,
       radius:radius,startAngle:0,sweepAngle:TAU,sourceIds:sources.slice(),
       sourceView:roleA,framePair:[roleA,roleB],oblique:true,
+      analytic:false,fitted:true,inferred:true,exact:false,
       displayVertices:[],displayEdges:[]};
   }
   function wrap(t) {return (t%TAU+TAU)%TAU;}
@@ -531,11 +532,11 @@
         sources.forEach(function(id) { used.add(id); });
       }
     }
-    // A circle or arc whose plane is edge-on in one view projects to an
-    // ellipse in another view and a straight run in the edge-on view. The
-    // ellipse fixes the radius and normal candidates. A closed circle uses the
-    // run midpoint for its centre; an open arc solves the missing coordinate
-    // from the run's supporting line and checks the covered interval instead.
+
+
+
+
+
     var lineRuns = [];
     ['PLAN','ELEVATION','PROFILE'].forEach(function(role) {
       lineRuns = lineRuns.concat(lineRunsInView(list, role));

@@ -1,0 +1,24 @@
+# expect: 54V 51E 2F rawFaces=2 faceBindings=ok curves=2 surfaces=2 surfaceKinds=plane conicProjection=ok conicDefinitions=ok conicJSON=ok status=partial determination=partial diagnostics=surface-ruled-singular-station unresolved=1
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/ellipse 0 -40 20 10 8 A plan
+/ellipse 0 40 20 20 8 A elevation
+/point a 20 0 plan
+/point "a'" 20 0 elevation
+/point c -20 -40 plan
+/point "c'" -20 40 elevation
+/point d -10 -8.6602540378 plan
+/point "d'" -10 17.3205080757 elevation
+/point e 10 -31.3397459622 plan
+/point "e'" 10 22.6794919243 elevation
+/point f -10 8.6602540378 plan
+/point "f'" -10 -17.3205080757 elevation
+/point g 10 -48.6602540378 plan
+/point "g'" 10 57.3205080757 elevation
+/line a c A plan
+/line "a'" "c'" A elevation
+/line d e A plan
+/line "d'" "e'" A elevation
+/line f g A plan
+/line "f'" "g'" A elevation

@@ -1,13 +1,13 @@
 'use strict';
-/* Codeforces menu animation, ported as-is to vanilla JS:
-   jquery.lavaLamp (blob follows hover, returns to current on leave)
-   + jquery.easing easeOutBack (s = 1.70158, 700 ms), with jQuery
-   .stop() semantics: a new hover retargets mid-flight, no queue. */
+
+
+
+
 (function () {
   var SPEED = 700;
-  var S = 1.70158; /* CF easeOutBack constant */
+  var S = 1.70158;
 
-  /* Exact CF easeOutBack, normalized: p in [0,1] -> eased progress. */
+
   function easeOutBack(p) {
     var t = p - 1;
     return t * t * ((S + 1) * t + S) + 1;
@@ -23,9 +23,9 @@
     if (!items.length) return;
 
     var current = list.querySelector('li.current') || items[0];
-    /* CF lavalamp blob markup: backLava caps the right, inner leftLava
-       stretches. (CF also emits bottomLava/cornerLava divs, but its CSS
-       leaves them unstyled, so they render nothing — omitted.) */
+
+
+
     var blob = document.createElement('li');
     blob.className = 'backLava';
     blob.setAttribute('aria-hidden', 'true');
@@ -39,10 +39,10 @@
     try {
       reduced = window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch (err) { /* keep animated */ }
+    } catch (err) {                     }
 
-    /* CF submenu geometry: the 20px pill covers the link plus its
-       8px side margins, so it floats as a jelly pill, not a tight box. */
+
+
     function targetOf(li) {
       return {
         left: li.offsetLeft - 8,
@@ -69,7 +69,7 @@
 
     function move(li, instant) {
       if (!li) return;
-      if (raf) { cancelAnimationFrame(raf); raf = 0; } /* jQuery .stop() */
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
       var to = targetOf(li);
       if (instant || reduced || !window.requestAnimationFrame) {
         render(to);
@@ -104,7 +104,7 @@
     });
     list.addEventListener('mouseleave', function () { move(current, false); });
     window.addEventListener('resize', function () { move(current, true); });
-    /* Webfont loads shift item widths: re-seat the blob once ready. */
+
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () { move(current, true); });
     }

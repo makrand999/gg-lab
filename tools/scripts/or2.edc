@@ -1,6 +1,4 @@
-# OR-2 (EduCAD Script): base plate + rib + two holes.
 # expect: 0V 0E 0F status=unresolved-edge unresolved=30
-# FV skeleton with centre lines, cutting plane, hatch, dims.
 /datum -90 90
 /point p1 -60 0
 /point p2 60 0

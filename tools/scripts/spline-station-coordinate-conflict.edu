@@ -1,0 +1,22 @@
+# expect: 0V 0E 0F parametricCurves=0 status=coordinate-conflict diagnostics=coordinate-conflict
+/datum -60 200
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point p 0.0000005 10 elevation
+/point q 20 40 elevation
+/point r 40 20 elevation
+/rename a first members
+/rename p first members
+/rename b middle members
+/rename q middle members
+/rename c last members
+/rename r last members
+/rename first a local
+/rename first' p local
+/rename middle b local
+/rename middle' q local
+/rename last c local
+/rename last' r local
+/curve-through a b c plan
+/curve-through p q r elevation

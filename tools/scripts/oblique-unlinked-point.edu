@@ -1,5 +1,4 @@
-# Boundary stations select a plane only when they correspond.
-# expect: 24V 24E 1F curves=1 oblique=1 obliqueReprojection=ok obliquePoints=0 diagnostics=oblique-curve-ambiguous,point-correspondence-missing status=partial
+# expect: curves=0 diagnostics=conic-lift-ambiguous status=conic-lift-ambiguous
 /datum -100 400
 /ellipse 0 0 20 10 A plan
 /ellipse 0 0 20 17.3205080757 A elevation

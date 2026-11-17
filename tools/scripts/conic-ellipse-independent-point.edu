@@ -1,0 +1,8 @@
+# expect: 25V 24E 1F rawFaces=1 faceBindings=ok curves=1 conicProjection=ok conicDefinitions=ok conicJSON=ok status=inferred
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/point p 16.5067122982 -5.64642473395 plan
+/point p' 16.5067122982 11.2928494679 elevation
+/point r 5 -2 plan
+/point r' 5 4 elevation

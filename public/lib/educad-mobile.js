@@ -6,33 +6,33 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD mobile inspection: View + Pose on touch-only devices and in
-  // narrow windows. Phones and small tablets get a usable inspection
-  // experience instead of the old "Desktop required" overlay: split
-  // 2D/3D panes, pane-owned touch gestures, a compact header, a
-  // collapsible bottom sheet, and touchscreen Pose controls. Edit and
-  // all authoring stay centrally forbidden on inspection-only devices
-  // (the page enforces it; this module only reports the verdict).
-  //
-  // Layout is responsive by SPACE (narrow windows split even with a
-  // mouse); inspection-only is a verdict about INPUT (coarse pointer
-  // with no fine pointer). Touch-only devices always split, so tablet
-  // users inspect too; narrow desktop windows split but keep Edit.
-  //
-  // Zero deps. Dual-env: browser via window.EduCADMobile, plain Node
-  // via module.exports. Node-safe: DOM is touched only inside mount()
-  // when a document is present; every pure helper below runs headless.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   var VERSION = '1.0.0-educad';
   var WORLD_UNITS = 'mm';
 
-  // Touch gesture tuning.
+
   var TAP_SLOP_PX = 10;
   var TAP_MAX_MS = 500;
   var TOUCH_TOL_PX = 24;
   var PINCH_MIN_DIST_PX = 8;
   var CLICK_SUPPRESS_MS = 800;
 
-  // Split layout tuning.
+
   var SPLIT_NARROW_W = 920;
   var SPLIT_MIN_DIM = 640;
   var MIN_PANE_PX = 120;
@@ -58,11 +58,11 @@
     return (typeof n === 'number' && isFinite(n)) ? n : fallback;
   }
 
-  // Inspection verdict, mirroring the retired blocker: coarse with no
-  // fine pointer means touch-only (phones, tablets). With no pointer
-  // information at all, fall back to touch + small screen. Touchscreen
-  // laptops (fine pointer present) are never inspection-only.
-  // info: {coarse, fine, touch, minDim}. Pure.
+
+
+
+
+
   function detectTouchOnly(info) {
     info = info || {};
     if (info.fine === true) return false;
@@ -72,8 +72,8 @@
     return touch && dim < 720;
   }
 
-  // Read the verdict inputs from a window-like object. Pure w.r.t. the
-  // passed object; defaults to the global window when present.
+
+
   function detectFromWindow(w) {
     var win = w || ((typeof window !== 'undefined') ? window : null);
     var coarse = false, fine = false, touch = false, minDim = Infinity;
@@ -84,11 +84,11 @@
           fine = !!win.matchMedia('(pointer: fine)').matches ||
             !!win.matchMedia('(any-pointer: fine)').matches;
         }
-      } catch (err) { /* media queries unavailable */ }
+      } catch (err) {                                 }
       try {
         touch = ('ontouchstart' in win) ||
           (win.navigator && win.navigator.maxTouchPoints > 0);
-      } catch (err2) { /* navigator unavailable */ }
+      } catch (err2) {                             }
       var iw = Number(win.innerWidth), ih = Number(win.innerHeight);
       if (isFinite(iw) && isFinite(ih) && iw > 0 && ih > 0) {
         minDim = Math.min(iw, ih);
@@ -99,8 +99,8 @@
         touch: touch, minDim: minDim }) };
   }
 
-  // Split when touch-only (tablets inspect too) or when space is tight.
-  // Pure.
+
+
   function shouldSplitLayout(w, h, touchOnly) {
     if (touchOnly === true) return true;
     w = finite(w, Infinity);
@@ -109,8 +109,8 @@
     return w < SPLIT_NARROW_W || Math.min(w, h) < SPLIT_MIN_DIM;
   }
 
-  // 'portrait' when height wins (square counts as portrait: 3D above 2D).
-  // Pure.
+
+
   function orientationOf(w, h) {
     return finite(h, 0) >= finite(w, 0) ? 'portrait' : 'landscape';
   }
@@ -120,23 +120,23 @@
     return clamp(f, DIVIDE_MIN, DIVIDE_MAX);
   }
 
-  // Pane pixel split for a container box: portrait stacks 3D above 2D,
-  // landscape puts 3D left of 2D. frac is the 3D share. Pure.
+
+
   function paneSplit(boxW, boxH, orientation, frac, dividerPx) {
     var f = clampFraction(frac);
     var dv = Math.max(0, finite(dividerPx, 0));
     var total = Math.max(0, finite(orientation === 'landscape' ? boxW : boxH, 0));
     var available = Math.max(0, total - dv);
-    // Browser chrome or the keyboard may leave less than two nominal
-    // pane minima. Share the actual space without overflowing it.
+
+
     var minimum = Math.min(MIN_PANE_PX, available / 2);
     var first = clamp(Math.round(total * f), minimum, available - minimum);
     var second = available - first;
     return { first: first, second: second, frac: f };
   }
 
-  // World bbox of drawable entities (points, spans, round rims), in mm.
-  // entities: [{type,x,y,x2,y2,radius,visible}]. Pure. Null when empty.
+
+
   function extentOf(entities) {
     var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     var n = 0;
@@ -169,10 +169,10 @@
     return { x0: x0, x1: x1, y0: y0, y1: y1 };
   }
 
-  // Fit a mm bbox into a pane: {s, tx, ty} in viewport convention
-  // (px = x*s + tx, py = ty - y*s). Null/empty bbox centers the origin
-  // with the XY datum across the middle, so empty sheets fit too.
-  // Pure.
+
+
+
+
   function fitSheetView(paneW, paneH, bbox, opts) {
     opts = opts || {};
     var pad = Math.max(0, finite(opts.padPx, FIT_PAD_PX));
@@ -196,8 +196,8 @@
     return { s: s, tx: w / 2 - cx * s, ty: h / 2 + cy * s };
   }
 
-  // Keep the world point at pane center fixed across a resize: returns
-  // the tx/ty that hold it. Pure.
+
+
   function preserveCenterTxTy(oldW, oldH, newW, newH, s, tx, ty) {
     oldW = finite(oldW, 1);
     oldH = finite(oldH, 1);
@@ -210,13 +210,13 @@
     return { tx: newW / 2 - wx * s, ty: newH / 2 + wy * s };
   }
 
-  // ---- Pure pointer-gesture tracker ---------------------------------
-  // Feeds pointer events (id, x, y, ms) and reports pane gestures:
-  // single-finger drag (pan/orbit deltas), two-finger pinch (anchored
-  // factor + centroid travel), and taps. Ownership is fixed from the
-  // first contact; extra fingers beyond two are ignored; lifting one
-  // finger of a pinch re-baselines the survivor so nothing jumps.
-  // No DOM: the page wires real listeners onto the pane surfaces.
+
+
+
+
+
+
+
   function createGestureTracker(callbacks) {
     callbacks = callbacks || {};
     var pointers = {};
@@ -341,7 +341,7 @@
     };
   }
 
-  // ---- Pose dock value helpers (pure) --------------------------------
+
   var POSE_MOVE_RANGE = { min: -120, max: 120, step: 1, snap: 5, unit: 'mm' };
   var POSE_ROT_RANGE = { min: -180, max: 180, step: 1, snap: 5, unit: '°' };
   var POSE_SCALE_RANGE = { min: 0.1, max: 3, step: 0.01, snap: 0.1, unit: '×' };
@@ -363,16 +363,16 @@
     return clamp(finite(value, 0), r.min, r.max);
   }
 
-  // ---- Browser shell --------------------------------------------------
-  // mount(ctx) builds the mobile header, split panes, divider, pose
-  // dock, bottom sheet, and overflow menu, then owns them: layout sync,
-  // node moves, gestures, and control wiring. ctx carries the app
-  // callbacks listed at the top of the mount function. Returns a shell
-  // handle, or a null shell without DOM. Safe to call once.
+
+
+
+
+
+
   var shellSingleton = null;
 
-  // Singleton probes for the page and sibling modules: false (never
-  // throw) before mount or without DOM.
+
+
   function splitActive() {
     try {
       return !!(shellSingleton && shellSingleton.active());
@@ -397,7 +397,7 @@
   function flash(msg) {
     try {
       if (shellSingleton && shellSingleton.flash) shellSingleton.flash(msg);
-    } catch (err) { /* toast is best-effort */ }
+    } catch (err) {                            }
   }
 
   function nullShell() {
@@ -491,7 +491,7 @@
       return b;
     }
 
-    // -- Header ------------------------------------------------------
+
     var header = document.createElement('header');
     header.id = 'mobile-header';
     header.hidden = true;
@@ -523,7 +523,7 @@
       else setSheetMode('pose');
     });
 
-    // -- Panes -------------------------------------------------------
+
     var panes = document.createElement('div');
     panes.id = 'mobile-panes';
     panes.hidden = true;
@@ -601,7 +601,7 @@
       setExpand(shell.expand === '2d' ? '3d' : '2d');
     });
 
-    // -- Pose dock ---------------------------------------------------
+
     var poseDock = document.createElement('section');
     poseDock.id = 'mobile-pose';
     poseDock.hidden = true;
@@ -797,7 +797,7 @@
     });
     syncPoseRange();
 
-    // -- Bottom sheet ------------------------------------------------
+
     var sheet = document.createElement('section');
     sheet.id = 'mobile-sheet';
     sheet.hidden = true;
@@ -841,7 +841,7 @@
       setSheetOpen(!sheetOpen);
     });
 
-    // -- Overflow menu -----------------------------------------------
+
     var menuRoot = document.createElement('div');
     menuRoot.id = 'mobile-menu-root';
     menuRoot.hidden = true;
@@ -944,15 +944,7 @@
     homeLink.setAttribute('role', 'menuitem');
     homeLink.textContent = 'Studio';
     homeLink.href = 'teacher.html';
-    var manualLink = document.createElement('a');
-    manualLink.className = 'mobile-menu-btn mobile-menu-link';
-    manualLink.setAttribute('role', 'menuitem');
-    manualLink.textContent = 'Manual';
-    manualLink.href = 'manual.html';
-    manualLink.target = '_blank';
-    manualLink.rel = 'noopener';
     acctSection.appendChild(homeLink);
-    acctSection.appendChild(manualLink);
     acctSection.appendChild(menuButton('Logout', function () {
       doLogout();
     }));
@@ -991,7 +983,7 @@
           homeLink.href = 'login.html';
           homeLink.textContent = 'Login';
         }
-      } catch (err) { /* keep defaults */ }
+      } catch (err) {                     }
     }
     function closeMenu() {
       menu.hidden = true;
@@ -1020,7 +1012,7 @@
       }
     }, true);
 
-    // -- Candidate chooser -------------------------------------------
+
     var chooser = document.createElement('div');
     chooser.id = 'mobile-chooser';
     chooser.hidden = true;
@@ -1069,7 +1061,7 @@
       if (e.key === 'Escape' && !chooser.hidden) closeChooser();
     });
 
-    // -- Toast -------------------------------------------------------
+
     var toast = document.createElement('p');
     toast.id = 'mobile-toast';
     toast.hidden = true;
@@ -1081,7 +1073,7 @@
       toast.textContent = String(msg);
       toast.hidden = false;
       if (toastTimer !== null) {
-        try { clearTimeout(toastTimer); } catch (err) { /* noop */ }
+        try { clearTimeout(toastTimer); } catch (err) {            }
       }
       toastTimer = setTimeout(function () {
         toast.hidden = true;
@@ -1089,7 +1081,7 @@
       }, 3200);
     }
 
-    // -- Node moves ----------------------------------------------------
+
     var moved = [];
     function stashMove(node, parent, before) {
       if (!node || !node.parentNode) return;
@@ -1110,12 +1102,12 @@
           } else {
             m.parent.appendChild(m.node);
           }
-        } catch (err) { /* node already home */ }
+        } catch (err) {                         }
       }
       moved = [];
     }
 
-    // -- Layout --------------------------------------------------------
+
     var shell = null;
     var fracStore = { portrait: 0.42, landscape: 0.44 };
     try {
@@ -1131,12 +1123,12 @@
           }
         }
       }
-    } catch (err) { /* private mode: fractions stay session-only */ }
+    } catch (err) {                                                 }
     function saveFrac() {
       try {
         window.localStorage.setItem('educad_mobile_split',
           JSON.stringify(fracStore));
-      } catch (err) { /* session-only */ }
+      } catch (err) {                    }
     }
 
     function viewportBox() {
@@ -1150,7 +1142,7 @@
             h = window.visualViewport.height;
           }
         }
-      } catch (err) { /* fall back to inner sizes */ }
+      } catch (err) {                                }
       return { w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)) };
     }
 
@@ -1192,7 +1184,7 @@
         if (el && typeof el.getBoundingClientRect === 'function') {
           r = el.getBoundingClientRect();
         }
-      } catch (err) { /* measure failed */ }
+      } catch (err) {                      }
       return { w: Math.max(1, Math.round(r.width || 0)),
         h: Math.max(1, Math.round(r.height || 0)) };
     }
@@ -1200,8 +1192,8 @@
     var didInitialFit = false;
     var lastLayoutMode = getMode();
     function sync() {
-      // A removed shell (for example after document replacement in a
-      // preview) must never move canvases belonging to the new document.
+
+
       if (!appContainer.isConnected) return;
       var box = viewportBox();
       var inspection = isInspection();
@@ -1272,14 +1264,14 @@
         if (sp) stashMove(sp, body);
         shell.moved = true;
       }
-      // Late menus (line/dot popups are built on demand): keep them in
-      // the sheet slot while split, so their pane-relative offsets land.
+
+
       document.querySelectorAll('#app-container .edugraphics-menu').forEach(function (m) {
         sheetSlot.appendChild(m);
       });
       refreshPoseDock();
-      // Keep canvas space when the details sheet and Pose disclosure are
-      // both open. Their content scrolls inside the remaining dock area.
+
+
       var reserved = contentBox(header).h;
       if (!poseDock.hidden) reserved += contentBox(poseDock).h;
       if (!expandBar.hidden) reserved += contentBox(expandBar).h;
@@ -1328,13 +1320,13 @@
       applySizes({ sheetW: s2.w, sheetH: s2.h,
         glassW: g3.w, glassH: g3.h, orientation: orient,
         sheetVisible: shell.expand !== '3d', glassVisible: shell.expand !== '2d' });
-      // Glass empty-state: the preferences switch hides the canvas.
+
       try {
         var cv = glassSlot.querySelector('canvas');
         glassEmpty.hidden = !(cv && (cv.hidden || cv.style.display === 'none'));
-      } catch (err) { /* leave the note as is */ }
-      // Pose controls change the available canvas area. Frame the drawing
-      // once at that mode boundary; subsequent resizes preserve navigation.
+      } catch (err) {                            }
+
+
       if (!didInitialFit || lastLayoutMode !== getMode()) {
         didInitialFit = true;
         fitSheet();
@@ -1343,7 +1335,7 @@
       lastLayoutMode = getMode();
     }
 
-    // Divider drag + keyboard.
+
     var divDrag = null;
     divider.addEventListener('pointerdown', function (e) {
       if (e.button !== undefined && e.button !== 0) return;
@@ -1351,7 +1343,7 @@
         frac: fracStore[shell.orientation || 'portrait'] };
       try {
         divider.setPointerCapture(e.pointerId);
-      } catch (err) { /* capture is best-effort */ }
+      } catch (err) {                              }
       e.preventDefault();
       e.stopPropagation();
     });
@@ -1401,7 +1393,7 @@
       e.preventDefault();
     });
 
-    // -- Gestures ------------------------------------------------------
+
     function relOf(el, x, y) {
       try {
         var r = el.getBoundingClientRect();
@@ -1426,14 +1418,14 @@
         var owner = gestureOwner;
         try {
           owner.el.setPointerCapture(e.pointerId);
-        } catch (err) { /* capture is best-effort */ }
+        } catch (err) {                              }
         var p = relOf(owner.el, e.clientX, e.clientY);
         owner.tracker.down(String(e.pointerId), p.x, p.y, nowMs());
         e.preventDefault();
         e.stopPropagation();
       });
-      // Long-press on touch does nothing (no clear, no menu); mouse
-      // right-click still reaches the desktop handler.
+
+
       el.addEventListener('contextmenu', function (e) {
         if (!shell.split) return;
         if (nowMs() - lastTouchDownMs < 1500) {
@@ -1458,7 +1450,7 @@
         else owner.tracker.up(String(e.pointerId), nowMs());
         if (!owner.tracker.state().count) gestureOwner = null;
         try { if (owner.el.hasPointerCapture(e.pointerId)) owner.el.releasePointerCapture(e.pointerId); }
-        catch (err) { /* capture may already have been released */ }
+        catch (err) {                                              }
         e.stopPropagation();
       }
       el.addEventListener('pointerup', function (e) { end(e, false); });
@@ -1483,7 +1475,7 @@
         try {
           var r = sheetSlot.getBoundingClientRect();
           client = { x: r.left + g.x, y: r.top + g.y };
-        } catch (err) { /* chooser centers on the pane */ }
+        } catch (err) {                                   }
         if (pressSheet) {
           var handled = pressSheet(g.x, g.y, box, client);
           if (handled === 'chooser') {
@@ -1514,7 +1506,7 @@
     attachSurface(sheetSlot, sheetTracker);
     attachSurface(glassSlot, glassTracker);
 
-    // -- Shell state ---------------------------------------------------
+
     var peekMode = 'view';
     var peekTitle = 'EduCAD';
     var peekInspect = '';
@@ -1621,8 +1613,8 @@
     }
 
     window.addEventListener('resize', scheduleSync);
-    // Disclosure controls and the details sheet can change the flex height
-    // without a window resize (including while a numeric keyboard is open).
+
+
     if (typeof window.ResizeObserver === 'function') {
       var paneObserver = new window.ResizeObserver(scheduleSync);
       paneObserver.observe(panes);
@@ -1634,7 +1626,7 @@
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', scheduleSync);
       }
-    } catch (err) { /* inner sizes already tracked */ }
+    } catch (err) {                                   }
     try {
       if (window.matchMedia) {
         var mq = window.matchMedia('(pointer: coarse)');
@@ -1651,7 +1643,7 @@
           mq2.addListener(onPointer);
         }
       }
-    } catch (err) { /* pointer verdict stays put */ }
+    } catch (err) {                                 }
 
     shellSingleton = shell;
     sync();

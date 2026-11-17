@@ -54,7 +54,7 @@ size_t writeHeader(char *data, size_t size, size_t count, void *opaque) {
     static_cast<Response *>(opaque)->location = clean(line.substr(9));
   return bytes;
 }
-// One cookie engine per sign-in. It never writes a cookie jar to disk.
+
 class Connection {
  public:
   explicit Connection(const std::string &base) : base_(base) {
@@ -161,7 +161,7 @@ Result authenticate(const std::string &email, const std::string &password) {
   }
   std::string base = env("EDUCAD_ERP_URL", "https://erp.mit.asia");
   while (!base.empty() && base.back() == '/') base.pop_back();
-  // HTTP is supported only for loopback test fixtures. Production always uses TLS.
+
   static const std::regex origin(R"(^https://[a-zA-Z0-9.-]+(:[0-9]+)?$|^http://(127\.0\.0\.1|localhost)(:[0-9]+)?$)");
   if (!std::regex_match(base, origin)) {
     result.error = "College ERP connection is not configured correctly.";
@@ -179,7 +179,7 @@ Result authenticate(const std::string &email, const std::string &password) {
     result.error = "Invalid college ERP email or password.";
     return result;
   }
-  // Follow only same-origin GET redirects, never replaying credentials.
+
   for (int hop = 0; login.status >= 300 && login.status < 400 && hop < 3; ++hop) {
     std::string path = login.location;
     if (path.rfind(base + "/", 0) == 0) path.erase(0, base.size());
@@ -240,8 +240,8 @@ Result authenticate(const std::string &email, const std::string &password) {
                     {"course", read({"courseName"})},
                     {"roll_no", read({"rollNo", "rollNumber"})},
                     {"student_id", read({"studentId"})}};
-  // Live MIT dashboard label: "CS&D Sem VII Div-2". Semester IDs from
-  // attendance are unrelated database IDs; only this displayed label is used.
+
+
   const std::string course = read({"courseName"});
   static const std::regex label(R"(^(.+?)\s+Sem(?:ester)?\s+([IVX]+|[0-9]+)\s+Div(?:ision)?\s*[-:]?\s*(.+)$)", std::regex::icase);
   std::smatch parts;

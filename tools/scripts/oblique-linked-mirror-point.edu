@@ -1,4 +1,3 @@
-# Boundary stations select a plane only when they correspond.
 # expect: 24V 24E 1F curves=1 oblique=1 obliqueReprojection=ok obliquePoints=1 obliquePointFit=ok unresolved=0 status=inferred
 /datum -100 400
 /ellipse 0 0 20 10 A plan

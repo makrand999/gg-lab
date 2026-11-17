@@ -1,15 +1,4 @@
-# WEDGE: triangular prism (6 vertices, 9 edges, 5 faces).
 # expect: 6V 9E 5F status=inferred unresolved=0
-# 3D corners: a=(0,0,10) b=(40,0,10) c=(40,0,50) d=(0,0,50)
-#             e=(0,40,10) f=(40,40,10)
-# Plan (X, -Z): a,e=(0,-10); b,f=(40,-10); c=(40,-50); d=(0,-50).
-# The plan rectangle covers a-b/e-f, b-c/c-f, c-d and d-a/d-e;
-# a-e and b-f collapse to their end stations.
-# Elevation (X, Y): a',d'=(0,0); b',c'=(40,0); e'=(0,40); f'=(40,40).
-# Base a'-b' covers a-b and c-d; top e'-f' covers e-f; verticals
-# e'-a' and f'-b' cover a-e/d-e and b-f/c-f. Collapsed elevation
-# stations carry d-a and b-c.
-# Expected: 6 vertices, 9 edges; faces reported.
 /datum -30 70
 /point a' 0 0 elevation
 /point b' 40 0 elevation

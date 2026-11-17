@@ -1,4 +1,3 @@
-# plate-occlusion
 # expect: 6V 5E 1F holes=0 open=1 topHidden=1
 /datum -100 400
 /point v0 0 -10 plan

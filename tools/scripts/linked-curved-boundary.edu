@@ -1,4 +1,3 @@
-# Existing analytic cone reader; mesh counts use the current 24 rim samples.
 # expect: 25V 48E 25F curves=1 unresolved=0 status=inferred
 /datum -30 70
 /point o 20 -30 plan

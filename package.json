@@ -5,13 +5,9 @@
   "description": "EduCAD: zero-dependency teaching CAD for first-angle Monge projection",
   "type": "commonjs",
   "scripts": {
-    "build:major2": "node tools/build-major2.js",
-    "dev:major2": "npm run build:major2 && node tools/serve-major2.js",
-    "prestart:cpp": "npm run build:major2",
     "start": "npm run start:cpp",
     "build:cpp": "cmake -S backend -B backend/build -DCMAKE_BUILD_TYPE=Release && cmake --build backend/build -j",
     "start:cpp": "npm run build:cpp && ./backend/build/educad-seed tools/users.json backend/data/educad.db && ./backend/build/educad-server",
-    "build:manual": "node tools/build-manual.js",
     "check:api": "node tools/check-api.js",
     "edc": "node tools/edc.js"
   },

@@ -6,12 +6,12 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function (Geometry) {
   'use strict';
-  // EduCAD select-and-measure: the read-only View mode behind the
-  // Edit/View toggle. Edit keeps every existing gesture; View inspects
-  // one clicked entity at a time (coords, lengths, angles, radii) and
-  // never mutates the entity table. All geometry here is pure: the page
-  // owns rendering, this module owns the numbers. Zero deps. Dual-env:
-  // browser via window.EduCADMeasure, plain Node via module.exports.
+
+
+
+
+
+
   var MODE_EDIT = 'edit';
   var MODE_VIEW = 'view';
   var MODE_POSE = 'pose';
@@ -26,9 +26,9 @@
   function createViewState() {
     return { mode: MODE_EDIT, inspectId: null, inspectSide: null };
   }
-  // Pose reads as view-like: every isView gate is a sheet-read-only
-  // gate, and pose never mutates the table, so pose takes the same
-  // branches. Use isPose only where pose needs its own behavior.
+
+
+
   function isView(st) {
     return !!st && (st.mode === MODE_VIEW || st.mode === MODE_POSE);
   }
@@ -38,9 +38,9 @@
   function isPose(st) {
     return !!st && st.mode === MODE_POSE;
   }
-  // Switching modes always drops the inspected pick: a readout must
-  // never survive into a mode that cannot explain it. Unknown modes
-  // are ignored (the sheet keeps its current mode).
+
+
+
   function setMode(st, mode) {
     if (mode !== MODE_EDIT && mode !== MODE_VIEW && mode !== MODE_POSE) {
       return st.mode;
@@ -50,8 +50,8 @@
     st.inspectSide = null;
     return st.mode;
   }
-  // The side (+1/-1) puts the dimension on the cursor's side of the
-  // span; anything else stores a null side (centered default).
+
+
   function setInspect(st, id, side) {
     st.inspectId = (id === null || id === undefined) ? null : String(id);
     st.inspectSide = (side === 1 || side === -1) ? side : null;
@@ -74,13 +74,13 @@
     var d = (digits === undefined || digits === null) ? 1 : digits;
     return Number(v).toFixed(d);
   }
-  // Undirected line orientation in [0, 180): a segment and its
-  // reverse read the same angle, which is what a student checks.
+
+
   function lineAngleDeg(dx, dy) {
     var a = Math.atan2(dy, dx) * 180 / Math.PI;
     while (a < 0) a += 180;
     while (a >= 180) a -= 180;
-    // Kill negative zero so badges never read "-0.0".
+
     return a + 0;
   }
   function viewTag(yMm) {
@@ -98,10 +98,10 @@
     return 'Point';
   }
 
-  // Pure readout for one entity: { kind, title, rows } with rows ready
-  // to stack in a badge. Returns null for hidden entities, unmeasurable
-  // types (TEXT and friends), and non-finite geometry. Never throws:
-  // the click path must degrade to "nothing to show", not a crash.
+
+
+
+
   function inspectEntity(ent) {
     if (!ent || ent.visible === false) return null;
     if(ent.type==='CURVE'&&ent.meta&&ent.meta.curve) return {kind:'curve',title:'Interpolated curve',rows:[ent.meta.curve.closed?'Closed periodic cubic':'Open natural cubic',String((ent.meta.throughRefs||[]).length)+' defining points','Edit the defining points to change the curve.']};
@@ -146,8 +146,8 @@
   function toPx(xMm, yMm, view) {
     return { x: xMm * view.s + view.tx, y: view.ty - yMm * view.s };
   }
-  // Badge anchor in px: the point itself, a line midpoint, a round
-  // center. Null when the entity has no measurable anchor.
+
+
   function inspectAnchor(ent, view) {
     if (!ent || !view || !finite(view.s) || !finite(view.tx) || !finite(view.ty)) {
       return null;
@@ -169,11 +169,11 @@
     return null;
   }
 
-  // View-mode hit test: nearest visible POINT wins, then the nearest
-  // two-point span, then the nearest round rim (a tiny circle also
-  // grabs by its center). Same px math as the canvas hit tests, same
-  // default tolerance. Skips unmeasurable types and bad geometry
-  // silently; returns the entity id or null. Never throws.
+
+
+
+
+
   function hitTestAll(entities, cursorPx, view, tolPx) {
     if (!Array.isArray(entities) || !cursorPx || !view) return null;
     if (!finite(cursorPx.x) || !finite(cursorPx.y)) return null;
@@ -236,11 +236,11 @@
     return best;
   }
 
-  // ---- Drafting-style dimension layout (pure px geometry) ----
-  // All three layouts return null on bad input and never throw, so
-  // the overlay click path degrades to the plain badge. Text stays
-  // horizontal (a legitimate drafting variant) and the caller draws
-  // it left-aligned at textPos, which is pre-shifted to center it.
+
+
+
+
+
   var DIM_OFFSET_MM = 10;
   var DIM_EXT_GAP_MM = 1.5;
   var DIM_EXT_OVER_MM = 2.5;
@@ -258,10 +258,10 @@
     }
     return ent;
   }
-  // Which side of the directed span the cursor is on (+1/-1), in the
-  // same screen space the linear layout derives its normal from, so
-  // the dimension always opens toward the click. Anything
-  // non-measurable answers +1 (unused).
+
+
+
+
   function dimSideFor(ent, view, cursorPx) {
     var ends = twoPointEnds(ent);
     if (ends === null || !validView(view) || !cursorPx) return 1;
@@ -276,15 +276,15 @@
       try {
         var w = measure(text);
         if (finite(w) && w >= 0) return w;
-      } catch (err) { /* fall through to the estimate */ }
+      } catch (err) {                                    }
     }
     return String(text).length * 6.6 + 2;
   }
-  // Linear dimension: extension lines off both ends, a parallel
-  // dimension line on the picked side, arrow tips at both ends, and
-  // the bare value centered. o: { side, offsetMm?, measure?, lineH? }.
-  // When the value cannot fit between the arrows it parks past the
-  // far end with a leader back to it (fitsInside false).
+
+
+
+
+
   function linearDimLayout(ent, view, o) {
     var ends = twoPointEnds(ent);
     if (ends === null || !validView(view)) return null;
@@ -320,8 +320,8 @@
     var text = fmtMm(lenMm);
     var textW = dimTextWidth(text, o.measure);
     var fitsInside = lenPx > textW + 2 * DIM_ARROW_PX + 6;
-    // Perpendicular lift clears the glyph block off the line; the up
-    // bias keeps near-horizontal text from straddling it.
+
+
     var lift = (ny > 0.35) ? (4 + lineH * 0.8) : 4;
     var upBias = (ny > -0.35 && ny <= 0.35) ? 4 : 0;
     var textPos, leader = null;
@@ -345,9 +345,9 @@
       lineHpx: lineH
     };
   }
-  // Radius leader: center mark, a leader from the rim at the cursor's
-  // angle (NE by default) with a horizontal shelf, and R + value.
-  // o: { cursorPx?, measure?, lineH? }.
+
+
+
   function radiusLeaderLayout(ent, view, o) {
     if (!ent || ROUND_MEASURABLE.indexOf(ent.type) === -1) return null;
     if (!finite(ent.x) || !finite(ent.y) || !finite(ent.radius)) return null;
@@ -381,10 +381,10 @@
       lineHpx: lineH
     };
   }
-  // Point witness: a thin line from the point straight to the XY
-  // ground line at the same x, labeled with the |Y| height — the
-  // point's distance to its own plane. Null on the fold or when the
-  // witness would be a stub (o.minPx, default 10). o: { minPx? }.
+
+
+
+
   function pointWitnessLayout(ent, view, o) {
     if (!ent || ent.type !== 'POINT') return null;
     if (!finite(ent.x) || !finite(ent.y)) return null;

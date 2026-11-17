@@ -1,6 +1,3 @@
-# Planar face minus one wholly contained analytic loop. Containment is
-# checked by the same point classifier as the surface model; a straddling or
-# tangent loop is refused with a diagnostic instead of being guessed.
 # expect: surfaceChecks=3 surfaceQueries=ok
 /datum -100 100
 /point a 0 0 plan

@@ -4,8 +4,8 @@
 })(typeof window !== 'undefined' ? window : globalThis, function (Settings) {
   'use strict';
 
-  // World coordinates are millimeters: X along XY, Y above HP, Z in front
-  // of VP. Reference surfaces use exactly the object's display transform.
+
+
   var EPS = 1e-6;
   function fmt(n) { return String(Number(n.toFixed(2))); }
   function bounds(g) {
@@ -27,7 +27,7 @@
     var x0 = b.minX - pad, x1 = b.maxX + pad;
     var y0 = Math.min(0, b.minY) - pad, y1 = Math.max(0, b.maxY) + pad;
     var z0 = Math.min(0, b.minZ) - pad, z1 = Math.max(0, b.maxZ) + pad;
-    // Give a lone point or a vertical line enough sheet width to read.
+
     if (x1 - x0 < span * 0.75) {
       var mid = (x0 + x1) / 2;
       x0 = mid - span * 0.375; x1 = mid + span * 0.375;
@@ -116,12 +116,12 @@
       var key = itemKey(item);
       if (!seen[key]) { seen[key] = true; items.push({ kind: item.kind, index: item.index }); }
     }
-    // The active selection stays visible in every scope and gets first
-    // choice of label placement. Pins survive ordinary clear-selection.
+
+
     add(selection);
     if (prefs.overlay !== 'selected') (pins || []).forEach(add);
     if (prefs.overlay === 'all') {
-      // Alternate points and edges so neither category uses every label slot.
+
       for (var i = 0; i < Math.max(g.vertices.length, g.edges.length); i++) {
         if (prefs.coordinates || prefs.planeDistances) add({ kind: 'point', index: i });
         if (prefs.lengths || prefs.inclinations) add({ kind: 'edge', index: i });
@@ -154,7 +154,7 @@
       occupied.push(rect);
       return { rect: rect, lines: lines, anchor: anchor };
     }
-    return null; // Values remain available in the panel when labels cannot fit.
+    return null;
   }
   function overlayLayout(st, solid, refs, selection, pins, prefs, measure, obstacles) {
     var g = st.geometryMm, items = inspectionItems(g, selection, pins, prefs);
@@ -166,7 +166,7 @@
       modelBounds.x0 = Math.min(modelBounds.x0, p.x - 8); modelBounds.x1 = Math.max(modelBounds.x1, p.x + 8);
       modelBounds.y0 = Math.min(modelBounds.y0, p.y - 8); modelBounds.y1 = Math.max(modelBounds.y1, p.y + 8);
     });
-    occupied.push(modelBounds); // Labels stay beside the object, preserving its silhouette.
+    occupied.push(modelBounds);
     function label(anchor, lines, color) {
       if (!prefs.labels) return;
       var placed = placeLabel(anchor, lines, measure, prefs, st, occupied, modelBounds);
@@ -207,8 +207,8 @@
     });
     return layout;
   }
-  // Vertex picks win near endpoints; frontmost wins when points overlap.
-  // tolPx widens both thresholds for touch; omitted means desktop (10/9).
+
+
   function pick(st, x, y, solid, tolPx) {
     if (!st.geometryMm || !solid.statusOf(st).available) return null;
     var pointTol = (typeof tolPx === 'number' && tolPx > 0) ? tolPx : 10;
@@ -241,10 +241,10 @@
     pts.forEach(function (p, i) { if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
     if (close) ctx.closePath();
   }
-  // Scanline gaps: runs of a horizontal screen row covered by boxes
-  // ({x0,y0,x1,y1} panels, label backings), quads (translucent plane
-  // fills), segments ({ax,ay,bx,by,pad} wire and guide lines), and
-  // dots ({x,y,pad} vertices). Returns merged [x0,x1] runs, sorted.
+
+
+
+
   function scanGaps(datumY, rects, quads, segs, dots) {
     var gaps = [];
     (rects || []).forEach(function (r) {
@@ -292,7 +292,7 @@
   function underlay(ctx, st, solid, refs) {
     var planes = [{ points: refs.hp, fill: 'rgba(160, 147, 120, 0.065)', stroke: 'rgba(142, 132, 110, 0.22)' },
       { points: refs.vp, fill: 'rgba(120, 148, 175, 0.065)', stroke: 'rgba(116, 140, 162, 0.22)' }];
-    // Paint back to front; the wireframe always renders over both surfaces.
+
     planes.forEach(function (p) {
       p.screen = p.points.map(function (v) { return projectMm(v, st, solid); });
       p.depth = p.screen.reduce(function (s, v) { return s + v.z; }, 0) / 4;
@@ -507,9 +507,9 @@
       return overlayLayout(st, solid, refs, selection, pins, prefs, measure, labelObstacles());
     }
     function positionPanel() {
-      // The panel lives in the top-left corner, the same corner as the
-      // pose panel; the 3D diagram keeps the right side. Expanded details
-      // scroll inside the panel and never cover the wireframe.
+
+
+
       var top = 44;
       panel.style.top = top + 'px';
       var mobile = typeof EduCADMobile !== 'undefined' && EduCADMobile.splitActive();
@@ -528,8 +528,8 @@
       var height = mobile ? st.h : sceneHeight();
       var padding = mobile ? Math.min(48, width * 0.3, height * 0.3) : 0;
       var radius = Math.min(Math.max(1, width - (mobile ? padding : 72)) / Math.max(maxX - minX, EPS), Math.max(1, height - (mobile ? padding : 65)) / Math.max(maxY - minY, EPS));
-      // A lone point can be far from both datum planes. Let inspection
-      // zoom out far enough to include them; restore editing limits on exit.
+
+
       st.minScale = Math.min(solid.GLASS_ZOOM_MIN, radius / st.baseR);
       st.scale = Math.max(st.minScale, Math.min(st.maxScale, radius / st.baseR)); radius = solid.projectionRadius(st);
       st.cx = (mobile ? st.w / 2 : st.w - width / 2 - 24) - (minX + maxX) / 2 * radius;
@@ -641,7 +641,7 @@
             segs.push({ ax: xyl[0].x, ay: xyl[0].y, bx: xyl[1].x, by: xyl[1].y, pad: 2 });
           }
           if (typeof measure === 'function') {
-            // Canvas labels and datum exclusions use the same layout.
+
             var layout = layoutWith(measure);
             layout.labels.forEach(function (label) {
               rects.push(label.rect);

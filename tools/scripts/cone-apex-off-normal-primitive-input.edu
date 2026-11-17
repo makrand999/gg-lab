@@ -1,0 +1,19 @@
+# expect: 25V 48E 25F curves=1 surfaces=2 surfaceKinds=implicit,plane surfaceModel=ok surfaceValidation=ok surfaceCertificate=ok diagnostics=none unresolved=0 status=inferred
+/datum -100 400
+/profile 100 0 1
+/circle 20 -30 10 A plan
+/point A 25 -35 plan
+/point "A'" 25 40 elevation
+/point "A''" 135 40 profile
+/point f0 10 0 elevation
+/point f1 30 0 elevation
+/line f0 f1 A elevation
+/line f0 "A'" A elevation
+/line f1 "A'" A elevation
+/point s0 120 0 profile
+/point s1 140 0 profile
+/line s0 s1 A profile
+/line s0 "A''" A profile
+/line s1 "A''" A profile
+# surface-query: {"operation":"primitive-reconstruct","expect":{"status":"ok","determination":"inferred","vertices":25,"edges":48,"faces":25,"surfaces":["plane","implicit"],"diagnostics":[]}}
+# expect: surfaceChecks=1 surfaceQueries=ok

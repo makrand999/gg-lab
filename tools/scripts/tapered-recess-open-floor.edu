@@ -1,0 +1,50 @@
+/datum -100 400
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/point mouthP 30 -30 plan
+/point mouthE 30 60 elevation
+/rename mouthP mouth members
+/rename mouthE mouth members
+/circle mouth 10 A plan
+/point h0 20 60 elevation
+/point h1 40 60 elevation
+/point b0 26 40 elevation
+/point b1 34 40 elevation
+/line h0 h1 A elevation
+/line h1 b1 A elevation
+/line h0 b0 A elevation
+# expect: 56V 84E 30F recesses=1 curves=2 surfaces=7 surfaceKinds=cone,plane surfaceShells=0 surfaceOpen=1 surfaceBoundary=1 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component surfaceValidation=partial holes=1 displaySync=ok displaySyncIssues=none diagnostics=recess-bottom-unclosed unresolved=1 status=partial previewStatus=ok previewParity=ok previewDiagnostics=recess-bottom-unclosed
+# expect: surfaceChecks=3 surfaceQueries=ok
+# surface-query: {"operation":"display-holes","expect":{"count":1}}
+# surface-query: {"operation":"feature-graph","expect":{"features":[{"type":"recess","family":"conical","bottomClosure":"open","through":false}]}}
+# surface-query: {"operation":"topology","expect":{"summary":{"status":"partial"}}}

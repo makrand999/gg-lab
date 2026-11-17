@@ -1,5 +1,3 @@
-# Shared member IDs select the matching even though both curves occupy the
-# same station positions, so the identity evidence beats the geometric tie.
 # expect: curves=2 parametricCurves=2 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=2 status=partial
 /datum -60 180
 /point a 0 -10 plan

@@ -1,4 +1,3 @@
-# Hidden strokes constrain the circle only through independent occluding geometry.
 # expect: curves=1 oblique=1 obliqueVisibility=1 obliqueVisibilityFit=ok obliqueReprojection=ok unresolved=1 diagnostics=oblique-curve-ambiguous status=partial
 /datum -100 400
 /point plate0 -30 -20 plan

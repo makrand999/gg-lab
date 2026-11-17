@@ -4,11 +4,11 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  // Minimal 3D vector arithmetic shared by the reconstruction stages. Vectors
-  // are plain {x,y,z} records, matching every geometry object in the app.
-  // `unit` returns null when the input has no direction; callers that need a
-  // fallback choose it explicitly. `eps`/`tol` default to EPS but call sites
-  // may pass their own tolerance to keep an existing numerical boundary.
+
+
+
+
+
   var EPS = 1e-9;
 
   function add(a, b) { return {x:a.x+b.x, y:a.y+b.y, z:a.z+b.z}; }

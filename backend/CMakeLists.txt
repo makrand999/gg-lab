@@ -8,7 +8,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(Threads REQUIRED)
 find_package(CURL REQUIRED)
 
-# Embed schema.sql into a generated header (single source of truth).
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/schema.sql" SCHEMA_SQL)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/schema.h.in"
                "${CMAKE_CURRENT_BINARY_DIR}/schema.h" @ONLY)

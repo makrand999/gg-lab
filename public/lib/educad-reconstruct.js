@@ -2,32 +2,34 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = factory(require('./educad-entities.js'), require('./educad-strict.js'),
       require('./educad-curve-reconstruct.js'), require('./educad-oblique-kernel.js'),function() {return require('./educad-project.js');},
-      require('./educad-surfaces.js'), require('./educad-parametric.js'), require('./educad-parametric-reconstruct.js'));
+      require('./educad-surfaces.js'), require('./educad-parametric.js'), require('./educad-parametric-reconstruct.js'),
+      require('./educad-surface-infer.js'), require('./educad-conic.js'));
   } else {
     root.EduCADReconstruct = factory(root.EduCADEntities, root.EduCADStrict,
       root.EduCADCurveReconstruct, root.EduCADObliqueKernel,function() {return root.EduCADProject;},
-      root.EduCADSurfaces, root.EduCADParametric, root.EduCADParametricReconstruct);
+      root.EduCADSurfaces, root.EduCADParametric, root.EduCADParametricReconstruct, root.EduCADSurfaceInfer,
+      root.EduCADConic);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function (Entities, Strict, Curves, Oblique, getProject, Surfaces, Parametric, ParametricReconstruct) {
+})(typeof window !== 'undefined' ? window : globalThis, function (Entities, Strict, Curves, Oblique, getProject, Surfaces, Parametric, ParametricReconstruct, SurfaceInfer, Conic) {
   'use strict';
-  // EduCAD two/three-view reconstruction: plan + elevation drawings, with
-  // an optional first-angle profile (side) view, resolve to a 3D wireframe
-  // in widget space (X, Y, Z) = (sheetX, elevY, -planY) with Y up and Z
-  // toward the viewer. Uses the shared entity identity model. Dual-env: browser via
-  // window.EduCADReconstruct, plain Node via module.exports. Node-safe.
-  //
-  // Interpretation contract (locked): 3D point (x, d, h) reads as elevation
-  // (x, h) and plan (x, -d); viewRole wins when PLAN/ELEVATION/PROFILE and
-  // BOTH is classified by y-sign plus a plan-x-overlap profile split;
-  // dimensions/text/datum axes, meta.kind in {projector, locus, axis}, and
-  // sheet-vertical lines crossing XY are filtered out. A profile depth d
-  // reads at xRef + s * (d - dRef); readers verify by round-trip
-  // coverage, while the wire builder trusts the drawing.
-  //
-  // Public reconstruct(): primitives -> correspondence -> 3D primitives ->
-  // inferred surfaces and explicit diagnostics. Shape names are not inputs.
-  // reconstructLive/reconstructStrict remain compatibility adapters; new
-  // application consumers must use reconstruct() for the shared pipeline.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '10.6.0-educad';
   var WELD_MIN_MM = 1e-6;
@@ -78,11 +80,11 @@
     return ((e && e.type) ? e.type : '?') + ' ' + tag;
   }
 
-  // --- Input filter (§3.2): geometry types only; drops annotations, datum
-  // helpers, and sheet-vertical lines crossing XY (projector helpers even
-  // without meta.kind). Circles/arcs are set aside as curves (M1 defers
-  // them); invisible entities are skipped silently (caller snapshots the
-  // visible set).
+
+
+
+
+
   var KEEP_TYPES = {
     POINT: 1, SEGMENT: 1, LINE: 1, RAY: 1, CIRCLE: 1, CIRCULAR_ARC: 1
   };
@@ -93,9 +95,9 @@
   }
 
   function crossesXY(e) {
-    // Strict crossing, plus touching-from-below: a vertical from a base
-    // station (y = 0) into the plan half is a projector just the same.
-    // Single-sided verticals (plan or elevation outlines) never match.
+
+
+
     var lo = Math.min(e.y, e.y2), hi = Math.max(e.y, e.y2);
     return lo < 0 && hi >= 0;
   }
@@ -124,15 +126,15 @@
     return { kept: kept, curves: curves, dropped: dropped };
   }
 
-  // --- View classification (§3.3 + M2 third view): viewRole wins when
-  // PLAN/ELEVATION/PROFILE; BOTH falls back to midpoint y-sign. Entities
-  // exactly on XY with no off-datum end are set aside with a warning.
-  // Untagged upper entities are then split by plan-x overlap: the cluster
-  // aligning with the plan x-range stays elevation, a disjoint cluster is
-  // the profile view. The split only commits when the profile reading is
-  // confirmed (tagged PROFILE, or an untagged cluster that width/height
-  // matches); otherwise every bucket is exactly the legacy two-view
-  // reading, so two-view behavior is bit-for-bit unchanged.
+
+
+
+
+
+
+
+
+
   function entityXRange(e) {
     var x1 = (e.x === undefined) ? 0 : e.x;
     var x2 = (e.x2 === undefined) ? x1 : e.x2;
@@ -174,8 +176,8 @@
     return x >= x0 - tol && x <= x1 + tol;
   }
 
-  // Endpoint sort vs the plan x-anchor: 'in' (both ends in), 'out'
-  // (both ends out), 'span' (straddling the view boundary).
+
+
   function spanKind(e, anchor, epsT) {
     var x1 = (e.x === undefined) ? 0 : e.x;
     var x2 = (e.x2 === undefined) ? x1 : e.x2;
@@ -203,9 +205,9 @@
       if (e.y < 0 || e.y2 < 0) { plan.push(e); continue; }
       onDatum.push(e);
     }
-    // Tentative plan x-anchor over the lower pool, blind to 45-degree
-    // diagonals so a miter line cannot widen it (solid 45-degree plan
-    // edges stay inside the anchor and are never mistaken for helpers).
+
+
+
     var anchorItems = [];
     for (i = 0; i < plan.length; i++) {
       if (!isDiagonal45(plan[i], LOOSE_EPS_MM)) anchorItems.push(plan[i]);
@@ -234,9 +236,9 @@
         }
       }
     }
-    // Miter candidates: untagged lower 45-degree diagonals x-disjoint
-    // from the anchor that reach up to the datum. Dropped only when a
-    // profile view is confirmed (same side as the profile).
+
+
+
     var miterCands = [];
     if (anchor) {
       for (i = 0; i < plan.length; i++) {
@@ -249,10 +251,10 @@
         miterCands.push(e);
       }
     }
-    // Upper split vs the anchor. Tagged ELEVATION stays; untagged
-    // degenerate-x entities (points, verticals) sort by station;
-    // untagged wide entities sort by endpoint: both ends in = elevation,
-    // both ends out = profile tentative, straddling = span helper.
+
+
+
+
     var elevKeep = [], profTent = [], spanTent = [];
     if (!anchor) {
       elevKeep = elev.slice();
@@ -275,10 +277,10 @@
         spanTent.push(e);
       }
     }
-    // Confirmation: tagged PROFILE declares a three-view sheet outright.
-    // An untagged profile cluster must earn it: at least one drawn
-    // segment (point-only clusters need explicit tags), profile width
-    // matching plan depth, profile height matching elevation height.
+
+
+
+
     var confirmed = profile.length > 0;
     var profR = rangeOver(profTent);
     if (!confirmed && profR) {
@@ -316,9 +318,9 @@
       elev = elevKeep;
       for (i = 0; i < spanTent.length; i++) droppedHelpers.push(spanTent[i]);
       profile = profile.concat(profTent);
-      // On-datum lines in a confirmed three-view sheet: spanners are
-      // construction (drop), disjoint lines belong to the profile view,
-      // in-range lines stay genuinely ambiguous (datum variants).
+
+
+
       var keptDatum = [];
       for (i = 0; i < onDatum.length; i++) {
         e = onDatum[i];
@@ -346,8 +348,8 @@
     };
   }
 
-  // Adaptive weld tolerance: exact for generated drawings, forgiving for
-  // hand-drawn ones. Floor is the locked coincident tolerance.
+
+
   function weldTolerance(planItems, elevItems, profileItems) {
     var minX = Infinity, maxX = -Infinity;
     var minY = Infinity, maxY = -Infinity;
@@ -396,10 +398,10 @@
     return out;
   }
 
-  // --- Per-view 2D graph: welded vertices, drawn segments, drawn points.
-  // LINE/RAY are finite between their stored points, matching the sheet
-  // renderer (which strokes p1->p2). Zero-length segments collapse to
-  // points. Items arrive pre-sorted so welding is order-independent.
+
+
+
+
   function buildViewGraph(items, tol) {
     var verts = [];
     var segs = [];
@@ -461,9 +463,9 @@
 
   function isAB(bis) { return bis === 'A' || bis === 'B'; }
 
-  // Fraction of samples along (ax,ay)->(bx,by) covered by A/B drawn
-  // segments within tol. Straight-vs-straight deviation peaks at an end,
-  // so a few samples are exact.
+
+
+
   function segCoveredFrac(ax, ay, bx, by, graph, tol, n) {
     n = n || 5;
     var hit = 0;
@@ -475,9 +477,9 @@
     return hit / n;
   }
 
-  // --- Convex plan loop (Andrew monotone chain over welded vertices).
-  // Returns {order:[vertIdx...], area} CCW, or null when fewer than 3
-  // non-collinear vertices exist.
+
+
+
   function convexLoop(graph, tol) {
     var verts = graph.verts;
     if (verts.length < 3) return null;
@@ -521,7 +523,7 @@
     return { order: order, area: area };
   }
 
-  // Point vs loop polygon: 'in' | 'out' | 'on' (within tol of boundary).
+
   function pointInLoop(px, py, graph, loop, tol) {
     var order = loop.order, verts = graph.verts;
     for (var i = 0; i < order.length; i++) {
@@ -539,7 +541,7 @@
     return inside ? 'in' : 'out';
   }
 
-  // Drawn A/B range of a view (segments only; points add no extent).
+
   function drawnRangeAB(graph) {
     var any = false;
     var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -572,8 +574,8 @@
     return segCoveredFrac(ax, ay, bx, by, graph, tol, 9) >= 1;
   }
 
-  // Hidden (E) edges depict occluded geometry: in a solid class they must
-  // lie inside the view silhouette rather than coincide with an outline.
+
+
   function eSegsContained(segs, verts, insideTest, tol, n) {
     n = n || 5;
     for (var i = 0; i < segs.length; i++) {
@@ -606,8 +608,8 @@
     return { x: nx, y: ny, z: nz };
   }
 
-  // Orient faces by outward checks, flipping loops that face inward.
-  // Deterministic: construction order is fixed, flips are local.
+
+
   function orientFaces(verts, faces, checks) {
     var out = [];
     for (var i = 0; i < faces.length; i++) {
@@ -618,13 +620,13 @@
     return out;
   }
 
-  // Logical faces for closed wire: planar simple cycles that tile the
-  // shell prove faces, purely so the 3D view can dash hidden edges —
-  // nothing is painted. Strict by construction: every edge in exactly
-  // two faces and Euler V-E+F=2 per connected component, else [].
-  // Ambiguous, warped, open, oversized, or malformed input yields [],
-  // never a guess, never a throw. Deterministic: ordered adjacency,
-  // canonical cycle starts, fixed selection orders.
+
+
+
+
+
+
+
   var FACES_MAX_VERTS = 64;
   var FACES_MAX_EDGES = 96;
   var FACES_MAX_LEN = 10;
@@ -681,8 +683,8 @@
     var dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
     var planarTol = Math.max(1e-6,
       Math.sqrt(dx * dx + dy * dy + dz * dz) * 1e-9);
-    // Simple cycles, each once: start at its minimum vertex, either
-    // direction (reverses deduped by canonical key). Bounded steps.
+
+
     var cycles = [], seenC = {}, steps = 0, capped = false;
     function canonKey(loop) {
       var n = loop.length, best = null, r, i, s;
@@ -754,7 +756,7 @@
       dfs(vi, vi);
     }
     if (cycles.length === 0) return [];
-    // Connected components: separate solids infer separately.
+
     var comp = [], compId = -1, stack;
     var compOf = [];
     for (vi = 0; vi < V; vi++) compOf.push(-1);
@@ -782,8 +784,8 @@
     var byComp = [];
     for (vi = 0; vi < comp.length; vi++) byComp.push([]);
     cycles.forEach(function (c) { byComp[compOf[c[0]]].push(c); });
-    // Greedy tiling, short and long orders: an edge may serve two
-    // faces; the first order whose set verifies Euler wins.
+
+
     function tryOrder(list, vCount, eCount, asc) {
       var ord = list.slice().sort(function (x, y) {
         return asc ? x.length - y.length : y.length - x.length;
@@ -819,7 +821,7 @@
         tryOrder(byComp[vi], comp[vi].verts.length,
           comp[vi].edges, false);
       if (!set) return [];
-      // Outward per component: Newell against its own centroid.
+
       var gx = 0, gy = 0, gz = 0, gi;
       for (gi = 0; gi < comp[vi].verts.length; gi++) {
         gx += verts[comp[vi].verts[gi]].x;
@@ -847,14 +849,14 @@
     return faces;
   }
 
-  // --- Planar face pass (DCEL-style) -------------------------------------
-  // Candidate edges are grouped by supporting plane. For each plane the
-  // graph is projected to 2D, half-edges are ordered by angle, and the
-  // boundary walks are traced and nested loops become face holes.
-  // Surface selection is shared by live and explicit wire previews.
 
-  // Every polygon corner defines its supporting plane. Unlike cycle
-  // enumeration this has no boundary-length limit or exponential DFS.
+
+
+
+
+
+
+
   function supportingPlanes(verts, edges) {
     var adjacent = verts.map(function () { return []; }), planes = [];
     edges.forEach(function (e) { adjacent[e[0]].push(e[1]); adjacent[e[1]].push(e[0]); });
@@ -879,6 +881,32 @@
     });
     return keys;
   }
+  function cyclicLoopKey(loop) {
+    var best = null, n = loop.length;
+    for (var dir = 0; dir < 2; dir++) {
+      var source = dir ? loop.slice().reverse() : loop.slice();
+      for (var shift = 0; shift < n; shift++) {
+        var rotated = [];
+        for (var i = 0; i < n; i++) rotated.push(source[(i+shift) % n]);
+        var key = rotated.join(',');
+        if (best === null || key < best) best = key;
+      }
+    }
+    return best;
+  }
+  function cyclicFaceKey(face) {
+    return cyclicLoopKey(face) + '|' + (face.holes || []).map(cyclicLoopKey).sort().join('|');
+  }
+  function dedupeFaces(faces) {
+    var seen = new Set(), out = [];
+    (faces || []).forEach(function (face) {
+      var key = cyclicFaceKey(face);
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(face);
+    });
+    return out;
+  }
 
   function addPlane(planes, verts, cycle) {
     var n = newellVec(verts, cycle);
@@ -900,11 +928,11 @@
     planes.push({ n: n, off: off });
   }
 
-  // Split crossing edges inside a plane. Two face diagonals crossing at
-  // the centre (a rectangle with both diagonals) are not a planar
-  // embedding until the crossing becomes a local vertex. The extra
-  // vertices are only for face tracing; the outer boundary still maps
-  // back to original 3D vertices.
+
+
+
+
+
   function splitPlanarCrossings(points, edges) {
     var pts = points.map(function (p) { return { x: p.x, y: p.y }; });
     function cross(ax, ay, bx, by) { return ax * by - ay * bx; }
@@ -944,8 +972,8 @@
     return {points:pts,edges:out};
   }
 
-  // Normalize collinear subdivisions using existing spatial vertices. This
-  // affects inferred previews only; declared incidence remains in the certificate.
+
+
   function splitSpatialEdges(verts, edges) {
     var out=[], seen={};
     edges.forEach(function(e) {
@@ -968,8 +996,8 @@
     return out;
   }
 
-  // Trace all faces of one connected planar graph and return the outer
-  // boundary (largest absolute area), oriented positively in 2D.
+
+
   function traceOuterFace(points, edges) {
     if (!points.length || !edges.length) return null;
     var adj = [], i;
@@ -1027,8 +1055,8 @@
     return out;
   }
 
-  // The link of each surface vertex must be one path or cycle. Edge
-  // incidence alone would accept two shells pinched at a common vertex.
+
+
   function manifoldVertexLinks(faces) {
     var links = new Map(), valid = true;
     faces.forEach(function(face) { faceLoops(face).forEach(function(loop) {
@@ -1051,9 +1079,9 @@
     return valid;
   }
 
-  // Solve independent face/edge constraint groups. Closed shells are
-  // preferred; otherwise allow manifold surfaces with boundary. No greedy
-  // size fallback: exhausted search is reported and leaves the wire intact.
+
+
+
   function selectManifoldFaces(faces) {
     var keys = faces.map(faceEdgeKeys), owners = Object.create(null);
     keys.forEach(function (ks, i) { ks.forEach(function (k) { (owners[k] || (owners[k] = [])).push(i); }); });
@@ -1092,8 +1120,8 @@
             chosen.push(f); search(at + 1); chosen.pop();
             keys[f].forEach(function (k) { use[k]--; });
           }
-          // Once all candidate edges and faces are retained no alternative
-          // can improve the objective (common for large ordinary shells).
+
+
           if (best.length !== group.length) search(at + 1);
           keys[f].forEach(function (k) { remaining[k]++; });
         }
@@ -1107,14 +1135,20 @@
     return { faces: exhausted || ambiguous ? [] : result, exhausted: exhausted, ambiguous: ambiguous };
   }
 
-  // Planar face pass: group by plane, extract the maximal outer face of
-  // each connected planar component, keep only boundary edges, and make
-  // open faces double-sided.
-  function extractPlanarFaces(verts, edges) {
+
+
+
+  function extractPlanarFaces(verts, edges, curves) {
     if (!Array.isArray(verts) || !Array.isArray(edges) ||
         verts.length < 3 || edges.length < 3) {
       return { edges: edges, faces: [] };
     }
+    var analyticLoops = new Set();
+    (curves || []).forEach(function (curve) {
+      if (!curve || !(curve.closed || curve.kind === 'circle' || curve.kind === 'ellipse')) return;
+      if (!Array.isArray(curve.displayVertices) || curve.displayVertices.length < 3) return;
+      analyticLoops.add(cyclicLoopKey(curve.displayVertices));
+    });
     edges = splitSpatialEdges(verts, edges);
     var planes = supportingPlanes(verts, edges), i;
     var faces = [];
@@ -1159,7 +1193,7 @@
           }
         }
       }
-      // Project the plane to 2D using the dominant normal axis.
+
       var ax = Math.abs(plane.n.x), ay = Math.abs(plane.n.y),
         az = Math.abs(plane.n.z), ux, uy;
       if (az >= ax && az >= ay) {
@@ -1200,8 +1234,8 @@
         if (crossing || face.length < 3) continue;
         planeFaces.push(face);
       }
-      // Containment is evaluated across disconnected planar loops. Even/odd
-      // nesting is the inferred sheet convention, not a certified material claim.
+
+
       function contains(loop, v) {
         var x = ux(verts[v]), y = uy(verts[v]), inside = false;
         for (var a = 0, b = loop.length - 1; a < loop.length; b = a++) {
@@ -1223,12 +1257,13 @@
       });
     }
     if (!faces.length) return { edges: edges, faces: [] };
+    faces = dedupeFaces(faces);
     var selection = selectManifoldFaces(faces);
-    faces = selection.faces;
+    faces = dedupeFaces(selection.faces);
     if (!faces.length) return { edges: edges, faces: [], topologyStatus: selection.exhausted ? 'search-limit' : selection.ambiguous ? 'ambiguous-surface' : 'wire' };
     var use = Object.create(null), candidate = Object.create(null);
-    // Only remove edges interior to discovered planar regions. Unrelated
-    // wire components must survive alongside surfaces.
+
+
     faces.forEach(function (face) {
       var n = newellVec(verts, face), length = Math.hypot(n.x,n.y,n.z), origin = verts[face[0]];
       var axis = Math.abs(n.x) > Math.abs(n.y) && Math.abs(n.x) > Math.abs(n.z) ? 'x' : Math.abs(n.y) > Math.abs(n.z) ? 'y' : 'z';
@@ -1259,8 +1294,8 @@
       var k = e[0] < e[1] ? e[0] + '_' + e[1] : e[1] + '_' + e[0];
       return use[k] || !candidate[k];
     });
-    // Propagate winding through shared edges, then use signed volume for
-    // closed shells. A centroid-facing rule is incorrect for concave solids.
+
+
     var signs = [], components = [], invalid = !manifoldVertexLinks(faces);
     faces.forEach(function (_, start) {
       if (signs[start]) return;
@@ -1295,16 +1330,19 @@
       regionIndex[fi] = regions.length;
       regions.push({ outer: outer, holes: holes });
       finalFaces.push(outer); faceHoles.push(holes);
-      if (!component.closed) { finalFaces.push(outer.slice().reverse()); faceHoles.push(holes.map(function (h) { return h.slice().reverse(); })); }
+      if (!component.closed && !analyticLoops.has(cyclicLoopKey(outer))) {
+        finalFaces.push(outer.slice().reverse());
+        faceHoles.push(holes.map(function (h) { return h.slice().reverse(); }));
+      }
     }); });
     components.forEach(function(c) { c.faceIndices = c.faceIndices.map(function(fi) { return regionIndex[fi]; }); });
     return { edges: kept, faces: finalFaces, faceHoles: faceHoles,
       faceRegions: regions, components: components, topologyStatus: 'inferred' };
   }
 
-  // Exact manifold/intersection checks apply to the inferred display
-  // triangulation, not to the analytic curved surface it approximates. Faces
-  // with holes are left out until their bridge triangulation is supplied.
+
+
+
   function validateInferredSurfaces(geometry) {
     if (!Strict || typeof Strict.classifySurfaces !== 'function' ||
         typeof Strict.exact !== 'function' || !geometry || !(geometry.faces || []).length) return null;
@@ -1381,7 +1419,7 @@
     return function (n) { return n.x * mx + n.z * mz > 0; };
   }
 
-  // Canonical form for tie detection: rounded sorted vertices + edges.
+
   function canonicalOf(verts, edges) {
     function r(v) { return Math.round(v * 1e6) / 1e6; }
     var vs = verts.map(function (v) { return [r(v.x), r(v.y), r(v.z)]; });
@@ -1402,8 +1440,8 @@
     return JSON.stringify({ v: vs, e: es });
   }
 
-  // Drawn-length coverage of one view: fraction of A/B sample points that
-  // lie on the projected interpretation. E points count via containment.
+
+
   function viewCoverage(graph, onProjected, insideE, tol) {
     var need = 0, hit = 0;
     var n = 5;
@@ -1444,10 +1482,10 @@
     };
   }
 
-  // --- M2 third view: a plan depth d reads in the profile at local x
-  // x'(d) = xRef + s * (d - dRef), with s = +1 (direct) or -1 (mirrored)
-  // and dRef the near depth edge. Both orientations are always tried in
-  // fixed order; the drawing (not a convention guess) picks the winner.
+
+
+
+
   function inferProfileMaps(dRef, p0, p1) {
     return [
       { xRef: p0, s: 1, dRef: dRef },
@@ -1480,12 +1518,12 @@
     };
   }
 
-  // --- Pair-by-name: display names are absolute. Plan `a`, elevation
-  // `a'`, and profile `a''` share base `a` and name one 3D point; pairing
-  // follows the shared base while the projector (same x-station within
-  // eps) still validates the pair. Only genuine POINT entities name a
-  // vertex; segment captions (edge names like `ab`) never do. Unlabeled
-  // vertices keep the legacy geometric reading.
+
+
+
+
+
+
   function baseNameOf(caption) {
     var s = (caption === undefined || caption === null) ? '' : String(caption);
     s = s.replace(/^\s+|\s+$/g, '');
@@ -1497,10 +1535,10 @@
     return s;
   }
 
-  // Base-name SET of one caption: multi-caption parts split on commas,
-  // one wrapping paren pair (the student's hidden verdict) stripped per
-  // part, then prime ticks stripped. Verdicts are invisible to the gate:
-  // typing parens never breaks reconstruction. 'h,(b\')' -> ['h','b'].
+
+
+
+
   function captionBases(caption) {
     var s = (caption === undefined || caption === null) ? '' : String(caption);
     var raw = s.split(',');
@@ -1516,16 +1554,16 @@
     return out;
   }
 
-  // --- Claimed corner-lift lamina (M5). The wire builder pairs whole
-  // vertices 1:1, which cannot express coincident corners (one elevation
-  // dot yielding two corners at different plan feet). Where pairing
-  // fails, the student's projector claims identify corners explicitly:
-  // one claim = one 3D corner lifted from its plan + elevation feet. v1
-  // builds profile laminae only: all corners share x, and the face is
-  // the convex hull in (depth, height), so a wrong pairing fails loudly
-  // (duplicate corners, broken hull, uncovered ink) instead of guessing.
-  // Claims apply always — hand drawings have no Check truth to gate on.
-  // Returns null when no claims exist.
+
+
+
+
+
+
+
+
+
+
   function tryClaimedCorners(planG, elevG, eps, tol, claimLines, byId) {
     if (!claimLines || claimLines.length === 0) return null;
     function nearVert(verts, x, y) {
@@ -1608,7 +1646,7 @@
         return fail('corners-not-coplanar', 'claimed corners leave the profile plane', 0);
       }
     }
-    // Convex hull in (depth, height): monotone chain, deterministic.
+
     var order = corners.map(function (c, idx) { return idx; });
     order.sort(function (a, b) {
       if (corners[a].d !== corners[b].d) return corners[a].d - corners[b].d;
@@ -1652,7 +1690,7 @@
     for (k = 0; k < hull.length; k++) {
       edges.push([hull[k], hull[(k + 1) % hull.length]]);
     }
-    // Coverage both directions, per view, against drawn A/B ink.
+
     function inkSegs(graph) {
       var segs = [];
       for (var s = 0; s < graph.segs.length; s++) {
@@ -1699,10 +1737,10 @@
     if (cov < COVERAGE_GATE) {
       return fail('coverage-failed', 'claimed lamina round-trip coverage ' + cov.toFixed(3), cov);
     }
-    // Both windings: a lamina has no interior, so single-sidedness would
-    // show all-dashed from behind and teach nothing. Faces only feed
-    // hidden classification (edges are stroked, never filled); exactly
-    // edge-on both faces turn away and the outline honestly dashes.
+
+
+
+
     var loop2 = hull.slice().reverse();
     return {
       pass: true, class: 'E', coverage: cov,
@@ -1714,10 +1752,10 @@
     };
   }
 
-  // --- Solids of revolution (M3 curves). Plan carries exactly one
-  // A/B CIRCLE (no polygon loop); elevation shows the silhouette
-  // (rectangle = cylinder, triangle + apex = cone). Full CIRCLE
-  // entities only; CIRCULAR_ARC never forms a revolved hypothesis.
+
+
+
+
   function isPlanCircle(curve) {
     if (!curve || curve.type !== 'CIRCLE') return false;
     if (curve.bisCode !== 'A' && curve.bisCode !== 'B') return false;
@@ -1737,9 +1775,9 @@
     return out;
   }
 
-  // Rim vertex k (0..K-1) at angle th = 2*pi*k/K: x = xc + r*cos, z =
-  // zc + r*sin. Vertex 0 sits at +X from the axis; increasing k runs
-  // counter-clockwise seen from +Y (with +Z up in that top view).
+
+
+
   function rimPoint(xc, zc, r, y, k) {
     var th = 2 * Math.PI * k / RIM_K;
     return { x: xc + r * Math.cos(th), y: y, z: zc + r * Math.sin(th) };
@@ -1771,9 +1809,9 @@
     return { name: 'cylinder', vertices: verts, edges: edges, faces: faces };
   }
 
-  // Cylinder from a plan circle + elevation silhouette. Returns null only
-  // when the caller should not treat this as a D hypothesis (never here;
-  // the wrapper decides); otherwise pass or a named fail.
+
+
+
   function tryCylinder(planG, elevG, circle, eps, tol, profG) {
     var stol = Math.max(tol, eps);
     var xc = circle.x, yc = circle.y, r = circle.radius;
@@ -2273,11 +2311,11 @@
     return outB;
   }
 
-  // Revolved-reader dispatcher (cylinder + cone). Returns null when no
-  // revolved hypothesis applies (plan loop exists, or no A/B plan circle);
-  // otherwise a pass or a named fail. Two plan circles report
-  // ambiguous-pairing, never a guess. Cylinder is tried first, then
-  // cone; the first pass wins, otherwise the better-ranked fail.
+
+
+
+
+
   function tryRevolved(planG, elevG, planLoop, curves, eps, tol, profG) {
     if (planLoop) return null;
     var circles = planCirclesOf(curves || []);
@@ -2295,11 +2333,11 @@
     return failRank(rcyl.reason) <= failRank(rcon.reason) ? rcyl : rcon;
   }
 
-  // Project a widget-space geometry back onto both sheet views:
-  // elevation (X, Y), plan (X, -Z). Independent of the class attempts;
-  // tests use it to verify the round-trip invariant from outside.
-  // An optional profile map {xRef, s, dRef} adds the profile projection
-  // (xRef + s * (Z - dRef), Y); one-argument calls are unchanged.
+
+
+
+
+
   function projectToViews(geometry, mapOpt) {
     var verts = geometry.vertices;
     var planPts = verts.map(function (v) { return { x: v.x, y: -v.z }; });
@@ -2343,12 +2381,12 @@
     return r === -1 ? FAIL_PRIORITY.length : r;
   }
 
-  // Reader shell for declared geometry: banked projector claims ('E')
-  // and drawn curves ('D'). Exactly one reader runs per call — claims
-  // assert a lamina, curves hypothesize a revolved solid — so there is
-  // no competition and no class letter on the result. Returns null
-  // only for 'D' when no revolved hypothesis applies anywhere (a plan
-  // loop exists, or no plan circle); every other sheet gets a verdict.
+
+
+
+
+
+
   function collectClaimLines(list) {
     var claimLines = [];
     for (var qi = 0; qi < list.length; qi++) {
@@ -2402,10 +2440,10 @@
       return unavailable('unsupported-curves',
         REASON_LABELS['unsupported-curves']);
     }
-    // Entities exactly on XY are genuinely ambiguous (resting base vs
-    // touching depth), so each placement is attempted as its own variant
-    // in fixed order. Two readings that both pass with different solids
-    // report ambiguity rather than guessing.
+
+
+
+
     var variants;
     if (cls.onDatum.length === 0) {
       variants = [{ plan: cls.plan, elev: cls.elev, profile: cls.profile,
@@ -2519,25 +2557,25 @@
     return unavailable(best.fail.reason, best.fail.label);
   }
 
-  // Live wireframe builder: every entity with a defined projection in
-  // both views resolves to 3D, whether or not anything closes into a
-  // solid. No classes, no gates: single-view entities simply stay
-  // 2D-only. A VP point and an HP point pair by caption base name
-  // (prime ticks stripped, same rule as captionBases) with a
-  // same-x-station check AND a drawn projector line physically
-  // covering both dots; same name at the same station without the
-  // line stays 2D-only. Unnamed points pair automatically iff
-  // exactly one candidate per side shares the station and the line.
-  // Datum (y = 0) points pair as either side by their mate, also on
-  // the line. Edges: a segment
-  // determining exactly one vertex pair emits it (trust the drawing);
-  // coincident stacks fall back to both-views consistency (a pair
-  // needs its mate projection drawn, or degenerated to a point for
-  // view-perpendicular edges), and stack-inferred pairs whose both
-  // projections are covered by strictly shorter emitted pairs drop as
-  // face diagonals on doubly edge-on faces. Closed shells infer
-  // logical faces (see inferClosedFaces) so the glass and the pose
-  // overlay can dash hidden edges; open wire stays faceless all-solid.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   function liveSideOf(e) {
     if (e.viewRole === 'PLAN') return 'plan';
     if (e.viewRole === 'ELEVATION') return 'elev';
@@ -2547,18 +2585,19 @@
     return 'datum';
   }
 
-  // Strict reconstruction expects shared member IDs. Table-created points
-  // start with one auto member per station (`point:<id>:<i>`), so `a` and
-  // `a'` would otherwise never meet. Pair only those auto members by the
-  // compatibility rule — same base name plus agreeing projection equations —
-  // and leave explicit member declarations (membersDeclared) untouched.
-  // Plan and elevation agree on x. A profile station agrees with plan on
-  // depth and with elevation on height through the resolved side frame
-  // {xRef, s, dRef}: side(d) = xRef + s*(d - dRef). Without that frame the
-  // profile station keeps its own member. Contradictory or ambiguous
-  // candidates stay separate; no averaging or snapping is allowed.
+
+
+
+
+
+
+
+
+
+
   function autoMembersForStrict(entities, profileFrame) {
     if (!Array.isArray(entities)) return entities;
+    entities = Entities.withDeclaredMembers(entities);
     var AUTO_EPS = 1e-6;
     var out = [], i;
     for (i = 0; i < entities.length; i++) {
@@ -2626,9 +2665,9 @@
       var axis = sharedAxis(a.side, b.side);
       return !!axis && near(a.obs[axis], b.obs[axis]);
     }
-    // One-to-one at the shared station, mirroring the live plan/elevation
-    // rule: a candidate only links when it is the only match in its view and
-    // the only match back from the other view.
+
+
+
     function uniqueMatch(rec, sameView, otherView) {
       var matches = otherView.filter(function (other) { return compatible(rec, other); });
       if (matches.length !== 1) return null;
@@ -2647,9 +2686,9 @@
       });
       if (conflict || values.x === null || values.height === null || values.depth === null) return null;
       function key(value) { return Math.round(value / AUTO_EPS); }
-      // Keep the historical plan/elevation ID shape. Profile-linked groups
-      // include the full coordinate so distinct depths/heights at one x
-      // cannot collide.
+
+
+
       if (!members.some(function (rec) { return rec.side === 'profile'; })) {
         return 'auto:' + base + ':' + key(values.x);
       }
@@ -2672,9 +2711,9 @@
         var ra = rootOf(list.indexOf(a)), rb = rootOf(list.indexOf(b));
         if (ra !== rb) parent[rb] = ra;
       }
-      // First establish the historical plan/elevation pairs. These are the
-      // established compatibility pairs and must survive an unrelated
-      // profile ambiguity.
+
+
+
       bySide.plan.forEach(function (rec) {
         var mate = uniqueMatch(rec, bySide.plan, bySide.elev);
         if (mate) join(rec, mate);
@@ -2689,9 +2728,9 @@
       var profileGroups = groups.map(function (group) {
         return group.some(function (rec) { return rec.side === 'plan' || rec.side === 'elev'; });
       });
-      // A profile station may join one group only when it is the single
-      // profile candidate for that group and that group is its single
-      // candidate. Otherwise the stations stay separate.
+
+
+
       var candidates = groups.map(function (group, gi) {
         if (!profileGroups[gi]) return [];
         return bySide.profile.filter(function (rec) {
@@ -2750,17 +2789,30 @@
     return out;
   }
 
-  // Public primitive pipeline. The old entry points remain compatibility
-  // adapters; the app, reference previews and scripts all enter here.
-  // The public pipeline keeps generic parametric boundaries analytic. Their
-  // samples are display wire only, never input to planar surface guessing.
+
+
+
+
   function reconstructParametric(list, opts) {
+    var declared=opts.identity==='explicit'||list.some(function(e){return e.meta&&e.meta.membersDeclared;});
+    var resolved=Curves.resolveProfileFrame(list,opts),normalized=autoMembersForStrict(list,resolved.profile);
+
+
+
+    if(declared) {
+      var check=Strict.reconstruct(normalized.filter(function(e){return e.type!=='CURVE'&&!Curves.isCurve(e);}),opts);
+      if(check.determination==='inconsistent') {
+        check.pipeline={version:1,input:'vertices-edges-curves',identity:'explicit',stage:'correspondence',diagnostics:check.issues||[]};
+        return check;
+      }
+    }
     var ink=list.filter(function(e){return e.type==='CURVE';}),refs=new Set(ink.flatMap(function(e){return (e.meta||{}).throughRefs||[];}));
     var needed=new Set(list.filter(function(e){return e.type!=='CURVE'&&e.type!=='POINT';}).flatMap(function(e){return (e.meta||{}).refs||[];}));
     var rest=list.filter(function(e){return e.type!=='CURVE'&&!(e.type==='POINT'&&refs.has(e.id)&&!needed.has(e.id));});
     var hasRest=rest.some(function(e){return ['POINT','SEGMENT','LINE','RAY','CIRCLE','CIRCULAR_ARC'].indexOf(e.type)!==-1;});
-    var base=hasRest?reconstruct(rest,opts):{geometry:null,issues:[]}, resolved=Curves.resolveProfileFrame(list,opts);
-    var lifted=ParametricReconstruct.reconstruct(autoMembersForStrict(list,resolved.profile),resolved.profile);
+    var base=hasRest?reconstruct(rest,opts):{geometry:null,issues:[]};
+    if(base.determination==='inconsistent')return base;
+    var lifted=ParametricReconstruct.reconstruct(normalized,resolved.profile);
     var diagnostics=((base.pipeline||{}).diagnostics||base.issues||[]).concat(lifted.issues);
     if(resolved.issue)diagnostics.push(resolved.issue);
     var g=base.geometry;
@@ -2777,27 +2829,79 @@
       });
       g.profileMap=resolved.profile;g.topologyStatus=diagnostics.length?'partial':'inferred';
       var model=Surfaces.build(g);g.surfaces=model.surfaces;g.surfaceModel=model.summary;
+      applyDisplaySync(g,model);
       if(opts.deferValidation){g.analyticSurfaceValidation={status:'pending',deferred:true,contract:'analytic-surface-v1'};
         g.analyticCertificate={status:'pending',deferred:true,contract:'analytic-surface-certificate-v1'};}
       else{g.analyticSurfaceValidation=Surfaces.validate(model,g);g.analyticCertificate=Surfaces.certify(model,g);
         g.surfaceModel.status=g.analyticSurfaceValidation.status;}
     }
-    return {status:g?'ok':'unavailable',reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
+    return mergeDisplaySyncResult({status:g?'ok':'unavailable',reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
       label:diagnostics.length?diagnostics[0].message:'Parametric curves reconstructed',geometry:g,
       determination:diagnostics.length?'partial':'inferred',issues:diagnostics,
-      pipeline:{version:1,input:'vertices-edges-curves',identity:opts.identity==='explicit'?'explicit':'inferred',stage:'surface-inference',diagnostics:diagnostics}};
+      pipeline:{version:1,input:'vertices-edges-curves',identity:declared?'explicit':'inferred',stage:'surface-inference',diagnostics:diagnostics}});
+  }
+
+  function applyDisplaySync(geometry, model) {
+    if (!geometry || !model || !Surfaces || !Surfaces.syncDisplayHoles) return null;
+    var sync = Surfaces.syncDisplayHoles(model, geometry);
+    geometry.displaySync = {status:sync && sync.diagnostics && sync.diagnostics.length ? 'issues' : 'ok',
+      holes:sync && Number.isFinite(sync.holes) ? sync.holes : 0,
+      diagnostics:sync && sync.diagnostics ? sync.diagnostics.slice() : []};
+    return geometry.displaySync;
+  }
+
+  function displaySyncDiagnostics(geometry) {
+    return geometry && geometry.displaySync && Array.isArray(geometry.displaySync.diagnostics) ?
+      geometry.displaySync.diagnostics : [];
+  }
+
+  function appendDisplayDiagnostics(list, diagnostics) {
+    (diagnostics || []).forEach(function (diagnostic) {
+      if (!list.some(function (existing) {
+        return existing && existing.code === diagnostic.code &&
+          existing.surfaceId === diagnostic.surfaceId &&
+          existing.curveIndex === diagnostic.curveIndex;
+      })) list.push(diagnostic);
+    });
+    return list;
+  }
+
+  function mergeDisplaySyncResult(result) {
+    if (!result) return result;
+    var sync = displaySyncDiagnostics(result.geometry);
+    if (!sync.length) return result;
+    var issues = Array.isArray(result.issues) ? result.issues.slice() : [];
+    appendDisplayDiagnostics(issues, sync);
+    result.issues = issues;
+    if (result.status === 'ok' && result.determination !== 'inconsistent') {
+      result.determination = 'partial';
+      if (result.geometry) result.geometry.topologyStatus = 'partial';
+      result.label = 'Partial 3D preview: ' + sync[0].message;
+    }
+    if (!result.pipeline) result.pipeline = {version:1, input:'vertices-edges-curves',
+      identity:'inferred', stage:'surface-inference', diagnostics:[]};
+    result.pipeline.diagnostics = appendDisplayDiagnostics(
+      Array.isArray(result.pipeline.diagnostics) ? result.pipeline.diagnostics.slice() : [], sync);
+    return result;
   }
 
   function validateSurfaces(geometry) {
     if (!geometry || !Surfaces) return null;
+    var priorScope=geometry.analyticCertificate&&geometry.analyticCertificate.scope||
+      geometry.analyticSurfaceValidation&&geometry.analyticSurfaceValidation.scope;
     var model = Surfaces.build(geometry);
     if (!model) return null;
     geometry.surfaces = model.surfaces;
     geometry.surfaceModel = model.summary;
+    applyDisplaySync(geometry, model);
     geometry.analyticSurfaceValidation = Surfaces.validate(model, geometry);
     geometry.analyticCertificate = Surfaces.certify(model, geometry);
     if (geometry.analyticSurfaceValidation)
       geometry.surfaceModel.status = geometry.analyticSurfaceValidation.status;
+    if (geometry.partialSubset||priorScope==='resolved-subset') {
+      if (geometry.analyticSurfaceValidation) geometry.analyticSurfaceValidation.scope='resolved-subset';
+      if (geometry.analyticCertificate) geometry.analyticCertificate.scope='resolved-subset';
+    }
     return {model:model, validation:geometry.analyticSurfaceValidation,
       certificate:geometry.analyticCertificate};
   }
@@ -2811,11 +2915,15 @@
       return null;
     }
   }
+  function isConicSource(e) {
+    return !!(e && e.meta && e.meta.ellipse);
+  }
   function reconstruct(entities, opts) {
     opts = opts || {};
     var list = Array.isArray(entities) ? entities.filter(Boolean).map(function(e) {
       return Object.assign({}, e, { visible: true });
     }) : [];
+    list = Entities.withDeclaredMembers(list);
     if(list.some(function(e){return e.type==='CURVE';})) return reconstructParametric(list,opts);
     var declared = opts.identity === 'explicit' || list.some(function(e) { return e.meta && e.meta.membersDeclared; });
     var topology = opts.topology || list.some(function(e) { return e.meta && e.meta.reconstructionTopology; });
@@ -2825,10 +2933,10 @@
     });
     var resolvedFrame = Curves.resolveProfileFrame(list,opts), frame=resolvedFrame.profile;
     var normalized = autoMembersForStrict(list, frame);
-    // A straight drawing whose side-view stations name the same bases as
-    // another principal view is a compatibility case, not live plan/elevation
-    // ink. Let the strict adapter's shared auto members supply the profile
-    // lift; contradictory coordinates stay separate and are reported there.
+
+
+
+
     function hasNamedProfileStations() {
       if (!frame) return false;
       var views = Object.create(null);
@@ -2850,6 +2958,124 @@
       });
     }
     var profileBridge = !declared && frame && !resolvedFrame.inferred && hasNamedProfileStations();
+    function strictComponent(rows) {
+      var result=reconstructStrict(rows,opts);
+      if(result.geometry&&frame)result.geometry.profileMap=frame;
+      return result;
+    }
+    function resolvedSubset(rows) {
+      var normalizedById=new Map(normalized.map(function(e) {return [e.id,e];}));
+      var source=rows.map(function(e) {return normalizedById.get(e.id)||e;});
+      function observation(e) {
+        if(e.viewRole==='PLAN') return {plan:{x:e.x,z:-e.y}};
+        if(e.viewRole==='ELEVATION') return {elev:{x:e.x,y:e.y}};
+        if(e.viewRole==='PROFILE'&&frame) return {profile:{z:frame.dRef+frame.s*(e.x-frame.xRef),y:e.y}};
+        return null;
+      }
+      var memberObs=new Map();
+      source.forEach(function(e) {
+        if(e.type!=='POINT') return;
+        var obs=observation(e);
+        if(!obs) return;
+        ((e.meta||{}).members||[]).forEach(function(m) {
+          if(!memberObs.has(m.id)) memberObs.set(m.id,{views:new Set()});
+          Object.keys(obs).forEach(function(role) {memberObs.get(m.id).views.add(role);});
+        });
+      });
+      var completeMembers=new Set();
+      memberObs.forEach(function(rec,id) {
+        var views=rec.views;
+        if((views.has('plan')&&views.has('elev'))||
+           (views.has('plan')&&views.has('profile'))||
+           (views.has('elev')&&views.has('profile'))) completeMembers.add(id);
+      });
+      if(!completeMembers.size) return [];
+      var points=new Map(),selectedByPoint=new Map();
+      source.forEach(function(e) {
+        if(e.type!=='POINT') return;
+        var members=(e.meta||{}).members||[];
+        var selected=members.filter(function(m) {return completeMembers.has(m.id);});
+        if(!selected.length) return;
+        var clone=Object.assign({},e,{meta:Object.assign({},e.meta,{members:selected})});
+        points.set(e.id,clone);
+        selectedByPoint.set(e.id,new Set(selected.map(function(m) {return m.id;})));
+      });
+      if(!points.size) return [];
+      var kept=new Set();
+      source.forEach(function(e) {
+        if(e.type!=='SEGMENT'&&e.type!=='LINE'&&e.type!=='RAY') return;
+        var refs=(e.meta||{}).endpointRefs||(e.meta||{}).refs||[];
+        if(!refs.length||!refs.every(function(id) {return points.has(id);})) return;
+        var endpointMembers=(e.meta||{}).endpointMemberIds;
+        var okay=Array.isArray(endpointMembers)&&endpointMembers.length?
+          endpointMembers.every(function(id) {return completeMembers.has(id);}):
+          refs.every(function(id) {
+            var selected=selectedByPoint.get(id);
+            return selected&&selected.size>0;
+          });
+        if(!okay) return;
+        kept.add(e.id);
+      });
+      source.forEach(function(e) {
+        if(e.type==='DATUM_AXIS') {kept.add(e.id);}
+      });
+      points.forEach(function(p,id) {kept.add(id);});
+      return source.map(function(e) {
+        return points.get(e.id)||e;
+      }).filter(function(e) {return kept.has(e.id);});
+    }
+    function straightComponent(rows) {
+      if(declared) {
+        var strict=strictComponent(rows);
+        if(strict.geometry||strict.determination!=='underdetermined') return strict;
+        var subset=resolvedSubset(rows);
+        if(subset.length) {
+          var part=strictComponent(subset);
+          if(part.geometry) {
+            part.determination='partial';
+            part.geometry.topologyStatus='partial';
+            part.geometry.partialSubset=true;
+            applySubsetScope(part.geometry);
+            var retained={};
+            (strict.issues||[]).forEach(function(d) {
+              if(!retained[d.code]) {retained[d.code]=true;part.issues=(part.issues||[]).concat([d]);}
+            });
+            return part;
+          }
+          if(part.determination==='inconsistent') return part;
+        }
+        return strict;
+      }
+      if(!profileBridge) return liveCore(rows,opts.eps===undefined?MATCH_EPS_MM:opts.eps);
+
+
+
+
+      var normalizedRows=autoMembersForStrict(rows,frame),views=new Map();
+      var exactCheck=Strict.reconstruct(normalizedRows,opts);
+      if(exactCheck.determination==='inconsistent')return exactCheck;
+      normalizedRows.forEach(function(e) {
+        if(e.type!=='POINT'||!['PLAN','ELEVATION','PROFILE'].includes(e.viewRole))return;
+        ((e.meta||{}).members||[]).forEach(function(m) {
+          if(!views.has(m.id))views.set(m.id,new Set());
+          views.get(m.id).add(e.viewRole);
+        });
+      });
+      var known=new Set(Array.from(views).filter(function(entry){return entry[1].size>=2;}).map(function(entry){return entry[0];}));
+      if(!known.size)return strictComponent(rows);
+      var kept=new Set(),filtered=normalizedRows.filter(function(e) {
+        if(e.type!=='POINT')return true;
+        var found=((e.meta||{}).members||[]).some(function(m){return known.has(m.id);});
+        if(found)kept.add(e.id);
+        return found;
+      }).filter(function(e) {
+        var refs=(e.meta||{}).endpointRefs||(e.meta||{}).refs;
+        return e.type!=='SEGMENT'||!Array.isArray(refs)||refs.every(function(id){return kept.has(id);});
+      }).map(function(e) {
+        return e.type==='POINT'?Object.assign({},e,{meta:Object.assign({},e.meta,{members:e.meta.members.filter(function(m){return known.has(m.id);})})}):e;
+      });
+      return strictComponent(filtered);
+    }
     function visibilityProvider(curveIds) {
       var excluded=new Set(curveIds), pending=true, occluder=null;
       return function classify(point,role) {
@@ -2863,8 +3089,8 @@
               (excluded.has(e.id)?refs:needed).add(id);
             });
           });
-          var rows=normalized.filter(function(e) {return !excluded.has(e.id) && !Curves.isCurve(e) && !(refs.has(e.id) && !needed.has(e.id));});
-          var result=declared?reconstructStrict(rows,opts):liveCore(rows,opts.eps===undefined?MATCH_EPS_MM:opts.eps);
+          var rows=normalized.filter(function(e) {return !excluded.has(e.id) && !Curves.isCurve(e) && !isConicSource(e) && !(refs.has(e.id) && !needed.has(e.id));});
+          var result=straightComponent(rows);
           if(result.geometry && result.geometry.faces.length) {occluder=result.geometry;classify.sourceIds=rows.map(function(e) {return e.id;});}
         }
         if(!occluder) return null;
@@ -2872,36 +3098,191 @@
         return projector.pointHidden(occluder,point,view);
       };
     }
-    var oblique = Oblique && Oblique.reconstruct ? Oblique.reconstruct(normalized,{profile:frame,visibilityProvider:visibilityProvider}) :
+    var conic = Conic && Conic.lift ? Conic.lift(normalized,
+      {profile:frame,visibilityProvider:visibilityProvider}) :
+      {curves:[],consumedIds:[],pointIds:[],issues:[],groups:[],usedGroups:[]};
+    var conicIssues = (conic.issues || []).slice();
+    var lineLift = Conic && Conic.liftLine ? Conic.liftLine(normalized,
+      {profile:frame,usedGroups:conic.usedGroups || []}) :
+      {curves:[],consumedIds:[],issues:[],usedGroups:[],consideredGroups:[]};
+    var lineConsidered = new Set(lineLift.consideredGroups || []), lineSegIds = new Set();
+    (conic.groups || []).forEach(function(g) {
+      if(lineConsidered.has(g.id)) g.segmentIds.forEach(function(id) {lineSegIds.add(id);});
+    });
+    conicIssues = conicIssues.filter(function(issue) {
+      return !(lineSegIds.has(issue.entityId) &&
+        ['conic-projection-missing','conic-lift-ambiguous','conic-third-view-conflict',
+          'conic-point-conflict'].indexOf(issue.code) !== -1);
+    });
+    var analyticCurves = (conic.curves || []).concat(lineLift.curves || []);
+    var analyticIds = new Set((conic.consumedIds || []).concat(lineLift.consumedIds || []));
+    var exactGroupSegments = new Set();
+    (conic.groups || []).forEach(function(g) {
+      g.segmentIds.forEach(function(id) {exactGroupSegments.add(id);});
+    });
+    var analyticIssues = conicIssues.concat(lineLift.issues || []);
+    var blockedSegments = new Set(exactGroupSegments);
+    (lineLift.consumedIds || []).forEach(function(id) {blockedSegments.add(id);});
+    var oblique = Oblique && Oblique.reconstruct ?
+      Oblique.reconstruct(normalized.filter(function(e) {return !blockedSegments.has(e.id);}),
+        {profile:frame,visibilityProvider:visibilityProvider}) :
       {curves:[],consumedIds:[],issues:[]};
-    if(resolvedFrame.issue && (oblique.curves.length || oblique.issues.length)) oblique.issues.unshift(resolvedFrame.issue);
+    if(resolvedFrame.issue && (oblique.curves.length || oblique.issues.length || analyticCurves.length))
+      oblique.issues.unshift(resolvedFrame.issue);
     var obliqueIds = new Set(oblique.consumedIds);
+    analyticIds.forEach(function(id) {obliqueIds.add(id);});
+    function applySubsetScope(g) {
+      if (!g || !g.partialSubset) return g;
+      if (g.analyticSurfaceValidation) g.analyticSurfaceValidation.scope = 'resolved-subset';
+      if (g.analyticCertificate) g.analyticCertificate.scope = 'resolved-subset';
+      return g;
+    }
+    function finalizeThroughCavities(g) {
+      var exitDiagnostics=[];
+      if(!g||!Array.isArray(g.recesses)||!g.recesses.length) return exitDiagnostics;
+      var vertices=g.vertices||[];
+      function vsub(a,b) {return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};}
+      function vdot(a,b) {return a.x*b.x+a.y*b.y+a.z*b.z;}
+      function vcross(a,b) {return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
+      function vlen(a) {return Math.hypot(a.x,a.y,a.z);}
+      function vunit(a) {var l=vlen(a);return l>1e-12?{x:a.x/l,y:a.y/l,z:a.z/l}:null;}
+      function basisFromAxis(axis) {
+        var n=vunit(axis);
+        if(!n) return null;
+        var ref=Math.abs(n.x)<0.9?{x:1,y:0,z:0}:{x:0,y:1,z:0};
+        var u=vunit(vcross(n,ref));
+        if(!u) return null;
+        var v=vunit(vcross(n,u));
+        return v?{u:u,v:v}:null;
+      }
+      function hostFaces() {
+        return (g.surfacePatches||[]).filter(function(p) {
+          return p&&p.kind==='plane'&&Array.isArray(p.outer)&&p.outer.length>=3&&
+            !p.recess&&!p.recessMouth&&!p.recessBottom;
+        });
+      }
+      function circleFor(record,volume) {
+        if(Number.isInteger(record.bottomCurve)) {
+          var curve=g.curves&&g.curves[record.bottomCurve];
+          if(curve&&Number.isFinite(curve.radius)&&curve.radius>0&&
+              curve.u&&curve.v) return curve;
+        }
+        if(!volume||volume.kind!=='cone'||!(volume.bottomRadius>0)) return null;
+        var basis=basisFromAxis(volume.axis);
+        if(!basis) return null;
+        var center=volume.bottomCenter;
+        if(!center) {
+          var axis=vunit(volume.axis);
+          if(!axis||!Number.isFinite(volume.depth)) return null;
+          center={x:volume.origin.x+axis.x*volume.depth,
+            y:volume.origin.y+axis.y*volume.depth,
+            z:volume.origin.z+axis.z*volume.depth};
+        }
+        return {kind:'circle',center:center,u:basis.u,v:basis.v,
+          radius:volume.bottomRadius,startAngle:0,sweepAngle:2*Math.PI};
+      }
+      function faceContains(circle,face) {
+        if(typeof Surfaces.circleInPlanarFace!=='function') return false;
+        var result=Surfaces.circleInPlanarFace(face,circle,vertices);
+        return !!(result&&result.contained);
+      }
+      function sourceEntity(record) {
+        return (record.sourceIds||[])[0];
+      }
+      g.recesses.forEach(function(record) {
+        if(record.kind!=='conical'||record.throughCandidate!==true) return;
+        var volume=Number.isInteger(record.volumeIndex)?(g.cavityVolumes||[])[record.volumeIndex]:null;
+        var circle=circleFor(record,volume);
+        var host=circle?hostFaces().find(function(face) {return faceContains(circle,face);}):null;
+        if(host) {
+          record.through=true;
+          record.throughConfirmed=true;
+          record.throughCandidate=true;
+          record.throughHostSource=host.sourceIds||null;
+          if(volume){volume.through=true;volume.throughCandidate=true;volume.openBottom=true;}
+          return;
+        }
+        var grouped=volume&&volume.group!==null&&volume.group!==undefined;
+        var floorEvidence=record.floorEvidence||
+          (record.bottomClosure==='open'?'open':record.bottomClosure==='apex'?'apex':'plane');
+        if(!grouped&&floorEvidence==='plane'&&Number.isInteger(record.bottomCurve)) {
+          var curve=g.curves[record.bottomCurve];
+          var faceIndex=g.faces.length;
+          g.faces.push(curve.displayVertices.slice());
+          record.through=false;
+          record.throughCandidate=false;
+          record.bottomClosure='plane';
+          delete record.throughConfirmed;
+          curve.recessMouth=undefined;
+          curve.throughOpening=undefined;
+          curve.recessBottom=true;
+          g.surfacePatches=(g.surfacePatches||[]).filter(function(p) {
+            return !(p&&p.throughOpening===true&&Array.isArray(p.boundaryCurves)&&
+              p.boundaryCurves.indexOf(record.bottomCurve)!==-1);
+          });
+          g.surfacePatches.push({kind:'plane',boundaryCurves:[record.bottomCurve],
+            faceIndices:[faceIndex],closure:'recess-bottom',recessBottom:true,
+            sourceIds:(record.sourceIds||[]).slice(),volumeIndex:record.volumeIndex,
+            memberRole:'bottom'});
+          if(volume){volume.through=false;volume.throughCandidate=false;volume.openBottom=false;}
+          if(Array.isArray(g.faceHoles))
+            while(g.faceHoles.length<g.faces.length) g.faceHoles.push([]);
+          return;
+        }
+        record.through=false;
+        record.throughCandidate=false;
+        record.bottomClosure=floorEvidence==='open'?'open':'unresolved';
+        record.exitUnresolved=true;
+        delete record.throughConfirmed;
+        if(volume){volume.through=false;volume.throughCandidate=false;volume.openBottom=true;}
+        if(Number.isInteger(record.bottomCurve)) {
+          var openCurve=g.curves[record.bottomCurve];
+          if(openCurve) {
+            openCurve.recessMouth=undefined;
+            openCurve.throughOpening=undefined;
+            openCurve.recessBottom=true;
+          }
+        }
+        if(!grouped) {
+          g.surfacePatches=(g.surfacePatches||[]).filter(function(p) {
+            return !(p&&p.throughOpening===true&&Array.isArray(p.boundaryCurves)&&
+              p.boundaryCurves.indexOf(record.bottomCurve)!==-1);
+          });
+        }
+        exitDiagnostics.push({code:'recess-exit-unresolved',entityId:sourceEntity(record),
+          message:'The taper bottom has host-silhouette evidence but no reconstructed host face contains the exit circle; the opening is retained without a fabricated floor.'});
+      });
+      return exitDiagnostics;
+    }
+
     function attachSurfaceModel(g) {
-      if (!g || g.surfaceModel || !Surfaces || !Surfaces.build) return g;
+      if (!g || g.surfaceModel || !Surfaces || !Surfaces.build) return applySubsetScope(g);
       var model = Surfaces.build(g);
       if (model) {
         g.surfaces = model.surfaces;
         g.surfaceModel = model.summary;
+        applyDisplaySync(g, model);
         if (opts.deferValidation) {
           g.analyticSurfaceValidation = {status:'pending', deferred:true,
             contract:'analytic-surface-v1'};
           g.analyticCertificate = {status:'pending', deferred:true,
             contract:'analytic-surface-certificate-v1'};
-          return g;
+          return applySubsetScope(g);
         }
         g.analyticSurfaceValidation = Surfaces.validate(model, g);
         g.analyticCertificate = Surfaces.certify(model, g);
         if (g.analyticSurfaceValidation) g.surfaceModel.status = g.analyticSurfaceValidation.status;
+        applySubsetScope(g);
       }
       return g;
     }
     function finish(result, stage, diagnostics) {
-      diagnostics = diagnostics || result.issues || [];
       result.pipeline = { version: 1, input: 'vertices-edges-curves', identity: declared ? 'explicit' : 'inferred',
-        stage: stage, diagnostics: diagnostics };
+        stage: stage, diagnostics: (diagnostics || result.issues || []).slice() };
+      mergeDisplaySyncResult(result);
       if (!result.determination) result.determination = result.status === 'ok' ? 'inferred' : 'underdetermined';
-      if (result.status === 'ok' && !result.label) result.label = diagnostics.length ?
-        'Partial 3D preview: ' + diagnostics[0].message : 'Geometry reconstructed from drawing primitives';
+      if (result.status === 'ok' && !result.label) result.label = result.issues.length ?
+        'Partial 3D preview: ' + result.issues[0].message : 'Geometry reconstructed from drawing primitives';
       if (opts && opts.correspondence === 'audit')
         result.correspondence = auditCorrespondence(list,
           result.geometry && result.geometry.profileMap);
@@ -2922,13 +3303,14 @@
       }).map(function(e) {return {code:'point-correspondence-missing',entityId:e.id,message:'This point has no reconstructed correspondence; add or link its observation in another view.'};});
     }
     if (topology) return finish(reconstructStrict(list,opts), 'declared-topology');
-    if (!curveInk.length && !oblique.curves.length) {
-      var straight = declared || profileBridge ? reconstructStrict(list,opts) : liveCore(list,opts.eps === undefined ? MATCH_EPS_MM : opts.eps);
-      var missing=unmatchedPoints(straight.geometry).concat(oblique.issues);
+    if (!curveInk.length && !oblique.curves.length && !analyticCurves.length) {
+      var straight = straightComponent(list);
+      var missing=unmatchedPoints(straight.geometry).concat(oblique.issues, analyticIssues);
       if(missing.length && straight.geometry) {straight.determination='partial';straight.geometry.topologyStatus='partial';}
-      if(oblique.issues.length && !straight.geometry && straight.determination!=='inconsistent') {
-        straight.reason=oblique.issues[0].code;
-        straight.label=oblique.issues[0].message;
+      if((oblique.issues.length || analyticIssues.length) && !straight.geometry && straight.determination!=='inconsistent') {
+        var firstIssue=oblique.issues[0] || analyticIssues[0];
+        straight.reason=firstIssue.code;
+        straight.label=firstIssue.message;
       }
       var straightValidation=validateInferredSurfaces(straight.geometry);
       if(straightValidation) straight.geometry.surfaceValidation=straightValidation;
@@ -2937,26 +3319,30 @@
       return finish(straight, 'surface-inference',straight.issues);
     }
     if (declared) {
-      // Explicit observations remain hard constraints. A curve centre or
-      // silhouette endpoint need not itself have two point observations,
-      // but contradictory coordinates or stale incidence cannot be ignored.
-      var check = Strict.reconstruct(normalized.filter(function(e) { return !Curves.isCurve(e); }),opts);
+
+
+
+      var check = Strict.reconstruct(normalized.filter(function(e) { return !Curves.isCurve(e) && !isConicSource(e); }),opts);
       if (check.determination === 'inconsistent') return finish(check,'correspondence',check.issues || []);
     }
     var lifted = curveInk.length ? Curves.reconstruct(normalized,opts) : {geometry:null,issues:[],consumedIds:[]};
     var geometry = lifted.geometry;
-    var diagnostics = lifted.issues.filter(function(d) {return !d.entityId || !obliqueIds.has(d.entityId);}).concat(oblique.issues);
+    var diagnostics = lifted.issues.filter(function(d) {return !d.entityId || !obliqueIds.has(d.entityId);})
+      .concat(oblique.issues, analyticIssues);
     diagnostics=diagnostics.filter(function(d,i,all) {
       return all.findIndex(function(p) {return p.code===d.code && p.entityId===d.entityId;})===i;
     });
     var used = new Set(lifted.consumedIds);
     oblique.consumedIds.forEach(function(id) {used.add(id);});
-    if (oblique.curves.length) {
+    exactGroupSegments.forEach(function(id) {used.add(id);});
+    analyticIds.forEach(function(id) {used.add(id);});
+    if (analyticCurves.length || oblique.curves.length) {
       if (!geometry) geometry = {name:'primitive surface',vertices:[],edges:[],faces:[],curves:[],spheres:[],surfacePatches:[],smoothSideFaces:[]};
       geometry.profileMap=frame;
       if(resolvedFrame.inferred && frame) geometry.profileInferred=true;
-      oblique.curves.forEach(function(c) {
-        var closed=c.kind==='circle', n=closed?24:Math.max(2,Math.ceil(24*c.sweepAngle/(2*Math.PI)-1e-7)), vo=geometry.vertices.length;
+      analyticCurves.concat(oblique.curves).forEach(function(c) {
+        var closed=c.kind==='circle'||c.kind==='ellipse'||c.closed===true;
+        var n=closed?24:Math.max(2,Math.ceil(24*c.sweepAngle/(2*Math.PI)-1e-7)), vo=geometry.vertices.length;
         c.displayVertices=[]; c.displayEdges=[];
         for (var i=0;i<(closed?n:n+1);i++) {
           geometry.vertices.push(Curves.point(c, c.startAngle+c.sweepAngle*i/n));
@@ -2969,9 +3355,13 @@
         geometry.curves.push(c);
       });
     }
-    // A circle in a general plane projects to ellipses. If tangent generator
-    // strokes support one apex on the base plane normal, infer a bounded cone
-    // and its planar cap. The oblique boundary itself stays the shared loop.
+    if (geometry) {
+      geometry.reservedConicIds = Array.from(exactGroupSegments);
+      geometry.consumedConicIds = Array.from(analyticIds);
+    }
+
+
+
     if (geometry && geometry.curves.some(function(c) {return c.oblique;}) && Curves.inferBoundedCones) {
       var cones = Curves.inferBoundedCones(geometry,normalized,frame);
       cones.consumedIds.forEach(function(id) {used.add(id);});
@@ -2980,28 +3370,49 @@
         return all.findIndex(function(p) {return p.code===d.code && p.entityId===d.entityId;})===i;
       });
     }
-    var consumedPoints = new Set(oblique.pointIds || []), neededPoints = new Set();
+    if (geometry && SurfaceInfer && SurfaceInfer.infer) {
+      var inferredSurfaces = SurfaceInfer.infer(geometry,normalized,frame,{used:used});
+      inferredSurfaces.consumedIds.forEach(function(id) {used.add(id);});
+      var inferredIds = new Set(inferredSurfaces.resolvedIds || []);
+      diagnostics = diagnostics.filter(function(d) {
+        return !(d.entityId && inferredIds.has(d.entityId) &&
+          ['unresolved-edge','curve-inclined-arc-unsupported'].indexOf(d.code) !== -1);
+      });
+      diagnostics = diagnostics.concat(inferredSurfaces.issues || []);
+    }
+    var consumedPoints = new Set((oblique.pointIds || []).concat(conic.pointIds || [],
+      lineLift.pointIds || [])), neededPoints = new Set();
     list.forEach(function(e) {
       var meta=e.meta || {}, refs=meta.endpointRefs || meta.refs || [];
       if (Curves.isCurve(e) || used.has(e.id)) refs.forEach(function(id) {consumedPoints.add(id);});
       else if (e.type === 'SEGMENT') refs.forEach(function(id) {neededPoints.add(id);});
     });
+    list.forEach(function(e) {
+      var meta=e.meta || {};
+      if (meta.ellipse && typeof meta.ellipse.centerRef === 'string')
+        consumedPoints.add(meta.ellipse.centerRef);
+      if (meta.centerRef && e.type === 'SEGMENT')
+        consumedPoints.add(meta.centerRef);
+    });
     var consumedMembers = new Set();
     normalized.forEach(function(e) { if(consumedPoints.has(e.id)) ((e.meta || {}).members || []).forEach(function(m) {consumedMembers.add(m.id);}); });
     normalized.forEach(function(e) { if(e.type==='POINT' && ((e.meta || {}).members || []).some(function(m) {return consumedMembers.has(m.id);})) consumedPoints.add(e.id); });
     var remaining = list.filter(function(e) {
-      return !Curves.isCurve(e) && !used.has(e.id) && !(e.type==='POINT' && consumedPoints.has(e.id) && !neededPoints.has(e.id));
+      return !Curves.isCurve(e) && !isConicSource(e) && !used.has(e.id) &&
+        !(e.type==='POINT' && consumedPoints.has(e.id) && !neededPoints.has(e.id));
     });
-    // Independent straight components can coexist with curved primitives.
-    // Their correspondence still uses the existing verified wire adapter.
-    var wire = declared ? reconstructStrict(remaining,opts) : liveCore(remaining,opts.eps === undefined ? MATCH_EPS_MM : opts.eps);
+
+
+    var wire = straightComponent(remaining);
     function coveredByWire(e,g) {
       if (e.type !== 'SEGMENT' || !g || !g.edges.length) return false;
       var role=e.viewRole, dx=e.x2-e.x,dy=e.y2-e.y,len=dx*dx+dy*dy;
-      if ((role!=='PLAN' && role!=='ELEVATION') || len<1e-12) return false;
+      var sideFrame=g.profileMap||frame;
+      if ((role!=='PLAN' && role!=='ELEVATION' && role!=='PROFILE') || role==='PROFILE'&&!sideFrame || len<1e-12) return false;
       var intervals=[];
       g.edges.forEach(function(edge) {
-        var ps=edge.map(function(v) { var p=g.vertices[v];return {x:p.x,y:role==='PLAN'?-p.z:p.y}; });
+        var ps=edge.map(function(v) { var p=g.vertices[v];return role==='PROFILE'?
+          {x:sideFrame.xRef+sideFrame.s*(p.z-sideFrame.dRef),y:p.y}:{x:p.x,y:role==='PLAN'?-p.z:p.y}; });
         if(ps.some(function(p) { return Math.abs((p.x-e.x)*dy-(p.y-e.y)*dx)>1e-6*Math.sqrt(len); })) return;
         var ts=ps.map(function(p) { return ((p.x-e.x)*dx+(p.y-e.y)*dy)/len; });
         intervals.push([Math.min.apply(null,ts),Math.max.apply(null,ts)]);
@@ -3011,11 +3422,16 @@
       for(var i=0;i<intervals.length;i++) {if(intervals[i][0]>reach+1e-6) break;reach=Math.max(reach,intervals[i][1]);}
       return reach>=1-1e-6;
     }
-    if (wire.geometry && wire.geometry.edges.length) {
+    if (wire.geometry && wire.geometry.vertices.length) {
       var wg = wire.geometry;
       diagnostics = diagnostics.filter(function(d) { var e=list.find(function(e) {return e.id===d.entityId;}); return !e || !coveredByWire(e,wg); });
+      if (wg.partialSubset) (wire.issues||[]).forEach(function(d) {
+        if (!diagnostics.some(function(p) {return p.code===d.code&&p.entityId===d.entityId;})) diagnostics.push(d);
+      });
       if (!geometry) geometry = Object.assign({},wg,{curves:[],surfacePatches:[]});
       else {
+        if(wg.partialSubset) geometry.partialSubset=true;
+        applySubsetScope(geometry);
         var offset=geometry.vertices.length;
         geometry.vertices=geometry.vertices.concat(wg.vertices);
         geometry.edges=geometry.edges.concat(wg.edges.map(function(e) {return e.map(function(v) {return v+offset;});}));
@@ -3027,7 +3443,7 @@
           outer:f.outer.map(function(v) {return v+offset;}), holes:f.holes.map(function(h) {return h.map(function(v) {return v+offset;});})}); });
       }
     }
-    // Unbounded lines/rays must not silently disappear from curve drawings.
+
     list.forEach(function(e) {
       if ((e.type === 'LINE' || e.type === 'RAY') && !(e.meta && (DROP_META[e.meta.kind] || e.meta.reconstructionRole === 'construction'))) {
         diagnostics.push({code:'unbounded-edge-unsupported',entityId:e.id,message:'An infinite line/ray needs finite edge endpoints or an explicit construction role.'});
@@ -3035,16 +3451,20 @@
     });
     if (!geometry) return finish({status:'unavailable',reason:diagnostics.length?diagnostics[0].code:'curve-projection-missing',
       label:diagnostics.length?diagnostics[0].message:'Needs another view of the curve.',geometry:null,issues:diagnostics},'primitive-lifting',diagnostics);
-    // Planar curve boundaries and straight boundaries share containment and
-    // hole inference. Keep ruled patches separate from their render facets.
+
+
     if (!(geometry.smoothSideFaces || []).length) {
-      var planar = extractPlanarFaces(geometry.vertices,geometry.edges);
+      var planar = extractPlanarFaces(geometry.vertices,geometry.edges,geometry.curves);
       geometry = Object.assign({},geometry,planar);
       geometry.surfaceComponents = planar.components || [];
       geometry.surfacePatches = (planar.faceRegions || []).map(function(region) {
         var indices = region.outer.slice();
         (region.holes || []).forEach(function(h) {indices=indices.concat(h);});
-        return {kind:'plane',outer:region.outer,holes:region.holes,
+        var regionKey = cyclicLoopKey(region.outer), faceIndices = [];
+        (geometry.faces || []).forEach(function(face, fi) {
+          if (cyclicLoopKey(face) === regionKey) faceIndices.push(fi);
+        });
+        return {kind:'plane',outer:region.outer,holes:region.holes,faceIndices:faceIndices,
           boundaryCurves:(geometry.curves || []).map(function(c,i) {return c.displayVertices.every(function(v) {return indices.indexOf(v)!==-1;})?i:-1;}).filter(function(i) {return i!==-1;})};
       });
       if (planar.topologyStatus && ['wire','inferred'].indexOf(planar.topologyStatus) === -1) {
@@ -3062,8 +3482,10 @@
       }
     });
     diagnostics = diagnostics.concat(unmatchedPoints(geometry,consumedPoints));
-    // Bounded analytic surface model: patch inference stays the source of the
-    // display, while each patch exposes its analytic family and ordered loops.
+
+
+    var exitDiagnostics=finalizeThroughCavities(geometry);
+    if(exitDiagnostics&&exitDiagnostics.length) diagnostics=diagnostics.concat(exitDiagnostics);
     attachSurfaceModel(geometry);
     if (opts.deferValidation) {
       geometry.surfaceValidation = {status:'pending', deferred:true};
@@ -3079,20 +3501,21 @@
 
   function reconstructStrict(entities, opts) {
     if (!Strict) throw new Error('Load educad-strict.js before educad-reconstruct.js for explicit reconstruction.');
-    // The exact path only accepts an explicitly declared side frame. Auto
-    // profile linking is a compatibility fallback, so an inferred frame is
-    // never fed into it here.
+
+
+
     var resolvedFrame = Array.isArray(entities) && Curves && Curves.resolveProfileFrame ?
       Curves.resolveProfileFrame(entities, opts || {}) : null;
     var profileFrame = resolvedFrame && resolvedFrame.profile && !resolvedFrame.inferred ? resolvedFrame.profile : null;
-    var result = Strict.reconstruct(autoMembersForStrict(entities, profileFrame), opts);
+    var strictRows = Array.isArray(entities) ? entities.filter(function(e) {return !isConicSource(e);}) : entities;
+    var result = Strict.reconstruct(autoMembersForStrict(strictRows, profileFrame), opts);
     var declaredTopology = opts && opts.topology || Array.isArray(entities) && entities.some(function(e) {
       return e && e.meta && e.meta.reconstructionTopology;
     });
     if (result.geometry && !result.geometry.faces.length && !declaredTopology) {
-      var g = result.geometry, planar = extractPlanarFaces(g.vertices, g.edges);
-      // Retain the exact declaration certificate separately from the inferred
-      // display. It certifies only declared vertices/edges, never these faces.
+      var g = result.geometry, planar = extractPlanarFaces(g.vertices, g.edges, g.curves);
+
+
       result.declaredGeometry = g;
       result.geometry = Object.assign({}, g, planar, { name: 'inferred surface preview',
         surfaceComponents: planar.components || [] });
@@ -3102,6 +3525,7 @@
       if (model) {
         result.geometry.surfaces = model.surfaces;
         result.geometry.surfaceModel = model.summary;
+        applyDisplaySync(result.geometry, model);
         if (opts && opts.deferValidation) {
           result.geometry.analyticSurfaceValidation = {status:'pending', deferred:true,
             contract:'analytic-surface-v1'};
@@ -3115,13 +3539,14 @@
         }
       }
     }
-    return result;
+    return mergeDisplaySyncResult(result);
   }
   function reconstructLive(entities, opts) {
     if (opts && opts.mode === 'strict') return reconstructStrict(entities, opts);
-    // Only explicit member declarations replace captions. Table-created
-    // points carry auto members (`point:<id>:<i>`); their captions are the
-    // live pairing rule, so keep them readable for name + x matching.
+    entities = Entities.withDeclaredMembers(entities);
+
+
+
     if (Entities && Array.isArray(entities) && entities.some(function (e) {
       return e && e.meta && e.meta.membersDeclared === true;
     })) entities = Entities.semanticEntities(entities, true);
@@ -3130,10 +3555,10 @@
     assertFinite(eps);
     if (!(eps > 0)) throw new Error('eps must be > 0');
     var list = Array.isArray(entities) ? entities.slice() : [];
-    // Drafting validates the side view separately so an unfinished or wrong
-    // side drawing does not erase a valid front/top preview (including curves).
+
+
     if (opts.ignoreProfile) list = list.filter(function (e) {
-      // Older saved sheets did not tag these side-transfer guides as helpers.
+
       return e && e.viewRole !== 'PROFILE' && !/^(?:proj-pf-|ref-X1Y1$|miter$)/.test(e.caption || '');
     });
     var claims = collectClaimLines(list);
@@ -3146,9 +3571,9 @@
         break;
       }
     }
-    // One or two claims cannot bound a face, so those sheets read as
-    // wire; three or more assert a lamina, and the claims reader owns
-    // the verdict (a broken claim fails named, never silently).
+
+
+
     if (claims.length >= 3) {
       var owned = runReader(list, eps, 'E');
       if (owned) return owned;
@@ -3166,20 +3591,21 @@
     return liveCore(list, eps);
   }
 
-  // Live wireframe core: every entity with a defined projection in
-  // both views resolves to 3D (see the builder contract above
-  // liveSideOf). Assumes the router already handled claims/curves.
+
+
+
   function liveCore(list, eps) {
-    // Own filter: same visibility/type/meta rules as filterEntities,
-    // but datum-touching verticals stay — an HP square side is not a
-    // projector, and true projectors self-skip (both endpoints
-    // resolve to one vertex).
+
+
+
+
     var kept = [];
     var ki;
     for (ki = 0; ki < list.length; ki++) {
       var ke = list[ki];
       if (!ke) continue;
       if (ke.visible === false) continue;
+      if (ke.meta && ke.meta.reconstructionRole === 'construction') continue;
       if (!KEEP_TYPES[ke.type]) continue;
       var kkind = ke.meta && ke.meta.kind;
       if (kkind && DROP_META[kkind]) continue;
@@ -3198,28 +3624,28 @@
         else if (s === 'datum') dp.push(e);
       } else if (e.type === 'SEGMENT' || e.type === 'LINE' ||
           e.type === 'RAY') {
-        // Cross-view banked claims are declarations, not ink: on a
-        // sheet with fewer than three claims the dots still read as
-        // wire, but the projector line itself never draws as an edge.
-        // Same-view member lines are drawn edges — the choice they
-        // carry narrows candidacy (see parentClaim) instead.
+
+
+
+
+
         var fm = e.meta && e.meta.fromMember;
         if (fm !== undefined && fm !== null && String(fm) !== '' &&
             crossesXY(e)) continue;
-        // Projector-shaped ink never evidences edges: a sheet-vertical
-        // strictly spanning both views is a helper even when untagged,
-        // and its span would otherwise vouch for face chords across
-        // stacked stations. Strictly spanning only — a vertical with an
-        // end exactly on XY (resting outline) still draws. Claims keep
-        // the looser crossesXY: their feet land on the datum by design.
+
+
+
+
+
+
         var vyl = Math.min(e.y, e.y2), vyh = Math.max(e.y, e.y2);
         if (isSheetVertical(e) && vyl < 0 && vyh > 0) continue;
         segs.push(e);
       }
     }
-    // Claimed-line candidacy, one entry per kept segment (see
-    // parentClaim). Runs after buckets fill — the claimed-end check
-    // reads the kept dots.
+
+
+
     var segClaims = [];
     for (i = 0; i < segs.length; i++) segClaims.push(parentClaim(segs[i]));
     var verts = [];
@@ -3244,11 +3670,11 @@
       return verts.length - 1;
     }
     function basesOf(ent) { return captionBases(ent.caption); }
-    // Strict projector rule: a VP dot and an HP dot lift to 3D only
-    // when a drawn projector line physically connects them — same
-    // base name plus same x-station is not enough. Correspondence
-    // ink only (user lines, projector records, untagged verticals);
-    // lesson traces (axis, locus, named readers) never connect.
+
+
+
+
+
     function isProjectorInk(e) {
       if (!e || e.visible === false) return false;
       if (e.type !== 'SEGMENT' && e.type !== 'LINE' &&
@@ -3281,12 +3707,12 @@
       }
       return false;
     }
-    // Pass A0: claimed projector pairs — the student's corner choice
-    // decides. One claim pairs its two refs (plan + elevation feet)
-    // even where names fail or collide; anything unresolvable
-    // (missing refs, non-point feet, one-view feet, station
-    // disagreement, non-projector claim line, feet off the line span)
-    // is ignored and positional pairing runs untouched.
+
+
+
+
+
+
     var byId = {};
     for (i = 0; i < list.length; i++) {
       if (list[i] && typeof list[i].id === 'string') byId[list[i].id] = list[i];
@@ -3329,10 +3755,10 @@
       claim('vp', cvi, 'vp', cvv);
       claim('hp', chi, 'hp', cvv);
     }
-    // Pass A: named pairs (exactly one VP + one HP owner per base at
-    // the same x-station). The name + station is enough: projection
-    // lines are decoration, not evidence. Anything ambiguous stays
-    // 2D-only.
+
+
+
+
     var ownersV = {}, ownersH = {}, bi, b;
     for (i = 0; i < vp.length; i++) {
       var bv = basesOf(vp[i]);
@@ -3369,17 +3795,17 @@
         claim('hp', qi, 'hp', v);
       }
     }
-    // Pass A1: drawn projector claims — a projector-shaped line
-    // (sheet-vertical, crossing XY, the same shape Check grades)
-    // pairs the same-letter corners stacked on it, so the drawing
-    // declares correspondence and no menu asks. Runs after Pass A
-    // so positional pairs keep their slots (a projector can only
-    // agree with a unique pair or rescue an ambiguous one, never
-    // contradict it); banked claims still lead in A0. Only
-    // correspondence ink reads (user lines, projector records,
-    // untagged verticals); lesson traces (axis, locus, named
-    // readers) never claim. One owner per base per side or the
-    // base stays out; banked feet keep precedence per corner.
+
+
+
+
+
+
+
+
+
+
+
     for (i = 0; i < list.length; i++) {
       var ple = list[i];
       if (!ple || ple.visible === false) continue;
@@ -3435,9 +3861,9 @@
         claim('hp', ppOwn[0], 'hp', pvv);
       }
     }
-    // Pass B: datum wildcard pairs (exactly one datum dot + one mate
-    // on exactly one side, linked by a drawn projector), plus
-    // same-station datum/datum twins on a projector.
+
+
+
     var ownersD = {};
     for (i = 0; i < dp.length; i++) {
       var bd = basesOf(dp[i]);
@@ -3490,9 +3916,9 @@
         claim('hp', matesH[0], 'hp', v2);
       }
     }
-    // Pass C: unnamed auto-pairs (exactly one free unnamed dot per
-    // side per station AND linked by a drawn projector; datum dots
-    // never auto-pair).
+
+
+
     function unnamedAt(arr, used, idx) {
       return !used[idx] && basesOf(arr[idx]).length === 0;
     }
@@ -3527,10 +3953,10 @@
       claim('vp', ui, 'vp', vu);
       claim('hp', wi, 'hp', vu);
     }
-    // Edge pass, tier 1: a segment determining exactly one vertex
-    // pair emits it (trust the drawing). Tier 2 (coincident stacks):
-    // a pair needs both-views consistency — its mate projection
-    // drawn, or degenerated to a point for view-perpendicular edges.
+
+
+
+
     function pairKey(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
     function resolveSide(dots, x, y) {
       var out = [];
@@ -3545,9 +3971,9 @@
       }
       return out;
     }
-    // A claimed parent endpoint is an end whose dot carries the
-    // member base — self-validating, refs-free: renamed dots carry
-    // nothing and the line resolves geometrically, as before.
+
+
+
     function dotCarries(x, y, base) {
       var buckets = [vp, hp, dp];
       for (var nb = 0; nb < buckets.length; nb++) {
@@ -3587,7 +4013,7 @@
           var endpoint = cl.endpoints[ei];
           if (!endpoint.member) continue;
           if (Math.hypot(endpoint.x - x, endpoint.y - y) <= eps) {
-            // Explicit endpoints never fall back to another overlapping corner.
+
             return all.filter(function (v) { return vBase[v] === endpoint.member; });
           }
         }
@@ -3626,15 +4052,15 @@
       seenEdge[key] = true;
       edges.push([a, b]);
     }
-    // Split segments at paired dots: a ring edge's projection is
-    // often a subsegment of a longer drawn line (hexagon edge inside
-    // the elevation base), and only splitting reveals it. Both sides'
-    // dots split every segment; views never share y except datum.
-    // A split is a guess, not ink: only unsplit drawn segments keep
-    // tier-1 blind trust. Split wholes and their pieces join tier-2
-    // and need their mate projection drawn, so crossed (not jointed)
-    // dots on inclined sheets emit no phantom edges — while a whole
-    // line through a crossing still counts once its mate confirms it.
+
+
+
+
+
+
+
+
+
     var allDots = [];
     for (i = 0; i < vpDots.length; i++) {
       for (var idv = 0; idv < vpDots[i].length; idv++) {
@@ -3745,15 +4171,15 @@
       if (side === 'vp') return { x: verts[vert].x, y: verts[vert].y };
       return { x: verts[vert].x, y: -verts[vert].z };
     }
-    // No subsumption. Candidate diagonals stay in the wire until the
-    // face pass below absorbs them: an edge strictly inside a planar
-    // face is not a solid edge and is removed there.
+
+
+
     var keptEdges = edges.slice();
-    // Joint pass: a confirmed pair from a split whole is the spanning
-    // artifact — not an edge — when a jointed midpoint's both
-    // sub-pairs survived in both views (a T-joint voids its span).
-    // A merely crossed midpoint's sub-pairs never survive, so the
-    // spanning pair stands. Unsplit tier-1 is never tested.
+
+
+
+
+
     function strictlyInside(vertC, vertA, vertB, side) {
       var p = projPt(vertA, side), q = projPt(vertB, side),
         r = projPt(vertC, side);
@@ -3780,10 +4206,10 @@
       }
       return true;
     });
-    // Edge evidence gate: a 3D edge needs a drawn projection in BOTH
-    // views. One line may cover several edges when their projections
-    // coincide/collapse (flat square elevation), but a line in one
-    // view never invents an edge missing from the other view.
+
+
+
+
     function segViewSide(sg) {
       if (sg.viewRole === 'ELEVATION') return 'elev';
       if (sg.viewRole === 'PLAN') return 'plan';
@@ -3893,6 +4319,7 @@
     reconstruct: reconstruct,
     reconstructStrict: reconstructStrict,
     reconstructLive: reconstructLive,
+    mergeDisplaySyncResult: mergeDisplaySyncResult,
     validateSurfaces: validateSurfaces
   };
 });

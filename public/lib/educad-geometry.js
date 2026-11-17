@@ -3,8 +3,8 @@
   else root.EduCADGeometry = factory(root.EduCADParametric);
 })(typeof window !== 'undefined' ? window : globalThis, function (Parametric) {
   'use strict';
-  // Entity angles are degrees CCW in world coordinates. Screen tolerance is
-  // converted at the boundary; geometry and coverage stay in millimeters.
+
+
   var RAD = Math.PI / 180, EPS = 1e-9, INTERVAL_EPS = 32 * Number.EPSILON;
   function degrees(a) { return ((a % 360) + 360) % 360; }
   function arcSweep(start, end) { return degrees(degrees(end) - degrees(start)); }
@@ -26,8 +26,8 @@
       return Math.hypot(dx - e.radius * Math.cos(a * RAD), dy - e.radius * Math.sin(a * RAD));
     }));
   }
-  // Exact intervals where a query segment lies inside a segment's tolerance
-  // capsule (rectangle plus endpoint disks). Union these instead of sampling.
+
+
   function capsuleIntervals(a, b, c, d, tolerance) {
     var out = [], vx = b.x - a.x, vy = b.y - a.y, q2 = vx * vx + vy * vy;
     function disk(p) {
@@ -70,13 +70,13 @@
     }
     return false;
   }
-  // Chord error, rather than a fixed count, controls curved coverage.
+
   function roundSegments(e, error) {
     var sweep = e.type === 'CIRCLE' ? 360 : arcSweep(e.startAngle, e.endAngle);
     if (!(e.radius > 0) || !sweep) return [];
     var angle = 2 * Math.acos(Math.max(-1, Math.min(1, 1 - error / e.radius)));
     var count = Math.max(1, Math.ceil(sweep * RAD / Math.max(angle, 1e-9)));
-    if (count > 32768) return null; // Never certify coverage beyond the error budget.
+    if (count > 32768) return null;
     var out = [], start = e.type === 'CIRCLE' ? 0 : e.startAngle;
     function at(i) { var a = (start + sweep * i / count) * RAD; return { x: e.x + e.radius * Math.cos(a), y: e.y + e.radius * Math.sin(a) }; }
     var a = at(0);

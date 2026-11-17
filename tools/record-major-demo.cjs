@@ -1,6 +1,6 @@
 'use strict';
-// Record the original Major UI against a disposable, seeded demo server.
-// EDUCAD_PLAYWRIGHT_MODULE=/tmp/major-demo-tools/node_modules/playwright node tools/record-major-demo.cjs
+
+
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require(process.env.EDUCAD_PLAYWRIGHT_MODULE||'playwright');
 const out=path.resolve(process.env.DEMO_OUTPUT||'output/major-demo');
@@ -51,7 +51,6 @@ fs.mkdirSync(path.join(out,'stills'),{recursive:true});
  await scene('23 | Guided tutorials','Square and prism tutorials guide construction step by step, with Back, Next, Restart and Exit controls.',async()=>{await click('#pose-exit');await click('#btn-mode-edit');await settings();await page.selectOption('#sel-tut','square');await closeSettings()},8);
  await scene('24 | Learn one step at a time','Follow the highlighted construction step, then move forward. Signed-in users can track completed lessons.',async()=>{await click('#tut-next');await pause(1200);await click('#tut-next')},7);
  await scene('25 | Display and inspection preferences','Settings controls guides, 3D preview, coordinate readouts and command behaviour, plus 2D and 3D inspection options.',async()=>{await click('#tut-exit');await settings()},8);
- await scene('26 | Built-in manual','The manual explains drawing gestures, precision, projections, 3D reconstruction, commands and classroom features.',async()=>{await page.goto(base+'/manual.html');await page.locator('h1').first().waitFor()},7);
  await scene('27 | Teacher studio','Teachers manage classes, question sets and model answers. This recording uses a separate local demonstration account.',()=>login('teacher'),8);
  await scene('28 | Save a drawing','Signed-in users can save a named sheet to their account and reopen it from Drawings.',async()=>{await page.goto(base+'/index.html?draw=1');await page.waitForFunction(()=>window.educadHandle?.drafting);await demo('3view');await click('#btn-save');await pause(600);await click('#btn-drawings')},8);
  await scene('28 | Create a class','A class has a title and a shareable code. Students use that code to join the class.',async()=>{await page.goto(base+'/teacher.html');await page.getByPlaceholder('Class code, e.g. be-a-2026').fill('major-demo');await page.getByPlaceholder('Title, e.g. BE-A Engineering Graphics').fill('Engineering Graphics - Demo');await page.getByText('Create class',{exact:true}).click();await pause(500)},7);

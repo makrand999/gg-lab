@@ -6,14 +6,14 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD Phase 4 constraint and geometry solver.
-  // World coordinates in mm only inside entities and solvers; screen px is
-  // ephemeral render only and never enters the solver. Projector invariant:
-  // elevation x equals plan x (mm). Analytic O(1) rigid-cluster pass plus a
-  // damped Levenberg-Marquardt fallback (lambda x10 after 5 rising
-  // residuals, 50 iteration cap, snapshot revert plus solver:unresolved
-  // event, delta clamp 50 mm). Zero dependencies. Dual-env: browser via
-  // window.EduCADSolver, plain Node via module.exports. No 3D.
+
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '4.0.0-educad';
   var MAX_ITERATIONS = 50;
@@ -87,7 +87,7 @@
     return v;
   }
 
-  // Line rotation: PL = TL cos theta, EL = TL cos phi.
+
   function planLength(TL, thetaDeg) {
     assertFinite(TL, thetaDeg);
     if (TL < 0) throw new Error('TL must be >= 0');
@@ -110,13 +110,13 @@
     };
   }
 
-  // Locus of B-prime: y = y(a-prime) + TL sin theta.
+
   function locusBPrimeY(yaPrime, TL, thetaDeg) {
     assertFinite(yaPrime, TL, thetaDeg);
     return yaPrime + TL * Math.sin(thetaDeg * DEG);
   }
 
-  // Locus of B: y = y(a) - TL sin phi.
+
   function locusBY(ya, TL, phiDeg) {
     assertFinite(ya, TL, phiDeg);
     return ya - TL * Math.sin(phiDeg * DEG);
@@ -134,7 +134,7 @@
     return Math.acos(clampUnit(EL / TL)) / DEG;
   }
 
-  // Alpha/beta via tans: atan2(opposite, adjacent).
+
   function alphaBeta(o) {
     o = o || {};
     assertFinite(o.TL, o.PL, o.EL);
@@ -147,11 +147,11 @@
     };
   }
 
-  // Physical feasibility: a real 3D line satisfies sin^2 theta +
-  // sin^2 phi <= 1 (equivalently theta + phi <= 90 deg for angles in
-  // [0, 90]). Beyond that, dx^2 = TL^2(1 - sin^2t - sin^2p) < 0 and the
-  // clamped dx = 0 silently describes an impossible line. Tolerance 1e-9
-  // keeps exact boundary cases (e.g. 45/45 deg) feasible under fp error.
+
+
+
+
+
   var FEAS_TOL = 1e-9;
 
   function lineFeasibility(o) {
@@ -167,7 +167,7 @@
     };
   }
 
-  // Projector dx consistency via sqrt.
+
   function projectorDxFromTL(o) {
     o = o || {};
     assertFinite(o.TL, o.dh, o.dd);
@@ -180,7 +180,7 @@
     return Math.sqrt(Math.max(0, o.PL * o.PL + o.EL * o.EL - o.TL * o.TL));
   }
 
-  // Trapezoidal true length: TL from PL with dh, TL from EL with dd.
+
   function trueLengthFromPlan(PL, dh) {
     assertFinite(PL, dh);
     return Math.sqrt(PL * PL + dh * dh);
@@ -191,7 +191,7 @@
     return Math.sqrt(EL * EL + dd * dd);
   }
 
-  // 3-step rabattement: chained arcs of radius TL splitting sweepDeg in 3.
+
   function rabattement(o) {
     o = o || {};
     var ax = (o.ax === undefined) ? 0 : o.ax;
@@ -224,8 +224,8 @@
     assertFinite(p.x, p.y, q.x, q.y);
     var dy = q.y - p.y;
     if (Math.abs(dy) < 1e-12) {
-      // Collinear with XY (line lies in the ground line): every point is
-      // an intersection; report the segment midpoint with a flag.
+
+
       if (Math.abs(p.y) < 1e-12 && Math.abs(q.y) < 1e-12) {
         return { x: (p.x + q.x) / 2, y: 0, collinear: true };
       }
@@ -235,7 +235,7 @@
     return { x: p.x + t * (q.x - p.x), y: 0 };
   }
 
-  // HT/VT traces through the XY ground line plus vertical projector mates.
+
   function traces(o) {
     o = o || {};
     var hp = lineXYIntersection(o.planA, o.planB);
@@ -257,7 +257,7 @@
     };
   }
 
-  // Damping policy: lambda x10 after 5 rising residuals.
+
   function dampingBoost(lambda, rises) {
     assertFinite(lambda, rises);
     return rises >= RISING_LIMIT ? lambda * LAMBDA_FACTOR : lambda;
@@ -284,7 +284,7 @@
         var a = map[ev];
         if (!a) return;
         for (var i = 0; i < a.length; i++) {
-          try { a[i](data); } catch (e) { /* listener errors never break solve */ }
+          try { a[i](data); } catch (e) {                                         }
         }
       }
     };
@@ -339,8 +339,8 @@
     return x;
   }
 
-  // Damped Levenberg-Marquardt: 50 iteration cap, delta clamp 50 mm,
-  // snapshot revert plus solver:unresolved event on failure.
+
+
   function lmSolve(x0, residualFn, emitFn, opts) {
     opts = opts || {};
     if (!Array.isArray(x0) || x0.length === 0) {
@@ -416,7 +416,7 @@
     }
     try {
       emitFn('solver:unresolved', { residual: res, iterations: it, lambda: lambda });
-    } catch (e) { /* emit never breaks solve */ }
+    } catch (e) {                               }
     return {
       ok: false, x: snapshot, residual: res, iterations: it,
       lambda: lambda, lambdaTrace: trace, reverted: true,
@@ -457,7 +457,7 @@
     return { ok: false, iters: 1, iterations: 1, values: cloneState(state), method: 'analytic', reason: reason };
   }
 
-  // Analytic O(1) rigid-cluster pass: fixed sweep count, no iteration.
+
   function solveAnalytic(state, constraints) {
     if (!state || typeof state !== 'object') throw new Error('state must be an object');
     if (!Array.isArray(constraints)) throw new Error('constraints must be an array');
@@ -536,7 +536,7 @@
     return varNames.length;
   }
 
-  // One-call Monge line solve: rotation + loci + dx + angle check.
+
   function solveMongeLine(o) {
     o = o || {};
     assertFinite(o.TL, o.thetaDeg, o.phiDeg, o.yaPlan, o.yaElev);

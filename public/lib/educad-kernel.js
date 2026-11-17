@@ -2,6 +2,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = factory({
       Surfaces:require('./educad-surfaces.js'),
+      Implicit:require('./educad-implicit.js'),
       Predicates:require('./educad-predicates.js'),
       Planar:require('./educad-planar.js'),
       Correspondence:require('./educad-correspondence.js'),
@@ -11,6 +12,7 @@
   } else {
     root.EduCADKernel = factory({
       Surfaces:root.EduCADSurfaces,
+      Implicit:root.EduCADImplicit,
       Predicates:root.EduCADPredicates,
       Planar:root.EduCADPlanar,
       Correspondence:root.EduCADCorrespondence,
@@ -34,6 +36,8 @@
       silhouetteHlr:'silhouette-hlr-v1',
       torusSection:'torus-section-v1',
       torusQuadric:'torus-quadric-v1',
+      implicitSurface:'implicit-surface-v1',
+      implicitIntersection:'implicit-intersection-v1',
       featureGraph:'feature-graph-v1',
       correspondence:'correspondence-audit-v1',
       constraint:'constraint-report-v1',
@@ -50,6 +54,7 @@
       exactness:['exact-decimal-rational','numeric']
     },
     Surfaces:modules.Surfaces,
+    Implicit:modules.Implicit,
     Predicates:modules.Predicates,
     Planar:modules.Planar,
     Correspondence:modules.Correspondence,

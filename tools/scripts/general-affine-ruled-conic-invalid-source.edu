@@ -1,0 +1,26 @@
+# expect: 48V 96E 50F rawFaces=50 faceBindings=ok curves=2 surfaces=3 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred previewParity=ok
+# conic-query: {"index":0,"expect":{"analyticVolume":12985.249634837812,"volumePatch":{"kind":"affine-ruled-conic-volume"}}}
+# surface-query: {"operation":"reference-audit","invalid":"E46","corrupt":[{"id":"E46","refs":["missing-a","missing-b"],"endpointRefs":["missing-a","missing-b"]}],"expect":{"status":"ok","determination":"partial","vertices":48,"edges":96,"faces":50,"generatorLines":3,"generatorSourceIds":["E47","E48","E49","E50","E51"],"invalidInGeneratorEvidence":false,"invalidInSurfaceSource":false,"diagnostics":["conic-observation-reference-missing"],"issueEntities":["E46"]}}
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/ellipse 0 -40 10 3 8 A plan
+/ellipse 0 40 10 6 8 A elevation
+/point p 0 -10 plan
+/point "p'" 0 20 elevation
+/point q 0 -43 plan
+/point "q'" 0 46 elevation
+/point a -20 0 plan
+/point "a'" -20 0 elevation
+/point b 20 0 plan
+/point "b'" 20 0 elevation
+/point c -10 -40 plan
+/point "c'" -10 40 elevation
+/point d 10 -40 plan
+/point "d'" 10 40 elevation
+/line a c A plan
+/line b d A plan
+/line "a'" "c'" A elevation
+/line "b'" "d'" A elevation
+/line p q A plan
+/line "p'" "q'" A elevation

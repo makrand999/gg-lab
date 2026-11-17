@@ -1,8 +1,3 @@
-# Conflict case: the floor face edge extends from the floor tangent point
-# (10,0) into the fillet instead of away from it (towards x=-10). The arc is
-# still tangent and the paired generator lines are drawn, but the face has no
-# material-side extent on the correct side. The fillet is refused with a
-# tangency conflict rather than being approximated.
 # expect: 14V 12E 0F fillets=0 curves=2 surfaces=0 surfaceKinds=none surfaceLoops=0 surfaceShells=0 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=partial surfaceCertificateIssues=certificate-empty-model surfaceLineBoundaries=0 surfaceSharedLineBoundaries=0 surfaceValidation=none diagnostics=fillet-tangent-conflict,point-correspondence-missing,unresolved-edge unresolved=7 status=partial
 /datum -100 400
 /point w0 0 10 elevation

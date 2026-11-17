@@ -1,4 +1,3 @@
-# plate-t-junction
 # expect: 6V 6E 1F open=1 boundary=5
 /datum -100 400
 /point v0 0 -10 plan

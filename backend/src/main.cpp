@@ -1,23 +1,23 @@
-// EduCAD C++ backend: static file server for public/ + JSON API.
-// Serves public/ plus the JSON API (login, drawings, progress, sets, classes).
-//
-//   educad-server [port]   (default 8124; $PORT fallback; +10 busy retry)
-//   env: EDUCAD_ROOT (default <exe>/../../public)
-//        EDUCAD_DB   (default <exe>/../data/educad.db, outside served root)
-//
-// Static files + auth (POST /api/login, POST /api/logout, GET /api/me)
-// + saves (GET/POST /api/drawings, GET/PUT/DELETE /api/drawings/:id,
-// GET /api/progress, PUT /api/progress/:lesson)
-// + question sets (GET/POST /api/sets, GET/DELETE /api/sets/:code,
-// GET/POST /api/sets/:code/submissions, POST /api/sets/:code/verify,
-// PUT/DELETE /api/sets/:code/questions/:qi/model,
-// PUT /api/sets/:code/questions/:qi/check, GET /api/submissions/mine,
-// GET /api/submissions/:id, PUT /api/submissions/:id/grade)
-// + classes (GET/POST /api/classes, GET/DELETE /api/classes/:code,
-// POST /api/classes/:code/join, POST /api/classes/:code/leave,
-// GET /api/classes/:code/members, GET /api/classes/:code/sets)
-// + natural language (POST /api/interpret: words to slash commands).
-// Sets carry an optional class_id (NULL = open set, solvable by code).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #include <algorithm>
 #include <cctype>
@@ -74,7 +74,7 @@ std::string trimWs(const std::string &s) {
   return s.substr(a, b - a);
 }
 
-// Percent-decode; false on invalid encoding (caller answers 400).
+
 bool pctDecode(const std::string &in, std::string *out) {
   out->clear();
   out->reserve(in.size());
@@ -94,7 +94,7 @@ bool pctDecode(const std::string &in, std::string *out) {
   return true;
 }
 
-// path.posix.normalize: collapse slashes, resolve . and .. (clamped at root).
+
 std::string posixNormalize(const std::string &p) {
   std::vector<std::string> parts;
   std::string cur;
@@ -148,7 +148,7 @@ std::string contentTypeFor(const std::string &ext0) {
   return "application/octet-stream";
 }
 
-// URL-safe base64 without padding, for opaque session tokens.
+
 std::string base64UrlNoPad(const unsigned char *data, size_t len) {
   static const char *kB64 =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -223,16 +223,16 @@ class Db {
       sqlite3_free(err);
       throw std::runtime_error("schema error: " + e);
     }
-    // Migration for databases created before classes existed: the new
-    // tables come from the schema above, but the class_id column must be
-    // added to the existing sets table. Re-running on a migrated db
-    // fails with "duplicate column" — that error is ignored on purpose.
+
+
+
+
     err = nullptr;
     sqlite3_exec(db_, "ALTER TABLE sets ADD COLUMN class_id INTEGER;",
                  nullptr, nullptr, &err);
     sqlite3_free(err);
-    // Migration for grading + auto-check: new columns on submissions.
-    // Duplicate-column errors are ignored on purpose (idempotent).
+
+
     const char *kSubMig[] = {
         "ALTER TABLE submissions ADD COLUMN verdict TEXT NOT NULL DEFAULT '';",
         "ALTER TABLE submissions ADD COLUMN remarks TEXT NOT NULL DEFAULT '';",
@@ -281,7 +281,7 @@ class Db {
     return ok;
   }
 
-  // Preserve the local account ID on every verified ERP sign-in.
+
   bool upsertErpStudent(const json &profile, User *out) {
     const std::string email = profile.at("email").get<std::string>();
     const std::string name = profile.at("name").get<std::string>();
@@ -324,7 +324,7 @@ class Db {
     return true;
   }
 
-  // Returns the raw token (only shown once); only its hash is stored.
+
   std::string createSession(long userId) {
     unsigned char tok[32];
     randombytes_buf(tok, sizeof tok);
@@ -461,8 +461,8 @@ class Db {
     return ok;
   }
 
-  // Null title/data means "leave unchanged". False when the row is missing
-  // (or not owned); updatedAt receives the new timestamp on success.
+
+
   bool updateDrawing(long userId, long id, const std::string *title,
                      const std::string *data, long *updatedAt) {
     if (!title && !data) return false;
@@ -546,7 +546,7 @@ class Db {
   struct Submission {
     long id = 0, setId = 0, userId = 0, createdAt = 0;
     int questionIndex = 0;
-    // autoPass: -1 = not checked (no model / check off), 0 = fail, 1 = pass.
+
     int autoPass = -1;
     double autoScore = 0;
     bool hasAutoScore = false;
@@ -554,7 +554,7 @@ class Db {
     std::string verdict, remarks, autoDetails;
   };
 
-  // Fill a Set row from the shared SELECT shape below (columns 0-9).
+
   static void readSetRow(sqlite3_stmt *st, Set *s) {
     s->id = (long)sqlite3_column_int64(st, 0);
     s->code = (const char *)sqlite3_column_text(st, 1);
@@ -579,8 +579,8 @@ class Db {
            " LEFT JOIN classes c ON c.id=s.class_id";
   }
 
-  // Returns new id, -2 when the code is taken, -1 on other errors.
-  // classId <= 0 stores NULL (open set, solvable by code).
+
+
   long createSet(long ownerId, const std::string &code, const std::string &title,
                  const std::string &questions, long classId) {
     std::lock_guard<std::mutex> l(mu_);
@@ -609,7 +609,7 @@ class Db {
     return id;
   }
 
-  // ownerId < 0 lists every set (academics); otherwise only the owner's.
+
   std::vector<Set> listSets(long ownerId) {
     std::vector<Set> out;
     std::lock_guard<std::mutex> l(mu_);
@@ -628,7 +628,7 @@ class Db {
     return out;
   }
 
-  // Student feed: open sets plus sets posted to joined classes.
+
   std::vector<Set> listSetsForStudent(long userId) {
     std::vector<Set> out;
     std::lock_guard<std::mutex> l(mu_);
@@ -682,7 +682,7 @@ class Db {
     return ok;
   }
 
-  // Returns new id, -2 when the code is taken, -1 on other errors.
+
   long createClass(long ownerId, const std::string &code, const std::string &title) {
     std::lock_guard<std::mutex> l(mu_);
     sqlite3_stmt *st = nullptr;
@@ -740,8 +740,8 @@ class Db {
     return ok;
   }
 
-  // Academics (scope "all") see every class; teachers ("own") their own;
-  // students ("joined") the classes they joined.
+
+
   std::vector<Class> listClasses(const std::string &scope, long userId) {
     std::vector<Class> out;
     std::lock_guard<std::mutex> l(mu_);
@@ -763,9 +763,9 @@ class Db {
     return out;
   }
 
-  // Deletes the class, its memberships, and unlinks its sets (they become
-  // open sets). Done explicitly: foreign-key enforcement is off, so the
-  // schema's ON DELETE clauses are documentation, not behavior.
+
+
+
   bool deleteClass(long classId, long callerId, bool isAdmin) {
     std::lock_guard<std::mutex> l(mu_);
     sqlite3_stmt *st = nullptr;
@@ -803,7 +803,7 @@ class Db {
     return ok;
   }
 
-  // Idempotent: joining twice reports joined=false, never an error.
+
   bool joinClass(long classId, long userId, bool *joined) {
     std::lock_guard<std::mutex> l(mu_);
     sqlite3_stmt *st = nullptr;
@@ -873,8 +873,8 @@ class Db {
     return ok;
   }
 
-  // autoPass: -1 = not checked, 0 = fail, 1 = pass. hasScore guards
-  // autoScore; autoDetails carries the counts JSON (never model coords).
+
+
   long createSubmission(long setId, long userId, int qIndex, const std::string &note,
                         const std::string &data, int autoPass, bool hasScore,
                         double autoScore, const std::string &autoDetails) {
@@ -936,8 +936,8 @@ class Db {
   }
 
   static void readSubmissionExtra(sqlite3_stmt *st, int base, Submission *s) {
-    // base: index of verdict column; layout verdict,remarks,auto_pass,
-    // auto_score,auto_details (5 columns).
+
+
     const unsigned char *v = sqlite3_column_text(st, base);
     const unsigned char *r = sqlite3_column_text(st, base + 1);
     s->verdict = v ? (const char *)v : "";
@@ -1085,7 +1085,7 @@ bool bearerToken(const httplib::Request &req, std::string *out) {
   return !out->empty();
 }
 
-// 401 + false when the request carries no valid session token.
+
 bool requireAuth(Db &db, const httplib::Request &req, httplib::Response &res,
                  Db::User *out) {
   std::string token;
@@ -1096,7 +1096,7 @@ bool requireAuth(Db &db, const httplib::Request &req, httplib::Response &res,
   return true;
 }
 
-// Parse a JSON object body with a size cap; on failure sends 413/400.
+
 bool jsonBody(const httplib::Request &req, httplib::Response &res, size_t maxBody,
               json *out) {
   if (req.body.size() > maxBody) {
@@ -1135,7 +1135,7 @@ bool validLesson(const std::string &lesson) {
   return true;
 }
 
-// Teacher-chosen set codes: short, URL-safe, no slashes (they sit in paths).
+
 bool validCode(const std::string &code) {
   if (code.size() < 3 || code.size() > 24) return false;
   for (char c : code) {
@@ -1147,8 +1147,8 @@ bool validCode(const std::string &code) {
 bool isTeacher(const Db::User &u) { return u.role == "teacher" || u.role == "academics"; }
 bool isAdmin(const Db::User &u) { return u.role == "academics"; }
 
-// Splits /api/sets/<code>[/submissions] into (code, tail). False when the
-// path is not under the prefix or the code segment is empty.
+
+
 bool splitSetPath(const std::string &path, std::string *code, std::string *tail) {
   static const std::string pre = "/api/sets/";
   if (path.size() <= pre.size() || path.compare(0, pre.size(), pre) != 0) return false;
@@ -1164,7 +1164,7 @@ bool splitSetPath(const std::string &path, std::string *code, std::string *tail)
   return !code->empty();
 }
 
-// Splits /api/classes/<code>[/join|/leave|/members|/sets] into (code, tail).
+
 bool splitClassPath(const std::string &path, std::string *code, std::string *tail) {
   static const std::string pre = "/api/classes/";
   if (path.size() <= pre.size() || path.compare(0, pre.size(), pre) != 0) return false;
@@ -1203,8 +1203,8 @@ bool validVerdict(const std::string &v) {
   return v == "pass" || v == "fail" || v == "" || v == "ungraded";
 }
 
-// Parses /api/sets/<code>/questions/<qi>/<action> where action is
-// "model", "check", or "show3d". qi must be a non-negative integer.
+
+
 bool parseQuestionSubPath(const std::string &path, std::string *code, int *qi,
                           std::string *action) {
   static const std::string pre = "/api/sets/";
@@ -1213,7 +1213,7 @@ bool parseQuestionSubPath(const std::string &path, std::string *code, int *qi,
   size_t s1 = rest.find('/');
   if (s1 == std::string::npos) return false;
   std::string c = rest.substr(0, s1);
-  std::string tail = rest.substr(s1);  // /questions/<qi>/<action>
+  std::string tail = rest.substr(s1);
   static const std::string qp = "/questions/";
   if (tail.size() <= qp.size() || tail.compare(0, qp.size(), qp) != 0) return false;
   std::string after = tail.substr(qp.size());
@@ -1233,7 +1233,7 @@ bool parseQuestionSubPath(const std::string &path, std::string *code, int *qi,
   return true;
 }
 
-// Parses /api/submissions/<id>/grade into id.
+
 bool parseGradePath(const std::string &path, long *out) {
   static const std::string pre = "/api/submissions/";
   static const std::string suf = "/grade";
@@ -1249,16 +1249,16 @@ bool parseGradePath(const std::string &path, long *out) {
   return *out > 0;
 }
 
-// ---- model-answer auto-check (strict) ----
-// Compares a student snapshot against the teacher model. Visible entities
-// only; DATUM_AXIS excluded (construction aid). Counts, types and
-// positions must match within tolerance; any missing or extra entity
-// fails. Returns counts only — never model coordinates.
+
+
+
+
+
 struct VerifyOutcome {
   bool checked = false;
   bool pass = false;
   double score = 0;
-  std::string reason;  // set when checked == false
+  std::string reason;
   json details = json::object();
 };
 
@@ -1424,11 +1424,11 @@ VerifyOutcome compareDrawings(const json &modelData, const json &studentData) {
   return r;
 }
 
-// Strips model drawings for non-owners. Teachers who own the set (and
-// admins) see full questions; everyone else gets has_model/check_enabled
-// flags but never the model payload. The derived 3D preview (model3d) is
-// the exception: students receive it when the per-question show_3d toggle
-// is on, so they can draw the 2D views from the reference shape.
+
+
+
+
+
 json filterQuestionsForRole(const json &questions, bool full) {
   json out = json::array();
   if (!questions.is_array()) return out;
@@ -1488,10 +1488,10 @@ json submissionAutoJson(const Db::Submission &b) {
   return o;
 }
 
-// Static file serving: resolve inside root, directory index or listing.
+
 void handleStatic(const fs::path &root, const httplib::Request &req,
                   httplib::Response &res) {
-  if (req.path.rfind("/api/", 0) == 0) {  // guarded by pre-routing; be safe
+  if (req.path.rfind("/api/", 0) == 0) {
     sendJson(res, 404, {{"ok", false}, {"error", "not found"}});
     return;
   }
@@ -1506,7 +1506,7 @@ void handleStatic(const fs::path &root, const httplib::Request &req,
   std::string norm = posixNormalize("/" + dec);
   std::string rel = norm.size() > 1 ? norm.substr(1) : "";
   fs::path abs = (root / rel).lexically_normal();
-  // Lexical containment (norm cannot escape by construction; keep the check).
+
   {
     std::string rs = root.lexically_normal().string();
     std::string as = abs.string();
@@ -1527,7 +1527,7 @@ void handleStatic(const fs::path &root, const httplib::Request &req,
     if (fs::is_regular_file(idx, ec) && !ec) {
       abs = idx;
     } else {
-      // Directory listing.
+
       std::vector<std::string> entries;
       for (const auto &e : fs::directory_iterator(abs, ec)) {
         if (ec) break;
@@ -1654,13 +1654,13 @@ void handleLogin(Db &db, const httplib::Request &req, httplib::Response &res) {
                       {"token", token}});
 }
 
-// ---- Natural-language interpretation (student `/ words`, teacher /auto) ----
-// POST /api/interpret turns one plain-language request into slash commands
-// via the local model gateway (antigravity-manager.md). Browsers never see
-// the key: it comes from server environment, else the manager's own file.
-//   OPENAI_API_KEY  (preferred; else ~/.hermes/.env; missing key answers 503)
-//   ANTIGRAVITY_URL (default http://127.0.0.1:8045)
-//   EDUCAD_NL_MODEL (default gemini-3.8-flash-medium)
+
+
+
+
+
+
+
 const size_t kInterpretMaxBody = 32768;
 const size_t kInterpretMaxText = 3000;
 const size_t kInterpretMaxPoints = 64;
@@ -1720,9 +1720,9 @@ std::string interpretSystemPrompt(const std::string &points, bool autoMode) {
   return p;
 }
 
-// The gateway key: explicit environment wins; otherwise read the manager's
-// single credential file (~/.hermes/.env, KEY=VALUE lines). Empty when
-// neither exists, which the route reports as 503.
+
+
+
 std::string gatewayApiKey() {
   const char *env = std::getenv("OPENAI_API_KEY");
   if (env && *env) return std::string(env);
@@ -1793,7 +1793,7 @@ bool extractJsonObject(const std::string &text, json *out) {
   return out->is_object();
 }
 
-// One chat completion against the local gateway. Returns the assistant text.
+
 bool gatewayChat(const std::string &system, const std::string &userText,
                  std::string *content) {
   const char *urlEnv = std::getenv("ANTIGRAVITY_URL");
@@ -1842,9 +1842,9 @@ bool gatewayChat(const std::string &system, const std::string &userText,
 
 void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
   using HR = httplib::Server::HandlerResponse;
-  // httplib defaults to SO_REUSEPORT, which lets a second server share a busy
-  // port instead of failing. Use plain SO_REUSEADDR so EADDRINUSE surfaces and
-  // the busy-port retry in main() works.
+
+
+
   svr.set_socket_options([](auto sock) {
 #ifndef _WIN32
     int one = 1;
@@ -1889,7 +1889,7 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
         if (stail == "/verify") {
           allowed = (m == "POST");
         } else if (stail == "/submissions") {
-          // DELETE falls through to the set handler (404); PUT stays 405.
+
           allowed = (m == "GET" || m == "POST" || m == "DELETE");
         } else if (stail.rfind("/questions/", 0) == 0) {
           std::string qc;
@@ -1904,7 +1904,7 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
             allowed = (m == "GET" || m == "POST" || m == "DELETE");
           }
         } else if (stail.empty()) {
-          // POST falls through to the router (404); PUT stays 405.
+
           allowed = (m == "GET" || m == "POST" || m == "DELETE");
         } else {
           allowed = (m == "GET" || m == "POST" || m == "DELETE");
@@ -1943,9 +1943,9 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
     }
     return HR::Unhandled;
   });
-  // NOTE: httplib invokes this for EVERY response with status >= 400, so it
-  // must only fill in true routing misses (empty body) and leave intentional
-  // error statuses (401/405/...) from handlers untouched.
+
+
+
   svr.set_error_handler([](const httplib::Request &req, httplib::Response &res) {
     if (!res.body.empty()) return httplib::Server::HandlerResponse::Unhandled;
     if (req.path.rfind("/api/", 0) == 0)
@@ -2056,7 +2056,7 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
                           "concrete words (names, mm, shapes)."}});
       return;
     }
-    // Reject the whole plan instead of silently dropping/truncating steps.
+
     const std::vector<std::string> drawingCommands = {
       "point", "line", "ray", "xline", "circle", "arc", "text", "dimension",
       "polygon", "polyline", "ellipse", "hatch", "rename", "delete", "style", "datum"};
@@ -2239,8 +2239,8 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
     sendJson(res, 200, {{"ok", true}, {"lesson", lesson}});
   });
 
-  // Normalize + validate the questions array for POST /api/sets.
-  // On success out holds canonical JSON; on failure err names the problem.
+
+
   auto normalizeQuestions = [](const json &body, std::string *out, std::string *err) {
     if (!body.contains("questions") || !body["questions"].is_array() ||
         body["questions"].empty() || body["questions"].size() > 50) {
@@ -2275,9 +2275,9 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
         }
         nq["starter"] = q["starter"];
       }
-      // Optional model answer (teacher drawing snapshot) + auto-check
-      // toggle. Model payloads are teacher-only; students never receive
-      // them (see filterQuestionsForRole).
+
+
+
       bool hasModel = false;
       if (q.contains("model") && !q["model"].is_null()) {
         if (!q["model"].is_object()) {
@@ -2296,10 +2296,10 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
       } else if (hasModel) {
         nq["check_enabled"] = true;
       }
-      // Optional 3D preview derived from the model by the teacher's
-      // browser (opaque geometry here, served to students while the
-      // per-question show_3d toggle is on). Like auto-check, an attached
-      // preview is visible by default; the toggle turns it off.
+
+
+
+
       bool hasModel3d = false;
       if (q.contains("model3d") && !q["model3d"].is_null()) {
         if (!q["model3d"].is_object()) {
@@ -2354,8 +2354,8 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
       sendJson(res, 400, {{"ok", false}, {"error", qerr}});
       return;
     }
-    // Optional class scope: posting into a class needs an existing class
-    // the caller owns (admins may post anywhere). Absent = open set.
+
+
     long classId = 0;
     if (body.contains("class_code") && !body["class_code"].is_null()) {
       if (!body["class_code"].is_string()) {
@@ -2387,7 +2387,7 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
     }
     sendJson(res, 201, {{"ok", true}, {"id", id}, {"code", code}});
   });
-  // Shared list-item shape for every sets listing (feed, class sets).
+
   auto setItem = [](const Db::Set &s) {
     int nq = 0;
     json q = parseStored(s.questionsJson);
@@ -2472,7 +2472,7 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
     int nq = questions.is_array() ? (int)questions.size() : 0;
     int qi = 0;
     if (body.contains("question_index")) {
-      // Wide parse: a huge integer must 400, never throw out of the worker.
+
       long long qll = -1;
       try {
         if (!body["question_index"].is_number_integer()) throw std::out_of_range("nan");
@@ -2507,9 +2507,9 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
       note = body["note"].get<std::string>();
       if (note.size() > 500) note.resize(500);
     }
-    // Strict auto-check against the model answer (when the teacher
-    // enabled it). The verdict is stored with the submission and
-    // returned here; the model itself is never exposed.
+
+
+
     int autoPass = -1;
     bool hasScore = false;
     double autoScore = 0;
@@ -2616,9 +2616,9 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
                         {"auto", submissionAutoJson(b)},
                         {"created_at", b.createdAt}});
   });
-  // Grade a submission: teacher verdict (pass/fail/ungraded) + remarks.
-  // Only the set owner (or admin) may grade; the submitter reads the
-  // grade via GET /api/submissions/:id and /mine.
+
+
+
   svr.Put(R"(/api/submissions/(\d+)/grade)", [&](const httplib::Request &req,
                                                  httplib::Response &res) {
     Db::User user;
@@ -2665,9 +2665,9 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
     }
     sendJson(res, 200, {{"ok", true}, {"id", id}, {"verdict", verdict}});
   });
-  // Verify a drawing against the model answer without revealing it.
-  // Any logged-in user may verify; the response carries pass/fail +
-  // counts only, never model coordinates.
+
+
+
   svr.Post(R"(/api/sets/([^/]+)/verify)", [&](const httplib::Request &req,
                                               httplib::Response &res) {
     Db::User user;
@@ -2727,8 +2727,8 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
                         {"score", vo.score},
                         {"details", vo.details}});
   });
-  // Attach / replace the model answer for one question from the
-  // teacher's current sheet snapshot. Owner (or admin) only.
+
+
   auto modelUpsert = [&](const httplib::Request &req, httplib::Response &res) {
     Db::User user;
     if (!requireAuth(db, req, res, &user)) return;
@@ -2758,9 +2758,9 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
     questions[(size_t)qi]["model"] = body["data"];
     if (!questions[(size_t)qi].contains("check_enabled"))
       questions[(size_t)qi]["check_enabled"] = true;
-    // A fresh 2D model invalidates the stored 3D preview: keep it only
-    // when the request carries a fresh one, else erase the stale shape
-    // so students never draw from the wrong reference.
+
+
+
     if (body.contains("model3d") && !body["model3d"].is_null()) {
       if (!body["model3d"].is_object()) {
         sendJson(res, 400, {{"ok", false}, {"error", "bad preview"}});
@@ -2820,8 +2820,8 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
                sendJson(res, 200,
                         {{"ok", true}, {"has_model", false}, {"has_3d", false}});
              });
-  // Toggle the per-question auto-check. The model is never revealed;
-  // this only switches strict pass/fail checking on or off.
+
+
   svr.Put(R"(/api/sets/([^/]+)/questions/(\d+)/check)",
           [&](const httplib::Request &req, httplib::Response &res) {
             Db::User user;
@@ -2862,9 +2862,9 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
             }
             sendJson(res, 200, {{"ok", true}, {"check_enabled", enabled}});
           });
-  // Toggle the per-question 3D preview students see while solving. The
-  // 2D model is never revealed; this only withholds or serves the stored
-  // preview geometry derived from it.
+
+
+
   svr.Put(R"(/api/sets/([^/]+)/questions/(\d+)/show3d)",
           [&](const httplib::Request &req, httplib::Response &res) {
             Db::User user;
@@ -2960,8 +2960,8 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
     for (const Db::Class &c : db.listClasses(scope, user.id)) arr.push_back(classItem(c));
     sendJson(res, 200, {{"ok", true}, {"classes", arr}});
   });
-  // One handler per method; the tail selects the sub-action so unknown
-  // tails 404 instead of falling through to the static catch-all.
+
+
   auto classSub = [&](const httplib::Request &req, httplib::Response &res) {
     Db::User user;
     if (!requireAuth(db, req, res, &user)) return;
@@ -3050,8 +3050,8 @@ void setupRoutes(httplib::Server &svr, Db &db, const fs::path &root) {
   svr.Post(R"(/api/classes/([^/]+).*)", classSub);
   svr.Delete(R"(/api/classes/([^/]+).*)", classSub);
 
-  // Static catch-all (registered after API routes; exact API matches win).
-  // HEAD dispatches here too (httplib routes HEAD to GET handlers).
+
+
   svr.Get(".*", [&](const httplib::Request &req, httplib::Response &res) {
     handleStatic(root, req, res);
   });
@@ -3077,7 +3077,7 @@ fs::path exeDir(char *argv0) {
   return fs::absolute(fs::path(argv0)).parent_path();
 }
 
-}  // namespace
+}
 
 int main(int argc, char **argv) {
   if (sodium_init() < 0) {
@@ -3108,7 +3108,7 @@ int main(int argc, char **argv) {
     std::cerr << "educad serve error: " << e.what() << "\n";
     return 1;
   }
-  // Fresh server per attempt so a failed bind leaves no residue.
+
   for (int i = 0; i < kMaxBindAttempts && port + i <= 65535; i++) {
     httplib::Server *svr = new httplib::Server();
     setupRoutes(*svr, *db, root);

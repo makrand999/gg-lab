@@ -1,0 +1,16 @@
+# expect: 25V 48E 25F curves=1 surfaces=2 surfaceKinds=implicit,plane surfaceModel=ok surfaceValidation=ok surfaceCertificate=ok diagnostics=none unresolved=0 status=inferred
+/datum -100 400
+/circle 20 -30 10 A plan
+/point Z 25 -35 plan
+/point "A'" 25 40 elevation
+/point f0 10 0 elevation
+/point f1 30 0 elevation
+/line f0 f1 A elevation
+/line f0 "A'" A elevation
+/line f1 "A'" A elevation
+# surface-query: {"operation":"normal","surface":1,"point":{"x":30,"y":0,"z":30},"expect":{"normal":{"x":0.9922778767136677,"y":0.12403473458920844,"z":0}}}
+# surface-query: {"operation":"section","surface":1,"plane":{"origin":{"x":0,"y":20,"z":0},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":5,"center":{"x":22.5,"y":20,"z":32.5}}}
+# surface-query: {"operation":"classify","surface":1,"point":{"x":27.5,"y":20,"z":32.5},"expect":{"status":"inside"}}
+# surface-query: {"operation":"topology","expect":{"summary":{"status":"closed"}}}
+# surface-query: {"operation":"preview-implicit","expect":{"valid":true,"count":2,"missing":0,"equationParity":"ok"}}
+# expect: surfaceChecks=5 surfaceQueries=ok

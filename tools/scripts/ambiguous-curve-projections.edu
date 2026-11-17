@@ -1,5 +1,3 @@
-# Two plan circles and two front lines make a four-way pairing with no third
-# view. The supported curves are retained, but the cross-product is reported.
 # expect: 96V 96E 4F curves=4 unresolved=2 status=partial
 /datum -30 180
 /circle 20 -20 20 A plan

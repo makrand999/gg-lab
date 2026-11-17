@@ -1,0 +1,77 @@
+# expect: V=188 E=350 F=164 recesses=2 minRecessDepth=20 maxRecessDepth=25 curves=6 surfaces=10 surfaceKinds=cylinder,plane surfaceLoops=14 surfaceShells=0 surfaceOpen=3 surfaceBoundary=70 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-approximate-union-boundary,certificate-open-component surfaceCertificateScope=display-boolean surfaceValidation=partial holes=2 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred previewParity=ok surfaceChecks=15 surfaceQueries=ok
+/datum -100 400
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/point h0 20 60 elevation
+/point h1 40 60 elevation
+/point h2 40 35 elevation
+/point h3 20 35 elevation
+/line h0 h1 A elevation
+/line h1 h2 A elevation
+/line h2 h3 A elevation
+/line h3 h0 A elevation
+/point topP 30 -30 plan
+/point topE 30 60 elevation
+/rename topP top members
+/rename topE top members
+/circle top 10 A plan
+/point bottomP 30 -30 plan
+/point bottomE 30 20 elevation
+/rename bottomP bottom members
+/rename bottomE bottom members
+/circle bottom 8 A plan
+/point b0 22 20 elevation
+/point b1 38 20 elevation
+/point b2 38 40 elevation
+/point b3 22 40 elevation
+/line b0 b1 A elevation
+/line b1 b2 A elevation
+/line b2 b3 A elevation
+/line b3 b0 A elevation
+
+# surface-query: {"operation":"display-holes","expect":{"count":2}}
+# surface-query: {"operation":"cavity","action":"summary","expect":{"volumes":2,"recesses":2,"unions":1,"absorbed":0,"approximate":1,"relations":[{"a":0,"b":1,"relation":"overlap"}]}}
+# surface-query: {"operation":"cavity","action":"volume","expect":{"unions":[{"volume":10746.166752656614,"mouthArea":509.3558807617608,"closed":true,"openEdges":0,"nonmanifoldEdges":0,"approximate":true,"members":2}]}}
+# surface-query: {"operation":"cavity","action":"mouths","expect":{"count":2,"faceHoles":2}}
+# surface-query: {"operation":"reconstruct","expect":{"status":"ok","recesses":[{"depth":25},{"depth":20}]}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":2}}}
+# surface-query: {"operation":"classify","surface":1,"point":{"x":30,"y":35,"z":30},"expect":{"status":"outside","method":"boolean-domain"}}
+# surface-query: {"operation":"classify","surface":1,"point":{"x":39,"y":35,"z":30},"expect":{"status":"inside","method":"plane-loops"}}
+# surface-query: {"operation":"classify","surface":3,"point":{"x":30,"y":40,"z":30},"expect":{"status":"outside","method":"boolean-domain"}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":50,"z":30},"view":"top","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":30,"z":30},"view":"top","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":37.5,"z":30},"view":"top","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":15,"y":37.5,"z":30},"view":"top","expect":{"hidden":true}}
+# surface-query: {"operation":"cavity-spec","a":{"kind":"cylinder","origin":{"x":30,"y":60,"z":30},"axis":{"x":0,"y":-1,"z":0},"radius":10,"depth":25,"outward":{"x":0,"y":1,"z":0},"mouthCenter":{"x":30,"y":60,"z":30}},"b":{"kind":"cylinder","origin":{"x":30,"y":20,"z":30},"axis":{"x":0,"y":1,"z":0},"radius":8,"depth":20,"outward":{"x":0,"y":-1,"z":0},"mouthCenter":{"x":30,"y":20,"z":30}},"expect":{"relation":"overlap"}}
+
+# surface-query: {"operation":"classify","surface":2,"point":{"x":38,"y":35,"z":30},"expect":{"status":"boundary","method":"boolean-domain"}}

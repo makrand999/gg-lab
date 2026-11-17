@@ -7,12 +7,12 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD Phase 5: virtual ruler + virtual compass, canvas-drawn on
-  // Layer2 only. World mm only; screen px is ephemeral render only.
-  // Projector invariant: elevation x equals plan x (mm). Direct
-  // manipulation state machines; ruler commits Type A/B SEGMENT specs,
-  // compass commits Type B/K CIRCLE or CIRCULAR_ARC specs. Zero deps.
-  // Dual-env: window.EduGraphicsInstruments, Node module.exports.
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '5.0.0-edugraphics';
   var LAYER = 'layer2';
@@ -83,7 +83,7 @@
 
   function copyPt(p) { return { x: p.x, y: p.y }; }
 
-  // ---- Ruler: idle -> placing -> placed ----
+
   function createRuler(opts) {
     opts = opts || {};
     return {
@@ -142,7 +142,7 @@
     return r;
   }
 
-  // Commit a Type A or B SEGMENT spec (mm only, no px keys).
+
   function rulerCommit(r, opts) {
     opts = opts || {};
     if (r.state !== 'placed') throw new Error('rulerCommit needs placed ruler, got ' + r.state);
@@ -158,7 +158,7 @@
     };
   }
 
-  // mm ticks along an edge of length lenMm: minor 1, mid 5, major 10.
+
   function rulerTicks(lenMm) {
     assertFinite(lenMm);
     if (lenMm < 0) throw new Error('lenMm must be >= 0');
@@ -171,7 +171,7 @@
     return out;
   }
 
-  // Layer2-only ruler geometry (mm world; no px stored).
+
   function rulerGeometry(r) {
     if (r.state === 'idle' || !r.p1Mm || !r.p2Mm) return [];
     var ticks = rulerTicks(r.lengthMm);
@@ -181,7 +181,7 @@
     ];
   }
 
-  // ---- Compass: idle -> pin-set -> radius-set ----
+
   function createCompass(opts) {
     opts = opts || {};
     return {
@@ -225,7 +225,7 @@
     return c;
   }
 
-  // Direct manipulation: drag the pin or the radius handle.
+
   function compassMove(c, handle, ptMm) {
     assertFinite(ptMm.x, ptMm.y);
     if (handle === 'pin') {
@@ -259,7 +259,7 @@
     return { radiusMm: c.radiusMm, text: c.radiusMm.toFixed(1) + ' mm' };
   }
 
-  // Commit a Type B or K CIRCLE / CIRCULAR_ARC spec (mm only).
+
   function compassCommit(c, opts) {
     opts = opts || {};
     if (c.state !== 'radius-set') throw new Error('compassCommit needs radius-set compass, got ' + c.state);
@@ -275,7 +275,7 @@
     return spec;
   }
 
-  // Layer2-only compass geometry (mm world; no px stored).
+
   function compassGeometry(c) {
     if (c.state === 'idle' || !c.pinMm) return [];
     var geos = [

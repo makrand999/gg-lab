@@ -6,11 +6,11 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD Phase 6 procedural curriculum generators.
-  // World coordinates in mm only inside entities and solvers; screen px is
-  // ephemeral render only and never stored. Projector invariant: elevation x
-  // equals plan x (mm). Dual-env: browser via window.EduCADCurriculum,
-  // plain Node via module.exports. Zero dependencies. No 3D. Canvas2D only.
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '6.1.0-educad';
   var DEG = Math.PI / 180;
@@ -61,7 +61,7 @@
   function isValidBis(c) { return BIS_CODES.indexOf(c) !== -1; }
   function isValidRole(r) { return VIEW_ROLES.indexOf(r) !== -1; }
 
-  // Entity-table-compatible spec (mm only, never px). Lacks id; table assigns.
+
   function spec(type, o) {
     o = o || {};
     var bis = (o.bisCode === undefined) ? 'B' : o.bisCode;
@@ -126,7 +126,7 @@
       : 'third-angle ASME (plan above, elevation above XY variant marker)';
   }
 
-  // Quadrant point: Q1(+,-) Q2(+,+) Q3(-,+) Q4(-,-) as (elevY, planY) signs.
+
   function quadrantPoint(opts) {
     opts = opts || {};
     var q = normalizeQuadrant(opts.quadrant === undefined ? 1 : opts.quadrant);
@@ -142,9 +142,9 @@
     else if (q === 2) { planY = distVP; elevY = distHP; }
     else if (q === 3) { planY = distVP; elevY = -distHP; }
     else { planY = -distVP; elevY = -distHP; }
-    // Anti-collision: in Q2/Q4 both views share one side of XY, so when
-    // plan and elevation sit within 6 mm their captions overlap. Push the
-    // labels apart via meta offsets (geometry untouched).
+
+
+
     var planMeta = { kind: 'quadrant-point', quadrant: q, projection: proj };
     var elevMeta = { kind: 'quadrant-point', quadrant: q, projection: proj };
     if (Math.abs(elevY - planY) < 6) {
@@ -191,7 +191,7 @@
     return out;
   }
 
-  // Straight line with theta/phi rotation: PL=TL cos theta, EL=TL cos phi.
+
   function straightLine(opts) {
     opts = opts || {};
     var TL = (opts.TL === undefined) ? 50 : opts.TL;
@@ -216,9 +216,9 @@
     var physicallyImpossible = (st * st + sp * sp) > 1 + 1e-9;
     var meta = { kind: 'straight-line', TL: TL, thetaDeg: thetaDeg, phiDeg: phiDeg };
     var degenerateViews = [];
-    // Apparent views of at most 1e-6 mm (e.g. theta = 90 deg collapses
-    // the plan to a point) are emitted as POINTs, never zero-length
-    // SEGMENTs, so direction vectors downstream never divide by zero.
+
+
+
     function viewSeg(x1, y1, x2, y2, role, bis, caption, viewTag, m) {
       var mm = (m === undefined) ? meta : m;
       var ddx = x2 - x1, ddy = y2 - y1;
@@ -274,7 +274,7 @@
     };
   }
 
-  // Plane surface with HT/VT traces meeting on XY plus tilt angle.
+
   function planeSurface(opts) {
     opts = opts || {};
     var xMm = (opts.xMm === undefined) ? 0 : opts.xMm;
@@ -290,10 +290,10 @@
     var HTelev = { x1: x1, y1: 0, x2: x2, y2: 0 };
     var VTplan = { x1: xMm, y1: 0, x2: vtx, y2: 0 };
     var VTelev = { x1: xMm, y1: 0, x2: vtx, y2: vty };
-    // Tilt extremes collapse a trace to one point (tilt 0: the VT tip
-    // sits on XY, so proj-VT vanishes; tilt 90: the plan mate VT
-    // vanishes). Collapsed traces are emitted as POINTs, never
-    // zero-length segments -- a line IS two distinct points.
+
+
+
+
     function traceSeg(x1s, y1s, x2s, y2s, role, bis, caption, m) {
       var ddx = x2s - x1s, ddy = y2s - y1s;
       if (ddx * ddx + ddy * ddy <= 1e-12) {
@@ -328,7 +328,7 @@
     };
   }
 
-  // 35 mm regular solids: prism, pyramid, cylinder, cone.
+
   function regularSolid(opts) {
     opts = opts || {};
     var solid = normalizeSolid(opts.solid === undefined ? 'PRISM' : opts.solid);
@@ -358,15 +358,15 @@
       loci.push(locusRec('ELEVATION', y, cap));
     }
     if (solid === 'PRISM') {
-      // True hexagonal prism: regular flat-top hexagon in plan, sizeMm
-      // across corners (R = sizeMm/2), extruded to heightMm. Corners run
-      // bottom a-f / top g-l around the hexagon (v0..v5). Plan stations
-      // pair bottom+top, elevation interior stations pair back+front;
-      // outer elevation stations are single corners. Visible member is
-      // listed first; no hidden verdicts ship (the student adds parens).
-      // Every hidden edge coincides with a visible one, so no Type E is
-      // drawn: visible wins per ISO 128, and hidden-ness lives in the
-      // verdicts, not the ink.
+
+
+
+
+
+
+
+
+
       var hexR = sizeMm / 2;
       var hexDy = hexR * Math.sqrt(3) / 2;
       var hx = [hexR, hexR / 2, -hexR / 2, -hexR, -hexR / 2, hexR / 2];
@@ -385,9 +385,9 @@
           topN[hi] + ',' + botN[hi], meta));
       }
       var hexTop = planYc + hexDy, hexBot = planYc - hexDy;
-      // Elevation: outer rectangle over the corner-to-corner width plus
-      // interior verticals at the inner stations (each stands for a
-      // coincident front/back edge pair of the hexagon).
+
+
+
       entities.push(segSpec(xL, 0, xR, 0, 'ELEVATION', 'A', "b1'b2'", meta));
       entities.push(segSpec(xR, 0, xR, heightMm, 'ELEVATION', 'A', "e-R", meta));
       entities.push(segSpec(xR, heightMm, xL, heightMm, 'ELEVATION', 'A', "t1't2'", meta));
@@ -523,16 +523,16 @@
     };
   }
 
-  // Profile-plane square lamina: edge-on in both views (the ambiguous
-  // sheet). A sizeMm square in plane x=xMm standing on HP (z 0..sizeMm),
-  // spanning depths around planYc. VP shows a vertical line pairing
-  // near+far corners at top/bottom; HP shows a horizontal line pairing
-  // top+bottom corners at the feet. Corners a (near-top), b (far-top),
-  // c (far-bottom), d (near-bottom); drawn captions are neutral letter
-  // pairs with no verdicts: the student pairs projectors and marks
-  // parens. Reconstruction reports ambiguous-pairing (every corner
-  // shares one x); the student's projectors record the pairing, and v1
-  // checks them without feeding reconstruction.
+
+
+
+
+
+
+
+
+
+
   function profileSquare(opts) {
     opts = opts || {};
     var sizeMm = (opts.sizeMm === undefined) ? 40 : opts.sizeMm;
@@ -581,15 +581,15 @@
     };
   }
 
-  // First-angle three-view sheet: a regularSolid bundle plus a
-  // PROFILE-tagged side view and construction helpers. The profile is
-  // read back from the drawn plan/elevation extents (depth span maps to
-  // profile width, heights shared), so it always matches the solid.
-  // Helpers: a tagged X1Y1 reference axis, untagged horizontal
-  // front-to-side projectors and an untagged 45-degree miter, which the
-  // reconstruction filter recognizes geometrically. PRISM/PYRAMID plus
-  // CYLINDER/CONE (M3 curves); arcs stay deferred.
-  // opts.side = +1 (right) or -1 (left).
+
+
+
+
+
+
+
+
+
   function threeViewSheet(opts) {
     opts = opts || {};
     var solid = normalizeSolid(opts.solid === undefined ? 'PRISM' : opts.solid);
@@ -671,8 +671,8 @@
             'PROFILE', 'A', 'pf-facet', pMeta));
         }
       }
-      // A prism has no horizontal edge halfway up its side view.
-      // Coincident visible edges take precedence over hidden ones.
+
+
     } else if (solid === 'CYLINDER') {
       extra.push(segSpec(pLo, z0, pHi, z0, 'PROFILE', 'A', "pf-b", pMeta));
       extra.push(segSpec(pHi, z0, pHi, z1, 'PROFILE', 'A', "pf-R", pMeta));
@@ -710,7 +710,7 @@
     };
   }
 
-  // Dispatcher across lesson kinds.
+
   function generateLesson(kind, opts) {
     var k = String(kind === undefined ? '' : kind).trim().toUpperCase().replace(/[-\s]+/g, '_');
     if (k === 'POINT' || k === 'QUADRANT' || k === 'QUADRANT_POINT') return quadrantPoint(opts);
@@ -720,7 +720,7 @@
     throw new Error('unknown lesson kind: ' + String(kind));
   }
 
-  // Full curriculum bundle: quadrants + line + plane + 4 solids.
+
   function generateCurriculum(opts) {
     opts = opts || {};
     var quads = quadrantSet({ distHP: opts.distHP, distVP: opts.distVP, projection: opts.projection });
@@ -751,7 +751,7 @@
     };
   }
 
-  // Validate a bundle: mm-only finite, no px keys, valid bis/role, projectors.
+
   function validateBundle(bundle) {
     var errors = [];
     if (!bundle || !Array.isArray(bundle.entities)) { errors.push('bundle.entities must be an array'); return { ok: false, errors: errors }; }

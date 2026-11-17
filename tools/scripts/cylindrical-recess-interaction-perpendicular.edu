@@ -1,0 +1,64 @@
+# expect: 391V 747E 358F recesses=2 minRecessDepth=20 maxRecessDepth=35 curves=6 surfaces=10 surfaceKinds=cylinder,plane surfaceLoops=14 surfaceShells=0 surfaceOpen=3 surfaceBoundary=62 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-approximate-union-boundary,certificate-open-component surfaceCertificateScope=display-boolean surfaceValidation=skipped holes=2 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred previewParity=ok previewTrimStatus=partial previewTrimExactness=unresolved previewTrimVisible=0 previewTrimUnsupported=0 surfaceChecks=12 surfaceQueries=ok
+/datum -100 400
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/circle 30 -30 10 A plan
+/point h0 20 60 elevation
+/point h1 40 60 elevation
+/point h2 40 40 elevation
+/point h3 20 40 elevation
+/line h0 h1 A elevation
+/line h1 h2 A elevation
+/line h2 h3 A elevation
+/line h3 h0 A elevation
+/circle 30 48 8 A elevation
+/point fm0 22 -60 plan
+/point fm1 38 -60 plan
+/point fb0 22 -25 plan
+/point fb1 38 -25 plan
+/line fm0 fm1 A plan
+/line fm0 fb0 A plan
+/line fm1 fb1 A plan
+/line fb0 fb1 A plan
+# surface-query: {"operation":"display-holes","expect":{"count":2,"faces":[{"count":1,"vertices":[36]},{"count":1,"vertices":[24]}]}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":2}}}
+# surface-query: {"operation":"cavity","action":"summary","expect":{"volumes":2,"recesses":2,"unions":1,"absorbed":0,"approximate":1,"relations":[{"a":0,"b":1,"relation":"overlap"}]}}
+# surface-query: {"operation":"cavity","action":"volume","expect":{"unions":[{"volume":10372.822810426924,"mouthArea":509.3558807617609,"closed":true,"openEdges":0,"nonmanifoldEdges":0,"approximate":true,"members":2}]}}
+# surface-query: {"operation":"cavity","action":"mouths","expect":{"count":2,"area":509.3558807617609,"faceHoles":2,"loops":[{"vertices":36,"closure":"host"},{"vertices":24,"closure":"host"}]}}
+# surface-query: {"operation":"cavity","action":"buried","tolerance":0.01,"expect":{"count":0,"maxDepth":0,"tolerance":0.01,"minVolumes":2}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":30,"y":48,"z":40},"expect":{"status":"outside","method":"boolean-domain"}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":48,"z":30},"view":"front","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":10,"y":48,"z":30},"view":"top","expect":{"hidden":true}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":40,"y":50,"z":30},"expect":{"status":"inside"}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":59,"z":30},"view":"top","expect":{"hidden":false}}
+# surface-query: {"operation":"cavity-trims","expect":{"status":"partial","exactness":"unresolved","unsupported":0,"unresolved":1,"unresolvedSupports":[{"a":0,"b":1,"aRole":"side","bRole":"side","status":"unresolved","kind":"implicit-intersection"}]}}

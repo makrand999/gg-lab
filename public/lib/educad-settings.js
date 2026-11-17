@@ -6,21 +6,21 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD preferences: a tiny boolean store behind the sheet's Settings
-  // panel. Sheet keys are boolean; inspection has its own typed defaults.
-  // Zero dependencies. Dual-env: browser via window.EduCADSettings, plain
-  // Node via module.exports. Node-safe: storage is injected, never global.
-  //
-  // Keys:
-  //   commandPreview     show a live preview of what /<cmd> would do
-  //   commandSuggestions show Minecraft-style completions while typing
-  //   showDemos          demo picker visible and usable
-  //   showTutorials      tutorial picker visible and usable
-  //   commandHistory     Up/Down recalls past commands
-  //   coordsHud          coordinate readout visible
-  //   showLocusLines     Type K locus lines drawn on the sheet
-  //   projectionGuides   centre axes and projection transfer guides
-  //   solidPreview       show the linked 3D preview
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   var VERSION = '1.0.0-educad';
   var STORAGE_KEY = 'educad_settings_v1';
   var DRAWING_MODES = ['menu', 'shortcuts'];
@@ -217,8 +217,8 @@
     return JSON.stringify(out);
   }
 
-  // parse(text): tolerant reader. Bad JSON, missing keys, and non-boolean
-  // values all fall back to defaults; unknown keys are ignored.
+
+
   function parse(text) {
     var store = createStore();
     if (typeof text !== 'string' || text === '') return store;
@@ -238,8 +238,8 @@
     return store;
   }
 
-  // load(storage): read from a localStorage-like {getItem}. Any failure
-  // (missing storage, blocked access, corrupt value) yields defaults.
+
+
   function load(storage) {
     try {
       if (!storage || typeof storage.getItem !== 'function') return createStore();
@@ -249,8 +249,8 @@
     }
   }
 
-  // save(storage, store): persist; returns true on success, false when the
-  // write fails or storage is unusable. Never throws for storage faults.
+
+
   function save(storage, store) {
     checkStore(store);
     try {

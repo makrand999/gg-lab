@@ -6,13 +6,13 @@
   <link rel="stylesheet" href="fonts/handwriting.css">
   <title>EduCAD • Master Engineering Drawing Sheet (Infinite Drafting Surface)</title>
   <style>
-    /* ==========================================================================
-       INFINITE DRAFTSMAN SURFACE: GRAPHITE PENCIL ON ENDLESS VELLUM
-       - No finite sheet borders, no margin rules, no page drop shadows
-       - Seamless infinite paper surface with pan/zoom-synced grid
-       - Minimalist hairlines & generous whitespace
-       - Four red accents: 01-05 numerals, index 1-5, fig captions, APPROVED stamp
-       ========================================================================== */
+
+
+
+
+
+
+
     :root[data-paper="white"] {
       --sheet: #fdfcf8;
       --sheet-tint: #f6f3ea;
@@ -43,7 +43,7 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ENDLESS FULL-SCREEN STAGE — VIEWPORT ITSELF IS THE INFINITE PAPER SURFACE */
+
     html, body {
       width: 100vw;
       height: 100vh;
@@ -57,7 +57,7 @@
       touch-action: none;
     }
 
-    /* THE INFINITE VIEWPORT STAGE: Background grid scales and pans with custom properties */
+
     #viewport-stage {
       width: 100%;
       height: 100%;
@@ -71,7 +71,7 @@
       cursor: grabbing !important;
     }
 
-    /* CONTENT WRAPPER ON THE INFINITE SURFACE (NO SHEET BORDER, NO SHADOW) */
+
     #sheet-content {
       position: absolute;
       top: 0;
@@ -86,7 +86,7 @@
       line-height: 1.65;
     }
 
-    /* TOP SHEET HEADER BAND (Clean, Sits directly on paper, Hairline Divider) */
+
     .sheet-top-band {
       position: absolute;
       top: 80px;
@@ -135,7 +135,7 @@
       margin-top: 2px;
     }
 
-    /* Header Key Figure */
+
     .top-band-keyfigure {
       width: 360px;
       height: 170px;
@@ -156,7 +156,7 @@
       padding-top: 2px;
     }
 
-    /* Header Tools */
+
     .top-band-tools {
       display: flex;
       flex-direction: column;
@@ -192,7 +192,7 @@
       border-bottom: 2px solid var(--pencil);
     }
 
-    /* 3-COLUMN x 2-ROW PLATES: FLOATING DIRECTLY ON INFINITE SURFACE */
+
     .plate-cell {
       position: absolute;
       width: 1020px;
@@ -207,17 +207,17 @@
       text-shadow: 0 0 1px rgba(51,54,59,0.3);
     }
 
-    /* ROW 1: top = 325px */
+
     #zone-a { top: 325px; left: 95px; }
     #zone-b { top: 325px; left: 1190px; }
     #zone-c { top: 325px; left: 2285px; }
 
-    /* ROW 2: top = 1320px */
+
     #zone-d { top: 1320px; left: 95px; }
     #zone-e { top: 1320px; left: 1190px; }
     #cell-legend { top: 1320px; left: 2285px; width: 1020px; }
 
-    /* Plain tracked-out zone label */
+
     .zone-meta-label {
       font-family: "Architects Daughter", cursive;
       font-size: 13px;
@@ -249,7 +249,7 @@
       flex-grow: 1;
     }
 
-    /* Figure Stage */
+
     .drafting-viewport-area {
       display: flex;
       flex-direction: column;
@@ -303,7 +303,7 @@
       font-family: "Architects Daughter", cursive !important;
     }
 
-    /* Red Accent 3: fig. A1 caption */
+
     .plate-red-caption {
       width: 100%;
       margin-top: 4px;
@@ -313,7 +313,7 @@
       color: var(--red-pencil);
     }
 
-    /* Minimalist slider */
+
     .slider-container {
       width: 100%;
       margin-top: 6px;
@@ -359,7 +359,7 @@
       line-height: 1.6;
     }
 
-    /* Note rows */
+
     .spec-notes {
       display: flex;
       flex-direction: column;
@@ -383,7 +383,7 @@
       line-height: 1.45;
     }
 
-    /* Student Handwritten Margin Tip */
+
     .margin-tip-note {
       font-family: "Kalam", cursive;
       font-size: 15.5px;
@@ -427,7 +427,7 @@
       color: var(--pencil);
     }
 
-    /* NOTES & NAVIGATION LEGEND (Cell 6 Upper) */
+
     .legend-steps-row {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -498,7 +498,7 @@
       flex-shrink: 0;
     }
 
-    /* CELL 6 LOWER: ISO 7200 TITLE BLOCK */
+
     #cell-signoff-block {
       position: absolute;
       top: 1940px;
@@ -566,7 +566,7 @@
       margin-top: 2px;
     }
 
-    /* MINIMALIST FLOATING HUD (NO BOX, BARE GLYPHS, TOUR & LIVE TOPIC STATUS) */
+
     .cad-panzoom-hud {
       position: fixed;
       bottom: 24px;
@@ -617,7 +617,7 @@
       color: var(--pencil);
     }
 
-    /* MINIMAP OVERVIEW (Pencil Hairline, Faint at Rest) */
+
     #minimap {
       position: fixed;
       bottom: 24px;
@@ -647,11 +647,11 @@
       background: rgba(51, 54, 59, 0.08);
       pointer-events: none;
     }
-  </style>
+</style>
 </head>
 <body>
 
-  <!-- SHARED SVG WOBBLE FILTER (NO TEXTURES, NO GRAIN) -->
+
   <svg class="svg-defs" style="position:absolute;width:0;height:0;overflow:hidden;" aria-hidden="true">
     <filter id="wobble">
       <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="n"/>
@@ -659,15 +659,13 @@
     </filter>
   </svg>
 
-  <!-- FIXED FULL-SCREEN CAD PLOT VIEWPORT: TILED INFINITE SURFACE -->
+
   <div id="viewport-stage">
 
-    <!-- FLOATING CONTENT ON THE INFINITE SURFACE -->
+
     <main id="sheet-content">
 
-      <!-- ==================================================================
-           TOP HEADER BAND: MINIMALIST (NO BOX, FINE HAIRLINE DIVIDER)
-           ================================================================== -->
+
       <header class="sheet-top-band">
         <div class="top-band-left">
           <div class="top-meta-chip">
@@ -680,7 +678,7 @@
           </div>
         </div>
 
-        <!-- Header Key Figure -->
+
         <div class="top-band-keyfigure">
           <svg width="340" height="140" viewBox="0 0 340 140">
             <g filter="url(#wobble)">
@@ -721,15 +719,12 @@
           </div>
         </div>
 
-        <!-- Plain text action links -->
+
         <div class="top-band-tools">
           <div class="tools-btn-row">
             <button class="text-action-link" id="theme-stamp" onclick="togglePaperTheme()">
               PAPER: <strong id="paper-mode-name">WHITE</strong>
             </button>
-            <a href="manual.html" class="text-action-link" target="_blank">
-              &equiv; SPEC MANUAL
-            </a>
             <a href="index.html" class="text-action-link text-action-primary">
               &#11042; OPEN CAD CANVAS &rarr;
             </a>
@@ -741,13 +736,11 @@
       </header>
 
 
-      <!-- ====================================================================
-           ROW 1, COL 1: ZONE A (DIHEDRAL PROJECTION PLANES)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-a">
         <span class="zone-meta-label">Zone A &bull; Coordinate Datum &bull; Ground Line XY</span>
         <div class="zone-header-line">
-          <!-- Red Accent 2: Hand-circled numeral -->
+
           <svg class="zone-num-callout" viewBox="0 0 44 38">
             <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
             <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">01</text>
@@ -755,7 +748,7 @@
           <h2 class="zone-heading">Monge Ground Line &amp; Dihedral Hinge Unfolding</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE A-1 &bull; DIHEDRAL HINGE</span>
@@ -792,7 +785,7 @@
               </g>
             </svg>
           </div>
-          <!-- Red Accent 3: fig. A1 caption -->
+
           <p class="plate-red-caption">fig. A1 &mdash; unfolding the dihedral angle into a coplanar Monge sheet</p>
           <div class="slider-container">
             <div class="slider-labels">
@@ -830,13 +823,11 @@
       </section>
 
 
-      <!-- ====================================================================
-           ROW 1, COL 2: ZONE B (PROJECTORS & VERTICAL CORRESPONDENCE)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-b">
         <span class="zone-meta-label">Zone B &bull; Projector Invariant &bull; Snapping Detent</span>
         <div class="zone-header-line">
-          <!-- Red Accent 2: Hand-circled numeral -->
+
           <svg class="zone-num-callout" viewBox="0 0 44 38">
             <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
             <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">02</text>
@@ -844,7 +835,7 @@
           <h2 class="zone-heading">Vertical Projector Rays &amp; Coordinate Snapping</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE B-1 &bull; MAGNETIC DETENT SIMULATOR</span>
@@ -876,7 +867,7 @@
               <circle id="sheet-halo" cx="180" cy="150" r="14" fill="none" stroke="var(--pencil)" stroke-width="1.8" stroke-dasharray="2 2" />
             </svg>
           </div>
-          <!-- Red Accent 3: fig. B1 caption -->
+
           <p class="plate-red-caption">fig. B1 &mdash; vertical projector ray and magnetic capture detent</p>
           <div class="slider-labels" style="width:100%; text-align:center; margin-top:8px;">
             <span>[MOVE CURSOR OVER PLATE TO TEST MAGNETIC LOCK]</span>
@@ -910,13 +901,11 @@
       </section>
 
 
-      <!-- ====================================================================
-           ROW 1, COL 3: ZONE C (TRUE LENGTH & RABATTEMENT)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-c">
         <span class="zone-meta-label">Zone C &bull; Line Rotation &bull; True Length</span>
         <div class="zone-header-line">
-          <!-- Red Accent 2: Hand-circled numeral -->
+
           <svg class="zone-num-callout" viewBox="0 0 44 38">
             <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
             <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">03</text>
@@ -924,7 +913,7 @@
           <h2 class="zone-heading">The Rotating Line Solver &amp; Horizontal Loci</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE C-1 &bull; ROTATING LINE SOLVER</span>
@@ -960,7 +949,7 @@
               <text x="140" y="14" font-family="'Architects Daughter', cursive" font-size="10.5" font-weight="bold" fill="var(--pencil)" text-anchor="middle">TL = 80 mm</text>
             </svg>
           </div>
-          <!-- Red Accent 3: fig. C1 caption -->
+
           <p class="plate-red-caption">fig. C1 &mdash; rabattement rotation solver revealing true geometric length</p>
           <div class="slider-container">
             <div class="slider-labels">
@@ -998,13 +987,11 @@
       </section>
 
 
-      <!-- ====================================================================
-           ROW 2, COL 1: ZONE D (3-VIEW ORTHOGRAPHIC PROJECTION & 45 MITER)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-d">
         <span class="zone-meta-label">Zone D &bull; Multi-View &bull; 45&deg; Miter Depth Transfer</span>
         <div class="zone-header-line">
-          <!-- Red Accent 2: Hand-circled numeral -->
+
           <svg class="zone-num-callout" viewBox="0 0 44 38">
             <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
             <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">04</text>
@@ -1012,7 +999,7 @@
           <h2 class="zone-heading">Multi-View Projection &amp; 45&deg; Depth Transfer</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE D-1 &bull; THREE-VIEW ALIGNMENT</span>
@@ -1053,7 +1040,7 @@
               <circle cx="248" cy="168" r="3" fill="var(--pencil)" />
             </svg>
           </div>
-          <!-- Red Accent 3: fig. D1 caption -->
+
           <p class="plate-red-caption">fig. D1 &mdash; orthographic 3-view correspondence with 45&deg; depth transfer</p>
           <div class="slider-labels" style="width:100%; text-align:center; margin-top:8px;">
             <span>[ANIMATED RAYS REFLECT PLAN DEPTH AUTOMATICALLY TO PROFILE]</span>
@@ -1087,13 +1074,11 @@
       </section>
 
 
-      <!-- ====================================================================
-           ROW 2, COL 2: ZONE E (ISOMETRIC AXONOMETRIC 3D GLASS BOX)
-           ==================================================================== -->
+
       <section class="plate-cell" id="zone-e">
         <span class="zone-meta-label">Zone E &bull; Axonometric &bull; 3D Glass Box Turntable</span>
         <div class="zone-header-line">
-          <!-- Red Accent 2: Hand-circled numeral -->
+
           <svg class="zone-num-callout" viewBox="0 0 44 38">
             <ellipse cx="22" cy="19" rx="19" ry="16" fill="none" stroke="var(--red-pencil)" stroke-width="2" filter="url(#wobble)" />
             <text x="22" y="25" font-family="'Caveat', cursive" font-size="22" font-weight="bold" fill="var(--red-pencil)" text-anchor="middle">05</text>
@@ -1101,7 +1086,7 @@
           <h2 class="zone-heading">The Real-Time 3D Glass Box Turntable Widget</h2>
         </div>
 
-        <!-- Figure Plate Area -->
+
         <div class="drafting-viewport-area">
           <div class="plate-caption-bar">
             <span class="viewport-meta-tag">PLATE E-1 &bull; LIVE AXONOMETRIC STAGE</span>
@@ -1110,7 +1095,7 @@
           <div class="interactive-stage-box" style="height: 420px;">
             <canvas id="sheet-turntable" width="800" height="460" style="cursor:grab; width:100%; max-width:880px; height:auto; aspect-ratio:800/460;"></canvas>
           </div>
-          <!-- Red Accent 3: fig. E1 caption -->
+
           <p class="plate-red-caption">fig. E1 &mdash; interactive turntable axonometric wireframe model</p>
           <div class="slider-labels" style="width:100%; text-align:center; margin-top:8px;">
             <span>[CLICK &amp; DRAG WIREFRAME ABOVE TO ORBIT 3D MODEL LIVE]</span>
@@ -1144,9 +1129,7 @@
       </section>
 
 
-      <!-- ====================================================================
-           ROW 2, COL 3 (UPPER): NOTES & NAVIGATION LEGEND (CLEAN LIST, NO BOX)
-           ==================================================================== -->
+
       <section class="plate-cell" id="cell-legend">
         <span class="zone-meta-label">Reference &bull; Sheet Instructions &bull; Contents</span>
         <div class="zone-header-line">
@@ -1157,7 +1140,7 @@
           <h2 class="zone-heading">How To Use This Sheet &amp; Zone Index</h2>
         </div>
 
-        <!-- 3-Step Strip -->
+
         <div class="legend-steps-row">
           <div class="legend-step-col">
             <strong>1. Pan &amp; Zoom</strong>
@@ -1173,7 +1156,7 @@
           </div>
         </div>
 
-        <!-- Clean list of 5 zones with Red Accent 2 circled numbers -->
+
         <ul class="legend-contents-list">
           <li>
             <button class="legend-zone-btn" id="btn-index-zone-a" onclick="flyToZone('zone-a')">
@@ -1244,12 +1227,10 @@
       </section>
 
 
-      <!-- ====================================================================
-           ROW 2, COL 3 (LOWER): ISO 7200 TITLE BLOCK (FINE HAIRLINES)
-           ==================================================================== -->
+
       <footer id="cell-signoff-block" aria-label="Sheet Title Block and Sign-off">
         <div class="signoff-inner-layout">
-          <!-- Institutional Cells -->
+
           <div class="so-cell-group">
             <div class="so-box">
               <div class="so-box-label">ORGANIZATION / INSTITUTION</div>
@@ -1271,7 +1252,7 @@
             </div>
           </div>
 
-          <!-- Signatures Column -->
+
           <div class="so-sig-box">
             <div class="sig-line-item">
               <span class="sig-script-text">Alex Chen</span>
@@ -1285,7 +1266,7 @@
             </div>
           </div>
 
-          <!-- Red Accent 4: Red Hand-Drawn APPROVED Stamp -->
+
           <div class="stamp-container-col">
             <svg width="135" height="85" viewBox="0 0 150 90">
               <g filter="url(#wobble)" transform="rotate(-8 75 45)">
@@ -1303,7 +1284,7 @@
     </main>
   </div>
 
-  <!-- MINIMAP OVERVIEW (PENCIL HAIRLINE, INTERACTIVE) -->
+
   <aside id="minimap" aria-label="Sheet Overview Minimap" title="Minimap (Click to fly to location)">
     <div class="minimap-plate" id="mm-zone-a" style="left:5px; top:16px; width:54px; height:48px;"></div>
     <div class="minimap-plate" id="mm-zone-b" style="left:63px; top:16px; width:54px; height:48px;"></div>
@@ -1314,7 +1295,7 @@
     <div class="minimap-viewport" id="minimap-view-rect"></div>
   </aside>
 
-  <!-- MINIMALIST FLOATING CAD HUD (LIVE TOPIC, TOUR, FIT, ZOOM) -->
+
   <aside class="cad-panzoom-hud" aria-label="CAD Viewport Controls">
     <span class="hud-topic-tag" id="hud-topic-name">SHEET OVERVIEW</span>
     <button class="hud-btn" onclick="stepTour(-1)" title="Previous Topic (Tour)">&#9664;</button>
@@ -1325,9 +1306,7 @@
     <span class="hud-zoom-readout" id="hud-scale-readout">100%</span>
   </aside>
 
-  <!-- ====================================================================
-       INTERACTIVE JAVASCRIPT: PAN-ZOOM ENGINE, INERTIA, MINIMAP & NAVIGATION
-       ==================================================================== -->
+
   <script>
     var panX = 0, panY = 0, scale = 1.0;
     window.currentDraftingScale = 1.0;
@@ -1338,11 +1317,11 @@
     var hudTopic = document.getElementById('hud-topic-name');
     var mmRect = document.getElementById('minimap-view-rect');
 
-    // List of sequential zones for tour
+
     var tourZones = ['zone-a', 'zone-b', 'zone-c', 'zone-d', 'zone-e', 'cell-legend'];
     var currentTourIndex = 0;
 
-    // Apply transform to content AND update infinite tiled grid properties
+
     function applyTransform() {
       sheetContent.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
       window.currentDraftingScale = scale;
@@ -1350,7 +1329,7 @@
       updateActiveTopicAndMinimap();
     }
 
-    // Unified smooth flyTo helper (Pure rAF, zero intervals)
+
     var currentAnimFrame = null;
     function flyTo(targetX, targetY, targetScale, duration, callback) {
       if (currentAnimFrame) {
@@ -1366,7 +1345,7 @@
         if (!startTime) startTime = now;
         var elapsed = now - startTime;
         var progress = Math.min(1, elapsed / duration);
-        // Quintic easeInOut for ultra-smooth natural flight
+
         var ease = progress < 0.5 ? 16 * Math.pow(progress, 5) : 1 - Math.pow(-2 * progress + 2, 5) / 2;
 
         panX = startPanX + (targetX - startPanX) * ease;
@@ -1384,7 +1363,7 @@
       currentAnimFrame = requestAnimationFrame(step);
     }
 
-    // Fit all content within window with comfortable padding
+
     function fitContent(smooth) {
       var vw = window.innerWidth;
       var vh = window.innerHeight;
@@ -1407,7 +1386,7 @@
       }
     }
 
-    // Auto-fit a specific zone and emphasize it
+
     function flyToZone(zoneId) {
       var el = document.getElementById(zoneId);
       if (!el) return;
@@ -1419,7 +1398,7 @@
       var vh = window.innerHeight;
       var pad = 50;
 
-      // Element coordinate space inside content (width 1020, height approx 960-980)
+
       var elX = el.offsetLeft;
       var elY = el.offsetTop;
       var elW = el.offsetWidth || 1020;
@@ -1435,13 +1414,13 @@
       });
     }
 
-    // Step Tour (Previous / Next)
+
     function stepTour(direction) {
       currentTourIndex = (currentTourIndex + direction + tourZones.length) % tourZones.length;
       flyToZone(tourZones[currentTourIndex]);
     }
 
-    // Zoom step (+ / -) toward viewport center
+
     function zoomStep(factor) {
       var cx = window.innerWidth / 2;
       var cy = window.innerHeight / 2;
@@ -1455,7 +1434,7 @@
       flyTo(targetPanX, targetPanY, nextScale, 280);
     }
 
-    // Update Live Topic in HUD and Minimap Viewport Indicator
+
     var zoneTitles = {
       'zone-a': 'ZONE A &bull; DIHEDRAL HINGE',
       'zone-b': 'ZONE B &bull; PROJECTOR DETENT',
@@ -1471,7 +1450,7 @@
       var vCenterX = vw / 2;
       var vCenterY = vh / 2;
 
-      // Unproject viewport center to content coordinates
+
       var contentCenterX = (vCenterX - panX) / scale;
       var contentCenterY = (vCenterY - panY) / scale;
 
@@ -1500,7 +1479,7 @@
         if (activeBtn) activeBtn.classList.add('active-zone');
       }
 
-      // Update minimap viewport indicator
+
       if (mmRect) {
         var mmW = 180, mmH = 120;
         var sheetW = 3400, sheetH = 2400;
@@ -1524,7 +1503,7 @@
       }
     }
 
-    // Pointer-driven Pan with Friction/Inertia & Gesture Safety
+
     (function() {
       var isPanning = false;
       var startX = 0, startY = 0;
@@ -1534,7 +1513,7 @@
       var inertiaFrame = null;
 
       viewport.addEventListener('pointerdown', function(e) {
-        // GESTURE SAFETY: Ignore when starting on interactive controls, sliders, canvas, minimap
+
         if (e.target.closest('input, a, button, .interactive-stage-box, canvas, #sheet-turntable, #svg-sheet-proj, #sheet-snap-stage, .cad-panzoom-hud, #minimap')) {
           return;
         }
@@ -1562,11 +1541,11 @@
         var dx = e.clientX - lastPointerX;
         var dy = e.clientY - lastPointerY;
 
-        // Moving average velocity
+
         vx = vx * 0.35 + (dx / dt) * 16 * 0.65;
         vy = vy * 0.35 + (dy / dt) * 16 * 0.65;
 
-        // Cap maximum velocity to roughly 24px/frame (~400px total glide)
+
         var speed = Math.hypot(vx, vy);
         if (speed > 24) {
           vx = (vx / speed) * 24;
@@ -1587,7 +1566,7 @@
         isPanning = false;
         viewport.classList.remove('is-dragging');
 
-        // Apply brief controlled inertia coasting with friction (settles within 600ms)
+
         if (Math.hypot(vx, vy) > 1.2) {
           var startTime = performance.now();
           function coast(now) {
@@ -1610,7 +1589,7 @@
       viewport.addEventListener('pointerup', endPan);
       viewport.addEventListener('pointercancel', endPan);
 
-      // Wheel Zoom toward mouse point
+
       viewport.addEventListener('wheel', function(e) {
         e.preventDefault();
         if (currentAnimFrame) cancelAnimationFrame(currentAnimFrame);
@@ -1630,9 +1609,9 @@
         applyTransform();
       }, { passive: false });
 
-      // Double-Click Handling (Zoom in or Auto-Fit Plate)
+
       viewport.addEventListener('dblclick', function(e) {
-        // EXCEPTION: Never hijack double-click inside canvas or interactive widgets
+
         if (e.target.closest('canvas, #sheet-turntable, input, button, a, #sheet-snap-stage, .cad-panzoom-hud, #minimap')) {
           return;
         }
@@ -1641,7 +1620,7 @@
         if (plate) {
           flyToZone(plate.id);
         } else {
-          // Double-click on empty paper: zoom in one step toward cursor
+
           var mouseX = e.clientX;
           var mouseY = e.clientY;
           var sheetX = (mouseX - panX) / scale;
@@ -1654,7 +1633,7 @@
         }
       });
 
-      // Window Resize: Maintain exact center point
+
       var lastVw = window.innerWidth;
       var lastVh = window.innerHeight;
       window.addEventListener('resize', function() {
@@ -1672,14 +1651,14 @@
         applyTransform();
       });
 
-      // Initial fit to screen on load
+
       window.addEventListener('DOMContentLoaded', function() { fitContent(false); });
       fitContent(false);
     })();
 
-    // Keyboard Shortcuts (1-5, 0, F, Esc, Arrows, +/-)
+
     window.addEventListener('keydown', function(e) {
-      // Do NOT fire when user is typing in a field
+
       if (e.target && e.target.nodeType === 1) {
         if (e.target.matches('input, textarea, select') || e.target.isContentEditable) return;
       }
@@ -1698,7 +1677,7 @@
       else if (e.key === 'ArrowDown') { flyTo(panX, panY - 160, scale, 200); }
     });
 
-    // Minimap Click / Drag to navigate
+
     (function() {
       var mm = document.getElementById('minimap');
       if (!mm) return;
@@ -1722,9 +1701,9 @@
       mm.addEventListener('click', jumpMinimap);
     })();
 
-    // ==========================================================================
-    // THEME SWITCHER & INTERACTIVE ZONE SOLVERS
-    // ==========================================================================
+
+
+
     function togglePaperTheme() {
       var root = document.documentElement;
       var cur = root.getAttribute('data-paper') || 'white';
@@ -1790,7 +1769,7 @@
       document.getElementById('sheet-theta-readout').textContent = thetaDeg + '°';
       var r = 160;
       var rad = (thetaDeg * Math.PI) / 180;
-      
+
       var startX = 60, startY = 75;
       var appLength = r * Math.cos(rad) * 0.75;
       var endX = startX + appLength;
@@ -1799,7 +1778,7 @@
 
       var tlEndX = startX + r * 0.95;
       document.getElementById('sheet-tl-line').setAttribute('x2', tlEndX);
-      
+
       var b1 = document.getElementById('sheet-b1-pt');
       var b1Lbl = document.getElementById('sheet-b1-lbl');
       b1.setAttribute('cx', tlEndX);
@@ -1877,7 +1856,7 @@
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
-          
+
           if (isHidden) {
             ctx.strokeStyle = hiddenStroke;
             ctx.globalAlpha = 0.45;
@@ -1991,7 +1970,7 @@
         });
       });
     })();
-  </script>
+</script>
 
   <div id="probe-results" style="display:none;"></div>
   <script>
@@ -2000,14 +1979,14 @@
       window.__errors.push({ msg: String(msg), line: line, col: col });
     };
 
-    // Drive frames smoothly in test environment
+
     function driveFlight(callback) {
       var start = performance.now();
       function check(now) {
         if (!currentAnimFrame || (now - start) > 700) {
           callback();
         } else {
-          // If in virtual-time rAF needs manual poke
+
           requestAnimationFrame(check);
         }
       }
@@ -2017,11 +1996,11 @@
     function testKey(keyName, targetZone, isFit) {
       return new Promise(function(resolve) {
         var before = { s: Number(scale.toFixed(2)), x: Math.round(panX), y: Math.round(panY) };
-        
-        // Dispatch keydown
+
+
         window.dispatchEvent(new KeyboardEvent('keydown', { key: keyName, bubbles: true }));
 
-        // Wait for flight animation to complete
+
         setTimeout(function() {
           var after = { s: Number(scale.toFixed(2)), x: Math.round(panX), y: Math.round(panY) };
           var isVisible = false;
@@ -2051,7 +2030,7 @@
     }
 
     async function runTest() {
-      // Ensure initial fit
+
       fitContent(false);
       await new Promise(r => setTimeout(r, 100));
 
@@ -2068,10 +2047,10 @@
       var stage = document.getElementById('viewport-stage');
       var bgImg = window.getComputedStyle(stage).backgroundImage;
 
-      // Invariants check
+
       scrubSheetHinge(50);
       var hpRectH = document.getElementById('sheet-hp-rect').getAttribute('height');
-      
+
       var stageBox = document.getElementById('sheet-snap-stage');
       var sRect = stageBox.getBoundingClientRect();
       scrubSheetProjector({ clientX: sRect.left + sRect.width / 2, clientY: sRect.top + 50 });
@@ -2099,7 +2078,7 @@
     }
 
     window.addEventListener('load', runTest);
-  </script>
+</script>
 
 </body>
 </html>

@@ -1,0 +1,13 @@
+# expect: V=9 E=8 F=0 curves=1 profileInferred=1 unresolved=3 status=partial diagnostics=point-correspondence-missing,unresolved-edge centreRefs=ok centreEdit=ok
+/datum -30 180
+/point cE 20 40 elevation
+/point cP 20 -30 plan
+/rename cE centre members
+/rename cP centre members
+/arc centre 20 210 330 A elevation
+/point a 2.6794919243 -30 plan
+/point b 37.3205080757 -30 plan
+/line a b A plan
+/point c 110 40 profile
+/point d 120 40 profile
+/line c d A profile

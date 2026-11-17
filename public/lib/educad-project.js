@@ -6,24 +6,24 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD exact 2D projection: orthographic Monge views of a 3D solid
-  // with per-edge occlusion, for pose mode's live overlay. Pose fits
-  // move existing ink and can never split coincident geometry (the two
-  // hexagons of a spun prism); this module projects the posed solid
-  // itself, so VP and HP always show the true stance. Pure: verts in,
-  // segments out. Zero deps. Dual-env: browser via
-  // window.EduCADProject, plain Node via module.exports. Node-safe.
-  // World units mm; widget space is the locked reconstruct frame
-  // (X, Y, Z) = (sheetX, elevY, -planY): front reads (x, y), top
-  // reads (x, -z). Faces are planar loops (reconstruct contract);
-  // winding is irrelevant (occlusion is double-sided).
+
+
+
+
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '1.0.0-educad';
   var VIEWS = ['front', 'top', 'left', 'right'];
-  // A face pierced at or below this ray distance does not occlude:
-  // the edge midpoint starts on its own faces (t ~ 0), and only a
-  // face strictly between the midpoint and the viewer hides it.
-  // Models are mm-scale, so 1e-7 clears float noise by ~5 decades.
+
+
+
+
   var HIT_EPS = 1e-7;
 
   function fail(msg) { throw new Error('educad-project: ' + msg); }
@@ -109,9 +109,9 @@
     }
     return inside(boundary) && !(holes || []).some(inside);
   }
-  // Intersect the view ray from one edge station with every non-adjacent
-  // face plane, then locate the hit in its polygon region. Triangle fans
-  // would incorrectly fill concavities and holes.
+
+
+
   function edgeHiddenAt(verts, faces, holes, adj, a, b, dx, dy, dz, t) {
     var origin = pointOnEdge(verts, a, b, t);
     var own = adj[edgeKey(a,b)] || [];
@@ -152,10 +152,10 @@
     var t=segmentParam2D(p,a,b);
     return t>=-1e-9 && t<=1+1e-9;
   }
-  // Split an edge where its visibility can change: projected face/hole
-  // boundaries and the face planes themselves. Each interval is classified
-  // by the same ray test, so the result is a split hidden-line stroke rather
-  // than a single midpoint verdict.
+
+
+
+
   function edgeIntervals(verts, faces, holes, adj, a, b, dx, dy, dz, view, map) {
     if (!faces.length) return [{t0:0,t1:1,hidden:false}];
     var pa=sheetPoint(verts[a],view,map), pb=sheetPoint(verts[b],view,map);
@@ -200,13 +200,13 @@
     return out.length?out:[{t0:0,t1:1,hidden:edgeHiddenAt(verts,faces,holes,adj,a,b,dx,dy,dz,0.5)}];
   }
 
-  // Exact orthographic Monge views of a solid: every edge projected
-  // to sheet mm with its occlusion verdict. view 'front' is the
-  // elevation (x, y) seen from +Z; view 'top' is the plan (x, -z)
-  // seen from +Y. Returns [{ax, ay, bx, by, hidden, intervals}] in edge
-  // order, so callers can diff rest vs posed segment by segment. `hidden`
-  // keeps the midpoint verdict; `intervals` carries the visible/hidden
-  // split strokes for partially occluded edges.
+
+
+
+
+
+
+
   function projectSolid(verts, edges, faces, view, profileMap, faceHoles) {
     faceHoles = faceHoles || [];
     checkVerts(verts);
@@ -257,9 +257,9 @@
     return out;
   }
 
-  // Revolved readers use a polygon mesh for 3D display. Its internal
-  // generators are sampling lines, not drafting edges. Keep the rims and
-  // generators at the silhouette, for every posed orthographic direction.
+
+
+
   function projectGeometry(geometry, view, profileMap) {
     var out = projectSolid(geometry.vertices, geometry.edges, geometry.faces || [], view, profileMap, geometry.faceHoles);
     if (!geometry.smoothSideFaces && geometry.name !== 'cylinder' && geometry.name !== 'cone') return out;
@@ -287,7 +287,7 @@
     });
   }
 
-  // Point visibility uses the same face/hole ray test as edge intervals.
+
   function pointHidden(geometry, point, view) {
     var direction=view==='top'?[0,1,0]:view==='front'?[0,0,1]:view==='left'?[-1,0,0]:[1,0,0];
     var verts=geometry.vertices.concat([point]), index=verts.length-1;

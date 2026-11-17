@@ -1,8 +1,3 @@
-# Line-boundary validation and certificate on a reconstructed cylinder. The
-# truncated cylinder supplies the analytic side surface; the query attaches a
-# finite generator segment (a straight boundary element) to it. The clone's
-# certificate must contain a line boundary record, and the line must pass the
-# exact finite/length checks and the sampled on-surface check.
 # expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
 /datum -30 80
 /point o 20 -30 plan
@@ -16,7 +11,5 @@
 /line c d A elevation
 /line d a A elevation
 
-# The attached line is the generator x=0,z=30 from y=0 to y=40. It lies on
-# cylinder surface 0 (origin (20,0,30), axis +Y, radius 20).
 # expect: surfaceChecks=1 surfaceQueries=ok
 # surface-query: {"operation":"attach","surface":0,"line":{"kind":"line","start":{"x":0,"y":0,"z":30},"end":{"x":0,"y":40,"z":30}},"expect":{"boundary":{"useCount":1},"validation":{"status":"partial","openBoundaries":3},"certificate":{"status":"partial","counts":{"boundaries":3,"sharedBoundaries":0,"openBoundaries":3}}}}

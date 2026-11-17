@@ -1,5 +1,3 @@
-# Three parallel-axis cylinders. Surfaces 0 and 1 overlap, surface 2 is far
-# away. The caps supply planes for circle, ellipse, and coincident tests.
 # expect: 144V 216E 78F curves=6 surfaces=9 surfaceKinds=cylinder,plane surfaceLoops=12 surfaceShells=3 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceChecks=6 surfaceQueries=ok diagnostics=curve-projection-ambiguous status=partial
 /datum -100 300
 /point o 20 -30 plan
@@ -33,8 +31,6 @@
 /line k l A elevation
 /line l i A elevation
 
-# surface:0 = cylinder x20 r20, surface:1 = cylinder x50 r20,
-# surface:2 = cylinder x200 r10. Base planes: 3, 4, 5. Inclined caps: 6, 7, 8.
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"lines","relation":"transverse","surfaceIds":["surface:0","surface:1"],"lines":[{"origin":{"x":35,"y":0,"z":16.7712434447},"direction":{"x":0,"y":1,"z":0}},{"origin":{"x":35,"y":0,"z":43.2287565553},"direction":{"x":0,"y":1,"z":0}}]}}
 # surface-query: {"operation":"intersect","surfaces":[0,2],"expect":{"kind":"none","relation":"none","reason":"separate","distance":180,"gap":150}}
 # surface-query: {"operation":"intersect","surfaces":[0,0],"expect":{"kind":"coincident","relation":"coincident","surfaceIds":["surface:0","surface:0"]}}

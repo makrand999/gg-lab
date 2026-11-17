@@ -1,6 +1,3 @@
-# A complete sphere silhouette pair is split by its equatorial plane. The two
-# spherical caps keep the same analytic section object as their new boundary,
-# so boundary incidence is 2 and the pair is one closed shell.
 # expect: 86V 252E 168F spheres=1 surfaces=1 surfaceKinds=sphere surfaceLoops=0 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
 /datum -100 400
 /circle 20 -30 20 A plan

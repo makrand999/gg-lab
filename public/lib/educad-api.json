@@ -2,12 +2,78 @@
   "apiVersion": "1.0.0",
   "version": "0.1.0",
   "modules": {
-    "Surfaces": ["build", "validate", "certify", "incidence", "topology", "featureGraph", "section", "intersect", "intersectBounded", "split", "trim", "attachBoundary", "shareBoundary", "intersectionCurves", "classifyPoint", "torusParameters", "planarBoolean", "subtractContainedLoop", "silhouettes", "silhouetteHLR"],
-    "Predicates": ["orient2d", "orient3d", "coplanar", "pointOnPlane"],
-    "Planar": ["arrangement", "booleanRegion", "pointInRegion"],
-    "Correspondence": ["analyze"],
-    "Constraints": ["analyze", "viewState"],
-    "Ref3d": ["buildPreview", "validPreview"]
+    "Surfaces": [
+      "build",
+      "validate",
+      "certify",
+      "incidence",
+      "topology",
+      "featureGraph",
+      "section",
+      "intersect",
+      "intersectBounded",
+      "split",
+      "trim",
+      "attachBoundary",
+      "shareBoundary",
+      "intersectionCurves",
+      "classifyPoint",
+      "torusParameters",
+      "planarBoolean",
+      "subtractContainedLoop",
+      "syncDisplayHoles",
+      "silhouettes",
+      "silhouetteHLR",
+      "implicitEquation",
+      "implicitLineIntervals"
+    ],
+    "Predicates": [
+      "orient2d",
+      "orient3d",
+      "coplanar",
+      "pointOnPlane"
+    ],
+    "Planar": [
+      "arrangement",
+      "booleanRegion",
+      "pointInRegion"
+    ],
+    "Correspondence": [
+      "analyze"
+    ],
+    "Constraints": [
+      "analyze",
+      "viewState"
+    ],
+    "Ref3d": [
+      "buildPreview",
+      "validPreview"
+    ],
+    "Implicit": [
+      "equation",
+      "normalizeEquation",
+      "serialize",
+      "equationIsValid",
+      "evaluate",
+      "parameterOf",
+      "constraintsHold",
+      "restrictToLine",
+      "lineIntersection",
+      "isolateRoots",
+      "proportionalEquation",
+      "boundsForPair",
+      "algebraicIntersection",
+      "polyEval",
+      "intervalPolyEval",
+      "paramDomain",
+      "paramPoint",
+      "trace",
+      "traceResult",
+      "planeSection",
+      "volumeConstraints",
+      "lineConstraintIntervals",
+      "planeEquation"
+    ]
   },
   "contracts": [
     "analytic-surface-v1",
@@ -23,6 +89,8 @@
     "feature-graph-v1",
     "correspondence-audit-v1",
     "constraint-report-v1",
-    "view-state-v1"
+    "view-state-v1",
+    "implicit-surface-v1",
+    "implicit-intersection-v1"
   ]
 }

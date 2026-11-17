@@ -6,34 +6,34 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD label layout: 3-tier dynamic annotation engine with leader
-  // fallback. Tier 1 filters to genuine BIS SP 46 annotations (primed
-  // points, dimensions, loci, datum ends; never projector/axis/hidden
-  // internals). Tier 2 samples 8 radial sectors per anchor and keeps the
-  // min-cost AABB (incident-line repulsion, label overlap = Infinity,
-  // edge crossing, XY ground-line rule, aesthetic preference) in
-  // O(8*N) time. Tier 3 is rendering (knockout halo, see canvas module).
-  // Tier 4 emits a BIS Type B leader when every sector is blocked.
-  // World mm inside; screen px is ephemeral (needs view {s,tx,ty,w,h}).
-  // Deterministic: fixed sector order, strict-min wins. Zero deps.
+
+
+
+
+
+
+
+
+
+
   var WORLD_UNITS = 'mm';
   var VERSION = '8.1.0-educad';
   var SECTORS_DEG = [0, 45, 90, 135, 180, 225, 270, 315];
-  // Screen-px steps (y down): 45 deg reads visually up-right.
+
   var SECTOR_STEP = {
     0: [1, 0], 45: [1, -1], 90: [0, -1], 135: [-1, -1],
     180: [-1, 0], 225: [-1, 1], 270: [0, 1], 315: [1, 1]
   };
-  // Cartographic preference: top-right first, bottom-left last.
+
   var SECTOR_PREF = {
     45: 0, 135: 0.5, 0: 1, 90: 1.5,
     180: 2, 270: 2.5, 315: 3, 225: 3.5
   };
   var RADIUS_PX = 10;
-  // Retry ring step: a job that would fire a leader is re-scanned at
-  // +12/+24 px before giving up, so crowded same-anchor parts (a tilted
-  // solid's stacked corners) seat on a wider adjacent ring instead of
-  // ejecting 25 mm out. Jobs that seat at radius 10 are untouched.
+
+
+
+
   var PART_RING_PX = 12;
   var FONT_PX = 13;
   var DEFAULT_FONT = 'italic 13px "Cambria", "Times New Roman", serif';
@@ -87,7 +87,7 @@
     return (e && e.meta && typeof e.meta.kind === 'string') ? e.meta.kind : '';
   }
 
-  // Tier 1: semantic filter. Returns a job kind or null (never label).
+
   function labelKind(e) {
     if (!e || typeof e !== 'object') return null;
     if (e.showLabel === false || e.visible === false) return null;
@@ -116,11 +116,11 @@
     return e.caption;
   }
 
-  // Multi-caption points: a POINT caption lists coincident corner names
-  // separated by commas ('a,b'), each optionally wrapped in one paren pair
-  // marking the student's hidden verdict ('a,(b)'). Parts keep typed order
-  // (first part wins the best sector); empty parts are ignored so rename
-  // needs no error channel. Single captions behave exactly as before.
+
+
+
+
+
   function splitCaption(caption) {
     var parts = String(caption === undefined || caption === null ? '' : caption).split(',');
     var out = [];
@@ -131,8 +131,8 @@
     return out;
   }
 
-  // Identity of one part: one wrapping paren pair (the hidden mark) is
-  // stripped; anything else is literal. '(b)' -> 'b', 'b' -> 'b'.
+
+
   function bareName(part) {
     var t = String(part === undefined || part === null ? '' : part);
     t = t.replace(/^\s+|\s+$/g, '');
@@ -142,14 +142,14 @@
     return t;
   }
 
-  // True when the part carries the student's hidden verdict.
+
   function isHiddenMark(part) {
     var t = String(part === undefined || part === null ? '' : part);
     t = t.replace(/^\s+|\s+$/g, '');
     return t.length >= 2 && t.charAt(0) === '(' && t.charAt(t.length - 1) === ')';
   }
 
-  // Fallback text metrics (override via opts.measure with ctx.measureText).
+
   function estimateTextSize(text, fontPx) {
     var fp = (fontPx === undefined || fontPx === null) ? FONT_PX : fontPx;
     assertFinite(fp);
@@ -157,8 +157,8 @@
     return { w: Math.max(8, t.length * 0.55 * fp), h: fp * 1.15 };
   }
 
-  // Tier 2 anchors (world mm). Locus labels sit at the outer (max-x) end;
-  // datum ground lines split into X (left end) and Y (right end).
+
+
   function locusOuterEnd(e) {
     assertFinite(e.x, e.y, e.x2, e.y2);
     if (e.x2 > e.x || (e.x2 === e.x && e.y2 > e.y)) {
@@ -182,8 +182,8 @@
     return { x: st[0] / len, y: st[1] / len, sx: st[0], sy: st[1] };
   }
 
-  // Candidate AABB: the box corner nearest the anchor sits R px out along
-  // the sector, so long texts clear the vertex instead of covering it.
+
+
   function candidateBox(axPx, ayPx, deg, w, h, radiusPx) {
     assertFinite(axPx, ayPx, w, h, radiusPx);
     var d = sectorDirPx(deg);
@@ -240,7 +240,7 @@
     return false;
   }
 
-  // Infinite line crosses the box iff box corners straddle it.
+
   function lineBoxIntersect(p1, p2, box) {
     var dx = p2.x - p1.x, dy = p2.y - p1.y;
     if (dx === 0 && dy === 0) return pointInBox(p1, box);
@@ -258,7 +258,7 @@
     return signs[0] === 1 && signs[1] === 1;
   }
 
-  // Ray (origin + unit dir, t >= 0) vs box via the slab test.
+
   function rayBoxIntersect(o, u, box) {
     var tmin = 0, tmax = Infinity;
     var axes = [[o.x, u.x, box.x, box.x + box.w], [o.y, u.y, box.y, box.y + box.h]];
@@ -298,9 +298,9 @@
     return { x: dxMm / len, y: -dyMm / len };
   }
 
-  // Incident edge directions at an anchor (screen-px unit vectors). Lines
-  // through the anchor repel in both directions; segments repel away from
-  // the anchor along their span. Pushes labels into the open wedge.
+
+
+
   function incidentDirs(anchorMm, entities, selfId) {
     var out = [];
     for (var i = 0; i < entities.length; i++) {
@@ -312,7 +312,7 @@
       if (!isFinite(e.x) || !isFinite(e.y) ||
           !isFinite(e.x2) || !isFinite(e.y2)) continue;
       if (t === 'LINE') {
-        // Infinite line: count it when the anchor sits on the line.
+
         var dx = e.x2 - e.x, dy = e.y2 - e.y;
         var len2 = dx * dx + dy * dy;
         if (!(len2 > 0)) continue;
@@ -332,7 +332,7 @@
         if (away) out.push({ x: away.x, y: away.y, both: false });
       } else if (t !== 'RAY' && t !== 'DATUM_AXIS' &&
           distPointSegMm(anchorMm.x, anchorMm.y, e.x, e.y, e.x2, e.y2) <= INCIDENT_EPS_MM) {
-        // Anchor lies mid-span (dimension midpoint, point on locus).
+
         var span = toScreenDir(e.x2 - e.x, e.y2 - e.y);
         if (span) out.push({ x: span.x, y: span.y, both: true });
       }
@@ -340,8 +340,8 @@
     return out;
   }
 
-  // True when any drawn stroke slices the candidate box. Invisible
-  // entities are skipped; the anchor's own point has no stroke.
+
+
   function geometryCrossesBox(box, entities, view) {
     for (var i = 0; i < entities.length; i++) {
       var e = entities[i];
@@ -383,8 +383,8 @@
     };
   }
 
-  // Cost(k) = 30*C_incident + inf*C_overlap + 50*C_edge + 100*C_ground
-  //   + C_pref. Overlap is checked unless skipOverlap (leader fallback).
+
+
   function costCandidate(box, dir, deg, job, placed, entities, view, skipOverlap) {
     var cost = 0;
     var inc = job.incident;
@@ -408,8 +408,8 @@
     return cost;
   }
 
-  // Ground-line rule applies only when the anchor sits on its expected
-  // side (Q2/Q4 legitimately place both views on one side of XY).
+
+
   function groundRuleFor(e, anchorMm) {
     if (e.viewRole === 'ELEVATION' && anchorMm.y >= 0) return 'above';
     if (e.viewRole === 'PLAN' && anchorMm.y <= 0) return 'below';
@@ -439,10 +439,10 @@
         loci.push({ entity: e, kind: kind, text: labelText(e, kind),
           anchorMm: locusOuterEnd(e), sectors: SECTORS_DEG });
       } else if (kind === 'datum') {
-        // Datum ends seat below the line (legacy sectors, tried first),
-        // falling back above it only when the underside is blocked: when
-        // the plan crowds below (a tilted solid's parted rings), X/Y step
-        // into VP instead of firing 25 mm leaders down into the part.
+
+
+
+
         var ends = datumEnds(e);
         datums.push({ entity: e, kind: kind, text: 'X',
           anchorMm: ends.left, sectors: [225, 270, 180],
@@ -459,8 +459,8 @@
     return { x: box.x, y: box.y + h * 0.8 };
   }
 
-  // Tier 4: leader from the vertex to a label parked 25 mm out along the
-  // least-bad sector, with a BIS Type B dot at the vertex end.
+
+
   function leaderPlacement(job, deg, box, cost, view) {
     var d = sectorDirPx(deg);
     var tip = {
@@ -512,10 +512,10 @@
       }
       return { best: rb, fallback: rf };
     };
-    // Attempt order: primary sectors at radius 10, then fallback sectors
-    // (datum above-line), then both groups at +12/+24 px. The first seat
-    // at or under threshold wins; jobs that seated before are untouched,
-    // and a surviving leader still uses the radius-10 primary read.
+
+
+
+
     var groups = [job.sectors];
     if (Array.isArray(job.fallbackSectors) && job.fallbackSectors.length > 0) {
       groups.push(job.fallbackSectors);
@@ -545,8 +545,8 @@
     };
   }
 
-  // resolve(entities, view, opts): full 3-tier layout + Tier 4 leaders.
-  // opts: {radiusPx, fontPx, threshold, measure(text)->{w,h}}.
+
+
   function resolve(entities, view, opts) {
     var t0 = nowMs();
     if (!Array.isArray(entities)) throw new Error('entities must be an array');

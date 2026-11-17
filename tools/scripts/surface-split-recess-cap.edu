@@ -1,8 +1,3 @@
-# The spherical recess cap is cut through its mouth loop by a plane through
-# the sphere centre. The mouth circle is split into two sub-arcs; the plane
-# section is split at the two mouth crossings, and only the section arc inside
-# the cap is used. Both pieces share that exact arc, so the closed cavity
-# becomes two open lunes with two open mouth boundaries.
 # expect: 73V 192E 120F recesses=1 surfaces=2 surfaceKinds=plane,sphere surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
 /datum -30 80
 /circle 20 -30 20 A plan

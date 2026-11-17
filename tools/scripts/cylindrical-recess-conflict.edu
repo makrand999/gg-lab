@@ -1,9 +1,3 @@
-# Cylindrical-recess depth conflict: the mouth and both depth strokes are
-# drawn, but the bottom edge covers only half the mouth diameter. The depth is
-# not closed into one consistent bottom loop; the mouth circle stays an
-# ordinary boundary and the specific diagnostic is reported instead of
-# guessing a cylinder. The unmatched side and partial-bottom strokes remain
-# explicit unresolved evidence.
 # expect: 8V 12E 6F recesses=0 curves=0 surfaces=6 surfaceKinds=plane surfaceLoops=6 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok diagnostics=curve-projection-missing,point-correspondence-missing,recess-depth-conflict,unresolved-edge unresolved=10 status=partial
 /datum -100 400
 /point v0 0 0 plan

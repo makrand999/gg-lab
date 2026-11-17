@@ -1,4 +1,3 @@
-# The mirrored orientation: ellipse in elevation, edge-on line in plan.
 # expect: 24V 24E 1F curves=1 oblique=1 obliqueReprojection=ok unresolved=0 status=inferred
 /datum -100 400
 /ellipse 20 30 14.1421356237 20 A elevation

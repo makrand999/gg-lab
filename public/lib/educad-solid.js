@@ -6,18 +6,18 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // EduCAD floating 3D wireframe cube: pen-style vector sketch on the sheet.
-  // Orthographic yaw/pitch projector ((X,Y,Z) -> 2D) drawn with plain
-  // Canvas2D strokes. Ink lines and dots only: no fills, no shading,
-  // no lights, no floor, no shadow, no extra scene dressing.
-  // World cube in [-1,1]^3; screen px is ephemeral render only. Zero deps.
-  // Dual-env: browser via window.EduCADSolid, Node via module.exports.
-  // Node-safe: DOM is touched only inside mountSolidWidget when a container
-  // element is passed; otherwise a headless stub is returned.
-  //
-  // Resting look: transparent stage, crisp ink strokes, isometric rest pose
-  // (pitch atan(1/sqrt(2)) ~= 35.26 deg, yaw 45 deg) so the cube reads as a
-  // 2D technical sketch until orbited.
+
+
+
+
+
+
+
+
+
+
+
+
   var SIZE_DEFAULT = 260;
   var SIZE_MIN = 120;
   var SIZE_MAX = 520;
@@ -27,9 +27,9 @@
   var VERTEX_R_PX = 3;
   var HIDDEN_DASH = [4, 4];
   var HIDDEN_OPACITY = 0.45;
-  // Inspection face paint: opaque sheet paper, so a closed solid reads
-  // as filled and occludes the reference planes behind it. Hidden ink
-  // draws over the fills, so only dashed edges and quiet dots show.
+
+
+
   var FACE_FILL = '#f8fafc';
   var ISO_YAW_RAD = Math.PI / 4;
   var ISO_PITCH_RAD = Math.atan(1 / Math.sqrt(2));
@@ -43,61 +43,61 @@
   var CANVAS_CLASS = 'educad-solid-canvas';
   var HANDLE_CLASS = 'educad-solid-handle';
   var HANDLE_TEXT = '⠿ 3D Solid';
-  // Full-screen glass overlay: the model floats on a transparent sheet
-  // covering the whole window (no widget box). Pointer events pass
-  // through everywhere except the "aura": a soft margin around the
-  // drawn wireframe ink. The sheet edge is the only zoom bound; pan
-  // keeps every part reachable instead.
+
+
+
+
+
   var GLASS_RADIUS_FRAC = 0.16;
   var GLASS_RADIUS_MIN = 64;
   var GLASS_RADIUS_MAX = 200;
   var GLASS_ZOOM_MIN = 0.08;
   var GLASS_ZOOM_MAX = 60;
-  // Pan margin in radii: sqrt(3) + headroom. Normalized geometry has
-  // |v| <= sqrt(3), so any vertex reaches any screen point (zoom has
-  // no practical limit with pan), while the model bbox always keeps
-  // an overlap strip on the sheet (the aura stays grabbable).
+
+
+
+
   var GLASS_PAN_MARGIN = 1.75;
   var AURA_PX = 12;
-  // Double-tap reset window: two presses within 450 ms and 8 px
-  // (manhattan) reset the glass. Detected manually because the orbit
-  // press calls preventDefault (no text selection while dragging),
-  // which suppresses the browser's compatibility dblclick event.
+
+
+
+
   var TAP_WINDOW_MS = 450;
   var TAP_SLOP_PX = 8;
   var GLASS_CLASS = 'educad-solid-glass';
   var GLASS_CANVAS_CLASS = 'educad-solid-glass-canvas';
 
-  // Unit cube corners. Index map: bit0 -> +X, bit1 -> +Y, bit2 -> +Z.
+
   var VERTICES = [
     { x: -1, y: -1, z: -1 }, { x: 1, y: -1, z: -1 },
     { x: -1, y: 1, z: -1 }, { x: 1, y: 1, z: -1 },
     { x: -1, y: -1, z: 1 }, { x: 1, y: -1, z: 1 },
     { x: -1, y: 1, z: 1 }, { x: 1, y: 1, z: 1 }
   ];
-  // 12 edges: 4 along each axis.
+
   var EDGES = [
     [0, 1], [2, 3], [4, 5], [6, 7],
     [0, 2], [1, 3], [4, 6], [5, 7],
     [0, 4], [1, 5], [2, 6], [3, 7]
   ];
-  // Outward face normals, in -X/+X/-Y/+Y/-Z/+Z order. Faces are never
-  // drawn; they only decide which edges read as hidden (dashed).
+
+
   var FACE_NORMALS = [
     { x: -1, y: 0, z: 0 }, { x: 1, y: 0, z: 0 },
     { x: 0, y: -1, z: 0 }, { x: 0, y: 1, z: 0 },
     { x: 0, y: 0, z: -1 }, { x: 0, y: 0, z: 1 }
   ];
-  // Adjacent face pair per edge (indices into FACE_NORMALS).
+
   var EDGE_FACES = [
     [2, 4], [3, 4], [2, 5], [3, 5],
     [0, 4], [1, 4], [0, 5], [1, 5],
     [0, 2], [1, 2], [0, 3], [1, 3]
   ];
-  // Cube faces as index loops into VERTICES, wound so Newell normals come
-  // out as FACE_NORMALS (-X/+X/-Y/+Y/-Z/+Z). Faces fill paper-opaque in
-  // inspection (renderFast) so the solid occludes the reference planes;
-  // otherwise they only decide which edges read as hidden (dashed).
+
+
+
+
   var CUBE_FACES = [
     [0, 4, 6, 2], [1, 3, 7, 5],
     [0, 1, 5, 4], [2, 6, 7, 3],
@@ -132,8 +132,8 @@
     }
   }
 
-  // Newell normal (unit length) for one index loop. Degenerate loops keep
-  // a zero normal and always read as facing away.
+
+
   function newellNormal(verts, loop) {
     var nx = 0, ny = 0, nz = 0;
     for (var i = 0; i < loop.length; i++) {
@@ -149,10 +149,10 @@
 
   function edgeKey(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
 
-  // Generic 3D geometry container: vertices [{x,y,z}], edges [[a,b]],
-  // faces [[idx...]...] (optional; wireframes pass []). Validates indices,
-  // derives unit face normals + edge adjacency. Returned object is a fresh
-  // copy the caller owns.
+
+
+
+
   function createGeometry(spec) {
     spec = spec || {};
     var vs = spec.vertices || spec.VERTICES;
@@ -196,6 +196,16 @@
     for (var f = 0; f < faces.length; f++) {
       normals.push(newellNormal(verts, faces[f]));
     }
+    var smooth = [];
+    var smoothSpec = spec.smoothSideFaces || [];
+    if (!Array.isArray(smoothSpec)) throw new Error('smoothSideFaces must be an array');
+    var seenSmooth = {};
+    for (var s = 0; s < smoothSpec.length; s++) {
+      assertIndex(smoothSpec[s], faces.length, 'smooth face');
+      if (seenSmooth[smoothSpec[s]]) continue;
+      seenSmooth[smoothSpec[s]] = true;
+      smooth.push(smoothSpec[s]);
+    }
     var adj = {};
     for (var g = 0; g < faces.length; g++) {
       var loops = [faces[g]].concat(faceHoles[g]);
@@ -216,7 +226,8 @@
     return {
       name: String(spec.name === undefined ? 'custom' : spec.name),
       vertices: verts, edges: edges, faces: faces, faceHoles: faceHoles,
-      faceNormals: normals, edgeFaces: edgeFaces
+      faceNormals: normals, edgeFaces: edgeFaces, smoothSideFaces: smooth,
+      curves: Array.isArray(spec.curves) ? spec.curves : []
     };
   }
 
@@ -230,10 +241,10 @@
     return (st && st.geometry) ? st.geometry : CUBE_GEOMETRY;
   }
 
-  // Center a geometry's bounding box on the origin and uniformly scale it
-  // so the largest half-extent is 1 (cube stage space). Aspect preserved.
-  // Returns {geometry, transform:{cx,cy,cz,scale}}. Single-point inputs
-  // center to the origin with scale 1.
+
+
+
+
   function normalizeGeometry(geometry) {
     if (!geometry || !Array.isArray(geometry.vertices) ||
         geometry.vertices.length < 1) {
@@ -269,7 +280,9 @@
         vertices: out,
         edges: geometry.edges || [],
         faces: geometry.faces || [],
-        faceHoles: geometry.faceHoles || []
+        faceHoles: geometry.faceHoles || [],
+        smoothSideFaces: geometry.smoothSideFaces || [],
+        curves: geometry.curves || []
       }),
       transform: { cx: cx, cy: cy, cz: cz, scale: scale }
     };
@@ -301,11 +314,11 @@
     return (st && st.status) ? st.status : { available: true, reason: '', label: '' };
   }
 
-  // Push a reconstructed geometry into a state or a mounted widget. The
-  // geometry is normalized into stage space (uniform scale, aspect kept)
-  // unless opts.normalize === false. A null geometry restores the default
-  // cube. Widget targets redraw immediately and return the widget; state
-  // targets return the state.
+
+
+
+
+
   function setGeometry(target, geometry, opts) {
     var st = (target && target.state) ? target.state : target;
     if (!st) throw new Error('setGeometry needs a state or widget');
@@ -336,8 +349,8 @@
     return st;
   }
 
-  // Named "3D unavailable" state: render() draws the reason instead of
-  // geometry until setGeometry restores an available geometry.
+
+
   function setUnavailable(target, reason, label) {
     var st = (target && target.state) ? target.state : target;
     if (!st) throw new Error('setUnavailable needs a state or widget');
@@ -355,7 +368,7 @@
     return st;
   }
 
-  // Rest pose: exact isometric projection.
+
   function resetView(st) {
     st.yaw = ISO_YAW_RAD;
     st.pitch = ISO_PITCH_RAD;
@@ -363,8 +376,8 @@
     return st;
   }
 
-  // Turntable orbit: horizontal pointer travel spins yaw, vertical travel
-  // tilts pitch (clamped so the cube never flips inside-out).
+
+
   function rotateBy(st, dxPx, dyPx) {
     assertFinite(dxPx, dyPx);
     st.yaw += dxPx * ORBIT_RAD_PER_PX;
@@ -391,10 +404,10 @@
     return st.scale * st.size * RADIUS_FRAC;
   }
 
-  // Orthographic projector. Yaw spins about world Y, pitch tilts about the
-  // viewer X axis; screen y grows downward. Depth z grows toward the viewer
-  // (larger z renders in front). Projects the state's geometry (default
-  // cube: 8 {x, y, z} points in CSS px).
+
+
+
+
   function project(st, cxPx, cyPx) {
     assertFinite(st.yaw, st.pitch, st.scale, cxPx, cyPx);
     var verts = geometryOf(st).vertices;
@@ -408,8 +421,8 @@
     return out;
   }
 
-  // Rotate one direction by the state's yaw/pitch. Shared by the vertex
-  // projector and the face-visibility test so both always agree.
+
+
   function rotateDir(x, y, z, yaw, pitch) {
     var cy = Math.cos(yaw), sy = Math.sin(yaw);
     var cp = Math.cos(pitch), sp = Math.sin(pitch);
@@ -418,8 +431,8 @@
     return { x: x1, y: y * cp - z1 * sp, z: y * sp + z1 * cp };
   }
 
-  // Front/back verdict per normal: a face turns toward the viewer when
-  // its rotated outward normal has positive depth.
+
+
   function faceVisibilityFor(normals, yaw, pitch) {
     assertFinite(yaw, pitch);
     var out = [];
@@ -430,24 +443,28 @@
     return out;
   }
 
-  // Front/back verdict per face: a face turns toward the viewer when its
-  // rotated outward normal has positive depth. Returns 6 booleans.
+
+
   function faceVisibility(yaw, pitch) {
     return faceVisibilityFor(FACE_NORMALS, yaw, pitch);
   }
 
-  // Split the state's edges into solid front strokes and dashed hidden
-  // strokes. An edge reads as hidden only when it has adjacent faces and
-  // every adjacent face turns away, so the default cube shows 9 solid + 3
-  // dashed edges (exactly 3 hidden at the isometric rest pose). Faceless
-  // wireframe edges always read as solid. Returns [{a, b, hidden}].
+
+
+
+
+
   function classifyEdges(st) {
     assertFinite(st.yaw, st.pitch);
     var g = geometryOf(st);
     var vis = faceVisibilityFor(g.faceNormals, st.yaw, st.pitch);
+    var smooth = {};
+    var smoothList = g.smoothSideFaces || [];
+    for (var s = 0; s < smoothList.length; s++) smooth[smoothList[s]] = true;
     var out = [];
     for (var i = 0; i < g.edges.length; i++) {
       var f = g.edgeFaces[i] || [];
+      if (f.length === 2 && smooth[f[0]] && smooth[f[1]]) continue;
       var hidden = false;
       if (f.length > 0) {
         hidden = true;
@@ -460,8 +477,51 @@
     return out;
   }
 
-  // Named "3D unavailable" stage: two centered ink lines, no geometry.
-  // Returns {front:0, hidden:0, vertices:0, unavailable:reason}.
+  function curveDotSuppression(g, edges) {
+    var out = {};
+    var curves = (g && g.curves) || [];
+    if (!curves.length) return out;
+    var incident = {};
+    for (var i = 0; i < edges.length; i++) {
+      var key = edgeKey(edges[i].a, edges[i].b);
+      if (!incident[edges[i].a]) incident[edges[i].a] = [];
+      if (!incident[edges[i].b]) incident[edges[i].b] = [];
+      incident[edges[i].a].push(key);
+      incident[edges[i].b].push(key);
+    }
+    for (var c = 0; c < curves.length; c++) {
+      var curve = curves[c] || {};
+      var dv = Array.isArray(curve.displayVertices) ? curve.displayVertices : [];
+      if (!dv.length) continue;
+      var keys = {};
+      var de = Array.isArray(curve.displayEdges) ? curve.displayEdges : [];
+      if (de.length) {
+        for (var e = 0; e < de.length; e++) {
+          var ed = g.edges && g.edges[de[e]];
+          if (ed) keys[edgeKey(ed[0], ed[1])] = true;
+        }
+      } else {
+        var closed = curve.kind === 'circle' || curve.kind === 'ellipse' ||
+          curve.closed === true;
+        var count = closed ? dv.length : dv.length - 1;
+        for (var k = 0; k < count; k++) {
+          keys[edgeKey(dv[k], dv[(k + 1) % dv.length])] = true;
+        }
+      }
+      for (var v = 0; v < dv.length; v++) {
+        var list = incident[dv[v]] || [];
+        var only = true;
+        for (var q = 0; q < list.length; q++) {
+          if (!keys[list[q]]) { only = false; break; }
+        }
+        if (only) out[dv[v]] = true;
+      }
+    }
+    return out;
+  }
+
+
+
   function renderUnavailable(ctx, status, cx, cy) {
     var msg = status.label || status.reason || 'unavailable';
     ctx.save();
@@ -483,12 +543,12 @@
     return { front: 0, hidden: 0, vertices: 0, unavailable: status.reason };
   }
 
-  // Pen-style draw: hidden edges first (dashed, faint), then front edges
-  // (solid ink), then filled vertex dots. Never fills a background: the
-  // stage stays fully transparent so the cube sits on the sheet paper.
-  // Returns {front, hidden, vertices} counts. No-op (null) without ctx.
-  // When the state is unavailable, draws the named reason instead and
-  // returns {front:0, hidden:0, vertices:0, unavailable}.
+
+
+
+
+
+
   function render(ctx, st, o) {
     if (!ctx || typeof ctx.beginPath !== 'function') return null;
     o = o || {};
@@ -500,6 +560,7 @@
     if (!status.available) return renderUnavailable(ctx, status, cx, cy);
     var pts = project(st, cx, cy);
     var edges = classifyEdges(st);
+    var dots = curveDotSuppression(geometryOf(st), edges);
     var counts = { front: 0, hidden: 0, vertices: pts.length };
     ctx.save();
     ctx.lineCap = 'round';
@@ -531,6 +592,7 @@
     ctx.save();
     ctx.fillStyle = VERTEX_FILL;
     for (i = 0; i < pts.length; i++) {
+      if (dots[i]) continue;
       ctx.beginPath();
       ctx.arc(pts[i].x, pts[i].y, VERTEX_R_PX, 0, 2 * Math.PI);
       ctx.fill();
@@ -564,9 +626,9 @@
     return 1;
   }
 
-  // Floating widget: transparent 2D stage, orbit on canvas drag, move via
-  // the hover pill, wheel zoom, double-click reset. Redraws only while
-  // interacting (one RAF per dirty frame); idle costs nothing.
+
+
+
   function mountSolidWidget(container, opts) {
     opts = opts || {};
     var st = createSolidState(opts);
@@ -627,7 +689,7 @@
       return render(ctx, st);
     }
 
-    // On-demand frames: a single RAF coalesces bursts of pointer events.
+
     var rafPending = false;
     function scheduleDraw() {
       if (rafPending) return;
@@ -652,10 +714,10 @@
             e && e.pointerId !== undefined) {
           el2.setPointerCapture(e.pointerId);
         }
-      } catch (err) { /* headless/mock pointer: capture is best-effort */ }
+      } catch (err) {                                                     }
     }
 
-    // --- Orbit: left-drag on the canvas spins the cube. ---
+
     var orbiting = false;
     var lastX = 0, lastY = 0;
     function onOrbitDown(e) {
@@ -683,7 +745,7 @@
       cv.style.cursor = '';
     }
 
-    // --- Move: drag the hover pill to reposition the widget on the sheet. ---
+
     var moving = false;
     var mStartX = 0, mStartY = 0, mBaseL = 0, mBaseT = 0;
     function onGripDown(e) {
@@ -692,8 +754,8 @@
       moving = true;
       mStartX = e.clientX;
       mStartY = e.clientY;
-      // Snapshot layout BEFORE clearing right: with left/right both auto
-      // the box would fall back to its static position.
+
+
       mBaseL = el.offsetLeft || 0;
       mBaseT = el.offsetTop || 0;
       el.style.right = 'auto';
@@ -729,7 +791,7 @@
       scheduleDraw();
     }
     function onIsolate(e) {
-      // Clicks and keys inside the widget must never reach sheet tools.
+
       if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     }
 
@@ -775,10 +837,10 @@
     };
   }
 
-  // Base projection radius (scale 1) for the glass sheet: a fraction
-  // of the smaller window dimension, clamped so the resting model
-  // reads at any window size. Fixed at mount; later resizes never
-  // rescale the ink.
+
+
+
+
   function glassBaseRadius(w, h) {
     assertFinite(w, h);
     if (!(w > 0 && h > 0)) throw new Error('glass needs positive w/h');
@@ -786,8 +848,8 @@
       GLASS_RADIUS_MIN, GLASS_RADIUS_MAX);
   }
 
-  // Resting projection center: top-right drafting quadrant, clear of
-  // the demo bar and status HUD at typical window sizes.
+
+
   function glassRestCenter(w, h, baseR) {
     assertFinite(w, h, baseR);
     var x = w - Math.max(190, baseR * 2.1);
@@ -798,9 +860,9 @@
     };
   }
 
-  // Glass state: legacy orbit/zoom state plus a pan-able projection
-  // center (cx, cy), sheet size (w, h), base radius, and wide zoom
-  // limits. Node-safe and pure.
+
+
+
   function createGlassState(opts) {
     opts = opts || {};
     var w = (opts.w === undefined || opts.w === null) ? 800 : opts.w;
@@ -824,12 +886,12 @@
     return clampPan(st);
   }
 
-  // Clamp the projection center to [-m*r, w+m*r] (m = pan margin):
-  // wide enough to slide any vertex onto any screen point, tight
-  // enough that the model bbox always overlaps the sheet, so the aura
-  // stays reachable and the model can never be lost off-screen
-  // (double-click the ink to reset). No-op for states without a pan
-  // center (legacy widget states).
+
+
+
+
+
+
   function clampPan(st) {
     if (!st || typeof st.cx !== 'number' || typeof st.cy !== 'number') {
       return st;
@@ -846,7 +908,7 @@
     return st;
   }
 
-  // Middle-drag pan: slide the projection center by a CSS-px delta.
+
   function panBy(st, dxPx, dyPx) {
     assertFinite(dxPx, dyPx);
     if (typeof st.cx !== 'number' || typeof st.cy !== 'number') {
@@ -859,9 +921,9 @@
     return clampPan(st);
   }
 
-  // Cursor-anchored zoom: the model point under (mx, my) stays fixed
-  // while the radius scales, so wheel zoom leans into the ink instead
-  // of drifting toward the projection center.
+
+
+
   function glassZoomAt(st, mx, my, factor) {
     assertFinite(mx, my, factor);
     if (!(factor > 0)) throw new Error('zoom factor must be > 0');
@@ -879,7 +941,7 @@
     return clampPan(st);
   }
 
-  // Glass rest pose: isometric orbit, unit scale, rest center.
+
   function resetGlassView(st) {
     resetView(st);
     if (typeof st.w === 'number' && typeof st.h === 'number' &&
@@ -891,8 +953,8 @@
     return clampPan(st);
   }
 
-  // Track sheet resizes. The base radius stays fixed (no surprise
-  // rescale); only the pan clamp follows the new bounds.
+
+
   function resizeGlassState(st, w, h) {
     assertFinite(w, h);
     if (!(w > 0 && h > 0)) throw new Error('glass needs positive w/h');
@@ -909,8 +971,8 @@
     };
   }
 
-  // Distance from P to segment AB (CSS px). Degenerate segments read
-  // as points.
+
+
   function distPointSeg(px, py, ax, ay, bx, by) {
     var dx = bx - ax, dy = by - ay;
     var len2 = dx * dx + dy * dy;
@@ -925,9 +987,9 @@
     return Math.sqrt(qx * qx + qy * qy);
   }
 
-  // Aura frame: the projected wireframe plus its bounding box. Hidden
-  // (dashed) edges count as ink: the aura hugs every drawn stroke, and
-  // lone vertices when the geometry has no edges (3D points).
+
+
+
   function buildGlassFrame(st) {
     var dc = defaultCenter(st);
     var status = statusOf(st);
@@ -957,11 +1019,11 @@
     };
   }
 
-  // Aura hit test in CSS px: true on or near a drawn stroke (within
-  // auraPx) or vertex dot (within auraPx + dot radius). The bbox
-  // rejects far misses in O(1); near misses walk the edges (O(E),
-  // E <= ~10^2, microseconds). Pure; the mounted widget feeds its
-  // cached frame so hover never projects.
+
+
+
+
+
   function hitTestFrame(frame, x, y, auraPx) {
     if (!frame || frame.available === false) return false;
     var a = (auraPx === undefined || auraPx === null) ?
@@ -993,11 +1055,11 @@
     return false;
   }
 
-  // Double-tap tracker (pure): feed each aura press; returns true
-  // when the press completes a double-tap (consumes it, so chains
-  // need a fresh pair). A drag invalidates the pending tap via
-  // invalidateTap, mirroring OS click semantics (moved presses are
-  // not taps). Node-safe.
+
+
+
+
+
   function createTapState() {
     return { armed: false, t: 0, x: 0, y: 0 };
   }
@@ -1023,10 +1085,10 @@
     return st;
   }
 
-  // Batched pen draw: same ink, weights, dashes, and dots as render(),
-  // but one path + stroke per edge pass and one path + fill for all
-  // vertex dots, so a full-screen frame costs a handful of canvas
-  // calls no matter the edge count. Returns the same counts shape.
+
+
+
+
   function renderFast(ctx, st, o) {
     if (!ctx || typeof ctx.beginPath !== 'function') return null;
     o = o || {};
@@ -1038,6 +1100,7 @@
     if (!status.available) return renderUnavailable(ctx, status, cx, cy);
     var pts = project(st, cx, cy);
     var edges = classifyEdges(st);
+    var dots = curveDotSuppression(geometryOf(st), edges);
     var counts = { front: 0, hidden: 0, vertices: pts.length };
     ctx.save();
     ctx.lineCap = 'round';
@@ -1045,10 +1108,10 @@
     ctx.strokeStyle = LINE_COLOR;
     ctx.lineWidth = LINE_WIDTH_PX;
     var i, e;
-    // Filled-solid read: in inspection, closed faces paint paper-opaque
-    // first, occluding the reference planes (and the dimmed sheet)
-    // behind the solid. One fill per face; fill() closes each loop.
-    // Hidden, front, and dot ink all draw over the fills.
+
+
+
+
     var solid = geometryOf(st);
     if (st.inspection && solid.faces && solid.faces.length > 0) {
       ctx.globalAlpha = 1;
@@ -1124,9 +1187,10 @@
         ctx.globalAlpha = st.inspection && dotPass === 0 ? 0.32 : 1;
         var dotRadius = st.inspection ? 2.3 : VERTEX_R_PX;
         for (i = 0; i < pts.length; i++) {
+          if (dots[i]) continue;
           var visibleDot = !incidentVertices[i] || !!frontVertices[i];
           if (st.inspection && visibleDot !== (dotPass === 1)) continue;
-          // Each arc starts a separate subpath; dots never fill faces.
+
           ctx.moveTo(pts[i].x + dotRadius, pts[i].y);
           ctx.arc(pts[i].x, pts[i].y, dotRadius, 0, 2 * Math.PI);
         }
@@ -1137,13 +1201,13 @@
     return counts;
   }
 
-  // Full-screen glass mount: a transparent sheet-sized canvas above
-  // the 2D layers (below HUD chrome) with pointer-events:none, so the
-  // 2D sheet keeps every event the aura does not claim. No listeners
-  // of its own: the app routes gestures through hitTest/orbitBy/
-  // panBy/zoomAt/resetView, and draw() refreshes the cached aura
-  // frame. Frames render only while interacting (one RAF per dirty
-  // frame); idle costs nothing.
+
+
+
+
+
+
+
   function mountSolidGlass(container, opts) {
     opts = opts || {};
     var cw = (container && isFinite(container.clientWidth)) ?
@@ -1182,8 +1246,8 @@
     var el = document.createElement('div');
     el.className = GLASS_CLASS;
     el.setAttribute('data-solid', geometryOf(st).name || 'cube');
-    // Critical layout inline, so the glass can never block or shift
-    // the sheet even if the stylesheet fails to load.
+
+
     el.style.position = 'absolute';
     el.style.left = '0px';
     el.style.top = '0px';
@@ -1233,10 +1297,10 @@
             rectT = r.top;
           }
         }
-      } catch (err) { /* rect cache keeps its last value */ }
-      // Committed-frame hook: sheet occlusion painted from this same
-      // projection (datum gaps) refreshes here, so every motion path
-      // stays consistent without shadowing each entry point.
+      } catch (err) {                                       }
+
+
+
       if (typeof opts.afterDraw === 'function') opts.afterDraw(st);
       return counts;
     }
@@ -1332,6 +1396,7 @@
     rotateBy: rotateBy, zoomBy: zoomBy,
     projectionRadius: projectionRadius,
     project: project, classifyEdges: classifyEdges,
+    curveDotSuppression: curveDotSuppression,
     render: render,
     renderFast: renderFast,
     hasDOM: hasDOM,

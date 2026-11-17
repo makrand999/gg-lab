@@ -1,7 +1,7 @@
-/* Spatial inspection stays on the paper, with one restrained information
-   area in the top-left corner — the same corner as the pose panel —
-   while the 3D diagram sits on the right. Drafting mode keeps its
-   original contrast. */
+
+
+
+
 .spatial-inspection .edugraphics-layer1 { opacity: 0.55; }
 .spatial-panel {
   box-sizing: border-box;

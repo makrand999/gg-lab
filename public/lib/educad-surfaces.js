@@ -1,14 +1,15 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-planar.js'));
-  else root.EduCADSurfaces = factory(root.EduCADPlanar);
-})(typeof window !== 'undefined' ? window : globalThis, function (Planar) {
+  if (typeof module !== 'undefined' && module.exports) module.exports =
+    factory(require('./educad-planar.js'), require('./educad-implicit.js'));
+  else root.EduCADSurfaces = factory(root.EduCADPlanar, root.EduCADImplicit);
+})(typeof window !== 'undefined' ? window : globalThis, function (Planar, Implicit) {
   'use strict';
 
-  // Bounded analytic surfaces. This is the bridge between the inferred display
-  // patches and a surface/boundary model: every patch keeps an analytic
-  // definition (plane, cylinder, cone, sphere) plus ordered boundary loops.
-  // Intersections and trims use those definitions; display tessellation is
-  // never the source of truth.
+
+
+
+
+
   var EPS = 1e-7, TAU = 2 * Math.PI;
   var TOLERANCE_CONTRACT = 'edu-tolerance-v1';
   var TOLERANCE = {absLength:1e-7, relLength:1e-6, numericAngle:1e-9,
@@ -21,9 +22,9 @@
     });
     return scale;
   }
-  // One tolerance policy for the whole kernel. `length` is the product
-  // tolerance; `exactLength` is the noise floor below which a computed gap is
-  // treated as exact. A gap between the two is near-degenerate, never exact.
+
+
+
   function tolerancePolicy(values) {
     var scale = scaleOf(values);
     return {contract:TOLERANCE_CONTRACT, scale:scale,
@@ -171,9 +172,9 @@
       Math.abs(length(c.u)-1) <= EPS && Math.abs(length(c.v)-1) <= EPS && Math.abs(dot(c.u,c.v)) <= EPS;
   }
 
-  // Every boundary element carries a persisted id. Object identity still
-  // shares a boundary in memory, but the id is what survives JSON storage and
-  // what incidence uses first, so a reloaded model keeps the same seams.
+
+
+
   var boundarySerial = 0;
   function boundaryElementId(element, prefix) {
     if (!element || typeof element !== 'object') return null;
@@ -200,10 +201,10 @@
     return model;
   }
 
-  // A straight boundary element is a finite line segment on the surface. It
-  // is stored inline on a loop as {kind:'line', start, end, sourceIds}. The
-  // object itself is the identity used by incidence, exactly like an inline
-  // section, so two loops share a line only by referencing the same object.
+
+
+
+
   function validLine(l) {
     return l && l.kind === 'line' && finite(l.start) && finite(l.end) &&
       length(sub(l.end, l.start)) > EPS;
@@ -218,9 +219,9 @@
     return validLine(l) ? length(sub(l.end, l.start)) : 0;
   }
 
-  // Boolean between two coplanar planar faces with straight loops. Curved
-  // boundaries are refused rather than tessellated; the analytic contained-
-  // loop fast path handles the circular case.
+
+
+
   function planarBoolean(faceA, faceB, operation, geometry) {
     function refuse(code, message) {
       return {ok:false, contract:'planar-boolean-v1', operation:operation,
@@ -280,10 +281,10 @@
       tolerance:result.tolerance, diagnostics:result.diagnostics};
   }
 
-  // Planar Boolean fast path as a public operation: subtract one wholly
-  // contained closed analytic loop from a planar face. This is region
-  // subtraction without an arrangement; a straddling or tangent loop is
-  // refused instead of guessed.
+
+
+
+
   function subtractContainedLoop(surface, loop, geometry) {
     function refuse(code, message) {
       return {ok:false, surface:null, innerLoop:null,
@@ -325,10 +326,55 @@
     return {ok:true, surface:out, innerLoop:inner, diagnostics:[]};
   }
 
-  // Planar-Boolean fast path: a recess mouth wholly inside a host plane is
-  // subtracted by adding one inner analytic loop. The separate mouth-closure
-  // patch is then removed; the host face and the cavity share the mouth curve,
-  // so no arrangement or coincident face is needed.
+
+
+
+
+  function mergeUnionMouths(model, geometry) {
+    var curves = geometry && geometry.curves || [];
+    var hosts = (model.surfaces || []).filter(function (s) {
+      return s.kind === 'plane' && !s.recessMouth && !s.recessBottom &&
+        !s.closed && (s.loops || []).length;
+    });
+    var merged = 0;
+    curves.forEach(function (curve, curveIndex) {
+      if (!curve || !curve.unionMouth || !curve.recessMouth) return;
+      var points = (curve.displayVertices || []).map(function (index) {
+        return geometry.vertices && geometry.vertices[index];
+      }).filter(finite);
+      if (points.length < 3) return;
+      for (var i = 0; i < hosts.length; i++) {
+        var host = hosts[i];
+        if (!finite(host.origin) || !finite(host.normal)) continue;
+        var tolerance = surfaceTolerance(host);
+        var coplanar = points.every(function (p) {
+          return Math.abs(dot(sub(p, host.origin), host.normal)) <= tolerance;
+        });
+        if (!coplanar) continue;
+        var inside = points.every(function (p) {
+          var state = classifyPoint(host, p, geometry);
+          return state.status === 'inside';
+        });
+        if (!inside) continue;
+        host.loops.push({kind:'inner', points:points.map(function (p) {
+          return {x:p.x, y:p.y, z:p.z};
+        })});
+        host.bounded = true;
+        host.unionMouth = true;
+        curve.hostSurfaceId = host.id;
+        (geometry.recesses || []).forEach(function (record) {
+          if (record.mouthCurve === curveIndex) {
+            record.closure = 'host';
+            record.hostMouth = true;
+          }
+        });
+        merged++;
+        break;
+      }
+    });
+    return {merged:merged};
+  }
+
   function mergeContainedMouths(model, geometry) {
     var removed = new Set();
     var hosts = (model.surfaces || []).filter(function (s) {
@@ -350,19 +396,19 @@
       if (!curve) return;
       for (var i = 0; i < hosts.length; i++) {
         var host = hosts[i];
-        var contained = true;
-        for (var k = 0; k < 24; k++) {
-          var state = classifyPoint(host, curvePoint(curve, TAU * k / 24), geometry);
-          if (state.status !== 'inside') { contained = false; break; }
-        }
-        if (!contained) continue;
         var already = (host.loops || []).some(function (loop) {
-          return loop.section === curve ||
+          return loop.kind === 'inner' && (loop.section === curve ||
             (loop.curves || []).some(function (c) {
               return (typeof c === 'object' ? c : (geometry.curves || [])[c]) === curve;
-            });
+            }));
         });
         if (!already) {
+          var contained = true;
+          for (var k = 0; k < 24; k++) {
+            var state = classifyPoint(host, curvePoint(curve, TAU * k / 24), geometry);
+            if (state.status !== 'inside' && state.status !== 'boundary') { contained = false; break; }
+          }
+          if (!contained) continue;
           var curveIndex = (geometry.curves || []).indexOf(curve);
           if (curveIndex >= 0) host.loops.push({kind:'inner', curves:[curveIndex]});
           else host.loops.push({kind:'inner', section:curve});
@@ -384,6 +430,1769 @@
     return {merged:removed.size};
   }
 
+  function canonicalLoopKey(loop) {
+    var n = (loop || []).length;
+    if (!n) return '';
+    var best = null;
+    [loop, loop.slice().reverse()].forEach(function (sequence) {
+      for (var start = 0; start < n; start++) {
+        var key = sequence.slice(start).concat(sequence.slice(0, start)).join(',');
+        if (best === null || key < best) best = key;
+      }
+    });
+    return best;
+  }
+
+  function sameLoopCyclic(a, b) {
+    return !!a && !!b && a.length === b.length && canonicalLoopKey(a) === canonicalLoopKey(b);
+  }
+
+  function displayOuterLoop(surface) {
+    var loops = surface && surface.loops || [];
+    for (var i = 0; i < loops.length; i++) {
+      if (loops[i].kind === 'inner') continue;
+      if (loops[i].vertices && loops[i].vertices.length >= 3) return loops[i].vertices;
+    }
+    return null;
+  }
+
+  function pointLoopState(loop, point, normal, vertices, tolerance) {
+    var b = basis(normal), q = {x:dot(point, b.u), y:dot(point, b.v)}, inside = false;
+    for (var i = 0; i < loop.length; i++) {
+      var a = vertices[loop[i]], c = vertices[loop[(i + 1) % loop.length]];
+      if (!finite(a) || !finite(c)) return 'outside';
+      var pa = {x:dot(a, b.u), y:dot(a, b.v)}, pc = {x:dot(c, b.u), y:dot(c, b.v)};
+      var dx = pc.x - pa.x, dy = pc.y - pa.y, length2 = dx*dx + dy*dy;
+      var t = length2 > 0 ? ((q.x - pa.x)*dx + (q.y - pa.y)*dy) / length2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      if (Math.hypot(pa.x + t*dx - q.x, pa.y + t*dy - q.y) <= tolerance) return 'boundary';
+      if ((pa.y > q.y) !== (pc.y > q.y) &&
+          q.x < (pc.x - pa.x) * (q.y - pa.y) / (pc.y - pa.y) + pa.x) inside = !inside;
+    }
+    return inside ? 'inside' : 'outside';
+  }
+
+  function rimSamples(curve, geometry, hole) {
+    var samples = [], vertices = geometry.vertices || [];
+    hole.forEach(function (index) {
+      if (finite(vertices[index])) samples.push(vertices[index]);
+    });
+    if (validCurve(curve)) {
+      for (var k = 0; k < 32; k++) samples.push(curvePoint(curve, TAU * k / 32));
+    }
+    for (var i = 0; i < hole.length; i++) {
+      var a = vertices[hole[i]], b = vertices[hole[(i + 1) % hole.length]];
+      if (finite(a) && finite(b))
+        samples.push({x:(a.x+b.x)/2, y:(a.y+b.y)/2, z:(a.z+b.z)/2});
+    }
+    return samples;
+  }
+
+  function faceOnSurface(face, surface, geometry, tolerance) {
+    var vertices = geometry.vertices || [];
+    var pts = face.map(function (index) { return vertices[index]; });
+    if (pts.some(function (p) {
+      return !finite(p) || Math.abs(dot(sub(p, surface.origin), surface.normal)) > tolerance;
+    })) return false;
+    var faceNormal = newell(pts);
+    return !!faceNormal && Math.abs(dot(faceNormal, surface.normal)) >= 1 - 1e-6;
+  }
+
+  function loopClearance(loop, point, normal, vertices) {
+    var b = basis(normal), q = {x:dot(point, b.u), y:dot(point, b.v)}, minimum = Infinity;
+    for (var i = 0; i < loop.length; i++) {
+      var a = vertices[loop[i]], c = vertices[loop[(i + 1) % loop.length]];
+      if (!finite(a) || !finite(c)) return 0;
+      var pa = {x:dot(a, b.u), y:dot(a, b.v)}, pc = {x:dot(c, b.u), y:dot(c, b.v)};
+      var dx = pc.x - pa.x, dy = pc.y - pa.y, length2 = dx*dx + dy*dy;
+      var t = length2 > 0 ? ((q.x - pa.x)*dx + (q.y - pa.y)*dy) / length2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      minimum = Math.min(minimum, Math.hypot(pa.x + t*dx - q.x, pa.y + t*dy - q.y));
+    }
+    return minimum;
+  }
+
+  function circleLoopState(loop, curve, surface, geometry, tolerance, keepOutside) {
+    var sweep = curve.sweepAngle === undefined ? TAU : curve.sweepAngle;
+    if (!(curve.radius > 0) || Math.abs(sweep - TAU) > 1e-9)
+      return 'rim-contained-unsupported';
+    if (!finite(curve.center) ||
+        Math.abs(dot(sub(curve.center, surface.origin), surface.normal)) > tolerance)
+      return 'rim-off-face';
+    var state = pointLoopState(loop, curve.center, surface.normal, geometry.vertices, tolerance);
+    if (keepOutside) {
+      if (state !== 'outside') return 'rim-overlaps-hole';
+    } else {
+      if (state === 'boundary') return 'rim-touching-boundary';
+      if (state !== 'inside') return 'rim-not-contained';
+    }
+    if (loopClearance(loop, curve.center, surface.normal, geometry.vertices) <=
+        curve.radius + tolerance)
+      return keepOutside ? 'rim-overlaps-hole' : 'rim-touching-boundary';
+    return null;
+  }
+
+  function analyticCircle(curve) {
+    if (!curve || !(curve.radius > 0) || !finite(curve.center)) return null;
+    var sweep = curve.sweepAngle === undefined ? TAU : curve.sweepAngle;
+    return Math.abs(sweep - TAU) <= 1e-9 ? curve : null;
+  }
+
+  function analyticCircleForHole(hole, geometry) {
+    var curves = geometry.curves || [];
+    for (var i = 0; i < curves.length; i++) {
+      var curve = analyticCircle(curves[i]);
+      if (curve && curve.displayVertices && sameLoopCyclic(curve.displayVertices, hole)) return curve;
+    }
+    return null;
+  }
+
+  function circlesOverlap(a, b, tolerance) {
+    var distance = Math.hypot(a.center.x - b.center.x, a.center.y - b.center.y,
+      a.center.z - b.center.z);
+    return distance < a.radius + b.radius - tolerance;
+  }
+
+  function rimFaceState(face, hole, curve, existingHoles, surface, geometry, tolerance) {
+    if (!validCurve(curve) && curve && curve.unionMouth) {
+      var vertices = geometry.vertices || [];
+      for (var h = 0; h < hole.length; h++) {
+        var state = pointLoopState(face, vertices[hole[h]], surface.normal, vertices, tolerance);
+        if (state === 'boundary') return 'rim-touching-boundary';
+        if (state !== 'inside') return 'rim-not-contained';
+      }
+      return null;
+    }
+    var state = circleLoopState(face, curve, surface, geometry, tolerance, false);
+    if (state) return state;
+    for (var h = 0; h < (existingHoles || []).length; h++) {
+      var existing = existingHoles[h];
+      if (sameLoopCyclic(existing, hole)) continue;
+      var existingCircle = analyticCircleForHole(existing, geometry);
+      if (existingCircle && analyticCircle(curve)) {
+        if (circlesOverlap(curve, existingCircle, tolerance)) return 'rim-overlaps-hole';
+        continue;
+      }
+      state = circleLoopState(existing, curve, surface, geometry, tolerance, true);
+      if (state) return state;
+    }
+    return null;
+  }
+
+  function displayCoverage(faces, samples, surface, geometry, tolerance) {
+    var vertices = geometry.vertices || [], covered = 0, keys = {}, any = false;
+    faces.forEach(function (fi) { keys[canonicalLoopKey(geometry.faces[fi])] = true; });
+    samples.forEach(function (sample) {
+      var hit = false;
+      faces.forEach(function (fi) {
+        var state = pointLoopState(geometry.faces[fi], sample, surface.normal, vertices, tolerance);
+        if (state !== 'outside') { hit = true; if (state === 'inside') any = true; }
+      });
+      if (hit) covered++;
+    });
+    return {all:covered === samples.length, any:any, boundaries:Object.keys(keys).length};
+  }
+
+  function displayTolerance(curve, geometry) {
+    var scale = 1, center = curve.center;
+    [curve.radius, curve.radiusU, curve.radiusV].forEach(function (radius) {
+      if (Number.isFinite(radius)) scale = Math.max(scale, Math.abs(radius));
+    });
+    if (finite(center)) {
+      (curve.displayVertices || []).forEach(function (index) {
+        var p = geometry.vertices && geometry.vertices[index];
+        if (finite(p)) scale = Math.max(scale,
+          Math.hypot(p.x - center.x, p.y - center.y, p.z - center.z));
+      });
+    } else {
+      var first = (curve.displayVertices || []).map(function (index) {
+        return geometry.vertices && geometry.vertices[index];
+      }).filter(finite)[0];
+      if (first) (curve.displayVertices || []).forEach(function (index) {
+        var p = geometry.vertices && geometry.vertices[index];
+        if (finite(p)) scale = Math.max(scale,
+          Math.hypot(p.x - first.x, p.y - first.y, p.z - first.z));
+      });
+    }
+    return 1e-5 * scale;
+  }
+
+  function displayTargets(surface, geometry, curve) {
+    var faces = geometry.faces || [], patches = geometry.surfacePatches || [];
+    var hole = (curve.displayVertices || []).slice();
+    if (hole.length < 3) return {indices:[], reason:'boundary-missing'};
+    if (!finite(surface.normal) || !finite(surface.origin)) return {indices:[], reason:'host-missing'};
+    var tolerance = displayTolerance(curve, geometry);
+    var hostOuter = displayOuterLoop(surface);
+    var candidates = [], groups = {};
+    function keep(index) {
+      if (Number.isInteger(index) && index >= 0 && index < faces.length &&
+          candidates.indexOf(index) === -1) candidates.push(index);
+    }
+    (surface.displayFaceIndices || []).forEach(keep);
+    if (!candidates.length) {
+      var patch = surface.patchIndex !== undefined ? patches[surface.patchIndex] : null;
+      if (patch && Array.isArray(patch.faceIndices)) patch.faceIndices.forEach(keep);
+    }
+    if (!candidates.length && hostOuter) {
+      faces.forEach(function (face, fi) {
+        if (sameLoopCyclic(face, hostOuter)) keep(fi);
+      });
+    }
+    if (!candidates.length) {
+      candidates = faces.map(function (_, fi) { return fi; }).filter(function (fi) {
+        return faceOnSurface(faces[fi], surface, geometry, tolerance);
+      });
+    }
+    if (!candidates.length) return {indices:[], reason:'host-missing'};
+    var failure = null;
+    candidates.forEach(function (fi) {
+      if (!faceOnSurface(faces[fi], surface, geometry, tolerance)) return;
+      var existing = geometry.faceHoles && geometry.faceHoles[fi] || [];
+      var state = rimFaceState(faces[fi], hole, curve, existing, surface, geometry, tolerance);
+      if (state) { failure = failure || state; return; }
+      var key = canonicalLoopKey(faces[fi]);
+      (groups[key] || (groups[key] = [])).push(fi);
+    });
+    var keys = Object.keys(groups);
+    if (keys.length === 1) return {indices:groups[keys[0]], reason:null};
+    if (keys.length > 1) return {indices:[], reason:'host-ambiguous'};
+    var samples = rimSamples(curve, geometry, hole);
+    var coverageCandidates = candidates.filter(function (fi) {
+      return faceOnSurface(faces[fi], surface, geometry, tolerance);
+    });
+    if (!coverageCandidates.length) return {indices:[], reason:'host-missing'};
+    var coverage = displayCoverage(coverageCandidates, samples, surface, geometry, tolerance);
+    if (coverage.all && coverage.boundaries > 1) return {indices:[], reason:'host-split'};
+    if (coverage.any) return {indices:[], reason:failure || 'rim-not-contained'};
+    return {indices:[], reason:failure || (hostOuter ? 'rim-not-contained' : 'host-missing')};
+  }
+
+  function syncDisplayHoles(model, geometry) {
+    if (!model || !geometry || !(geometry.faces || []).length) return {holes:0, diagnostics:[]};
+    var curves = geometry.curves || [], mouths = [];
+    (model.surfaces || []).forEach(function (surface) {
+      if (surface.kind !== 'plane') return;
+      (surface.loops || []).forEach(function (loop) {
+        if (loop.kind !== 'inner') return;
+        loopCurves(loop, curves).forEach(function (curve) {
+          if (curve && curve.recessMouth && (curve.displayVertices || []).length >= 3)
+            mouths.push({surface:surface, curve:curve});
+        });
+      });
+    });
+    curves.forEach(function (curve) {
+      if (!curve || !curve.unionMouth || !curve.recessMouth) return;
+      if (!(curve.displayVertices || []).length) return;
+      var surface = (model.surfaces || []).filter(function (candidate) {
+        return candidate.id === curve.hostSurfaceId;
+      })[0];
+      if (surface) mouths.push({surface:surface, curve:curve});
+    });
+    if (!mouths.length) return {holes:0, diagnostics:[]};
+    var faces = geometry.faces, patches = geometry.surfacePatches || [];
+    var faceHoles = Array.isArray(geometry.faceHoles) ? geometry.faceHoles : [];
+    geometry.faceHoles = faces.map(function (_, i) {
+      return (faceHoles[i] || []).map(function (hole) { return hole.slice(); });
+    });
+    faceHoles = geometry.faceHoles;
+    var regions = Array.isArray(geometry.faceRegions) ? geometry.faceRegions : null;
+    var applied = 0, diagnostics = [];
+    mouths.forEach(function (mouth) {
+      var surface = mouth.surface, curve = mouth.curve, hole = curve.displayVertices.slice();
+      var targets = displayTargets(surface, geometry, curve);
+      if (!targets.indices.length) {
+        diagnostics.push({code:'surface-display-' + targets.reason, message:
+          'The displayed host face of an analytic recess mouth could not be identified (' +
+          targets.reason + ').', surfaceId:surface.id, curveIndex:curves.indexOf(curve),
+          sourceIds:(curve.sourceIds || []).slice()});
+        return;
+      }
+      targets.indices.forEach(function (fi) {
+        if (!faceHoles[fi].some(function (existing) { return sameLoopCyclic(existing, hole); })) {
+          faceHoles[fi].push(hole.slice());
+          applied++;
+        }
+        if (regions) regions.forEach(function (region) {
+          if (!region || !sameLoopCyclic(region.outer, faces[fi])) return;
+          region.holes = Array.isArray(region.holes) ? region.holes : [];
+          if (!region.holes.some(function (existing) { return sameLoopCyclic(existing, hole); }))
+            region.holes.push(hole.slice());
+        });
+        var patch = surface.patchIndex !== undefined ? patches[surface.patchIndex] : null;
+        if (!patch) patch = patches.filter(function (p) { return sameLoopCyclic(p.outer, faces[fi]); })[0];
+        var curveIndex = curves.indexOf(curve);
+        if (patch && curveIndex >= 0) {
+          patch.innerCurves = Array.isArray(patch.innerCurves) ? patch.innerCurves : [];
+          if (patch.innerCurves.indexOf(curveIndex) === -1) patch.innerCurves.push(curveIndex);
+        }
+      });
+    });
+    return {holes:applied, diagnostics:diagnostics};
+  }
+
+  function circleInPlanarFace(face, circle, vertices, options) {
+    if (!face || !Array.isArray(face.outer) || face.outer.length < 3)
+      return {contained:false, reason:'face-missing'};
+    if (!circle || !finite(circle.center) || !(circle.radius > 0) ||
+        !finite(circle.u) || !finite(circle.v))
+      return {contained:false, reason:'circle-invalid'};
+    if (!Array.isArray(vertices))
+      return {contained:false, reason:'face-vertex-invalid'};
+    var outer = face.outer.map(function (i) { return vertices[i]; });
+    var holes = face.holes || [];
+    if (outer.some(function (p) { return !finite(p); }))
+      return {contained:false, reason:'face-vertex-invalid'};
+    var normal = newell(outer);
+    if (!normal)
+      return {contained:false, reason:'face-degenerate'};
+    var circleCross = cross(circle.u, circle.v);
+    if (!finite(circleCross) || length(circleCross) <= EPS)
+      return {contained:false, reason:'circle-basis-invalid'};
+    var circleNormal = unitOrNull(circleCross);
+    if (!circleNormal)
+      return {contained:false, reason:'circle-basis-invalid'};
+    var scale = Math.max(1, circle.radius);
+    function edgeScale(points) {
+      for (var i = 0; i < points.length; i++) {
+        var a = points[i], b = points[(i + 1) % points.length];
+        if (finite(a) && finite(b)) scale = Math.max(scale, length(sub(b, a)));
+      }
+    }
+    edgeScale(outer);
+    holes.forEach(function (hole) {
+      if (Array.isArray(hole)) edgeScale(hole.map(function (i) { return vertices[i]; }));
+    });
+    var tolerance = options && Number.isFinite(options.tolerance) ?
+      options.tolerance : 1e-5 * scale;
+    if (Math.abs(Math.abs(dot(normal, circleNormal)) - 1) > 1e-6)
+      return {contained:false, reason:'circle-plane-not-parallel'};
+    var origin = outer[0];
+    if (Math.abs(dot(sub(circle.center, origin), normal)) > tolerance)
+      return {contained:false, reason:'circle-plane-offset'};
+    var rawU = sub(outer[1], origin);
+    if (!finite(rawU) || length(rawU) <= EPS)
+      return {contained:false, reason:'face-basis-invalid'};
+    var u = unitOrNull(rawU);
+    if (!u) return {contained:false, reason:'face-basis-invalid'};
+    var rawV = cross(normal, u);
+    if (!finite(rawV) || length(rawV) <= EPS)
+      return {contained:false, reason:'face-basis-invalid'};
+    var v = unitOrNull(rawV);
+    if (!v) return {contained:false, reason:'face-basis-invalid'};
+    function projectPoint(p) {
+      var d = sub(p, origin);
+      return {x:dot(d, u), y:dot(d, v)};
+    }
+    function polygon2(indices) {
+      return indices.map(function (i) { return projectPoint(vertices[i]); });
+    }
+    function distanceToPolygon(p, polygon) {
+      var best = Infinity;
+      for (var i = 0; i < polygon.length; i++) {
+        var a = polygon[i], b = polygon[(i + 1) % polygon.length];
+        var dx = b.x - a.x, dy = b.y - a.y, l2 = dx*dx + dy*dy;
+        var t = l2 > 0 ? Math.max(0, Math.min(1,
+          ((p.x - a.x)*dx + (p.y - a.y)*dy) / l2)) : 0;
+        best = Math.min(best, Math.hypot(p.x - a.x - t*dx, p.y - a.y - t*dy));
+      }
+      return best;
+    }
+    var center = projectPoint(circle.center);
+    var outerPolygon = polygon2(face.outer);
+    if (!pointInPolygon2(center, outerPolygon))
+      return {contained:false, reason:'circle-center-outside-face'};
+    var clearance = distanceToPolygon(center, outerPolygon);
+    for (var h = 0; h < holes.length; h++) {
+      if (!Array.isArray(holes[h])) continue;
+      var holePolygon = polygon2(holes[h]);
+      if (pointInPolygon2(center, holePolygon))
+        return {contained:false, reason:'circle-center-inside-hole'};
+      clearance = Math.min(clearance, distanceToPolygon(center, holePolygon));
+    }
+    if (clearance <= circle.radius + tolerance)
+      return {contained:false, reason:'circle-crosses-face-boundary',
+        clearance:clearance, tolerance:tolerance};
+    return {contained:true, clearance:clearance, tolerance:tolerance};
+  }
+
+  var CAVITY_TRIM_CONTRACT = 'cavity-analytic-trim-v1';
+
+  function trimStatusRank(status) {
+    return {none:0, exact:1, numeric:2, unresolved:3, unsupported:4}[status] || 0;
+  }
+  function trimWorst(a, b) {
+    return trimStatusRank(a) >= trimStatusRank(b) ? a : b;
+  }
+  function trimTolerance(volumes) {
+    var scale = 1;
+    (volumes || []).forEach(function (volume) {
+      if (!volume) return;
+      scale = Math.max(scale, Math.abs(volume.radius || 0),
+        Math.abs(volume.bottomRadius || 0),
+        Math.abs(volume.depth || 0), Math.abs(volume.mouthRadius || 0));
+      if (volume.kind === 'sphere' && Number.isFinite(volume.capAngle))
+        scale = Math.max(scale, Math.abs(volume.radius || 0) * Math.sin(volume.capAngle));
+    });
+    return 1e-7 * scale;
+  }
+  function axialVolumeRadius(volume, station) {
+    if (!volume || volume.kind !== 'cone') return volume && volume.radius;
+    var start = volume.radius;
+    var end = Number.isFinite(volume.bottomRadius) ? volume.bottomRadius : start;
+    if (!(volume.depth > 0)) return start;
+    var fraction = Math.max(0, Math.min(1, station / volume.depth));
+    return start + (end - start) * fraction;
+  }
+  function trimVolumeContains(volume, p, tolerance) {
+    if (!volume || !finite(p)) return false;
+    if (volume.kind === 'cylinder') {
+      var axis = unit(volume.axis), d = sub(p, volume.origin);
+      var axial = dot(d, axis);
+      var radial = length(sub(d, mul(axis, axial)));
+      return axial >= -tolerance && axial <= volume.depth + tolerance &&
+        radial <= volume.radius + tolerance;
+    }
+    if (volume.kind === 'cone') {
+      var coneAxis = unit(volume.axis), delta = sub(p, volume.origin);
+      var coneAxial = dot(delta, coneAxis);
+      if (coneAxial < -tolerance || coneAxial > volume.depth + tolerance) return false;
+      var coneRadial = length(sub(delta, mul(coneAxis, coneAxial)));
+      return coneRadial <= axialVolumeRadius(volume, coneAxial) + tolerance;
+    }
+    if (volume.kind === 'sphere') {
+      var distance = length(sub(p, volume.center));
+      var plane = dot(sub(p, volume.mouthCenter), unit(volume.outward));
+      return distance <= volume.radius + tolerance && plane <= tolerance;
+    }
+    return false;
+  }
+  function trimInsideUnion(volumes, indices, p, tolerance) {
+    for (var i = 0; i < indices.length; i++) {
+      if (trimVolumeContains(volumes[indices[i]], p, tolerance)) return true;
+    }
+    return false;
+  }
+  function trimSurfaceFor(volume, role, model) {
+    var surfaces = model && model.surfaces || [];
+    for (var i = 0; i < surfaces.length; i++) {
+      var surface = surfaces[i];
+      if (surface && surface.volumeIndex === volume.index && surface.memberRole === role)
+        return surface;
+    }
+    return null;
+  }
+  function trimSupport(volume, role, model) {
+    var surface = trimSurfaceFor(volume, role, model);
+    if (volume.kind === 'cylinder' && role === 'side') {
+      surface = surface || {kind:'cylinder', origin:volume.origin, axis:volume.axis,
+        radius:volume.radius};
+    } else if (volume.kind === 'cylinder' && role === 'bottom') {
+      surface = surface || {kind:'plane', origin:volume.bottomCenter ||
+        add(volume.origin, mul(unit(volume.axis), volume.depth)),
+        normal:unit(volume.axis)};
+    } else if (volume.kind === 'cone' && role === 'side') {
+      if (!surface) {
+        var coneAxis = unit(volume.axis), coneStart = volume.radius;
+        var coneEnd = Number.isFinite(volume.bottomRadius) ? volume.bottomRadius : coneStart;
+        var coneSlope = volume.depth > 0 ? (coneEnd - coneStart) / volume.depth : 0;
+        var coneApexOffset = Math.abs(coneSlope) > EPS ? -coneStart / coneSlope : 0;
+        surface = {kind:'cone', origin:volume.origin, axis:coneAxis,
+          radius:coneStart, apex:add(volume.origin, mul(coneAxis, coneApexOffset)),
+          halfAngle:Math.atan2(coneStart, Math.abs(coneApexOffset))};
+      }
+    } else if (volume.kind === 'cone' && role === 'bottom') {
+      surface = surface || {kind:'plane', origin:volume.bottomCenter ||
+        add(volume.origin, mul(unit(volume.axis), volume.depth)),
+        normal:unit(volume.axis)};
+    } else if (volume.kind === 'sphere' && role === 'cap') {
+      surface = surface || {kind:'sphere', center:volume.center, radius:volume.radius};
+    }
+    if (!surface) return null;
+    return {volume:volume, role:role, surface:surface,
+      surfaceId:surface.id === undefined ? null : surface.id,
+      sourceIds:Array.from(new Set((surface.sourceIds || []).concat(volume.sourceIds || [])))};
+  }
+  function trimSupportsFor(volume, model) {
+    var roles = volume.kind === 'cylinder' ? ['side', 'bottom'] :
+      volume.kind === 'cone' ? ['side'].concat(
+        Number.isFinite(volume.bottomRadius) && volume.bottomRadius > EPS ? ['bottom'] : []) :
+      volume.kind === 'sphere' ? ['cap'] : [];
+    return roles.map(function (role) {
+      return trimSupport(volume, role, model);
+    }).filter(Boolean);
+  }
+  function trimDomainRecord(volume, role) {
+    if (volume.kind === 'cylinder' && role === 'side')
+      return {volume:volume.index, role:role, kind:'cylinder-side',
+        origin:copyPoint(volume.origin), axis:copyPoint(unit(volume.axis)),
+        radius:volume.radius, axial:[0, volume.depth]};
+    if (volume.kind === 'cylinder' && role === 'bottom')
+      return {volume:volume.index, role:role, kind:'cylinder-cap',
+        center:copyPoint(volume.bottomCenter ||
+          add(volume.origin, mul(unit(volume.axis), volume.depth))),
+        normal:copyPoint(unit(volume.axis)), radius:volume.radius};
+    if (volume.kind === 'cone' && role === 'side')
+      return {volume:volume.index, role:role, kind:'cone-side',
+        origin:copyPoint(volume.origin), axis:copyPoint(unit(volume.axis)),
+        radius:volume.radius, bottomRadius:volume.bottomRadius, axial:[0, volume.depth]};
+    if (volume.kind === 'cone' && role === 'bottom')
+      return {volume:volume.index, role:role, kind:'cone-cap',
+        center:copyPoint(volume.bottomCenter ||
+          add(volume.origin, mul(unit(volume.axis), volume.depth))),
+        normal:copyPoint(unit(volume.axis)),
+        radius:Number.isFinite(volume.bottomRadius) ? volume.bottomRadius : volume.radius};
+    if (volume.kind === 'sphere' && role === 'cap')
+      return {volume:volume.index, role:role, kind:'sphere-cap',
+        center:copyPoint(volume.center), radius:volume.radius,
+        capAngle:volume.capAngle, mouthCenter:copyPoint(volume.mouthCenter),
+        outward:copyPoint(unit(volume.outward)),
+        mouthRadius:Number.isFinite(volume.mouthRadius) ? volume.mouthRadius :
+          volume.radius * Math.sin(volume.capAngle)};
+    return null;
+  }
+  function trimNormalizeAngle(a) { return ((a % TAU) + TAU) % TAU; }
+  function trimTrigLe(A, B, C) {
+    var amplitude = Math.hypot(A, B), rhs = -C;
+    var tolerance = 1e-12 * Math.max(1, Math.abs(C), amplitude);
+    if (amplitude <= tolerance) return rhs >= -tolerance ? [{start:0, end:TAU}] : [];
+    if (rhs >= amplitude - tolerance) return [{start:0, end:TAU}];
+    if (rhs <= -amplitude + tolerance) return [];
+    var ratio = Math.max(-1, Math.min(1, rhs / amplitude));
+    var phi = Math.atan2(B, A), delta = Math.acos(ratio);
+    if (delta <= 1e-12) return [{start:0, end:TAU}];
+    if (Math.PI - delta <= 1e-12) return [];
+    var start = trimNormalizeAngle(phi + delta);
+    var end = trimNormalizeAngle(phi + TAU - delta);
+    if (start < end) return [{start:start, end:end}];
+    return [{start:start, end:TAU}, {start:0, end:end}];
+  }
+  function trimIntersectIntervals(a, b) {
+    var out = [];
+    for (var i = 0; i < a.length; i++) for (var j = 0; j < b.length; j++) {
+      var start = Math.max(a[i].start, b[j].start);
+      var end = Math.min(a[i].end, b[j].end);
+      if (end >= start - 1e-12) out.push({start:start, end:end});
+    }
+    out.sort(function (x, y) { return x.start - y.start; });
+    var merged = [];
+    out.forEach(function (interval) {
+      var last = merged[merged.length - 1];
+      if (last && interval.start <= last.end + 1e-12) last.end = Math.max(last.end, interval.end);
+      else merged.push({start:interval.start, end:interval.end});
+    });
+    return merged;
+  }
+  function trimLinearLe(A, B) {
+    var tolerance = 1e-12 * Math.max(1, Math.abs(A), Math.abs(B));
+    if (Math.abs(A) <= tolerance)
+      return B <= tolerance ? [{start:-Infinity, end:Infinity}] : [];
+    var t = -B / A;
+    return A > 0 ? [{start:-Infinity, end:t}] : [{start:t, end:Infinity}];
+  }
+  function trimQuadraticLe(a, b, c, tolerance) {
+    if (Math.abs(a) <= tolerance * tolerance) return trimLinearLe(b, c);
+    var disc = b * b - 4 * a * c;
+    if (disc < -tolerance * Math.max(1, Math.abs(b), Math.abs(c))) return [];
+    var root = Math.sqrt(Math.max(0, disc));
+    var t0 = (-b - root) / (2 * a), t1 = (-b + root) / (2 * a);
+    if (t0 > t1) { var swap = t0; t0 = t1; t1 = swap; }
+    return a > 0 ? [{start:t0, end:t1}] :
+      [{start:-Infinity, end:t0}, {start:t1, end:Infinity}];
+  }
+  function trimPolyNormalize(c) {
+    var n = c.length - 1;
+    while (n > 0 && !Number.isFinite(c[n])) n--;
+    var scale = 0;
+    for (var i = 0; i <= n; i++) scale = Math.max(scale, Math.abs(c[i]));
+    if (!(scale > 0)) return {c:[0], scale:0};
+    var out = [];
+    for (var k = 0; k <= n; k++) out.push(c[k] / scale);
+    while (out.length > 1 && Math.abs(out[out.length - 1]) <= 1e-15) out.pop();
+    return {c:out, scale:scale};
+  }
+  function trimPolyEval(c, x) {
+    var value = 0;
+    for (var i = c.length - 1; i >= 0; i--) value = value * x + c[i];
+    return value;
+  }
+  function trimPolyDerivative(c) {
+    var out = [];
+    for (var i = 1; i < c.length; i++) out.push(i * c[i]);
+    return out.length ? out : [0];
+  }
+  function trimPolyBisect(c, a, b, fa) {
+    var left = a, right = b, fleft = fa;
+    for (var i = 0; i < 200; i++) {
+      var middle = 0.5 * (left + right);
+      if (!(middle > left && middle < right)) break;
+      var fm = trimPolyEval(c, middle);
+      if (fm === 0) return middle;
+      if ((fleft < 0) !== (fm < 0)) { right = middle; }
+      else { left = middle; fleft = fm; }
+      if (right - left <= 1e-15 * (1 + Math.abs(middle))) break;
+    }
+    return 0.5 * (left + right);
+  }
+  function trimPolyUnique(values) {
+    var sorted = values.filter(Number.isFinite).sort(function (a, b) { return a - b; });
+    var out = [];
+    sorted.forEach(function (value) {
+      var last = out[out.length - 1];
+      if (last === undefined || Math.abs(value - last) > 1e-12 * (1 + Math.abs(value)))
+        out.push(value);
+    });
+    return out;
+  }
+  function trimPolyRealRoots(coeffs) {
+    var norm = trimPolyNormalize(coeffs);
+    var c = norm.c, n = c.length - 1;
+    if (n <= 0) return [];
+    if (n === 1) return [-c[0] / c[1]];
+    if (n === 2) {
+      var disc = c[1] * c[1] - 4 * c[2] * c[0];
+      var bound = Math.max(1, c[1] * c[1], Math.abs(4 * c[2] * c[0]));
+      if (disc < -1e-14 * bound) return [];
+      var root = Math.sqrt(Math.max(0, disc));
+      return trimPolyUnique([(-c[1] - root) / (2 * c[2]),
+        (-c[1] + root) / (2 * c[2])]);
+    }
+    var critical = trimPolyUnique(trimPolyRealRoots(trimPolyDerivative(c)));
+    var limit = 1;
+    for (var i = 0; i < n; i++) limit = Math.max(limit, Math.abs(c[i] / c[n]));
+    limit = 1 + limit;
+    critical = critical.filter(function (value) { return Math.abs(value) <= limit * (1 + 1e-12); });
+    var valueTolerance = 1e-13;
+    var roots = [];
+    critical.forEach(function (value) {
+      if (Math.abs(trimPolyEval(c, value)) <= valueTolerance) roots.push(value);
+    });
+    var points = [-limit].concat(critical, [limit]);
+    for (var k = 0; k < points.length - 1; k++) {
+      var a = points[k], b = points[k + 1];
+      if (!(b > a)) continue;
+      var fa = a === -limit ? (c[n] > 0 ? (n % 2 ? -1 : 1) : (n % 2 ? 1 : -1))
+        : trimPolyEval(c, a);
+      var fb = b === limit ? (c[n] > 0 ? 1 : -1) : trimPolyEval(c, b);
+      if (fa === 0 || fb === 0) continue;
+      if ((fa < 0) !== (fb < 0)) roots.push(trimPolyBisect(c, a, b, fa));
+    }
+    return trimPolyUnique(roots);
+  }
+  function trimHarmonicScale(coeffs) {
+    return Math.max(1e-300, Math.abs(coeffs.a0 || 0), Math.abs(coeffs.a1 || 0),
+      Math.abs(coeffs.b1 || 0), Math.abs(coeffs.a2 || 0), Math.abs(coeffs.b2 || 0));
+  }
+  function trimHarmonicEval(coeffs, t) {
+    var ct = Math.cos(t), st = Math.sin(t);
+    return (coeffs.a0 || 0) + (coeffs.a1 || 0) * ct + (coeffs.b1 || 0) * st +
+      (coeffs.a2 || 0) * (ct * ct - st * st) + (coeffs.b2 || 0) * (2 * st * ct);
+  }
+  function trimHarmonicQuartic(coeffs) {
+    var a0 = coeffs.a0 || 0, a1 = coeffs.a1 || 0, b1 = coeffs.b1 || 0,
+      a2 = coeffs.a2 || 0, b2 = coeffs.b2 || 0;
+    return [a0 + a1 + a2, 2 * b1 + 4 * b2, 2 * a0 - 6 * a2,
+      2 * b1 - 4 * b2, a0 - a1 + a2];
+  }
+  function trimHarmonicIntervals(coeffs, valueTolerance) {
+    var scale = trimHarmonicScale(coeffs);
+    var tolerance = Number.isFinite(valueTolerance) ? valueTolerance : 0;
+    var amplitude = Math.max(Math.abs(coeffs.a1 || 0), Math.abs(coeffs.b1 || 0),
+      Math.abs(coeffs.a2 || 0), Math.abs(coeffs.b2 || 0));
+    if (amplitude <= 1e-14) {
+      var constant = coeffs.a0 || 0;
+      var coincident = Math.abs(constant) <= 1e-14;
+      return {ok:true, intervals:(constant <= tolerance) ? [{start:0, end:TAU}] : [],
+        events:[], residual:coincident ? 0 : Math.abs(constant),
+        residualKnown:coincident, scale:Math.max(scale, Math.abs(constant)),
+        breakpoints:[0, TAU], constant:true, coincident:coincident,
+        value:constant};
+    }
+    var roots = trimPolyRealRoots(trimHarmonicQuartic(coeffs));
+    var events = [], points = [0, Math.PI, TAU];
+    var residual = 0;
+    roots.forEach(function (z) {
+      var t = 2 * Math.atan(z);
+      t = trimNormalizeAngle(t);
+      if (t <= 1e-12 || TAU - t <= 1e-12) t = 0;
+      else if (Math.abs(t - Math.PI) <= 1e-12) t = Math.PI;
+      points.push(t);
+      residual = Math.max(residual, Math.abs(trimHarmonicEval(coeffs, t)) / scale);
+      events.push({t:t, z:z,
+        residual:Math.abs(trimHarmonicEval(coeffs, t)) / scale});
+    });
+    if (Math.abs(trimHarmonicEval(coeffs, Math.PI)) / scale <= 1e-12) {
+      events.push({t:Math.PI, z:null,
+        residual:Math.abs(trimHarmonicEval(coeffs, Math.PI)) / scale});
+    }
+    var sorted = points.slice().sort(function (a, b) { return a - b; });
+    var breakpoints = [];
+    sorted.forEach(function (value) {
+      var last = breakpoints[breakpoints.length - 1];
+      if (last === undefined || value - last > 1e-12) breakpoints.push(value);
+    });
+    if (breakpoints[0] !== 0) breakpoints.unshift(0);
+    if (breakpoints[breakpoints.length - 1] !== TAU) breakpoints.push(TAU);
+    var intervals = [];
+    breakpoints.forEach(function (start, index) {
+      var end = breakpoints[index + 1];
+      if (end === undefined || !(end > start)) return;
+      var middle = 0.5 * (start + end);
+      var value = trimHarmonicEval(coeffs, middle);
+      if (value <= tolerance) intervals.push({start:start, end:end});
+    });
+    var seen = {};
+    var uniqueEvents = [];
+    events.forEach(function (event) {
+      var key = Math.round(event.t * 1e9);
+      if (seen[key]) { seen[key].residual = Math.max(seen[key].residual, event.residual); return; }
+      seen[key] = event;
+      uniqueEvents.push(event);
+    });
+    uniqueEvents.sort(function (a, b) { return a.t - b.t; });
+    return {ok:true, intervals:intervals, events:uniqueEvents,
+      residual:residual, residualKnown:true, scale:scale,
+      breakpoints:breakpoints, constant:false, coincident:false};
+  }
+  function trimNegateCoeffs(coeffs) {
+    return {a0:-coeffs.a0, a1:-coeffs.a1, b1:-coeffs.b1,
+      a2:-coeffs.a2, b2:-coeffs.b2};
+  }
+  function trimAxialCoeffs(volume, branch, offset) {
+    var axis = unit(volume.axis), radiiUV = radii(branch);
+    return {a0:dot(sub(branch.center, volume.origin), axis) - (offset || 0),
+      a1:radiiUV.u * dot(branch.u, axis), b1:radiiUV.v * dot(branch.v, axis),
+      a2:0, b2:0};
+  }
+  function trimPlaneCoeffs(origin, normal, branch, offset) {
+    var n = unit(normal), radiiUV = radii(branch);
+    return {a0:dot(sub(branch.center, origin), n) - (offset || 0),
+      a1:radiiUV.u * dot(branch.u, n), b1:radiiUV.v * dot(branch.v, n),
+      a2:0, b2:0};
+  }
+  function trimQuadricCoeffs(center, radius, branch) {
+    var radiiUV = radii(branch), q = sub(branch.center, center);
+    var uu = dot(branch.u, branch.u), vv = dot(branch.v, branch.v),
+      uv = dot(branch.u, branch.v);
+    return {a0:dot(q, q) + 0.5 * (radiiUV.u * radiiUV.u * uu +
+        radiiUV.v * radiiUV.v * vv) - radius * radius,
+      a1:2 * radiiUV.u * dot(q, branch.u),
+      b1:2 * radiiUV.v * dot(q, branch.v),
+      a2:0.5 * (radiiUV.u * radiiUV.u * uu - radiiUV.v * radiiUV.v * vv),
+      b2:radiiUV.u * radiiUV.v * uv};
+  }
+  function trimCylinderRadialCoeffs(volume, branch) {
+    var quadric = trimQuadricCoeffs(volume.origin, 0, branch);
+    var axial = trimAxialCoeffs(volume, branch, 0);
+    var a0 = axial.a0, a1 = axial.a1, b1 = axial.b1;
+    return {a0:quadric.a0 - (a0 * a0 + 0.5 * (a1 * a1 + b1 * b1)),
+      a1:quadric.a1 - 2 * a0 * a1, b1:quadric.b1 - 2 * a0 * b1,
+      a2:quadric.a2 - 0.5 * (a1 * a1 - b1 * b1),
+      b2:quadric.b2 - a1 * b1};
+  }
+  function trimCylinderBottomCenter(volume) {
+    return volume.bottomCenter ||
+      add(volume.origin, mul(unit(volume.axis), volume.depth));
+  }
+  function trimCurveDomainChecks(volume, role, branch, tolerance) {
+    if (volume.kind === 'cylinder' && role === 'side') {
+      var axis = unit(volume.axis), axial = trimAxialCoeffs(volume, branch, 0);
+      return {checks:[{coeffs:trimNegateCoeffs(axial), valueTolerance:tolerance,
+          source:'parent-axial-start'},
+        {coeffs:trimAxialCoeffs(volume, branch, volume.depth),
+          valueTolerance:tolerance, source:'parent-axial-end'}], reason:null};
+    }
+    if (volume.kind === 'cylinder' && role === 'bottom') {
+      var center = trimCylinderBottomCenter(volume);
+      var normal = unit(volume.axis);
+      if (Math.abs(dot(sub(branch.center, center), normal)) > tolerance)
+        return {checks:[], reason:'circle-plane-offset'};
+      return {checks:[{coeffs:trimQuadricCoeffs(center, volume.radius, branch),
+        valueTolerance:2 * Math.max(volume.radius, 1) * tolerance,
+        source:'parent-disk'}], reason:null};
+    }
+    if (volume.kind === 'cone' && role === 'side') {
+      var coneAxis = unit(volume.axis);
+      var coneDelta = sub(branch.center, volume.origin);
+      var coneStation = dot(coneDelta, coneAxis);
+      var coneRadial = sub(coneDelta, mul(coneAxis, coneStation));
+      var branchNormal = finite(branch.u) && finite(branch.v) ?
+        unit(cross(branch.u, branch.v)) : null;
+      var expectedRadius = axialVolumeRadius(volume, coneStation);
+      var branchRadius = Number.isFinite(branch.radius) ? branch.radius :
+        Number.isFinite(branch.radiusU) ? branch.radiusU : null;
+      if (length(coneRadial) > tolerance * 8 ||
+          !branchNormal || Math.abs(Math.abs(dot(branchNormal, coneAxis)) - 1) > 1e-6 ||
+          branchRadius === null || Math.abs(branchRadius - expectedRadius) > tolerance * 8)
+        return {checks:[], reason:'circle-off-cone'};
+      var coneAxial = trimAxialCoeffs(volume, branch, 0);
+      return {checks:[{coeffs:trimNegateCoeffs(coneAxial), valueTolerance:tolerance,
+          source:'parent-axial-start'},
+        {coeffs:trimAxialCoeffs(volume, branch, volume.depth),
+          valueTolerance:tolerance, source:'parent-axial-end'}], reason:null};
+    }
+    if (volume.kind === 'cone' && role === 'bottom') {
+      var coneCenter = volume.bottomCenter ||
+        add(volume.origin, mul(unit(volume.axis), volume.depth));
+      var coneCapNormal = unit(volume.axis);
+      if (Math.abs(dot(sub(branch.center, coneCenter), coneCapNormal)) > tolerance)
+        return {checks:[], reason:'circle-plane-offset'};
+      var coneBottomRadius = Number.isFinite(volume.bottomRadius) ?
+        volume.bottomRadius : volume.radius;
+      return {checks:[{coeffs:trimQuadricCoeffs(coneCenter, coneBottomRadius, branch),
+        valueTolerance:2 * Math.max(coneBottomRadius, 1) * tolerance,
+        source:'parent-disk'}], reason:null};
+    }
+    if (volume.kind === 'sphere' && role === 'cap') {
+      return {checks:[{coeffs:trimPlaneCoeffs(volume.mouthCenter,
+        volume.outward, branch, 0), valueTolerance:tolerance,
+        source:'parent-cap-plane'}], reason:null};
+    }
+    return {checks:[], reason:'finite-domain-unsupported'};
+  }
+  function trimCurveFiniteIntervals(volume, role, branch, tolerance) {
+    var domain = trimCurveDomainChecks(volume, role, branch, tolerance);
+    if (domain.reason) return {ok:false, status:'unresolved', reason:domain.reason};
+    var intervals = [{start:0, end:TAU}], events = [], coincident = [];
+    var residual = 0;
+    for (var i = 0; i < domain.checks.length; i++) {
+      var check = domain.checks[i];
+      var set = trimHarmonicIntervals(check.coeffs, check.valueTolerance);
+      residual = Math.max(residual, set.residual);
+      if (set.coincident) coincident.push(check.source);
+      intervals = trimIntersectIntervals(intervals, set.intervals);
+      set.events.forEach(function (event) {
+        events.push({kind:'bounds', source:check.source, t:event.t,
+          residual:event.residual});
+      });
+    }
+    return {ok:true, intervals:intervals, events:events, coincident:coincident,
+      residual:residual, method:'harmonic-event-intervals'};
+  }
+  function trimCurveInsideVolume(volume, branch, tolerance) {
+    var inset = Math.max(1e-9, 1e-8 * Math.max(1, volume.radius || 0));
+    var checks = [], boundaryChecks = [], source;
+    if (volume.kind === 'cylinder') {
+      var axis = unit(volume.axis), axial = trimAxialCoeffs(volume, branch, 0);
+      source = 'member-cylinder';
+      checks.push({a0:-(axial.a0 - inset), a1:-axial.a1, b1:-axial.b1,
+        a2:0, b2:0});
+      checks.push(trimAxialCoeffs(volume, branch, volume.depth - inset));
+      var radial = trimCylinderRadialCoeffs(volume, branch);
+      radial.a0 -= Math.pow(Math.max(0, volume.radius - inset), 2);
+      checks.push(radial);
+      boundaryChecks.push({a0:-axial.a0, a1:-axial.a1, b1:-axial.b1,
+        a2:0, b2:0});
+      boundaryChecks.push(trimAxialCoeffs(volume, branch, volume.depth));
+      var boundaryRadial = trimCylinderRadialCoeffs(volume, branch);
+      boundaryRadial.a0 -= volume.radius * volume.radius;
+      boundaryChecks.push(boundaryRadial);
+    } else if (volume.kind === 'cone') {
+      source = 'member-cone';
+      var coneStart = volume.radius;
+      var coneEnd = Number.isFinite(volume.bottomRadius) ? volume.bottomRadius : coneStart;
+      var coneSlope = volume.depth > 0 ? (coneEnd - coneStart) / volume.depth : 0;
+      var coneAxial = trimAxialCoeffs(volume, branch, 0);
+      var coneQuadric = trimQuadricCoeffs(volume.origin, 0, branch);
+      function coneProfileCoeffs(offset) {
+        var radius0 = coneStart + coneSlope * coneAxial.a0 - offset;
+        var radiusCos = coneSlope * coneAxial.a1;
+        var radiusSin = coneSlope * coneAxial.b1;
+        return {constant:radius0, cos:radiusCos, sin:radiusSin};
+      }
+      function coneInterior(offset) {
+        var profile = coneProfileCoeffs(offset);
+        var squareHalf = 0.5 * (profile.cos * profile.cos + profile.sin * profile.sin);
+        var squareDiff = 0.5 * (profile.cos * profile.cos - profile.sin * profile.sin);
+        return {
+          a0:coneQuadric.a0 -
+            (coneAxial.a0 * coneAxial.a0 +
+              0.5 * (coneAxial.a1 * coneAxial.a1 + coneAxial.b1 * coneAxial.b1)) -
+            (profile.constant * profile.constant + squareHalf),
+          a1:coneQuadric.a1 - 2 * coneAxial.a0 * coneAxial.a1 -
+            2 * profile.constant * profile.cos,
+          b1:coneQuadric.b1 - 2 * coneAxial.a0 * coneAxial.b1 -
+            2 * profile.constant * profile.sin,
+          a2:coneQuadric.a2 -
+            0.5 * (coneAxial.a1 * coneAxial.a1 - coneAxial.b1 * coneAxial.b1) -
+            squareDiff,
+          b2:coneQuadric.b2 - coneAxial.a1 * coneAxial.b1 -
+            profile.cos * profile.sin
+        };
+      }
+      checks.push(coneInterior(inset));
+      checks.push({a0:-(coneAxial.a0 - inset), a1:-coneAxial.a1,
+        b1:-coneAxial.b1, a2:0, b2:0});
+      checks.push(trimAxialCoeffs(volume, branch, volume.depth - inset));
+      boundaryChecks.push({a0:-(coneAxial.a0), a1:-coneAxial.a1,
+        b1:-coneAxial.b1, a2:0, b2:0});
+      boundaryChecks.push(trimAxialCoeffs(volume, branch, volume.depth));
+      boundaryChecks.push(coneInterior(0));
+    } else if (volume.kind === 'sphere') {
+      source = 'member-sphere';
+      checks.push(trimQuadricCoeffs(volume.center,
+        Math.max(0, volume.radius - inset), branch));
+      checks.push(trimPlaneCoeffs(volume.mouthCenter, volume.outward,
+        branch, -inset));
+      boundaryChecks.push(trimQuadricCoeffs(volume.center, volume.radius, branch));
+      boundaryChecks.push(trimPlaneCoeffs(volume.mouthCenter, volume.outward,
+        branch, 0));
+    } else return {ok:false, status:'unresolved',
+      reason:'finite-domain-unsupported'};
+    var intervals = [{start:0, end:TAU}], events = [], coincident = [];
+    var residual = 0;
+    for (var i = 0; i < checks.length; i++) {
+      var set = trimHarmonicIntervals(checks[i], 0);
+      residual = Math.max(residual, set.residual);
+      if (set.coincident) coincident.push(source);
+      intervals = trimIntersectIntervals(intervals, set.intervals);
+      set.events.forEach(function (event) {
+        events.push({kind:'contact', source:source, t:event.t,
+          residual:event.residual});
+      });
+    }
+    var contactEvents = [];
+    boundaryChecks.forEach(function (coeffs) {
+      var set = trimHarmonicIntervals(coeffs, 0);
+      if (set.coincident && coincident.indexOf(source) === -1)
+        coincident.push(source);
+      set.events.forEach(function (event) {
+        contactEvents.push({kind:'contact', source:source, t:event.t,
+          residual:event.residual});
+      });
+    });
+    return {ok:true, intervals:intervals, events:events,
+      contactEvents:contactEvents, coincident:coincident, residual:residual,
+      source:source, inset:inset};
+  }
+  function trimLineFiniteIntervals(volume, role, branch, tolerance) {
+    var origin = branch.origin, direction = unit(branch.direction);
+    var intervals = [{start:-Infinity, end:Infinity}];
+    function le(A, B) { intervals = trimIntersectIntervals(intervals, trimLinearLe(A, B)); }
+    if (volume.kind === 'cylinder' && role === 'side') {
+      var axis = unit(volume.axis);
+      var s0 = dot(sub(origin, volume.origin), axis);
+      var s1 = dot(direction, axis);
+      le(-s1, -s0);
+      le(s1, s0 - volume.depth);
+    } else if (volume.kind === 'cylinder' && role === 'bottom') {
+      var center = trimCylinderBottomCenter(volume);
+      var delta = sub(origin, center);
+      intervals = trimIntersectIntervals(intervals,
+        trimQuadraticLe(dot(direction, direction), 2 * dot(delta, direction),
+          dot(delta, delta) - volume.radius * volume.radius, tolerance));
+    } else if (volume.kind === 'cone' && role === 'side') {
+      var coneAxis = unit(volume.axis);
+      var coneStation = dot(sub(origin, volume.origin), coneAxis);
+      var coneRate = dot(direction, coneAxis);
+      le(-coneRate, -coneStation);
+      le(coneRate, coneStation - volume.depth);
+    } else if (volume.kind === 'cone' && role === 'bottom') {
+      var coneCenter = volume.bottomCenter ||
+        add(volume.origin, mul(unit(volume.axis), volume.depth));
+      var coneDelta = sub(origin, coneCenter);
+      var coneRadius = Number.isFinite(volume.bottomRadius) ?
+        volume.bottomRadius : volume.radius;
+      intervals = trimIntersectIntervals(intervals,
+        trimQuadraticLe(dot(direction, direction), 2 * dot(coneDelta, direction),
+          dot(coneDelta, coneDelta) - coneRadius * coneRadius, tolerance));
+    } else if (volume.kind === 'sphere' && role === 'cap') {
+      var outward = unit(volume.outward);
+      le(dot(direction, outward), dot(sub(origin, volume.mouthCenter), outward));
+    } else return {ok:false, status:'unresolved', reason:'finite-domain-unsupported'};
+    return {ok:true, intervals:intervals, method:'event-intervals'};
+  }
+  function trimLineInsideVolume(volume, origin, direction, tolerance) {
+    var strict = Math.max(tolerance, 1e-9);
+    var intervals = [{start:-Infinity, end:Infinity}];
+    function le(A, B) { intervals = trimIntersectIntervals(intervals, trimLinearLe(A, B)); }
+    function quad(a, b, c) {
+      intervals = trimIntersectIntervals(intervals, trimQuadraticLe(a, b, c, 1e-12));
+    }
+    if (volume.kind === 'cylinder') {
+      var axis = unit(volume.axis);
+      var s0 = dot(sub(origin, volume.origin), axis);
+      var s1 = dot(direction, axis);
+      le(-s1, -(s0 - strict));
+      le(s1, s0 - (volume.depth - strict));
+      var base = sub(sub(origin, volume.origin), mul(axis, s0));
+      var velocity = sub(direction, mul(axis, s1));
+      var radius = Math.max(0, volume.radius - strict);
+      quad(dot(velocity, velocity), 2 * dot(base, velocity),
+        dot(base, base) - radius * radius);
+    } else if (volume.kind === 'cone') {
+      var coneAxis = unit(volume.axis), coneStart = volume.radius;
+      var coneEnd = Number.isFinite(volume.bottomRadius) ? volume.bottomRadius : coneStart;
+      var coneSlope = volume.depth > 0 ? (coneEnd - coneStart) / volume.depth : 0;
+      var coneS0 = dot(sub(origin, volume.origin), coneAxis);
+      var coneS1 = dot(direction, coneAxis);
+      var coneBase = sub(sub(origin, volume.origin), mul(coneAxis, coneS0));
+      var coneVelocity = sub(direction, mul(coneAxis, coneS1));
+      var coneRadiusAt0 = coneStart + coneSlope * coneS0 - strict;
+      var coneRadiusRate = coneSlope * coneS1;
+      le(-coneS1, -(coneS0 - strict));
+      le(coneS1, coneS0 - (volume.depth - strict));
+      quad(dot(coneVelocity, coneVelocity) -
+          coneRadiusRate * coneRadiusRate,
+        2 * dot(coneBase, coneVelocity) -
+          2 * coneRadiusAt0 * coneRadiusRate,
+        dot(coneBase, coneBase) - coneRadiusAt0 * coneRadiusAt0);
+    } else if (volume.kind === 'sphere') {
+      var delta = sub(origin, volume.center);
+      var sphereRadius = Math.max(0, volume.radius - strict);
+      quad(dot(direction, direction), 2 * dot(delta, direction),
+        dot(delta, delta) - sphereRadius * sphereRadius);
+      var outward = unit(volume.outward);
+      le(dot(direction, outward),
+        dot(sub(origin, volume.mouthCenter), outward) + strict);
+    }
+    return intervals;
+  }
+  function implicitLineIntervals(volume, origin, direction, options) {
+    if (!Implicit || !volume || !finite(origin) || !finite(direction)) return null;
+    var spec = Implicit.volumeConstraints(volume);
+    if (!spec) return null;
+    return Implicit.lineConstraintIntervals(spec.constraints, {origin:origin, direction:direction},
+      options || {});
+  }
+  function implicitEquation(surface, options) {
+    return implicitEquationFor(surface, options);
+  }
+  function trimSubtractIntervals(base, cuts) {
+    var out = [];
+    base.forEach(function (interval) {
+      var segments = [interval];
+      cuts.forEach(function (cut) {
+        var next = [];
+        segments.forEach(function (segment) {
+          if (cut.end <= segment.start || cut.start >= segment.end) {
+            next.push(segment);
+            return;
+          }
+          if (cut.start <= segment.start && cut.end >= segment.end) return;
+          if (cut.start > segment.start)
+            next.push({start:segment.start, end:Math.min(cut.start, segment.end)});
+          if (cut.end < segment.end)
+            next.push({start:Math.max(cut.end, segment.start), end:segment.end});
+        });
+        segments = next;
+      });
+      out = out.concat(segments);
+    });
+    return out.filter(function (segment) { return segment.end - segment.start > 1e-12; });
+  }
+  function trimBranchKind(branch) {
+    if (branch.kind === 'line') return 'line';
+    var radiiUV = radii(branch);
+    return Math.abs(radiiUV.u - radiiUV.v) <= 1e-9 * Math.max(1, radiiUV.u, radiiUV.v) ?
+      'circle' : 'ellipse';
+  }
+  function trimBoundBranch(branch, sa, sb, volumes, group, tolerance) {
+    var kind = trimBranchKind(branch);
+    var first = kind === 'line' ?
+      trimLineFiniteIntervals(sa.volume, sa.role, branch, tolerance) :
+      trimCurveFiniteIntervals(sa.volume, sa.role, branch, tolerance);
+    if (!first.ok) return first;
+    var second = kind === 'line' ?
+      trimLineFiniteIntervals(sb.volume, sb.role, branch, tolerance) :
+      trimCurveFiniteIntervals(sb.volume, sb.role, branch, tolerance);
+    if (!second.ok) return second;
+    var intervals = trimIntersectIntervals(first.intervals, second.intervals);
+    var subtraction = 'none', events = [], coincident = [];
+    (first.events || []).concat(second.events || []).forEach(function (event) {
+      events.push(event);
+    });
+    (first.coincident || []).concat(second.coincident || []).forEach(function (source) {
+      coincident.push(source);
+    });
+    function stationResidual(list, t) {
+      var best = null, bestDistance = Infinity;
+      (list || []).forEach(function (event) {
+        if (!Number.isFinite(event.t)) return;
+        var distance = Math.abs(event.t - t);
+        distance = Math.min(distance, Math.abs(TAU - distance));
+        if (distance < bestDistance && distance <= 1e-7) {
+          bestDistance = distance;
+          best = Number.isFinite(event.residual) ? event.residual : null;
+        }
+      });
+      return best;
+    }
+    var removed = [];
+    (group || []).forEach(function (index) {
+      if (index === sa.volume.index || index === sb.volume.index) return;
+      if (!volumes[index]) return;
+      var inside = kind === 'line' ?
+        {ok:true, intervals:trimLineInsideVolume(volumes[index], branch.origin,
+          unit(branch.direction), tolerance), events:[]} :
+        trimCurveInsideVolume(volumes[index], branch, tolerance);
+      if (!inside.ok) return;
+      var cuts = trimIntersectIntervals(intervals, inside.intervals);
+      var positive = cuts.filter(function (cut) {
+        return cut.end - cut.start > 1e-12;
+      });
+      (inside.coincident || []).forEach(function (source) {
+        coincident.push('member-' + index + ':' + source);
+      });
+      if (positive.length) {
+        positive.forEach(function (cut) {
+          removed.push({member:index, start:cut.start, end:cut.end});
+          events.push({kind:'occlusion', source:'member-' + index,
+            member:index, t:cut.start,
+            residual:stationResidual(inside.events, cut.start)});
+          events.push({kind:'occlusion', source:'member-' + index,
+            member:index, t:cut.end,
+            residual:stationResidual(inside.events, cut.end)});
+        });
+        intervals = trimSubtractIntervals(intervals, positive);
+        subtraction = 'event-intervals';
+      } else if (kind !== 'line' && (inside.contactEvents || []).length) {
+        var seenContact = {};
+        intervals.forEach(function (interval) {
+          inside.contactEvents.forEach(function (event) {
+            var key = Math.round(event.t * 1e9);
+            if (seenContact[key]) return;
+            if (event.t >= interval.start - 1e-12 && event.t <= interval.end + 1e-12) {
+              seenContact[key] = true;
+              events.push({kind:'contact', source:event.source, member:index,
+                t:event.t, residual:event.residual});
+            }
+          });
+        });
+      }
+    });
+    var components = [];
+    var angularTolerance = tolerance / Math.max(1e-9, Math.min(
+      Math.abs(radii(branch).u || 0), Math.abs(radii(branch).v || 0)));
+    intervals.forEach(function (interval) {
+      if (kind === 'line') {
+        if (!Number.isFinite(interval.start) || !Number.isFinite(interval.end)) return;
+        var start = add(branch.origin, mul(unit(branch.direction), interval.start));
+        var end = add(branch.origin, mul(unit(branch.direction), interval.end));
+        if (length(sub(end, start)) <= tolerance) return;
+        var lineComponent = {kind:'line', start:copyPoint(start), end:copyPoint(end),
+          origin:copyPoint(branch.origin), direction:copyPoint(unit(branch.direction)),
+          startParameter:interval.start, endParameter:interval.end,
+          bounded:true, supportStatus:'exact', boundsStatus:'exact',
+          unionDomainSubtraction:subtraction, boundsMethod:'event-intervals'};
+        var lineEvents = events.filter(function (event) {
+          return Number.isFinite(event.t) && event.t >= interval.start - 1e-12 &&
+            event.t <= interval.end + 1e-12;
+        }).map(function (event) {
+          return {kind:event.kind, source:event.source, member:event.member,
+            t:event.t, residual:event.residual};
+        });
+        var lineResiduals = lineEvents.map(function (event) {
+          return event.residual;
+        }).filter(Number.isFinite);
+        lineComponent.events = lineEvents;
+        lineComponent.eventCount = lineEvents.length;
+        lineComponent.residual = lineResiduals.length ?
+          Math.max.apply(null, lineResiduals) : null;
+        lineComponent.residualKnown = lineResiduals.length > 0;
+        lineComponent.coincident = Array.from(new Set(coincident));
+        lineComponent.coincidentCount = lineComponent.coincident.length;
+        components.push(lineComponent);
+        return;
+      }
+      if (interval.end - interval.start <= Math.max(1e-12, angularTolerance)) return;
+      var radiiUV = radii(branch), circular = kind === 'circle';
+      var full = Math.abs((interval.end - interval.start) - TAU) <= 1e-9;
+      var point = {kind:full ? (circular ? 'circle' : 'ellipse') :
+        (circular ? 'arc' : 'arc'), center:copyPoint(branch.center),
+        u:copyPoint(branch.u), v:copyPoint(branch.v),
+        startAngle:full ? 0 : interval.start,
+        sweepAngle:full ? TAU : interval.end - interval.start,
+        closed:full, bounded:true, supportStatus:'exact', boundsStatus:'exact',
+        unionDomainSubtraction:subtraction, boundsMethod:'harmonic-event-intervals'};
+      if (circular) point.radius = radiiUV.u;
+      else { point.radiusU = radiiUV.u; point.radiusV = radiiUV.v; }
+      point.start = copyPoint(curvePoint(point, point.startAngle));
+      point.end = copyPoint(curvePoint(point, point.startAngle + point.sweepAngle));
+      point.events = events.filter(function (event) {
+        return event.t >= interval.start - 1e-12 &&
+          event.t <= interval.end + 1e-12;
+      }).map(function (event) {
+        return {kind:event.kind, source:event.source, member:event.member,
+          t:event.t, residual:event.residual};
+      });
+      point.eventCount = point.events.length;
+      var knownResiduals = point.events.map(function (event) {
+        return event.residual;
+      }).filter(Number.isFinite);
+      point.residual = knownResiduals.length ?
+        Math.max.apply(null, knownResiduals) : null;
+      point.residualKnown = knownResiduals.length > 0;
+      point.coincident = Array.from(new Set(coincident));
+      point.coincidentCount = point.coincident.length;
+      components.push(point);
+    });
+    if (kind === 'line' && !components.length &&
+        intervals.some(function (i) { return !Number.isFinite(i.start) || !Number.isFinite(i.end); }))
+      return {ok:false, status:'unresolved', reason:'unbounded-trim-branch'};
+    return {ok:true, components:components, method:'event-intervals'};
+  }
+  function trimSupportNormal(support, p) {
+    var surface = support.surface;
+    if (surface.kind === 'cylinder') {
+      var axis = unit(surface.axis), d = sub(p, surface.origin);
+      var radial = sub(d, mul(axis, dot(d, axis)));
+      return length(radial) > 1e-12 ? unit(radial) : basis(axis).u;
+    }
+    if (surface.kind === 'cone') {
+      var coneAxis = unit(surface.axis);
+      var apex = finite(surface.apex) ? surface.apex : surface.origin;
+      var delta = sub(p, apex);
+      var station = dot(delta, coneAxis);
+      var coneRadial = sub(delta, mul(coneAxis, station));
+      if (length(coneRadial) <= 1e-12) return basis(coneAxis).u;
+      var radialDirection = unit(coneRadial);
+      var halfAngle = Number.isFinite(surface.halfAngle) ? surface.halfAngle :
+        Math.atan2(surface.radius || 0, Math.abs(station));
+      return unit(add(mul(radialDirection, Math.cos(halfAngle)),
+        mul(coneAxis, station >= 0 ? -Math.sin(halfAngle) : Math.sin(halfAngle))));
+    }
+    if (surface.kind === 'sphere') return unit(sub(p, surface.center));
+    if (surface.kind === 'plane') return unit(surface.normal);
+    return null;
+  }
+  function trimSolveLinear(matrix, rhs) {
+    var n = rhs.length, a = [], i, j, k;
+    for (i = 0; i < n; i++) a.push(matrix[i].slice().concat([rhs[i]]));
+    for (i = 0; i < n; i++) {
+      var pivot = i;
+      for (j = i + 1; j < n; j++)
+        if (Math.abs(a[j][i]) > Math.abs(a[pivot][i])) pivot = j;
+      if (Math.abs(a[pivot][i]) <= 1e-14) return null;
+      if (pivot !== i) { var row = a[i]; a[i] = a[pivot]; a[pivot] = row; }
+      for (j = i + 1; j < n; j++) {
+        var factor = a[j][i] / a[i][i];
+        for (k = i; k <= n; k++) a[j][k] -= factor * a[i][k];
+      }
+    }
+    var out = new Array(n);
+    for (i = n - 1; i >= 0; i--) {
+      var sum = a[i][n];
+      for (j = i + 1; j < n; j++) sum -= a[i][j] * out[j];
+      out[i] = sum / a[i][i];
+    }
+    return out;
+  }
+  function trimHullDistance(points) {
+    var count = (points || []).length;
+    if (!count) return 1;
+    var best = 1;
+    function consider(indices) {
+      var m = indices.length, gram = [], rhs = [], i, j;
+      for (i = 0; i < m; i++) {
+        gram.push([]);
+        for (j = 0; j < m; j++)
+          gram[i].push(2 * dot(points[indices[i]], points[indices[j]]));
+        gram[i].push(1);
+      }
+      var last = [];
+      for (i = 0; i < m; i++) last.push(1);
+      last.push(0);
+      gram.push(last);
+      for (i = 0; i < m; i++) rhs.push(0);
+      rhs.push(1);
+      var solution = trimSolveLinear(gram, rhs);
+      if (!solution) return;
+      var lambda = solution.slice(0, m);
+      for (i = 0; i < m; i++) if (lambda[i] < -1e-9) return;
+      var point = {x:0, y:0, z:0};
+      for (i = 0; i < m; i++) point = add(point, mul(points[indices[i]], lambda[i]));
+      best = Math.min(best, length(point));
+    }
+    var subset = [];
+    function enumerate(start) {
+      if (subset.length) consider(subset.slice());
+      if (subset.length === 4 || start >= count) return;
+      for (var index = start; index < count; index++) {
+        subset.push(index);
+        enumerate(index + 1);
+        subset.pop();
+      }
+    }
+    enumerate(0);
+    return best;
+  }
+  function trimVolumeBoundaryState(volume, p, tolerance) {
+    if (volume.kind === 'cylinder') {
+      var axis = unit(volume.axis), delta = sub(p, volume.origin);
+      var axial = dot(delta, axis);
+      var radialVector = sub(delta, mul(axis, axial));
+      var radial = length(radialVector);
+      var tol = Math.max(tolerance, 1e-9 * Math.max(1, volume.radius));
+      if (axial < -tol || axial > volume.depth + tol ||
+          radial > volume.radius + tol) return {state:'outside'};
+      var normals = [], corner = false;
+      if (Math.abs(radial - volume.radius) <= tol) {
+        normals.push(radial > 1e-12 ? unit(radialVector) : basis(axis).u);
+      } else if (radial < volume.radius - tol) {
+        if (axial > tol && axial < volume.depth - tol) return {state:'inside'};
+        corner = true;
+      }
+      if (Math.abs(axial) <= tol) { normals.push(mul(axis, -1)); corner = normals.length > 1; }
+      else if (Math.abs(axial - volume.depth) <= tol) {
+        normals.push(axis); corner = normals.length > 1;
+      } else if (axial > tol && axial < volume.depth - tol && normals.length === 0) {
+        return {state:'inside'};
+      }
+      if (!normals.length) return {state:'outside'};
+      return {state:'boundary', normals:normals, corner:corner};
+    }
+    if (volume.kind === 'cone') {
+      var axis = unit(volume.axis), delta = sub(p, volume.origin);
+      var axial = dot(delta, axis);
+      var radialVector = sub(delta, mul(axis, axial));
+      var radial = length(radialVector);
+      var coneTol = Math.max(tolerance, 1e-9 * Math.max(1, volume.radius,
+        Number.isFinite(volume.bottomRadius) ? volume.bottomRadius : volume.radius));
+      if (axial < -coneTol || axial > volume.depth + coneTol ||
+          radial > axialVolumeRadius(volume, axial) + coneTol) return {state:'outside'};
+      var start = volume.radius;
+      var end = Number.isFinite(volume.bottomRadius) ? volume.bottomRadius : start;
+      var slope = volume.depth > 0 ? (end - start) / volume.depth : 0;
+      var apexStation = Math.abs(slope) > EPS ? -start / slope : -Infinity;
+      var nappe = axial >= apexStation ? 1 : -1;
+      var halfAngle = Math.atan2(Math.abs(slope), 1);
+      var coneNormals = [], coneCorner = false;
+      var profile = axialVolumeRadius(volume, axial);
+      if (Math.abs(radial - profile) <= coneTol) {
+        var radialDirection = radial > 1e-12 ? unit(radialVector) :
+          basis(axis).u;
+        coneNormals.push(unit(add(mul(radialDirection, Math.cos(halfAngle)),
+          mul(axis, -nappe * Math.sin(halfAngle)))));
+      } else if (radial < profile - coneTol) {
+        if (axial > coneTol && axial < volume.depth - coneTol)
+          return {state:'inside'};
+        coneCorner = true;
+      }
+      if (Math.abs(axial) <= coneTol) {
+        coneNormals.push(mul(axis, -1));
+        coneCorner = coneNormals.length > 1;
+      } else if (Math.abs(axial - volume.depth) <= coneTol &&
+                 end > 1e-12 && volume.openBottom !== true) {
+        coneNormals.push(axis);
+        coneCorner = coneNormals.length > 1;
+      } else if (axial > coneTol && axial < volume.depth - coneTol &&
+                 coneNormals.length === 0) {
+        return {state:'inside'};
+      }
+      if (!coneNormals.length) return {state:'boundary', normals:[], corner:false};
+      return {state:'boundary', normals:coneNormals, corner:coneCorner};
+    }
+    if (volume.kind === 'sphere') {
+      var distance = length(sub(p, volume.center));
+      var plane = dot(sub(p, volume.mouthCenter), unit(volume.outward));
+      var sphereTol = Math.max(tolerance, 1e-9 * Math.max(1, volume.radius));
+      if (distance > volume.radius + sphereTol || plane > sphereTol)
+        return {state:'outside'};
+      var sphereNormals = [], sphereCorner = false;
+      if (Math.abs(distance - volume.radius) <= sphereTol)
+        sphereNormals.push(unit(sub(p, volume.center)));
+      else if (distance < volume.radius - sphereTol) {
+        if (plane < -sphereTol) return {state:'inside'};
+        sphereCorner = true;
+      }
+      if (Math.abs(plane) <= sphereTol) {
+        sphereNormals.push(unit(volume.outward));
+        sphereCorner = sphereNormals.length > 1;
+      } else if (plane < -sphereTol && sphereNormals.length === 0) {
+        return {state:'inside'};
+      }
+      if (!sphereNormals.length) return {state:'outside'};
+      return {state:'boundary', normals:sphereNormals, corner:sphereCorner};
+    }
+    return {state:'outside'};
+  }
+  function trimClassifyComponent(component, sa, sb, volumes, group, tolerance, record) {
+    var relation = record.supportRelation ||
+      (record.support && record.support.relation) || null;
+    if (relation === 'tangent')
+      return {role:'contact', method:'tangent-support', exposureStatus:'numeric'};
+    if (relation !== 'transverse')
+      return {role:'boundary', method:'support-relation-unproven',
+        exposureStatus:'unresolved', reason:'normal-topology-unresolved'};
+    var parameters;
+    if (component.kind === 'line') {
+      var first = component.startParameter, last = component.endParameter;
+      parameters = [first + (last - first) * 0.5,
+        first + (last - first) * 0.25, first + (last - first) * 0.75];
+    } else {
+      var start = component.startAngle, sweep = component.sweepAngle;
+      parameters = [start + sweep * 0.5, start + sweep * 0.25,
+        start + sweep * 0.75];
+    }
+    var thirdActive = false, stable = true, signature = null;
+    var insideMember = false, corner = false, pointed = false;
+    var coveredCount = 0, exposedCount = 0, margin = Infinity;
+    parameters.forEach(function (t) {
+      var p = component.kind === 'line' ?
+        add(component.origin, mul(component.direction, t)) : curvePoint(component, t);
+      var normals = [], active = [];
+      (group || [sa.volume.index, sb.volume.index]).forEach(function (index) {
+        var state = trimVolumeBoundaryState(volumes[index], p, tolerance);
+        if (state.state === 'inside') insideMember = true;
+        if (state.state === 'boundary') {
+          active.push(index);
+          (state.normals || []).forEach(function (normal) {
+            if (finite(normal)) normals.push(unit(normal));
+          });
+          if (state.corner) corner = true;
+          if (index !== sa.volume.index && index !== sb.volume.index)
+            thirdActive = true;
+        }
+      });
+      active.sort(function (a, b) { return a - b; });
+      var key = active.join(',');
+      if (signature === null) signature = key;
+      else if (signature !== key) stable = false;
+      if (!normals.length) return;
+      var distance = trimHullDistance(normals);
+      margin = Math.min(margin, distance);
+      if (distance <= 1e-6) coveredCount++;
+      else exposedCount++;
+      if (distance > 1e-6 && distance > 1e-3) pointed = true;
+    });
+    if (insideMember)
+      return {role:'internal', exposureStatus:'unresolved',
+        method:'member-normal-cone', reason:'member-interior-evidence'};
+    if (!stable || corner)
+      return {role:'boundary', exposureStatus:'unresolved',
+        method:'member-normal-cone', reason:'multi-member-topology-unresolved',
+        evidence:{margin:margin}};
+    if (coveredCount && !exposedCount)
+      return {role:'internal', exposureStatus:'unresolved',
+        method:'member-normal-cone', reason:'union-normal-cone-covered',
+        evidence:{margin:margin}};
+    if (coveredCount && exposedCount)
+      return {role:'unresolved', exposureStatus:'unresolved',
+        method:'member-normal-cone', reason:'union-normal-cone-transition',
+        evidence:{margin:margin}};
+    if (!pointed)
+      return {role:'boundary', exposureStatus:'unresolved',
+        method:'member-normal-cone', reason:'narrow-exterior-cone',
+        evidence:{margin:margin}};
+    if (thirdActive)
+      return {role:'boundary', exposureStatus:'numeric',
+        method:'member-normal-cone', reason:'multi-member-exterior-wedge',
+        evidence:{margin:margin}};
+    return {role:'boundary', exposureStatus:'exact',
+      method:'transverse-analytic', evidence:{margin:margin}};
+  }
+  function trimSerializeCurve(curve) {
+    if (!curve) return null;
+    var out = {kind:curve.kind || 'circle', center:copyPoint(curve.center),
+      u:copyPoint(curve.u), v:copyPoint(curve.v)};
+    if (curve.radiusU !== undefined || curve.radiusV !== undefined) {
+      out.radiusU = curve.radiusU === undefined ? curve.radius : curve.radiusU;
+      out.radiusV = curve.radiusV === undefined ? curve.radius : curve.radiusV;
+    } else out.radius = curve.radius;
+    if (curve.origin) out.origin = copyPoint(curve.origin);
+    if (curve.direction) out.direction = copyPoint(curve.direction);
+    return out;
+  }
+  function trimJsonClone(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+  }
+  function trimSerializeSupport(support) {
+    if (!support) return {kind:'unsupported', reason:'analytic-support-unimplemented'};
+    var out = {kind:support.kind, relation:support.relation || null};
+    if (support.contract) out.contract = support.contract;
+    if (support.kind === 'circle' || support.kind === 'ellipse') {
+      var curve = trimSerializeCurve(support);
+      Object.keys(curve).forEach(function (key) { out[key] = curve[key]; });
+    } else if (support.kind === 'circles') {
+      out.circles = (support.circles || []).map(trimSerializeCurve).filter(Boolean);
+    } else if (support.kind === 'line') {
+      out.origin = copyPoint(support.origin);
+      out.direction = copyPoint(support.direction);
+    } else if (support.kind === 'lines') {
+      out.lines = (support.lines || []).map(function (line) {
+        return {origin:copyPoint(line.origin), direction:copyPoint(line.direction)};
+      });
+    } else if (support.kind === 'point') {
+      out.point = copyPoint(support.point);
+    } else if (support.kind === 'points') {
+      out.points = (support.points || []).map(copyPoint).filter(Boolean);
+    } else if (support.kind === 'plane-overlap') {
+      out.plane = support.plane ? {origin:copyPoint(support.plane.origin),
+        normal:copyPoint(support.plane.normal)} : null;
+    } else if (support.kind === 'coincident') {
+      ['origin', 'center', 'axis'].forEach(function (key) {
+        if (finite(support[key])) out[key] = copyPoint(support[key]);
+      });
+      if (Number.isFinite(support.radius)) out.radius = support.radius;
+    } else if (support.kind === 'unsupported') {
+      out.reason = support.reason || null;
+      out.guarantee = support.guarantee || 'numeric';
+    } else if (support.kind === 'none' || support.kind === 'implicit-intersection') {
+      ['proven', 'separated', 'supportOnly', 'status', 'guarantee', 'method', 'topologyCertified',
+        'bounds', 'equations', 'constraints', 'evidence', 'coincidence', 'legacy',
+        'unresolvedDomain', 'diagnostic', 'display'].forEach(function (key) {
+        if (support[key] !== undefined) out[key] = trimJsonClone(support[key]);
+      });
+    }
+    if (Array.isArray(support.surfaceIds)) out.surfaceIds = support.surfaceIds.slice();
+    if (Array.isArray(support.surfaceKinds)) out.surfaceKinds = support.surfaceKinds.slice();
+    return out;
+  }
+  function trimRecordStatus(record) {
+    return [record.supportStatus || 'exact', record.boundsStatus || 'none',
+      record.exposureStatus || 'none'].reduce(trimWorst, 'none');
+  }
+  function trimSupportPair(sa, sb, relation, volumes, group, tolerance) {
+    var support = intersect(sa.surface, sb.surface);
+    var record = {aVolume:sa.volume.index, bVolume:sb.volume.index,
+      aRole:sa.role, bRole:sb.role, aSurfaceId:sa.surfaceId, bSurfaceId:sb.surfaceId,
+      relation:relation.relation, kind:support && support.kind || null,
+      support:trimSerializeSupport(support), supportStatus:'exact',
+      boundsStatus:'none', exposureStatus:'none', status:'exact', role:null, reason:null,
+      domain:[trimDomainRecord(sa.volume, sa.role), trimDomainRecord(sb.volume, sb.role)],
+      sourceIds:Array.from(new Set((sa.sourceIds || []).concat(sb.sourceIds || []))),
+      branches:[], excluded:0};
+    if (!support) {
+      record.supportStatus = 'unsupported';
+      record.status = 'unsupported';
+      record.reason = 'analytic-support-unimplemented';
+      return record;
+    }
+    record.kind = support.kind;
+    record.supportRelation = support.relation || relation.relation;
+    if (support.kind === 'implicit-intersection') {
+      record.supportStatus = 'implicit';
+      record.boundsStatus = 'unresolved';
+      record.exposureStatus = 'unresolved';
+      record.status = 'unresolved';
+      record.role = support.relation === 'coincident-support' ? 'coincident' : null;
+      record.reason = support.relation === 'coincident-support' ?
+        'implicit-coincident-support-domain-unresolved' :
+        (support.supportOnly ? 'implicit-support-only-domain-unresolved' :
+          'implicit-support-topology-numeric');
+      record.exactness = 'algebraic-set';
+      record.guarantee = support.guarantee || 'algebraic-set';
+      record.topologyCertified = false;
+      record.domainStatus = support.supportOnly ? 'unresolved-support-only' : 'algebraic-only';
+      record.supportOnly = !!support.supportOnly;
+      if (support.equations) record.equations = trimJsonClone(support.equations);
+      if (support.evidence) record.evidence = trimJsonClone(support.evidence);
+      return record;
+    }
+    if (support.kind === 'none' && support.proven === false) {
+      record.supportStatus = 'numeric';
+      record.boundsStatus = 'none';
+      record.exposureStatus = 'unresolved';
+      record.status = 'unresolved';
+      record.reason = 'numeric-interval-separation-not-certified';
+      record.coverage = {complete:false, uncertain:true};
+      return record;
+    }
+    if (support.kind === 'unsupported') {
+      record.supportStatus = 'unsupported';
+      record.status = 'unsupported';
+      record.reason = support.reason || 'analytic-support-unsupported';
+      return record;
+    }
+    if (support.kind === 'none') {
+      record.supportStatus = 'none';
+      record.status = 'none';
+      return record;
+    }
+    if (support.kind === 'coincident' || support.kind === 'plane-overlap') {
+      record.supportStatus = 'exact';
+      record.boundsStatus = 'none';
+      record.exposureStatus = 'unresolved';
+      record.status = 'unresolved';
+      record.role = 'coincident';
+      record.reason = support.kind === 'plane-overlap' ?
+        'coincident-plane-topology-unresolved' : 'coincident-support-topology-unresolved';
+      if (support.kind === 'plane-overlap' && support.plane && finite(support.plane.normal)) {
+        var plane = support.plane;
+        var referenceA = volumeInteriorReference(sa.volume);
+        var referenceB = volumeInteriorReference(sb.volume);
+        if (finite(referenceA) && finite(referenceB)) {
+          var sideA = dot(unit(plane.normal), sub(referenceA, plane.origin));
+          var sideB = dot(unit(plane.normal), sub(referenceB, plane.origin));
+          if (sideA * sideB < 0) {
+            record.role = 'internal';
+            record.reason = 'opposed-cap-contact-uncertified';
+            record.evidence = {contact:relation.contact || null};
+          } else if (sideA * sideB > 0) {
+            record.reason = 'same-facing-common-floor-topology-unresolved';
+          }
+        }
+      }
+      return record;
+    }
+    if (support.kind === 'point' || support.kind === 'points') {
+      var points = support.kind === 'point' ? [copyPoint(support.point)] :
+        (support.points || []).map(copyPoint).filter(Boolean);
+      points = points.filter(function (point) {
+        return trimVolumeContains(sa.volume, point, tolerance) &&
+          trimVolumeContains(sb.volume, point, tolerance);
+      });
+      if (!points.length) {
+        record.supportStatus = 'exact';
+        record.boundsStatus = 'exact';
+        record.exposureStatus = 'none';
+        record.status = 'none';
+        return record;
+      }
+      record.supportStatus = 'exact';
+      record.boundsStatus = 'exact';
+      record.exposureStatus = 'numeric';
+      record.status = 'numeric';
+      record.role = 'contact';
+      record.points = points;
+      record.reason = 'tangent-point-contact';
+      return record;
+    }
+    var branches;
+    if (support.kind === 'circle' || support.kind === 'ellipse') branches = [support];
+    else if (support.kind === 'circles') branches = support.circles || [];
+    else if (support.kind === 'line') branches = [support];
+    else if (support.kind === 'lines') branches = support.lines || [];
+    else {
+      record.supportStatus = 'unsupported';
+      record.status = 'unsupported';
+      record.reason = 'bounded-support-kind';
+      return record;
+    }
+    record.boundsStatus = 'exact';
+    branches.forEach(function (branch) {
+      if (!branch.kind) branch.kind = finite(branch.center) ? 'circle' : 'line';
+      var bounded = trimBoundBranch(branch, sa, sb, volumes, group, tolerance);
+      if (!bounded.ok) {
+        record.boundsStatus = trimWorst(record.boundsStatus, bounded.status || 'unresolved');
+        record.reason = record.reason || bounded.reason || 'trim-bounds-unresolved';
+        return;
+      }
+      bounded.components.forEach(function (component) {
+        var classification = trimClassifyComponent(component, sa, sb, volumes,
+          group, tolerance, record);
+        component.role = classification.role;
+        component.classification = classification.method;
+        component.reason = classification.reason || null;
+        component.exposureStatus = classification.exposureStatus || 'numeric';
+        component.status = trimWorst(component.boundsStatus || 'exact',
+          component.exposureStatus);
+        if (component.role === 'outside') record.excluded++;
+        record.branches.push(component);
+      });
+    });
+    record.exposureStatus = record.branches.length ?
+      record.branches.reduce(function (worst, branch) {
+        return trimWorst(worst, branch.exposureStatus || 'numeric');
+      }, 'none') : 'none';
+    if (record.branches.length) {
+      record.branches.forEach(function (branch) {
+        record.status = trimWorst(record.status, branch.status || 'exact');
+      });
+    } else if (record.supportStatus === 'exact' && record.boundsStatus === 'exact') {
+      record.status = 'none';
+    }
+    record.status = trimRecordStatus(record);
+    return record;
+  }
+  function trimUnionGroup(relation, unions) {
+    for (var i = 0; i < unions.length; i++) {
+      var members = (unions[i].members || []).map(function (member) { return member.volume; });
+      if (members.indexOf(relation.a) !== -1 && members.indexOf(relation.b) !== -1)
+        return members;
+    }
+    return [relation.a, relation.b];
+  }
+  function cavityTrims(model, geometry) {
+    var volumes = geometry && geometry.cavityVolumes || [];
+    var relations = geometry && geometry.cavityRelations || [];
+    var unions = geometry && geometry.cavityUnions || [];
+    var result = {contract:CAVITY_TRIM_CONTRACT, version:1, status:'none',
+      exactness:'none', pairs:[], boundaries:[], diagnostics:[]};
+    if (!volumes.length || !relations.length) return result;
+    var tolerance = trimTolerance(volumes);
+    relations.forEach(function (relation) {
+      if (!relation || relation.relation === 'separate') return;
+      var a = volumes[relation.a], b = volumes[relation.b];
+      if (!a || !b) return;
+      var group = trimUnionGroup(relation, unions);
+      var pair = {a:relation.a, b:relation.b, relation:relation.relation,
+        status:'exact', exactness:'exact', kind:null, reason:null, supports:[], boundaries:0};
+      if (relation.relation === 'duplicate') {
+        pair.kind = 'duplicate';
+        pair.role = 'internal';
+        pair.reason = 'duplicate-cavity-member';
+        result.pairs.push(pair);
+        return;
+      }
+      var supportsA = trimSupportsFor(a, model), supportsB = trimSupportsFor(b, model);
+      supportsA.forEach(function (sa) {
+        supportsB.forEach(function (sb) {
+          var record = trimSupportPair(sa, sb, relation, volumes, group, tolerance);
+          pair.supports.push(record);
+          pair.boundaries += record.branches.length;
+          record.branches.forEach(function (branch) {
+            var boundary = {};
+            Object.keys(branch).forEach(function (key) { boundary[key] = branch[key]; });
+            boundary.contract = CAVITY_TRIM_CONTRACT;
+            boundary.memberVolumes = [relation.a, relation.b];
+            boundary.surfaceIds = [sa.surfaceId, sb.surfaceId];
+            boundary.supportKind = record.kind;
+            boundary.supportRelation = record.supportRelation;
+            boundary.sourceIds = Array.from(new Set((sa.sourceIds || [])
+              .concat(sb.sourceIds || [])));
+            boundary.domain = record.domain;
+            result.boundaries.push(boundary);
+          });
+          if (record.status === 'unsupported' || record.status === 'unresolved' ||
+              record.status === 'numeric')
+            result.diagnostics.push({code:'cavity-trim-' + record.status,
+              message:'Cavity trim support pair ' + sa.role + '/' + sb.role + ' is ' +
+                record.status + (record.reason ? ': ' + record.reason : ''),
+              pair:[relation.a, relation.b],
+              surfaceIds:[sa.surfaceId, sb.surfaceId],
+              sourceIds:record.sourceIds.slice()});
+        });
+      });
+      pair.status = pair.supports.reduce(function (worst, support) {
+        return trimWorst(worst, support.status);
+      }, 'exact');
+      if (pair.status === 'none') pair.status = 'exact';
+      pair.exactness = pair.status;
+      result.pairs.push(pair);
+    });
+    var worst = 'none';
+    result.pairs.forEach(function (pair) { worst = trimWorst(worst, pair.status); });
+    result.exactness = worst;
+    result.status = result.pairs.length ? 'partial' : 'none';
+    result.boundaryCount = result.boundaries.length;
+    result.visible = result.boundaries.filter(function (b) { return b.role === 'boundary'; }).length;
+    result.internal = result.boundaries.filter(function (b) { return b.role === 'internal'; }).length;
+    result.contact = result.boundaries.filter(function (b) { return b.role === 'contact'; }).length;
+    result.unsupported = result.pairs.reduce(function (count, pair) {
+      return count + pair.supports.filter(function (support) {
+        return support.status === 'unsupported';
+      }).length;
+    }, 0);
+    result.unresolved = result.pairs.reduce(function (count, pair) {
+      return count + pair.supports.filter(function (support) {
+        return support.status === 'unresolved';
+      }).length;
+    }, 0);
+    result.numeric = result.pairs.reduce(function (count, pair) {
+      return count + pair.supports.filter(function (support) {
+        return support.status === 'numeric';
+      }).length;
+    }, 0);
+    result.exact = result.pairs.reduce(function (count, pair) {
+      return count + pair.supports.filter(function (support) {
+        return support.status === 'exact';
+      }).length;
+    }, 0);
+    return result;
+  }
+
   function build(geometry, options) {
     if (!geometry) return null;
     var model = {version:1, contract:'analytic-surface-v1', surfaces:[], diagnostics:[]};
@@ -391,11 +2200,30 @@
     function diag(code, message, sourceIds) {
       model.diagnostics.push({code:code, message:message, sourceIds:sourceIds || []});
     }
-    function addSurface(surface) {
+    function addSurface(surface, patch) {
       if (!surface) return;
       surface.id = 'surface:' + model.surfaces.length;
       surface.inferred = true;
+      if (surface.implicit && surface.implicit.identity) {
+        surface.implicit.identity.surfaceId = surface.id;
+        if (surface.implicit.sourceEvidence)
+          surface.implicit.sourceEvidence.surfaceIds = [surface.id];
+      }
       surface.closed = !!surface.closed;
+      if (patch) {
+        if (patch.approximateTrim) surface.approximateBoundary = true;
+        if (patch.displayOnlyBoundary) surface.displayOnlyBoundary = true;
+        if (patch.booleanDomain) surface.booleanDomain = patch.booleanDomain;
+        if (patch.unionGroup !== undefined) surface.unionGroup = patch.unionGroup;
+        if (patch.volumeIndex !== undefined) surface.volumeIndex = patch.volumeIndex;
+        if (patch.memberRole) surface.memberRole = patch.memberRole;
+      }
+      if (Implicit && IMPLICIT_KINDS[surface.kind] && surface.kind !== 'implicit') {
+        try {
+          var equation = Implicit.equation(surface, {inferred:true});
+          if (equation) surface.implicit = equation;
+        } catch (err) {}
+      }
       model.surfaces.push(surface);
     }
     function unique(list) {
@@ -433,10 +2261,10 @@
       (loop.points || []).forEach(function (p) { if (!finite(p)) okay = false; });
       return okay;
     }
-    // Patches may supply their ordered loops directly. This is the common
-    // schema used for straight boundary elements: a loop can carry vertex
-    // indices, drawing curve indices, inline sections and inline lines.
-    // Returns {loops:null} when the legacy fields should be used instead.
+
+
+
+
     function patchLoops(patch, sourceIds) {
       if (!patch.loops || !patch.loops.length) return {loops:null, ok:true};
       var loops = patch.loops.map(copyLoopInput);
@@ -454,8 +2282,8 @@
       return out;
     }
     var patches = (geometry.surfacePatches || []).slice();
-    // Legacy wire adapters expose logical planar regions directly, without
-    // the primitive pipeline's surfacePatches array.
+
+
     if (!patches.length && geometry.faceRegions) patches = geometry.faceRegions.map(function (region) {
       return {kind:'plane', outer:region.outer, holes:region.holes || []};
     });
@@ -468,8 +2296,8 @@
           if (!finite(patch.center) || !(patch.radius > 0)) {
             diag('surface-invalid-sphere', 'A sphere needs a finite centre and positive radius.', sourceIds); return;
           }
-          // A complete sphere silhouette has no boundary. A spherical patch
-          // (for example a recess cap) keeps its analytic boundary loop.
+
+
           var sphereBoundary = (patch.boundaryCurves || []).slice();
           var sphereLoops = [];
           if (requested.loops) {
@@ -496,10 +2324,10 @@
         } else if (patch.kind === 'torus') {
           var major = patch.majorRadius !== undefined ? patch.majorRadius : patch.major;
           var minor = patch.minorRadius !== undefined ? patch.minorRadius : patch.minor;
-          var torusAxis = patch.axis && finite(patch.axis) ? unit(patch.axis) : null;
+          var torusAxis = patch.axis && finite(patch.axis) ? unitOrNull(patch.axis) : null;
           if (!finite(patch.center) || !(major > 0) || !(minor > 0) || !torusAxis) {
-            diag('surface-invalid-torus',
-              'A torus needs a finite centre, a unit axis and positive major/minor radii.', sourceIds);
+            diag(torusAxis === null && patch.axis ? 'surface-invalid-axis' : 'surface-invalid-torus',
+              'A torus needs a finite centre, a nonzero unit axis and positive major/minor radii.', sourceIds);
             return;
           }
           var torusLoops = requested.loops || [];
@@ -515,6 +2343,27 @@
               'A torus parameter domain needs finite increasing u and v intervals no longer than one turn.',
               sourceIds);
           }
+        } else if (patch.kind === 'implicit') {
+          var implicitPatch = patch.implicit ? Implicit.normalizeEquation(patch.implicit) : null;
+          if (!implicitPatch) {
+            diag('surface-invalid-implicit', 'An implicit patch needs a valid equation.', sourceIds); return;
+          }
+          var implicitBoundary = requested.loops ? loopCurveIndices(requested.loops) :
+            (patch.boundaryCurves || []).slice();
+          if (implicitBoundary.some(function (i) { return !validCurve(curves[i]); })) {
+            diag('surface-invalid-boundary', 'An implicit patch references a missing analytic boundary.', sourceIds); return;
+          }
+          var implicitLoops = requested.loops ||
+            implicitBoundary.map(function (i) { return {kind:'outer', curves:[i]}; });
+          surface = {kind:'implicit', analyticKind:patch.analyticKind || 'implicit',
+            origin:patch.origin || implicitPatch.frame.origin, implicit:implicitPatch,
+            loops:implicitLoops, boundaryCurves:implicitBoundary, closed:false,
+            sourceIds:sourceIds, displayFaceIndices:(patch.faceIndices || []).slice(), patchIndex:pi};
+          if (patch.generator) surface.generator = JSON.parse(JSON.stringify(patch.generator));
+          if (patch.apex) surface.apex = patch.apex;
+          if (patch.inference) surface.inference = JSON.parse(JSON.stringify(patch.inference));
+          if (patch.displayTessellation)
+            surface.displayTessellation = JSON.parse(JSON.stringify(patch.displayTessellation));
         } else if (patch.kind === 'plane') {
           if (requested.loops) {
             var origin = patch.origin, normal = patch.normal, u = patch.u, v = patch.v;
@@ -547,7 +2396,10 @@
             if (!finite(origin) || !finite(normal)) {
               diag('surface-unbounded-plane', 'A planar patch with explicit loops needs an origin and normal.', sourceIds); return;
             }
-            normal = unit(normal);
+            normal = unitOrNull(normal);
+            if (!normal) {
+              diag('surface-invalid-normal', 'A planar patch needs a nonzero normal.', sourceIds); return;
+            }
             if (!finite(u) || !finite(v)) {
               var derivedBasis = basis(normal);
               u = derivedBasis.u; v = derivedBasis.v;
@@ -652,8 +2504,12 @@
             if (!validCurve(first) || second && !validCurve(second)) {
               diag('surface-invalid-boundary', 'A ruled patch references a missing analytic boundary.', sourceIds); return;
             }
-            var axis = patch.axis && finite(patch.axis) ? unit(patch.axis) :
-              second && length(sub(second.center, first.center)) > EPS ? unit(sub(second.center, first.center)) : curveNormal(first);
+            var axis = patch.axis && finite(patch.axis) ? unitOrNull(patch.axis) :
+              second && length(sub(second.center, first.center)) > EPS ? unitOrNull(sub(second.center, first.center)) : curveNormal(first);
+            if (!axis || !finite(axis)) {
+              diag('surface-invalid-axis', 'A ruled patch needs a finite nonzero axis.', sourceIds);
+              return;
+            }
             var kind = patch.analyticKind || patch.kind;
             if (kind === 'ruled') kind = second && Math.abs(first.radius - second.radius) <= EPS ? 'cylinder' : 'cone';
             var loops2 = bcs.map(function (i) { return {kind:'outer', curves:[i]}; });
@@ -682,21 +2538,26 @@
         diag('surface-build-failed', 'The surface could not be modelled: ' + (err && err.message || err), sourceIds);
         return;
       }
-      addSurface(surface);
+      addSurface(surface, patch);
     });
     mergeContainedMouths(model, geometry);
+    mergeUnionMouths(model, geometry);
     model.summary = summarize(model);
     stampModelIdentity(model);
+    model.cavityTrims = cavityTrims(model, geometry);
+    if (geometry.cavityVolumes && geometry.cavityVolumes.length)
+      geometry.cavityTrims = model.cavityTrims;
+    else delete geometry.cavityTrims;
     if (model.diagnostics.length) model.summary.status = 'issues';
     return model;
   }
 
-  // A loop names boundary elements in one of four ways: drawing-curve indices
-  // (`curves`), one inline section object (`section`), drawing-vertex indices
-  // (`vertices`), or an ordered mixed list (`elements`). The last form is
-  // produced by an analytic loop split and holds `{kind:'curve',curve}` and
-  // `{kind:'polyline',points}` records. `points` is the older inline-polyline
-  // form. All four are consumed through the helpers below.
+
+
+
+
+
+
   function loopCurves(loop, curves) {
     var out = [];
     (loop.elements || []).forEach(function (el) {
@@ -721,8 +2582,8 @@
   function pointKey(p) { return p.x + ',' + p.y + ',' + p.z; }
   function edgeKey(a, b) { return 'p:' + pointKey(a) + '_' + pointKey(b); }
 
-  // Ordered boundary geometry used by side tests and station queries. Curves
-  // are analytic records; edges are [a,b] point pairs (straight boundaries).
+
+
   function loopGeometry(loop, curves, vertices) {
     var out = {curves:[], edges:[]};
     if (loop.elements) {
@@ -774,9 +2635,9 @@
     return keys;
   }
 
-  // Canonical boundary incidence for the whole model. Both the lightweight
-  // validation summary and the detailed certificate consume this graph, so a
-  // shared seam cannot be counted differently by the two checks.
+
+
+
   function incidence(model) {
     var sectionIds = new Map(), lineIds = new Map(), uses = new Map(), bySurface = new Map();
     function elementId(element) {
@@ -812,9 +2673,9 @@
     return {uses:uses, bySurface:bySurface, elementId:elementId};
   }
 
-  // Analytic topology shadow model. Faces, edges, edge uses and vertices are
-  // derived from the v1 surface loops without changing them; the persisted
-  // boundary ids are the bridge, so a shared seam is one Edge with two uses.
+
+
+
   function topology(model, geometry) {
     model = model || {surfaces:[]};
     stampModelIdentity(model);
@@ -965,12 +2826,31 @@
     if (surface.kind === 'plane') direction = finite(surface.normal) ? unit(surface.normal) : null;
     else if (surface.kind === 'sphere')
       direction = finite(surface.center) ? unit(sub(point, surface.center)) : null;
-    else if (surface.kind === 'cylinder' || surface.kind === 'cone') {
+    else if (surface.kind === 'cylinder') {
       if (!finite(surface.origin) || !finite(surface.axis)) return null;
       var axis = unit(surface.axis);
       var delta = sub(point, surface.origin);
       var radial = sub(delta, mul(axis, dot(delta, axis)));
       direction = length(radial) > EPS ? unit(radial) : null;
+    } else if (surface.kind === 'cone') {
+      if (!finite(surface.origin) || !finite(surface.axis)) return null;
+      var coneAxis = unit(surface.axis);
+      var apex = finite(surface.apex) ? surface.apex : surface.origin;
+      var apexDelta = sub(point, apex);
+      var station = dot(apexDelta, coneAxis);
+      var coneRadial = sub(apexDelta, mul(coneAxis, station));
+      if (length(coneRadial) <= EPS) return null;
+      var radialDirection = unit(coneRadial);
+      var halfAngle = Number.isFinite(surface.halfAngle) ? surface.halfAngle :
+        Math.atan2(surface.radius || 0, Math.abs(station));
+      var nappe = station >= 0 ? 1 : -1;
+      direction = unit(add(mul(radialDirection, Math.cos(halfAngle)),
+        mul(coneAxis, -nappe * Math.sin(halfAngle))));
+    } else if (surface.kind === 'implicit' || surface.kind === 'polynomial') {
+      var implicitNormal = implicitEquationFor(surface);
+      if (!implicitNormal || !Implicit) return null;
+      var implicitAt = Implicit.evaluate(implicitNormal, point);
+      direction = implicitAt && length(implicitAt.gradient) > EPS ? unit(implicitAt.gradient) : null;
     } else if (surface.kind === 'torus') {
       if (!finite(surface.center) || !finite(surface.axis)) return null;
       var tAxis = unit(surface.axis), tDelta = sub(point, surface.center);
@@ -1418,6 +3298,8 @@
       });
       features.push({id:'feature:recess:' + index, type:'recess',
         family:record.kind, faces:faces, closure:record.closure || 'open',
+        bottomClosure:record.bottomClosure || null,
+        through:record.through === true,
         mouthCurve:record.mouthCurve === undefined ? null : record.mouthCurve,
         sourceIds:(record.sourceIds || []).slice()});
     });
@@ -1525,10 +3407,10 @@
         }
       }
       var tol = 1e-5 * Math.max(1, s.radius || 1, s.majorRadius || 0);
-      // Boundary curves and finite line elements must lie on their analytic
-      // surface. A line is sampled at its endpoints and midpoint; its straight
-      // span is exact, so those samples are sufficient for every supported
-      // surface family.
+
+
+
+
       (s.loops || []).forEach(function (loop) {
         if (loop.vertices && s.kind === 'plane') loop.vertices.forEach(function (i) {
           var p = geometry && geometry.vertices && geometry.vertices[i];
@@ -1571,7 +3453,7 @@
             }
             if (!ok) { add('surface-boundary-off-surface', 'A boundary curve does not lie on ' + s.id + '.', s.sourceIds); break; }
           }
-          // The boundary plane must recover the same section from the surface.
+
           if (s.kind === 'cylinder') {
             var sec = section(s, {origin:c.center, normal:curveNormal(c)});
             if (!sec || (sec.kind !== 'circle' && sec.kind !== 'ellipse')) {
@@ -1595,11 +3477,11 @@
       surfaces:(model.surfaces || []).length, issues:issues};
   }
 
-  // Analytic certificate. The validation above answers "is this model
-  // consistent?"; this records the evidence for each check and is deliberately
-  // independent of the display triangles. Exact checks use the stored decimal
-  // values as rationals. Everything else is numeric with an explicit tolerance;
-  // a numeric check is not a rigorous interval enclosure.
+
+
+
+
+
   var DECIMAL_RE = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i;
   function exactNormalize(n, d) {
     if (!d) throw new Error('Zero denominator');
@@ -1647,8 +3529,8 @@
     var x = exactNumber(value);
     return !!(x && x.n > 0n);
   }
-  // True when every point is exactly coplanar in the stored decimal model.
-  // The predicate is homogeneous, so no normal normalization is involved.
+
+
   function exactCoplanar(points) {
     if (!points || points.length < 3) return {ok:false, reason:'fewer-than-three'};
     var exactPoints = points.map(exactVector);
@@ -1721,6 +3603,13 @@
     var radius = Math.abs((s && s.radius) || 0);
     if (s && Number.isFinite(s.majorRadius))
       radius = Math.max(radius, Math.abs(s.majorRadius));
+    if (s && s.generator) {
+      radius = Math.max(radius, length(s.generator.A || {x:0,y:0,z:0}),
+        length(s.generator.B || {x:0,y:0,z:0}),
+        length(sub(s.generator.D || {x:0,y:0,z:0}, s.generator.C || {x:0,y:0,z:0})));
+      if (finite(s.generator.A2)) radius = Math.max(radius, length(s.generator.A2));
+      if (finite(s.generator.B2)) radius = Math.max(radius, length(s.generator.B2));
+    }
     return 1e-5 * Math.max(1, Number.isFinite(radius) ? radius : 1);
   }
   function surfaceResidual(s, p) {
@@ -1750,6 +3639,14 @@
     }
     if (s.kind === 'sphere') {
       return finite(s.center) && s.radius > 0 ? Math.abs(length(sub(p, s.center)) - s.radius) : Infinity;
+    }
+    if (s.kind === 'implicit' || s.kind === 'polynomial') {
+      var implicitSurface = implicitEquationFor(s);
+      if (!implicitSurface || !Implicit) return Infinity;
+      var implicitValue = Implicit.evaluate(implicitSurface, p);
+      if (!implicitValue) return Infinity;
+      var implicitGradient = length(implicitValue.gradient);
+      return implicitGradient > 0 ? Math.abs(implicitValue.value) / implicitGradient : Infinity;
     }
     return Infinity;
   }
@@ -1879,9 +3776,9 @@
       idCounts.set(key, (idCounts.get(key) || 0) + 1);
     });
 
-    // Pass 1 uses the canonical incidence graph. Section objects keep
-    // reference identity, so two separately built but equal sections do not
-    // become shared merely because their numbers match.
+
+
+
     var uses = graph.uses;
 
     function loopIncidence(loop) {
@@ -1897,15 +3794,16 @@
         selfShared:elements.some(function (e) { return e.useCount === 2 && e.surfaces.length === 1; })};
     }
 
-    // Pass 2: certify each surface, its loops, and its type-specific parameters.
+
     var surfaceRecords = model.surfaces.map(function (s, si) {
       var id = s && typeof s.id === 'string' ? s.id : 'surface-index:' + si;
       var surface = s || {};
       var rec = {id:id, kind:surface.kind || 'unknown', closed:surface.closed === true,
         sourceIds:unique(surface.sourceIds || []),
         displayFaceIndices:(surface.displayFaceIndices || []).slice(),
-        parameters:surfaceParameters(surface), loops:[], checks:[], status:'ok'};
-      var known = ['plane','cylinder','cone','sphere','torus'].indexOf(rec.kind) !== -1;
+        parameters:surfaceParameters(surface), loops:[], checks:[], status:'ok',
+        boundaryApproximate:surface.approximateBoundary === true};
+      var known = ['plane','cylinder','cone','sphere','torus','implicit','polynomial'].indexOf(rec.kind) !== -1;
 
       check(rec, rec, 'surface-id-present', {status:typeof surface.id === 'string' && surface.id !== '' ? 'ok':'failed',
         arithmetic:'exact-combinatorial', method:'combinatorial', issue:'certificate-surface-id-missing',
@@ -1994,6 +3892,25 @@
       } else if (rec.kind === 'sphere') {
         finiteVector(rec, rec, 'sphere-center-finite', surface.center, 'certificate-sphere-center-invalid');
         positiveExact(rec, rec, 'sphere-radius-positive', surface.radius, 'certificate-sphere-radius-invalid');
+      } else if (rec.kind === 'implicit' || rec.kind === 'polynomial') {
+        var implicitEquation = implicitEquationFor(surface);
+        finiteVector(rec, rec, 'implicit-origin-finite', surface.origin, 'certificate-implicit-origin-invalid');
+        check(rec, rec, 'implicit-equation-valid', {
+          status:implicitEquation && Implicit && Implicit.equationIsValid(implicitEquation) ? 'ok' : 'failed',
+          arithmetic:'exact-combinatorial', method:'combinatorial',
+          issue:'certificate-implicit-equation-invalid',
+          message:rec.id + ' has no valid polynomial equation.'});
+        if (implicitEquation && Implicit && Implicit.equationIsValid(implicitEquation)) {
+          var implicitDegree = implicitEquation.degree;
+          var degreeSupported = Number.isInteger(implicitDegree) && implicitDegree >= 1 &&
+            (implicitDegree <= 2 || (implicitDegree === 4 && implicitEquation.paramChart &&
+              Implicit.paramChartStatus(implicitEquation) === 'ok'));
+          check(rec, rec, 'implicit-degree-supported', {
+            status:degreeSupported ? 'ok' : 'failed',
+            arithmetic:'exact-combinatorial', method:'combinatorial',
+            issue:'certificate-implicit-degree-unsupported',
+            message:rec.id + ' has an unsupported implicit degree.'});
+        }
       } else if (rec.kind === 'torus') {
         finiteVector(rec, rec, 'torus-center-finite', surface.center, 'certificate-torus-center-invalid');
         positiveExact(rec, rec, 'torus-major-positive', surface.majorRadius, 'certificate-torus-major-invalid');
@@ -2007,8 +3924,8 @@
         }
       }
 
-      // Plane vertex loops have an exact coplanarity predicate on the stored
-      // decimals. Curved loops use sampled numeric residuals below.
+
+
       if (rec.kind === 'plane') {
         var planePoints = [];
         (surface.loops || []).forEach(function (loop) {
@@ -2136,9 +4053,9 @@
             sourceIds:loopRec.sourceIds.length ? loopRec.sourceIds : rec.sourceIds});
         }
 
-        // Cylinder boundaries are analytic plane sections. This is the
-        // strongest type-specific test: the section must reproduce the drawn
-        // centre and both radii, not merely sample points on the surface.
+
+
+
         if (rec.kind === 'cylinder') {
           loopCurves(loop, curves).forEach(function (c) {
             if (!boundaryCurveValid(c)) return;
@@ -2208,8 +4125,8 @@
       return rec;
     });
 
-    // Boundary records are per element, not per loop, so a seam appears once
-    // with both incident surfaces. Section identity is preserved by elementId.
+
+
     var boundaryRecords = [];
     uses.forEach(function (use) {
       var status = use.useCount > 2 ? 'nonmanifold' :
@@ -2240,8 +4157,8 @@
       boundaryRecords.push(rec);
     });
 
-    // Shells follow shared boundary elements exactly as validate() does, but
-    // additionally record which surfaces and boundaries form each component.
+
+
     var parent = model.surfaces.map(function (_, i) { return i; });
     function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
     function union(a, b) { a = find(a); b = find(b); if (a !== b) parent[b] = a; }
@@ -2302,6 +4219,35 @@
       shellRecords.push(shell);
     });
 
+    var approximate = model.surfaces.some(function (s) {
+      return s && s.approximateBoundary === true;
+    });
+    if (approximate) {
+      issue('certificate-approximate-union-boundary',
+        'A cavity union boundary is represented by a deterministic display Boolean; its parent analytic surfaces are certified but the trim boundary is approximate.',
+        {severity:'warning', sourceIds:model.surfaces.reduce(function (all, s) {
+          return all.concat(s.approximateBoundary ? (s.sourceIds || []) : []);
+        }, [])});
+    }
+    var singularContacts = (geometry && Array.isArray(geometry.cavityRelations) ?
+      geometry.cavityRelations : []).filter(function (pair) {
+        return pair && pair.relation === 'touch' && pair.contact &&
+          pair.contact.positiveArea === false;
+      });
+    if (singularContacts.length) {
+      var contactSources = [];
+      var cavityVolumes = geometry && geometry.cavityVolumes || [];
+      singularContacts.forEach(function (pair) {
+        [pair.a, pair.b].forEach(function (index) {
+          var volume = cavityVolumes[index];
+          if (volume && Array.isArray(volume.sourceIds))
+            contactSources = contactSources.concat(volume.sourceIds);
+        });
+      });
+      issue('certificate-singular-contact',
+        'Two cavity volumes meet along a zero-area contact; the joined material manifold is not established.',
+        {severity:'warning', sourceIds:unique(contactSources)});
+    }
     var counts = {
       surfaces:surfaceRecords.length,
       boundaryLoops:surfaceRecords.reduce(function (n, s) { return n + s.loops.length; }, 0),
@@ -2327,11 +4273,16 @@
       counts.issues++;
       if (status !== 'issues') status = 'partial';
     }
-    return {contract:'analytic-surface-certificate-v1', modelContract:model.contract || 'analytic-surface-v1',
+    if (approximate && status === 'ok') status = 'partial';
+    if (singularContacts.length && status === 'ok') status = 'partial';
+    var result = {contract:'analytic-surface-certificate-v1', modelContract:model.contract || 'analytic-surface-v1',
       arithmetic:'mixed-exact-rational-and-numeric', status:status,
       surfaceCount:counts.surfaces, boundaryCount:counts.boundaries,
       counts:counts, surfaces:surfaceRecords, boundaries:boundaryRecords,
       shells:shellRecords, issues:issues};
+    if (approximate) result.scope = 'display-boolean';
+    else if (singularContacts.length) result.scope = 'contact';
+    return result;
   }
 
   function summarize(model) {
@@ -2346,12 +4297,12 @@
       openBoundaries:analysis.openBoundaries, status:analysis.openBoundaries ? 'partial' : 'ok'};
   }
 
-  // Oblique plane/torus intersection. For a ring torus the plane equation
-  // reduces to a quadratic in W(u) = A cos u + B sin u, so the valid major-
-  // angle intervals and the two v branches have closed-form endpoints.
-  // Each loop is two branch arcs over one interval; a fully valid interval
-  // gives one closed branch per sign. The curve is analytic and is sampled
-  // only by display/HLR consumers.
+
+
+
+
+
+
   function torusObliqueSection(surface, spec) {
     var axis = unit(surface.axis), frame = basis(axis), n = spec.normal;
     var A = dot(n, frame.u), B = dot(n, frame.v), D = dot(n, axis);
@@ -2447,11 +4398,108 @@
         wMin:w0, wMax:w1, amplitude:amp}};
   }
 
-  // Analytic section of a bounded surface by a plane. The result is a conic
-  // or line set in space; it is independent of the display tessellation.
+
+
+  function principalConicAxes(A, B) {
+    var areaVector = cross(A, B);
+    var area = length(areaVector);
+    var normal = area > EPS ? unitOrNull(areaVector) : null;
+    if (!normal) return null;
+    var u0 = unitOrNull(A);
+    if (!u0) return null;
+    var v0 = cross(normal, u0);
+    var a1 = dot(A,u0), a2 = dot(A,v0), b1 = dot(B,u0), b2 = dot(B,v0);
+    var m11 = a1*a1 + b1*b1, m12 = a1*a2 + b1*b2, m22 = a2*a2 + b2*b2;
+    var scale = Math.max(Math.abs(m11), Math.abs(m12), Math.abs(m22));
+    if (!(scale > 0)) return null;
+    var s11 = m11/scale, s12 = m12/scale, s22 = m22/scale;
+    var trace = s11 + s22;
+    var determinant = area*area/(scale*scale);
+    var discriminant = Math.sqrt(Math.max(0, trace*trace - 4*determinant));
+    var l1 = (trace + discriminant)/2;
+    if (!(l1 > 0)) return null;
+    var l2 = determinant/l1;
+    var theta = 0.5 * Math.atan2(2*s12, s11 - s22);
+    var axis1 = unitOrNull(add(mul(u0,Math.cos(theta)), mul(v0,Math.sin(theta))));
+    if (!axis1) return null;
+    var axis2 = unitOrNull(cross(normal, axis1));
+    if (!axis2) return null;
+    return {u:axis1, v:axis2, radiusU:Math.sqrt(Math.max(0,l1*scale)),
+      radiusV:Math.sqrt(Math.max(0,l2*scale))};
+  }
+
   function section(surface, plane) {
     var spec = planeSpec(plane), q = spec && spec.origin, n = spec && spec.normal;
     if (!surface || !spec) return null;
+    if (surface.kind === 'implicit' && surface.generator) {
+      var generator = surface.generator;
+      var generatorNormal = finite(generator.n) ? generator.n : cross(generator.A, generator.B);
+      var generatorSpan = sub(generator.D, generator.C);
+      var perpendicular = cross(generatorNormal, n);
+      var denominator = dot(generatorNormal, generatorSpan);
+      if (length(perpendicular) <= 1e-6 * Math.max(1, length(generatorNormal)) &&
+          Math.abs(denominator) > EPS) {
+        var station = -dot(generatorNormal, sub(generator.C, q)) / denominator;
+        var localExtent = Math.max(1, length(generator.A), length(generator.B), length(generatorSpan));
+        if (finite(generator.A2)) localExtent = Math.max(localExtent, length(generator.A2));
+        if (finite(generator.B2)) localExtent = Math.max(localExtent, length(generator.B2));
+        var worldTolerance = 1e-6 * localExtent;
+        var parameterTolerance = worldTolerance / Math.max(EPS, Math.abs(denominator));
+        if (station < -parameterTolerance || station > 1 + parameterTolerance) return null;
+        var sectionCenter = add(generator.C, mul(generatorSpan, station));
+        var sectionA, sectionB, scale = null;
+        if (finite(generator.A2) && finite(generator.B2)) {
+          sectionA = add(generator.A, mul(sub(generator.A2, generator.A), station));
+          sectionB = add(generator.B, mul(sub(generator.B2, generator.B), station));
+        } else {
+          scale = 1 + station * (generator.k - 1);
+          if (scale < -parameterTolerance) return null;
+          if (Math.abs(scale) <= parameterTolerance)
+            return {kind:'point', point:sectionCenter, center:sectionCenter,
+              surfaceId:surface.id, sectionType:'apex', t:station, scale:scale,
+              topologyCertified:true, domainStatus:'bounded'};
+          sectionA = mul(generator.A, scale);
+          sectionB = mul(generator.B, scale);
+        }
+        var principal = principalConicAxes(sectionA, sectionB);
+        if (principal) {
+          var circular = Math.abs(principal.radiusU - principal.radiusV) <=
+            1e-6*Math.max(1, principal.radiusU);
+          var result = {kind:circular ? 'circle' : 'ellipse', center:sectionCenter,
+            u:principal.u, v:principal.v, radius:Math.min(principal.radiusU,principal.radiusV),
+            radiusU:principal.radiusU, radiusV:principal.radiusV,
+            startAngle:0, sweepAngle:TAU, closed:true, surfaceId:surface.id,
+            t:station, domainStatus:'bounded'};
+          if (scale === null) {
+            var inverseU = 1 / (principal.radiusU * principal.radiusU);
+            var inverseV = 1 / (principal.radiusV * principal.radiusV);
+            result.sectionType = 'parallel-affine-conic';
+            result.conicMatrix = {
+              basis:{origin:sectionCenter, u:principal.u, v:principal.v},
+              quadratic:[[inverseU, 0], [0, inverseV]],
+              homogeneous:[[inverseU, 0, 0], [0, inverseV, 0], [0, 0, -1]],
+              exact:true};
+            result.parameterization = {a:sectionA, b:sectionB, exact:true};
+          } else {
+            result.sectionType = 'parallel-homothetic-conic';
+            result.scale = scale;
+          }
+          return result;
+        }
+      }
+    }
+    if (surface.kind === 'implicit' || surface.kind === 'polynomial') {
+      var implicitRecord = implicitEquationFor(surface);
+      if (!implicitRecord || !Implicit) return null;
+      var implicitSection = Implicit.planeSection(implicitRecord,
+        {origin:q, normal:n, u:spec.u, v:spec.v});
+      if (!implicitSection) return null;
+      return {kind:'implicit-section', sectionType:'implicit-plane',
+        algebraic:implicitSection.algebraic, display:implicitSection.display,
+        surfaceId:surface.id, sourceIds:(surface.sourceIds || []).slice(),
+        topologyCertified:false, guarantee:'numeric-display',
+        contract:Implicit.INTERSECTION_CONTRACT};
+    }
     if (surface.kind === 'plane') {
       var sn = unit(surface.normal), direction = cross(sn, n);
       var denominator = dot(direction, direction);
@@ -2459,7 +4507,7 @@
         return Math.abs(dot(n, sub(surface.origin, q))) < EPS ?
           {kind:'plane-overlap', surfaceId:surface.id} : null;
       }
-      // Move within the source plane along the cutting normal's projection.
+
       var tangent = cross(direction, sn);
       var origin = add(surface.origin, mul(tangent, dot(n, sub(q, surface.origin))/denominator));
       return {kind:'line', origin:origin, direction:unit(direction),
@@ -2511,6 +4559,29 @@
         sourceIds:(surface.sourceIds || []).slice(), surfaceId:surface.id,
         sectionType:'plane-cylinder-ellipse'};
     }
+    if (surface.kind === 'cone') {
+      var apex = finite(surface.apex) ? surface.apex : surface.origin;
+      var coneAxis = unit(surface.axis);
+      if (!finite(apex) || !Number.isFinite(surface.halfAngle))
+        return {kind:'unsupported', reason:'cone-section-parameters-unavailable',
+          surfaceId:surface.id, guarantee:'numeric'};
+      var ca = dot(n, coneAxis);
+      if (Math.abs(Math.abs(ca) - 1) <= 1e-7) {
+        var station = dot(n, sub(q, apex)) / ca;
+        var radius = Math.abs(station) * Math.tan(surface.halfAngle);
+        var center = add(apex, mul(coneAxis, station));
+        if (radius <= EPS)
+          return {kind:'point', point:center, surfaceId:surface.id,
+            sectionType:'plane-cone-apex'};
+        var coneBasis = basis(coneAxis);
+        return {kind:'circle', center:center, u:coneBasis.u, v:coneBasis.v,
+          radius:radius, sourceIds:(surface.sourceIds || []).slice(),
+          surfaceId:surface.id, sectionType:'plane-cone-circle'};
+      }
+      return {kind:'unsupported', relation:'oblique',
+        reason:'cone-oblique-section-unsupported', surfaceId:surface.id,
+        guarantee:'numeric'};
+    }
     if (surface.kind === 'torus') {
       var ta = unit(surface.axis), tc = surface.center;
       var R = surface.majorRadius, r = surface.minorRadius;
@@ -2554,8 +4625,8 @@
       var ac = dot(n, axis), Dc = dot(n, sub(q, apex));
       if (Math.abs(Math.abs(ac) - 1) < EPS) {
         var t0 = Dc / ac;
-        // The support is the same double cone used by boundary validation.
-        // Boundary loops, rather than axis sign, select the bounded patch.
+
+
         var radius = Math.abs(t0) * Math.tan(halfAngle);
         if (radius < EPS) return {kind:'point', point:add(apex, mul(axis, t0)),
           sourceIds:(surface.sourceIds || []).slice(), surfaceId:surface.id, sectionType:'plane-cone-apex'};
@@ -2572,12 +4643,12 @@
     return null;
   }
 
-  // Surface–surface intersections. Only exact analytic families are handled:
-  // plane/plane, plane/quadric (through section), sphere/sphere,
-  // parallel-axis cylinder/cylinder, and a sphere with a cylinder whose axis
-  // passes through the sphere centre. A supported pair always returns a
-  // result; `kind:'none'` means the supporting surfaces miss. An unsupported
-  // pair returns null rather than a sampled or approximate curve.
+
+
+
+
+
+
   function tolerance(values) {
     return tolerancePolicy(values).length;
   }
@@ -2623,8 +4694,8 @@
     return {kind:'line', relation:'transverse', origin:cut.origin, direction:cut.direction};
   }
 
-  // A plane section is already the exact intersection of one plane with one
-  // quadric. Reuse it, adding the pair identity and the relation.
+
+
   function planeQuadric(plane, surface) {
     var spec = planeSpec(plane);
     var policy = tolerancePolicy([surface.radius, surface.origin && length(surface.origin),
@@ -2709,8 +4780,8 @@
       u:b2.u, v:b2.v, radius:Math.sqrt(Math.max(0, rho2))};
   }
 
-  // Parallel/coaxial cylinders intersect in zero, one or two lines. Skew and
-  // intersecting-axis cylinders (a quartic curve) are not approximated.
+
+
   function cylinderCylinder(a, b) {
     var axis = unit(a.axis), otherAxis = unit(b.axis);
     var policy = tolerancePolicy([a.radius, b.radius]);
@@ -2778,9 +4849,9 @@
     ]};
   }
 
-  // Exact sphere/cylinder case: the cylinder axis passes through the sphere
-  // centre, so both are surfaces of revolution about that axis. The general
-  // offset-axis case is a quartic space curve and stays unsupported.
+
+
+
   function sphereCylinder(sphere, cylinder) {
     var axis = unit(cylinder.axis);
     var delta = sub(sphere.center, cylinder.origin);
@@ -2788,8 +4859,8 @@
     var offset = length(sub(delta, mul(axis, axial)));
     var policy = tolerancePolicy([sphere.radius, cylinder.radius, offset]);
     if (offset > policy.length) {
-      // An offset axis is a quartic curve, but the clearly disjoint cases are
-      // still decidable from the radial distance range of the sphere.
+
+
       var gap = offset - cylinder.radius - sphere.radius;
       if (gap > 0) {
         var gapInfo = gapClass(gap, policy);
@@ -2821,10 +4892,10 @@
     ]};
   }
 
-  // A torus/sphere intersection reduces to a quadratic in the major-angle
-  // cosine W = d_perp . e(u), because the sphere equation is linear in
-  // cos(v) and sin(v) once W is fixed. Ring tori only; the branch and loop
-  // structure mirrors the oblique plane section.
+
+
+
+
   function torusSphere(torus, sphere) {
     if (!finite(torus.center) || !finite(torus.axis) || !finite(sphere.center) ||
         !(sphere.radius > 0)) return null;
@@ -2945,9 +5016,9 @@
         majorRadius:R, minorRadius:r}};
   }
 
-  // Coaxial torus/cylinder: the cylinder radius fixes the tube station
-  // (rho - R), so the intersection is one or two circles perpendicular to the
-  // shared axis. Offset and skew axes need a quartic and stay unsupported.
+
+
+
   function torusCylinder(torus, cylinder) {
     if (!finite(torus.center) || !finite(torus.axis) ||
         !finite(cylinder.origin) || !finite(cylinder.axis) ||
@@ -2982,9 +5053,9 @@
       circles:[circleAt(dz), circleAt(-dz)]};
   }
 
-  // Coaxial torus/cone: a right cone has radial = tan(alpha) * s from its
-  // apex, so substituting into the tube equation leaves a quadratic in the
-  // axial station s. Only the forward nappe (s >= 0) is retained.
+
+
+
   function torusCone(torus, cone) {
     if (!finite(torus.center) || !finite(torus.axis) || !finite(cone.axis))
       return null;
@@ -3032,9 +5103,23 @@
       circles:circles};
   }
 
-  function intersect(a, b) {
+  var IMPLICIT_KINDS = {plane:1, sphere:1, cylinder:1, cone:1, torus:1, implicit:1, polynomial:1};
+  function implicitEquationFor(surface, options) {
+    if (!Implicit || !surface || typeof surface.kind !== 'string') return null;
+    if (surface.kind === 'implicit' || surface.kind === 'polynomial')
+      return Implicit.normalizeEquation(surface.implicit || surface);
+    if (!IMPLICIT_KINDS[surface.kind]) return null;
+    return Implicit.normalizeEquation(Implicit.equation(surface, options));
+  }
+  function implicitPair(a, b, options) {
+    var ea = implicitEquationFor(a, options), eb = implicitEquationFor(b, options);
+    if (!ea || !eb) return null;
+    return Implicit.algebraicIntersection(ea, eb, options);
+  }
+  function intersect(a, b, options) {
     if (!a || !b || !a.kind || !b.kind) return null;
-    var result;
+    if (!IMPLICIT_KINDS[a.kind] || !IMPLICIT_KINDS[b.kind]) return null;
+    var result = null;
     if (a.kind === 'plane' && b.kind === 'plane') result = planePlane(a, b);
     else if (a.kind === 'plane') result = planeQuadric(a, b);
     else if (b.kind === 'plane') result = planeQuadric(b, a);
@@ -3048,8 +5133,12 @@
     else if (a.kind === 'cylinder' && b.kind === 'torus') result = torusCylinder(b, a);
     else if (a.kind === 'torus' && b.kind === 'cone') result = torusCone(a, b);
     else if (a.kind === 'cone' && b.kind === 'torus') result = torusCone(b, a);
-    else return null;
-    return result && tagged(result, a, b);
+    if (result && result.kind !== 'unsupported') return tagged(result, a, b);
+    var fallback = implicitPair(a, b, options);
+    if (!fallback) return result && tagged(result, a, b);
+    if (result) fallback.legacy = {kind:result.kind, relation:result.relation || null,
+      reason:result.reason || null, guarantee:result.guarantee || null};
+    return tagged(fallback, a, b);
   }
 
   function loopSide(loop, spec, curves, vertices) {
@@ -3065,8 +5154,8 @@
     });
     loopCurves(loop, curves).forEach(function(c) {
       if (!validCurve(c)) { invalid = true; return; }
-      // Signed distance is A cos(t) + B sin(t) + C. Its extrema, together
-      // with arc endpoints, decide the side exactly (no sampling blind spots).
+
+
       var r = radii(c), A = dot(spec.normal, c.u)*r.u, B = dot(spec.normal, c.v)*r.v;
       var start = c.startAngle === undefined ? 0 : c.startAngle;
       var sweep = c.sweepAngle === undefined ? TAU : c.sweepAngle;
@@ -3079,8 +5168,8 @@
     });
     (loop.lines || []).forEach(function(l) {
       if (!validLine(l)) { invalid = true; return; }
-      // A straight element has a linear signed distance, so its endpoints
-      // decide the side of the cutting plane.
+
+
       distances.push(distance(l.start), distance(l.end));
     });
     if (invalid || !distances.length) return 2;
@@ -3089,8 +5178,8 @@
     return pos && neg ? 2 : pos ? 1 : neg ? -1 : 0;
   }
 
-  // Replace boundary loops on the discarded side by the analytic section.
-  // Loops that cross the cutting plane are reported unsupported instead of guessed.
+
+
   function trim(surface, plane, keepPositive, geometry) {
     if (!surface || surface.kind === 'plane') return null;
     if (surface.kind === 'torus') {
@@ -3133,9 +5222,9 @@
     return out;
   }
 
-  // A loop is usable by split when every boundary element it names exists.
-  // loopSide() returns 2 for both a crossing loop and an invalid one, so the
-  // two cases are separated before the side classification.
+
+
+
   function loopValid(loop, curves, vertices) {
     var ok = true;
     (loop.curves || []).forEach(function (i) {
@@ -3160,16 +5249,16 @@
     return ok;
   }
 
-  // ---------------------------------------------------------------------
-  // Analytic loop splitting for a plane-crossing boundary.
-  //
-  // The plane cuts a circle/ellipse/arc where A cos t + B sin t + C = 0. The
-  // roots split the curve into ordered sub-arcs that keep the parent curve's
-  // centre, frame, radii and parameter direction. Straight polygon edges are
-  // split at their plane intersection and carried as inline point polylines.
-  // The section is split at the same crossing stations, so both pieces share
-  // the section arcs rather than the full section.
-  // ---------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
   function curveStart(c) { return Number.isFinite(c.startAngle) ? c.startAngle : 0; }
   function curveSweep(c) { return Number.isFinite(c.sweepAngle) ? c.sweepAngle : TAU; }
   function pointDistance(a, b) {
@@ -3200,8 +5289,8 @@
     var out = copyFields(c);
     out.kind = (c.kind === 'torusContour' || c.kind === 'torusSectionBranch' ||
       c.kind === 'torusSphereBranch') ? c.kind : 'arc';
-    // Deterministic child id: the same parent station pair names the same
-    // shared seam after a JSON round-trip and across repeated splits.
+
+
     out.id = c.id + '/arc:' + Number(t0).toFixed(9) + ':' + Number(t1).toFixed(9);
     out.parentKind = c.kind;
     out.startAngle = t0;
@@ -3223,9 +5312,9 @@
   function curveSignedDistance(c, t, spec) {
     return dot(spec.normal, sub(curvePoint(c, t), spec.origin));
   }
-  // Interior roots of the signed-distance sinusoid. A tangent root does not
-  // switch sides, so callers merge equal-sign intervals back into the parent
-  // curve. Roots at the curve endpoints are not split points.
+
+
+
   function curveRoots(c, spec) {
     var data = planeCurveData(c, spec), amplitude = Math.hypot(data.A, data.B);
     var start = curveStart(c), sweep = curveSweep(c), roots = [];
@@ -3260,9 +5349,9 @@
       var t0 = cuts[i], t1 = cuts[i+1];
       if (t1 - t0 <= 1e-10) continue;
       var d = curveSignedDistance(c, 0.5*(t0+t1), spec);
-      // A true on-plane curve was rejected above via curveRoots(). Here a
-      // sub-arc midpoint can be very close to the plane merely because the
-      // arc is a tiny sliver, so only an exact-zero interval is ambiguous.
+
+
+
       if (Math.abs(d) <= 1e-12*scale) return {ok:false, code:'split-loop-on-plane'};
       segments.push({sign:d > 0 ? 1 : -1, curve:subArc(c, t0, t1),
         start:curvePoint(c, t0), end:curvePoint(c, t1), t0:t0, t1:t1});
@@ -3272,9 +5361,9 @@
       return {ok:true, segments:[{sign:segments[0].sign, curve:c,
         start:startPoint, end:endPoint}]};
     }
-    // A closed curve can cross the parameter origin in the middle of one
-    // same-side run. Merge the parameter-wrap pair so the run is one sub-arc,
-    // not two boundary elements that meet away from the cutting plane.
+
+
+
     if (sweep >= TAU - 1e-9 && segments.length > 2 &&
         segments[0].sign === segments[segments.length-1].sign) {
       var firstSeg = segments.shift(), lastSeg = segments.pop();
@@ -3369,9 +5458,9 @@
     chain.end = segment.end;
   }
 
-  // Split one loop into maximal same-side chains. `segments` are in loop
-  // order; a sign change is a crossing with the cutting plane and also a
-  // station that must appear in the section split.
+
+
+
   function splitLoopForCrossing(loop, surface, spec, curves, vertices, loopIndex) {
     var ordered = loopOrderedElements(loop, curves, vertices);
     if (!ordered.ok) return {ok:false, code:ordered.code, loopIndex:loopIndex};
@@ -3462,9 +5551,9 @@
     return Math.atan2(dot(radial, frame.v), dot(radial, frame.u));
   }
 
-  // Axial station of the loop boundary on the generator at radial angle
-  // theta. Analytic curves use their supporting plane; polygon edges use a
-  // line/segment intersection. Both are exact, not mesh samples.
+
+
+
   function curveStationAt(surface, c, theta, frame, tol) {
     var n = curveNormal(c);
     var d = add(mul(frame.u, Math.cos(theta)), mul(frame.v, Math.sin(theta)));
@@ -3559,9 +5648,9 @@
     return {ok:true, inside:true};
   }
 
-  // Is a point of the supporting surface inside the bounded patch? Cylinder
-  // and cone patches are tested between their loop stations along the same
-  // generator. A spherical cap is an analytic pole/angle half-space.
+
+
+
   function patchContainsPoint(surface, p, curves, vertices) {
     var tol = surfaceTolerance(surface);
     if (surface.kind === 'sphere') return sphereCapContainsPoint(surface, p);
@@ -3628,8 +5717,8 @@
       out.push(curvePoint(c, start + sweep*i/count));
     return true;
   }
-  // Ordered polygon approximation of one loop, used only for point
-  // classification. Mixed curve/line order is refused rather than guessed.
+
+
   function loopPolygon(loop, curves, vertices, chordTol) {
     var out = [];
     function add(p) {
@@ -3728,10 +5817,148 @@
       method:'plane-loops', residual:0, tolerance:tol};
   }
 
-  // Classify a point against a bounded surface patch: inside the trimmed
-  // region, outside it, on its boundary, or unknown when the loop topology
-  // cannot decide. The point must lie on the supporting surface; otherwise
-  // it is outside with reason "off-surface".
+
+
+
+
+  function volumeInteriorReference(volume) {
+    if (!volume) return null;
+    if (volume.kind === 'cylinder')
+      return add(volume.origin, mul(volume.axis, volume.depth * 0.5));
+    if (volume.kind === 'cone')
+      return add(volume.origin, mul(volume.axis, volume.depth * 0.5));
+    if (volume.kind === 'sphere') {
+      var pole = unit(volume.pole || neg(volume.outward));
+      return add(volume.center, mul(pole, volume.radius * 0.5));
+    }
+    return null;
+  }
+
+  function oppositeCapSides(parent, capCenter, capNormal, tolerance) {
+    var reference = volumeInteriorReference(parent);
+    if (!reference) return false;
+    return dot(sub(reference, capCenter), capNormal) > Math.max(tolerance, 1e-9);
+  }
+
+  function booleanDomainState(surface, p, tolerance) {
+    var domain = surface && surface.booleanDomain;
+    if (!domain || !Array.isArray(domain.exclude)) return null;
+    var onBoundary = false;
+    var parentNormal = surface.kind === 'plane' ?
+      (surface.normal || (surface.parameters && surface.parameters.normal)) : null;
+    for (var i = 0; i < domain.exclude.length; i++) {
+      var volume = domain.exclude[i];
+      if (volume.kind === 'cylinder') {
+        var axis = unit(volume.axis);
+        var d = sub(p, volume.origin);
+        var axial = dot(d, axis);
+        var radial = Math.sqrt(Math.max(0, dot(d, d) - axial * axial));
+        if (axial > tolerance && axial < volume.depth - tolerance &&
+            radial < volume.radius - tolerance) return 'outside';
+        var onCap = Math.abs(axial) <= tolerance*2 ||
+          Math.abs(axial - volume.depth) <= tolerance*2;
+        if (onCap && radial < volume.radius - tolerance) {
+          var capNormal = Math.abs(axial) <= tolerance*2 ? neg(axis) : axis;
+          var capCenter = Math.abs(axial) <= tolerance*2 ? volume.origin :
+            add(volume.origin, mul(axis, volume.depth));
+          var coincidentCap = parentNormal &&
+            Math.abs(Math.abs(dot(unit(parentNormal), capNormal)) - 1) <= 1e-6;
+          if (coincidentCap) {
+            if (oppositeCapSides(domain.volume, capCenter, capNormal, tolerance))
+              return 'outside';
+            continue;
+          }
+          onBoundary = true;
+          continue;
+        }
+        var withinAxial = axial >= -tolerance*2 && axial <= volume.depth + tolerance*2;
+        var onSide = withinAxial &&
+          Math.abs(radial - volume.radius) <= tolerance*2;
+        if (onSide || (onCap && radial <= volume.radius + tolerance*2))
+          onBoundary = true;
+      } else if (volume.kind === 'cone') {
+        var axis = unit(volume.axis), d = sub(p, volume.origin);
+        var axial = dot(d, axis);
+        var radial = Math.sqrt(Math.max(0, dot(d, d) - axial * axial));
+        var profile = axialVolumeRadius(volume, Math.max(0, Math.min(volume.depth, axial)));
+        var bottomRadius = Number.isFinite(volume.bottomRadius) ?
+          volume.bottomRadius : volume.radius;
+        if (axial > tolerance && axial < volume.depth - tolerance &&
+            radial < profile - tolerance) return 'outside';
+        var onMouth = Math.abs(axial) <= tolerance * 2 &&
+          radial <= volume.radius + tolerance * 2;
+        var onBottom = bottomRadius > 1e-12 && volume.openBottom !== true &&
+          Math.abs(axial - volume.depth) <= tolerance * 2 &&
+          radial <= bottomRadius + tolerance * 2;
+        if ((onMouth || onBottom) && radial <
+            (onMouth ? volume.radius : bottomRadius) - tolerance) {
+          var capNormal = onMouth ? mul(axis, -1) : axis;
+          var capCenter = onMouth ? volume.origin :
+            add(volume.origin, mul(axis, volume.depth));
+          var coincidentCap = parentNormal &&
+            Math.abs(Math.abs(dot(unit(parentNormal), capNormal)) - 1) <= 1e-6;
+          if (coincidentCap) {
+            if (oppositeCapSides(domain.volume, capCenter, capNormal, tolerance))
+              return 'outside';
+            continue;
+          }
+          onBoundary = true;
+          continue;
+        }
+        var withinAxial = axial >= -tolerance * 2 &&
+          axial <= volume.depth + tolerance * 2;
+        var onSide = withinAxial &&
+          Math.abs(radial - profile) <= tolerance * 2;
+        if (onSide || onMouth || onBottom) onBoundary = true;
+      } else if (volume.kind === 'sphere') {
+        var radius = length(sub(p, volume.center));
+        var plane = dot(sub(p, volume.mouthCenter), volume.outward);
+        if (radius < volume.radius - tolerance && plane < -tolerance) return 'outside';
+        var normal = unit(volume.outward);
+        var inPlane = sub(sub(p, volume.mouthCenter), mul(normal, plane));
+        var mouthRadius = Number.isFinite(volume.mouthRadius) ? volume.mouthRadius :
+          volume.radius * Math.sin(volume.capAngle);
+        if (Math.abs(plane) <= tolerance*2 && Number.isFinite(mouthRadius) &&
+            length(inPlane) < mouthRadius - tolerance) {
+          var sphereCap = normal;
+          var coincidentSphereCap = parentNormal &&
+            Math.abs(Math.abs(dot(unit(parentNormal), sphereCap)) - 1) <= 1e-6;
+          if (coincidentSphereCap) {
+            if (oppositeCapSides(domain.volume, volume.mouthCenter, sphereCap, tolerance))
+              return 'outside';
+            continue;
+          }
+          onBoundary = true;
+          continue;
+        }
+        if (Math.abs(radius - volume.radius) <= tolerance*2 && plane <= tolerance*2)
+          onBoundary = true;
+        if (Math.abs(plane) <= tolerance*2 && Number.isFinite(mouthRadius) &&
+            length(inPlane) <= mouthRadius + tolerance*2) onBoundary = true;
+      }
+    }
+    return onBoundary ? 'boundary' : null;
+  }
+
+  function implicitGeneratorState(surface, p, tolerance) {
+    var g = surface.generator;
+    if (!g || !finite(g.C) || !finite(g.A) || !finite(g.B) || !finite(g.D)) return null;
+    var normal = finite(g.n) ? g.n : cross(g.A, g.B);
+    var span = sub(g.D, g.C), h = dot(normal, span);
+    var residual = surfaceResidual(surface, p);
+    if (Math.abs(h) <= EPS) {
+      if (Math.abs(g.k - 1) > EPS) return null;
+      return {status:'inside', method:'implicit-generator', residual:residual, tolerance:tolerance};
+    }
+    var t = dot(normal, sub(p, g.C)) / h;
+    var slack = tolerance / Math.max(1, length(span));
+    if (t < -slack || t > 1 + slack)
+      return {status:'outside', method:'implicit-generator', residual:residual,
+        tolerance:tolerance, t:t};
+    return {status:'inside', method:'implicit-generator', residual:residual,
+      tolerance:tolerance, t:t};
+  }
+
   function classifyPoint(surface, p, geometry) {
     if (!surface || !finite(p))
       return {status:'unknown', reason:'invalid-input'};
@@ -3740,9 +5967,21 @@
     if (!Number.isFinite(residual) || residual > Math.max(tol*4, EPS))
       return {status:'outside', reason:'off-surface', residual:residual,
         tolerance:Math.max(tol*4, EPS)};
-    if (surface.kind === 'plane') return classifyPlanePoint(surface, p, geometry || {});
+    var domainState = booleanDomainState(surface, p, tol);
+    if (domainState === 'outside')
+      return {status:'outside', method:'boolean-domain', residual:residual, tolerance:tol};
+    if (surface.kind === 'plane') {
+      var planeState = classifyPlanePoint(surface, p, geometry || {});
+      if (domainState === 'boundary' && planeState.status === 'inside')
+        return {status:'boundary', method:'boolean-domain', residual:residual, tolerance:tol};
+      return planeState;
+    }
     if (surface.kind === 'sphere' && surface.closed === true && !surface.cap)
       return {status:'inside', method:'closed-sphere', residual:residual, tolerance:tol};
+    if (surface.kind === 'implicit' && surface.generator) {
+      var generatorState = implicitGeneratorState(surface, p, tol);
+      if (generatorState) return generatorState;
+    }
     if (surface.kind === 'torus') {
       if (validTorusDomain(surface.domain)) {
         var params = torusParameters(surface, p);
@@ -3772,6 +6011,8 @@
     if (!contained.ok)
       return {status:contained.reason === 'boundary' ? 'boundary' : 'unknown',
         reason:contained.reason, residual:residual, tolerance:tol};
+    if (domainState === 'boundary' && contained.inside)
+      return {status:'boundary', method:'boolean-domain', residual:residual, tolerance:tol};
     return {status:contained.inside ? 'inside' : 'outside',
       method:surface.kind === 'sphere' ? 'sphere-cap' : 'loop-stations',
       residual:residual, tolerance:tol};
@@ -3803,8 +6044,8 @@
   }
   function findBoundedStation(a, b, branch, tInside, tOutside, geometry, tolerance) {
     var inside = tInside, outside = tOutside;
-    // A closed branch crossing the parameter seam must be bisected across the
-    // short arc, not the long way around the circle.
+
+
     if (branch.kind !== 'line' && Math.abs(outside - inside) > Math.PI) {
       if (outside > inside) outside -= TAU; else outside += TAU;
     }
@@ -3994,20 +6235,257 @@
         surfaceIds:[a.id === undefined ? null : a.id, b.id === undefined ? null : b.id]};
     });
   }
-  // Bounded intersection: keep the exact support algebra, clip its branches
-  // to both patches with explicit classification. Station parameters are
-  // computed by sampled bisection, so every component is labelled numeric;
-  // this layer never claims an exact cut station.
+
+
+
+
+  function surfacePatchPoints(surface, geometry) {
+    if (!surface) return [];
+    var curves = geometry && geometry.curves || [];
+    var vertices = geometry && geometry.vertices || [];
+    var points = [];
+    function addCurve(c) {
+      if (!validCurve(c)) return;
+      var start = c.startAngle === undefined ? 0 : c.startAngle;
+      var sweep = c.sweepAngle === undefined ? TAU : c.sweepAngle;
+      for (var k = 0; k <= 24; k++) {
+        var p = curvePoint(c, start + sweep * k / 24);
+        if (finite(p)) points.push(copyPoint(p));
+      }
+    }
+    (surface.loops || []).forEach(function (loop) {
+      (loop.vertices || []).forEach(function (i) {
+        if (vertices && finite(vertices[i])) points.push(copyPoint(vertices[i]));
+      });
+      (loop.points || []).forEach(function (p) { if (finite(p)) points.push(copyPoint(p)); });
+      (loop.curves || []).forEach(function (i) { addCurve(curves[i]); });
+      (loop.lines || []).forEach(function (line) {
+        if (validLine(line)) { points.push(copyPoint(line.start)); points.push(copyPoint(line.end)); }
+      });
+      (loop.elements || []).forEach(function (element) {
+        if (!element) return;
+        if (element.kind === 'curve') addCurve(element.curve);
+        else if (element.kind === 'polyline')
+          (element.points || []).forEach(function (p) { if (finite(p)) points.push(copyPoint(p)); });
+      });
+      if (loop.section) addCurve(loop.section);
+    });
+    return points;
+  }
+  function surfacePatchBounds(surface, geometry) {
+    var points = surfacePatchPoints(surface, geometry);
+    if (!points.length) return null;
+    var min = {x:Infinity, y:Infinity, z:Infinity};
+    var max = {x:-Infinity, y:-Infinity, z:-Infinity};
+    points.forEach(function (p) {
+      min.x = Math.min(min.x, p.x); min.y = Math.min(min.y, p.y); min.z = Math.min(min.z, p.z);
+      max.x = Math.max(max.x, p.x); max.y = Math.max(max.y, p.y); max.z = Math.max(max.z, p.z);
+    });
+    return {min:min, max:max, source:'patch-loops'};
+  }
+  function intersectWorldBoxes(boxes) {
+    if (!boxes.length) return null;
+    var min = {x:-Infinity, y:-Infinity, z:-Infinity};
+    var max = {x:Infinity, y:Infinity, z:Infinity};
+    boxes.forEach(function (box) {
+      min.x = Math.max(min.x, box.min.x); min.y = Math.max(min.y, box.min.y);
+      min.z = Math.max(min.z, box.min.z);
+      max.x = Math.min(max.x, box.max.x); max.y = Math.min(max.y, box.max.y);
+      max.z = Math.min(max.z, box.max.z);
+    });
+    if (max.x < min.x || max.y < min.y || max.z < min.z) return null;
+    return {min:min, max:max, source:boxes.map(function (box) { return box.source; }).filter(Boolean)};
+  }
+  function splitInsideRuns(points, inside, closed) {
+    var runs = [], current = [];
+    points.forEach(function (p) {
+      if (inside(p)) current.push(p);
+      else { if (current.length) runs.push(current); current = []; }
+    });
+    if (current.length) runs.push(current);
+    if (closed && runs.length > 1 && inside(points[0])) {
+      var merged = runs.pop().concat(runs.shift() || []);
+      runs.push(merged);
+    }
+    return runs.map(function (run) {
+      return {points:run, closed:closed && run.length === points.length};
+    });
+  }
+  function classifyImplicitSurface(eq, p) {
+    if (!Implicit || !eq) return {status:'unknown', reason:'no-equation'};
+    var evaluated = Implicit.evaluate(eq, p);
+    if (!evaluated) return {status:'unknown', reason:'invalid-point'};
+    var residual = Math.abs(evaluated.value);
+    var tolerance = Implicit.equationTolerance(eq, p) * 64;
+    if (residual > tolerance)
+      return {status:'outside', reason:'off-support', residual:residual, tolerance:tolerance};
+    var domain = Implicit.constraintsHold(eq, p);
+    if (!domain.ok)
+      return {status:'outside', reason:'domain', residual:residual,
+        violations:domain.violations};
+    if (eq.domain && eq.domain.unresolved && eq.domain.unresolved.length)
+      return {status:'unknown', reason:'unresolved-domain', residual:residual,
+        unresolvedDomain:eq.domain.unresolved.slice()};
+    return {status:'inside', residual:residual, tolerance:tolerance};
+  }
+  function boundedImplicitIntersection(a, b, support, geometry, options) {
+    options = options || {};
+    if (!Implicit || !support) return null;
+    var equationA = implicitEquationFor(a), equationB = implicitEquationFor(b);
+    if (!equationA || !equationB) return null;
+    var diagnostics = [];
+    var bounds = null;
+    if (options.bounds) {
+      var lo = options.bounds.min || options.bounds.lo;
+      var hi = options.bounds.max || options.bounds.hi;
+      if (finite(lo) && finite(hi)) {
+        bounds = {min:copyPoint(lo), max:copyPoint(hi), source:'caller'};
+        if (bounds.min.x > bounds.max.x || bounds.min.y > bounds.max.y ||
+            bounds.min.z > bounds.max.z) {
+          return {contract:'bounded-intersection-v1', kind:'bounded', status:'unresolved',
+            support:support, components:[],
+            diagnostics:[{code:'bounded-implicit-invalid-bounds', severity:'error',
+              message:'Caller bounds are not an ordered finite world box.'}],
+            topologyCertified:false, confidence:'none'};
+        }
+      }
+    }
+    var boxes = [];
+    [a, b].forEach(function (surface) {
+      var box = surfacePatchBounds(surface, geometry);
+      if (box) boxes.push(box);
+    });
+    if (support.bounds) boxes.push(support.bounds);
+    var combined = intersectWorldBoxes(boxes);
+    if (boxes.length && !combined)
+      return {contract:'bounded-intersection-v1', kind:'bounded', status:'none',
+        support:support, components:[],
+        separation:{emptyWithinBounds:true, proven:false,
+          reason:'patch-and-compact-bounds-disjoint', method:'world-box-intersection'},
+        diagnostics:[{code:'bounded-implicit-bounds-disjoint', severity:'info',
+          message:'Patch, compact support and caller boxes do not overlap; no display curve is claimed.'}],
+        method:'implicit-interval-trace', confidence:'numeric', topologyCertified:false,
+        coverage:{complete:false, uncertain:true}};
+    if (bounds && combined) {
+      var overlap = intersectWorldBoxes([bounds, combined]);
+      if (!overlap)
+        return {contract:'bounded-intersection-v1', kind:'bounded', status:'none',
+          support:support, components:[],
+          separation:{emptyWithinBounds:true, proven:false, reason:'caller-bounds-disjoint',
+            method:'world-box-intersection'},
+          diagnostics:[{code:'bounded-implicit-caller-bounds-disjoint', severity:'info',
+            message:'Caller bounds do not overlap the compact or patch bounds.'}],
+          method:'implicit-interval-trace', confidence:'numeric', topologyCertified:false,
+          coverage:{complete:false, uncertain:true}};
+      bounds = overlap;
+    } else if (combined) bounds = combined;
+    if (!bounds)
+      return {contract:'bounded-intersection-v1', kind:'bounded', status:'unbounded',
+        support:support, components:[],
+        diagnostics:[{code:'bounded-implicit-unbounded', severity:'warning',
+          message:'The implicit support set needs finite patch, compact or caller bounds for display.'}],
+        method:'implicit-interval-trace', confidence:'numeric', topologyCertified:false};
+    var display = Implicit.trace(equationA, equationB, Object.assign({}, options, {bounds:bounds}));
+    var components = [];
+    var implicitKind = {implicit:true, polynomial:true};
+    var clipA = implicitKind[a.kind] ? true : patchBounded(a);
+    var clipB = implicitKind[b.kind] ? true : patchBounded(b);
+    var unknownDomain = 0;
+    var insideSurface = function (surface, equation, clip, p) {
+      if (!clip) return true;
+      if (implicitKind[surface.kind]) {
+        var state = classifyImplicitSurface(equation, p);
+        if (state.status === 'unknown') {
+          unknownDomain++;
+          return true;
+        }
+        return state.status === 'inside' || state.status === 'boundary';
+      }
+      return boundedInside(classifyPoint(surface, p, geometry));
+    };
+    display.curves.forEach(function (curve) {
+      var inside = function (p) {
+        return insideSurface(a, equationA, clipA, p) &&
+          insideSurface(b, equationB, clipB, p);
+      };
+      splitInsideRuns(curve.points, inside, curve.closed).forEach(function (run) {
+        if (run.points.length === 1) {
+          components.push({kind:'point', point:run.points[0], bounded:true,
+            confidence:'numeric', method:'implicit-interval-trace',
+            residual:curve.residual, topologyCertified:false});
+        } else if (run.points.length > 1) {
+          components.push({kind:'polyline', points:run.points, closed:run.closed,
+            bounded:true, confidence:'numeric', method:'implicit-interval-trace',
+            residual:curve.residual, trace:curve.trace,
+            sourceIds:(curve.sourceIds || []).slice(), topologyCertified:false,
+            domainStatus:'patch-classified'});
+        }
+      });
+    });
+    if (unknownDomain)
+      diagnostics.push({code:'bounded-implicit-domain-unknown', severity:'warning',
+        message:'Implicit loop or boolean domain masks are not compiled; curve points are retained with unknown domain membership.'});
+    var status = components.length ?
+      (display.status === 'partial' ? 'partial' : 'ok') :
+      display.status === 'none' ? 'none' :
+      display.status === 'coincident' ? 'coincident' :
+      display.status === 'unresolved' ? 'unresolved' :
+      display.status === 'unbounded' ? 'unbounded' : 'unresolved';
+    (display.diagnostics || []).forEach(function (d) { diagnostics.push(d); });
+    if (support.supportOnly)
+      diagnostics.push({code:'bounded-implicit-support-only', severity:'warning',
+        message:'The support equations compile finite axes and nappes; loop or boolean domains are classified through the patches.'});
+    if (display.unresolved && display.unresolved.length)
+      diagnostics.push({code:'bounded-implicit-unresolved', severity:'warning',
+        message:'Some implicit display cells or trace ends remain unresolved.'});
+    var result = {contract:'bounded-intersection-v1', kind:'bounded', status:status,
+      support:support, components:components, diagnostics:diagnostics,
+      summary:{components:components.length,
+        arcs:components.filter(function (c) { return c.kind === 'arc'; }).length,
+        full:components.filter(function (c) { return c.closed === true; }).length,
+        points:components.filter(function (c) { return c.kind === 'point'; }).length,
+        polylines:components.filter(function (c) { return c.kind === 'polyline'; }).length},
+      method:'implicit-interval-trace', confidence:'numeric',
+      topologyCertified:false, bounds:bounds,
+      unresolved:(display.unresolved || []).concat(unknownDomain ?
+        [{reason:'implicit-domain-unknown', count:unknownDomain}] : []),
+      domainUnknown:unknownDomain > 0,
+      coverage:display.coverage || {complete:false, uncertain:true},
+      tolerance:boundedTolerance(a, b)};
+    if (display.status === 'none')
+      result.separation = {emptyWithinBounds:true, proven:false,
+        reason:'numeric-parameter-grid-and-interval-exclusion',
+        method:'interval-separation-parameter-domain'};
+    return result;
+  }
+
   function intersectBounded(a, b, geometry, options) {
     options = options || {};
     var diagnostics = [];
     var contract = 'bounded-intersection-v1';
-    var support = intersect(a, b);
+    var support = intersect(a, b, options);
     if (!support) {
       return {contract:contract, kind:'bounded', status:'unsupported',
         support:null, components:[],
         diagnostics:[{code:'bounded-support-unsupported', severity:'error',
           message:'The support intersection is not implemented for this surface pair.'}]};
+    }
+    if (support.contract === (Implicit && Implicit.INTERSECTION_CONTRACT) &&
+        support.kind === 'implicit-intersection') {
+      var generic = boundedImplicitIntersection(a, b, support, geometry, options);
+      if (generic) return generic;
+    }
+    if (support.contract === (Implicit && Implicit.INTERSECTION_CONTRACT) &&
+        support.kind === 'none' && support.proven === false) {
+      return {contract:contract, kind:'bounded', status:'unresolved', support:support,
+        components:[], diagnostics:[{code:'bounded-implicit-separation-numeric',
+          severity:'warning', message:'Interval separation is numeric evidence, not a certified empty intersection.'}],
+        topologyCertified:false, confidence:'numeric',
+        coverage:{complete:false, uncertain:true}};
+    }
+    if (support.kind === 'none') {
+      return {contract:contract, kind:'bounded', status:'none', support:support,
+        components:[], diagnostics:diagnostics};
     }
     if (!patchBounded(a) || !patchBounded(b)) {
       return {contract:contract, kind:'bounded', status:'unbounded',
@@ -4149,9 +6627,9 @@
     });
     return supported && segments.length ? segments : null;
   }
-  // Analytic stations where a circle/ellipse lying in a plane patch crosses
-  // the patch's straight loop elements. Returns null when the loop has curved
-  // elements or the branch is not in the plane; callers then use sampling.
+
+
+
   function analyticPlaneStations(surface, branch, geometry, tolerance) {
     if (!surface || surface.kind !== 'plane' || !finite(surface.origin) ||
         !finite(surface.normal)) return null;
@@ -4193,9 +6671,9 @@
     stations.sort(function (a, b) { return a - b; });
     return stations;
   }
-  // Clip a periodic branch using analytic plane-patch stations. Only used
-  // when the other patch is a closed support, so no other boundary can cut
-  // the interval between two stations.
+
+
+
   function clipPeriodicBranchAnalytic(a, b, branch, geometry, planeSurface, otherSurface) {
     var tolerance = boundedTolerance(a, b);
     var stations = analyticPlaneStations(planeSurface, branch, geometry, tolerance);
@@ -4232,8 +6710,8 @@
         b.id === undefined ? null : b.id];
       components.push(arc);
     }
-    // Merge intervals separated only by a tangent station, then merge a
-    // component that crosses the parameter seam.
+
+
     var merged = [];
     components.forEach(function (component) {
       var last = merged[merged.length-1];
@@ -4382,9 +6860,9 @@
     });
   }
 
-  // Assemble closed loops from open same-side loop chains plus the shared
-  // section arcs. Endpoint identity is the only junction rule; a cycle that
-  // does not close is refused instead of being guessed.
+
+
+
   function assembleCrossingLoops(surface, loopChains, arcs) {
     var matchTol = 1e-6*Math.max(1, surface.radius || 1);
     var chains = loopChains.concat(arcs.map(sectionArcChain));
@@ -4422,9 +6900,9 @@
     return {ok:true, loops:loops};
   }
 
-  // The bounded patch of a sphere is only explicit when build() preserved the
-  // recess cap metadata. Without it the material side of a single loop is
-  // ambiguous, so split refuses rather than guessing which cap is material.
+
+
+
   function sphereCapContainsCut(surface, spec, cut) {
     var cap = surface.cap;
     if (!cap || !finite(cap.pole) || !finite(cap.mouth && cap.mouth.origin) ||
@@ -4439,9 +6917,9 @@
     return {ok:true};
   }
 
-  // A side with no retained loop is bounded only on a compact sphere, or at a
-  // cone apex that lies on that side. A bare loop cannot cap a cylinder or an
-  // open cone band.
+
+
+
   function splitSideBounded(surface, retained, spec, sign) {
     if (surface.kind === 'sphere') return true;
     if (retained > 0) return true;
@@ -4458,15 +6936,15 @@
     Object.keys(surface).forEach(function (k) { if (k !== 'loops') out[k] = surface[k]; });
     out.id = (surface.id || 'surface') + '/split:' + (sign > 0 ? 'positive' : 'negative');
     out.loops = loops.slice();
-    // In the non-crossing case both pieces reference this exact closed
-    // section object, so the section is a shared boundary (incidence 2).
-    // A crossing cut instead already placed the shared section sub-arcs in
-    // the assembled loops.
+
+
+
+
     if (!detail || detail.appendSection !== false)
       out.loops.push({kind:'outer', section:cut});
     out.closed = false;
-    // A split curved patch is no longer a single spherical cap, and the
-    // advisory boundaryCurves list no longer names every loop element.
+
+
     delete out.cap;
     delete out.recess;
     delete out.boundaryCurves;
@@ -4481,9 +6959,9 @@
     return out;
   }
 
-  // Crossing-loop split: every crossing loop is cut into ordered same-side
-  // chains, the section is cut at the same stations, and only the section
-  // arcs inside the bounded patch are used as the shared seam.
+
+
+
   function crossingSplitPlan(surface, spec, cut, geometry, loops, sides) {
     function fail(code, message, detail) {
       var diagnostic = {code:code, message:message};
@@ -4582,13 +7060,13 @@
     return {ok:true, result:result};
   }
 
-  // Internal split plan. split() keeps the public "null means refused"
-  // contract; splitDiagnostic() exposes the reason without duplicating the
-  // classification. The optional diagnostics array on split() collects the
-  // A plane perpendicular to the torus axis cuts it into two annular bands;
-  // a plane through the axis cuts it into two half-tori. Both cases have
-  // circular sections, so each piece can carry an explicit u/v domain and the
-  // two shared section circles. Oblique quartic cuts are refused.
+
+
+
+
+
+
+
   function torusSplitPlan(surface, plane, geometry) {
     function fail(code, message, detail) {
       var diagnostic = {code:code, message:message};
@@ -4673,8 +7151,8 @@
       var v0 = Math.atan2(axial, half), v1 = Math.atan2(axial, -half);
       if (v1 <= v0) v1 += TAU;
       var first = {u:[0, TAU], v:[v0, v1]}, second = {u:[0, TAU], v:[v1, v0 + TAU]};
-      // v = +pi/2 is the outer tube crest, hence axial = +r. The first arc
-      // contains it, so nAxis decides which signed side owns that arc.
+
+
       domains = nAxis > 0 ? {positive:first, negative:second} :
         {positive:second, negative:first};
       mode = 'perpendicular-plane';
@@ -4707,7 +7185,7 @@
     return {ok:true, result:result};
   }
 
-  // same record for callers that prefer one traversal.
+
   function splitPlan(surface, plane, geometry) {
     function fail(code, message, detail) {
       var diagnostic = {code:code, message:message};
@@ -4766,8 +7244,8 @@
       else { negativeLoops.push(loop); negativeRetained++; }
     }
 
-    // A boundary that crosses the cutting plane is split analytically. The
-    // old whole-loop path remains for loops that stay on one side.
+
+
     if (crossing) return crossingSplitPlan(surface, spec, cut, geometry, loops, loopSides);
 
     if (surface.kind === 'sphere' && loops.length) {
@@ -4804,10 +7282,10 @@
     return {ok:true, result:result};
   }
 
-  // Split a bounded analytic surface by a plane. Both returned pieces carry
-  // the same closed section object as the new loop, so the section is a shared
-  // boundary (incidence 2) immediately. Returns null when a sound split cannot
-  // be formed; the optional diagnostics array receives {code,message,...}.
+
+
+
+
   function split(surface, plane, geometry, diagnostics) {
     var plan = splitPlan(surface, plane, geometry);
     if (!plan.ok) {
@@ -4817,8 +7295,8 @@
     return plan.result;
   }
 
-  // Reason a split is refused, or null when split() would succeed. This keeps
-  // the null-returning public API and still reports a precise failure.
+
+
   function splitDiagnostic(surface, plane, geometry) {
     var plan = splitPlan(surface, plane, geometry);
     return plan.ok ? null : plan.diagnostic;
@@ -4833,12 +7311,12 @@
     });
   }
 
-  // Clone a surface with one more analytic loop. The exact same boundary
-  // object is stored, so attaching it to a second surface raises its incidence
-  // from 1 to 2. This is the promotion step for a future trim/intersection
-  // chain; it does not clip the surface or create new geometry. A line
-  // boundary is accepted as a structural element; a single open line is not a
-  // closed patch, so the clone remains open.
+
+
+
+
+
+
   function attachBoundary(surface, boundary, geometry, diagnostics) {
     function fail(code, message) {
       if (Array.isArray(diagnostics)) diagnostics.push({code:code, message:message});
@@ -4885,8 +7363,8 @@
     out.loops = loops.slice();
     out.loops.push(isLine ? {kind:'outer', lines:[boundary]} : {kind:'outer', section:boundary});
     out.closed = false;
-    // A spherical cap has exactly one mouth loop; an attached loop invalidates
-    // that claim, so the cap record is not carried onto the clone.
+
+
     delete out.cap;
     out.parentSurfaceId = surface.id === undefined ? null : surface.id;
     out.attachedBoundary = {kind:isLine ? 'line' : (boundary.kind || 'curve'), closed:!isLine,
@@ -4895,8 +7373,8 @@
     return out;
   }
 
-  // Convenience promotion for two surfaces: each clone references the same
-  // boundary object, making its incidence 2 in one operation.
+
+
   function shareBoundary(a, b, boundary, geometry, diagnostics) {
     if (!a || !b || a === b) {
       if (Array.isArray(diagnostics)) diagnostics.push({code:'share-surfaces-invalid',
@@ -4910,9 +7388,9 @@
     return {boundary:boundary, surfaces:[first, second]};
   }
 
-  // Promote a closed intersection/section result into analytic boundary
-  // records. Only circle/ellipse families are closed loops here; lines, points
-  // and classified conics return null because they do not bound a patch.
+
+
+
   function intersectionCurves(result) {
     if (!result || typeof result !== 'object') return null;
     var components = null;
@@ -4961,9 +7439,17 @@
     shareBoundary:shareBoundary,
     intersectionCurves:intersectionCurves,
     intersectBounded:intersectBounded,
+    implicitEquation:implicitEquation,
+    implicitLineIntervals:implicitLineIntervals,
+    cavityTrims:cavityTrims,
+    circleInPlanarFace:circleInPlanarFace,
+    trimCurveInsideVolume:trimCurveInsideVolume,
+    trimLineInsideVolume:trimLineInsideVolume,
     classifyPoint:classifyPoint,
+    surfaceNormal:surfaceNormalAt,
     planarBoolean:planarBoolean,
     subtractContainedLoop:subtractContainedLoop,
+    syncDisplayHoles:syncDisplayHoles,
     planeSpec:planeSpec,
     point:curvePoint,
     torusParameters:torusParameters,

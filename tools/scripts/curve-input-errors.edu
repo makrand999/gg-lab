@@ -1,4 +1,3 @@
-# Invalid constructions leave the drawing unchanged.
 # expect: rejected=5
 /datum -60 180
 /point a 0 -10 plan

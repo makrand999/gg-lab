@@ -8,7 +8,7 @@
   var ALLOWED = ['point', 'line', 'ray', 'xline', 'circle', 'arc', 'text',
     'dimension', 'polygon', 'polyline', 'ellipse', 'hatch', 'rename', 'delete', 'style', 'datum'];
   function fail(message) { return { ok: false, message: message, ids: [] }; }
-  // Execute on a detached table. A malformed or incomplete plan never reaches the sheet.
+
   function stage(commands, snapshot, autoMode) {
     if (!Array.isArray(commands) || !commands.length || commands.length > MAX_COMMANDS) {
       return fail('The drawing needs 1–' + MAX_COMMANDS + ' commands.');
@@ -53,7 +53,7 @@
       return { ok: true, entities: S.snapshotTable(table).entities, steps: commands.length, commands: commands.slice() };
     } catch (err) { return fail('Could not validate drawing: ' + err.message); }
   }
-  // One request at a time; responses are applicable only to the unchanged editable sheet/session.
+
   function createRunner(options) {
     var busy = false;
     return async function (text, mode, replace) {
@@ -104,7 +104,7 @@
           if (!data || !Array.isArray(data.commands)) result = fail('The model gave an unusable drawing plan.');
           else if (!data.commands.length) {
             result = fail(data.reply || 'The model could not produce drawing steps.');
-            if (!data.invalid_plan) return result; // An honest refusal needs input, not a retry.
+            if (!data.invalid_plan) return result;
           } else result = stage(data.commands, replace ? { entities: [] } : before, mode === 'auto');
           if (result.ok) break;
           if (attempt + 1 === attempts) return result;

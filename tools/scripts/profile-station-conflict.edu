@@ -1,6 +1,3 @@
-# A matching base name is not enough when the side-frame depth contradicts
-# the plan depth: the stations stay separate and the missing coordinate is
-# reported instead of averaging or snapping the pair.
 # expect: 0V 0E 0F unresolved=2 diagnostics=coordinates-missing status=coordinates-missing
 /datum -30 180
 /profile 100 0 1

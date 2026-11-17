@@ -1,0 +1,48 @@
+# expect: 72V 168E 98F rawFaces=98 faceBindings=ok curves=3 surfaces=4 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred previewParity=ok
+# conic-query: {"index":0,"expect":{"analyticVolume":103881.9970787025}}
+# conic-query: {"index":1,"expect":{"analyticVolume":164200.57602762652}}
+# conic-query: {"index":2,"expect":{"analyticVolume":60318.57894892403}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":162331.30508830157,"vertices":72,"edges":168,"faces":98,"euler":2,"oriented":true,"sameDirectionEdges":0,"openEdges":0,"nonmanifoldEdges":0,"invalidVertexCount":0,"invalidFaces":0,"missingDisplayEdgeCount":0,"faceComponents":1,"faceEuler":2,"allFaceEdgesOpposite":true,"unusedDisplayEdgeCount":0,"allDisplayEdgesFaceBacked":true}}
+# surface-query: {"operation":"normal","surface":2,"point":{"x":120,"y":280,"z":380},"expect":{"normal":{"x":0.8728715609439696,"y":-0.2182178902359924,"z":0.4364357804719848}}}
+# surface-query: {"operation":"normal","surface":3,"point":{"x":120,"y":280,"z":380},"expect":{"normal":{"x":0.9480909262799545,"y":0.14221363894199318,"z":-0.28442727788398636}}}
+# surface-query: {"operation":"section","surface":2,"plane":{"origin":{"x":100,"y":240,"z":340},"normal":{"x":0,"y":-0.4472135954999579,"z":0.8944271909999159}},"expect":{"kind":"ellipse","center":{"x":100,"y":240,"z":340},"radiusU":30,"radiusV":29.068883707497268,"sectionType":"parallel-affine-conic"}}
+# surface-query: {"operation":"section","surface":3,"plane":{"origin":{"x":100,"y":320,"z":420},"normal":{"x":0,"y":-0.4472135954999579,"z":0.8944271909999159}},"expect":{"kind":"ellipse","center":{"x":100,"y":320,"z":420},"radiusU":26,"radiusV":20.124611797498108,"sectionType":"parallel-affine-conic"}}
+# surface-query: {"operation":"generator-lines","expect":{"count":6,"checkedEdges":6,"edgeBacked":true,"sourceIntervalError":0,"invalidSourceIntervals":0,"ownershipFailures":0,"ownershipParity":true,"ownerPatchIndices":[2,3],"reprojectionError":0,"surfaceResidual":0,"ok":true}}
+# surface-query: {"operation":"primitive-reconstruct","reverse":true,"expect":{"mesh":{"openEdges":0,"nonmanifoldEdges":0,"sameDirectionEdges":0,"faceComponents":1,"faceEuler":2,"allFaceEdgesOpposite":true},"status":"ok","determination":"inferred","vertices":72,"edges":168,"faces":98,"generatorLines":6,"generatorEdgesBacked":true,"generatorOwnership":true,"meshVolume":162331.30508830157,"inputUnchanged":true,"diagnostics":[]}}
+/datum -100 400
+/ellipse 100.0 -300.0 40.0 20.0 8 A plan
+/ellipse 100.0 200.0 40.0 40.0 8 A elevation
+/ellipse 100.0 -380.0 20.0 6.0 8 A plan
+/ellipse 100.0 280.0 20.0 12.0 8 A elevation
+/point p 100.0 -320.0 plan
+/point p' 100.0 240.0 elevation
+/point q 100.0 -386.0 plan
+/point q' 100.0 292.0 elevation
+/point a 60.0 -300.0 plan
+/point a' 60.0 200.0 elevation
+/point b 140.0 -300.0 plan
+/point b' 140.0 200.0 elevation
+/point c 80.0 -380.0 plan
+/point c' 80.0 280.0 elevation
+/point d 120.0 -380.0 plan
+/point d' 120.0 280.0 elevation
+/line a c A plan
+/line b d A plan
+/line "a'" "c'" A elevation
+/line "b'" "d'" A elevation
+/line p q A plan
+/line "p'" "q'" A elevation
+/ellipse 100.0 -460.0 32.0 12.0 8 A plan
+/ellipse 100.0 360.0 32.0 24.0 8 A elevation
+/point r 100.0 -472.0 plan
+/point r' 100.0 384.0 elevation
+/point e 68.0 -460.0 plan
+/point e' 68.0 360.0 elevation
+/point f 132.0 -460.0 plan
+/point f' 132.0 360.0 elevation
+/line c e A plan
+/line d f A plan
+/line "c'" "e'" A elevation
+/line "d'" "f'" A elevation
+/line q r A plan
+/line "q'" "r'" A elevation

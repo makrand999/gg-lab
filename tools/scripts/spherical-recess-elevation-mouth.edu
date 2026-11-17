@@ -1,6 +1,3 @@
-# Spherical recess opening through a vertical face: the full mouth circle is
-# in elevation and the cap silhouette is in plan. The same inference is used;
-# it is not tied to a plan mouth or to a named solid.
 # expect: 73V 192E 120F recesses=1 surfaces=2 surfaceKinds=plane,sphere surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
 /datum -30 80
 /circle 20 50 20 A elevation
@@ -9,6 +6,5 @@
 /point b 40 -30 plan
 /line a b A plan
 
-# The sphere centre is (20, 50, 30); a section through it has radius 20.
 # expect: surfaceChecks=1 surfaceQueries=ok
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":50,"z":30},"normal":{"x":0,"y":0,"z":1}},"expect":{"kind":"circle","radius":20}}

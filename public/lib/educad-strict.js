@@ -3,8 +3,8 @@
   else root.EduCADStrict = factory();
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
-  // Exact reconstruction of declared incidence, never recognition of drawn ink.
-  // See docs/RECONSTRUCTION_CONTRACT.md for domain, proof and numeric semantics.
+
+
   function gcd(a, b) { a = a < 0n ? -a : a; while (b) { var r = a % b; a = b; b = r; } return a || 1n; }
   function rational(n, d) {
     if (!d) throw new Error('Zero denominator');
@@ -24,8 +24,8 @@
   function mul(a, b) { return rational(a.n * b.n, a.d * b.d); }
   function equal(a, b) { return a.n === b.n && a.d === b.d; }
   function serial(a) { return a.n.toString() + '/' + a.d.toString(); }
-  // Rendering is approximate. Scientific conversion avoids Infinity/Infinity for
-  // valid rationals with large denominators; the exact certificate stays intact.
+
+
   function numeric(a) {
     if (!a.n) return 0;
     var sign = a.n < 0n ? -1 : 1, n = (a.n < 0n ? -a.n : a.n).toString(), d = a.d.toString();
@@ -45,8 +45,8 @@
   function insideTriangle(point, triangle, n) {
     return triangle.every(function (a, i) { return dot(n, cross(vector(triangle[(i + 1) % 3], a), vector(point, a))).n >= 0n; });
   }
-  // Intersect a segment with a closed triangle exactly. Coplanar segments
-  // are clipped against its three linear half-space inequalities in t.
+
+
   function segmentTriangle(a, b, triangle, n) {
     var da = dot(n, vector(a, triangle[0])), db = dot(n, vector(b, triangle[0]));
     if (da.n === 0n && db.n === 0n) {
@@ -67,7 +67,7 @@
   }
   function improperIntersection(a, b, positions) {
     var ta = a.map(function (i) { return positions[i]; }), tb = b.map(function (i) { return positions[i]; });
-    // Exact boxes only reject provably disjoint triangles.
+
     for (var axis = 0; axis < 3; axis++) {
       var aa = ta.map(function (p) { return p[axis]; }).sort(cmp), bb = tb.map(function (p) { return p[axis]; }).sort(cmp);
       if (cmp(aa[2], bb[0]) < 0 || cmp(bb[2], aa[0]) < 0) return false;
@@ -118,8 +118,8 @@
       while (queue.length) { var v = queue.pop(); if (reached.has(v)) continue; reached.add(v); link.get(v).forEach(function (n) { if (!reached.has(n)) queue.push(n); }); }
       if (degreeBad || ends !== 0 && ends !== 2 || reached.size !== link.size) invalid('surface-nonmanifold-vertex', 'Triangles at a surface vertex must form one disk or half-disk, not touching separate shells.');
     });
-    // Triangle intersection is allowed only at its declared shared simplex.
-    // This also catches coincident positions carrying different vertex IDs.
+
+
     for (var i = 0; i < faces.length; i++) {
       for (var j = i + 1; j < faces.length; j++) {
         if (improperIntersection(faces[i], faces[j], positions)) invalid('surface-self-intersection', 'Triangles ' + i + ' and ' + j + ' intersect outside their declared shared edge or vertex.');
@@ -141,8 +141,8 @@
       var componentSet = new Set(component), boundary = [];
       edgeMap.forEach(function (uses, key) { if (uses.length === 1 && componentSet.has(uses[0].face)) boundary.push(key.split(':').map(Number)); });
       if (boundary.length) { open.push({ faceIndices: component, boundaryEdges: boundary }); return; }
-      // Sum oriented tetrahedral volumes about a vertex. The divergence theorem
-      // gives the bounded interior volume of a closed embedded surface.
+
+
       var origin = positions[faces[start][0]], sixVolume = rational(0n, 1n);
       component.forEach(function (fi) {
         var p = faces[fi].map(function (id) { return vector(positions[id], origin); });
@@ -231,8 +231,8 @@
     entities.forEach(function (e) {
       if (!e || helper(e) || ['POINT', 'TEXT', 'DIMENSION', 'DATUM_AXIS'].indexOf(e.type) !== -1) return;
       var meta = e.meta || {};
-      // Projector ink is an annotation of a relationship already declared by
-      // shared member IDs. It cannot create or merge spatial identities.
+
+
       if (e.type === 'SEGMENT' && meta.kind === 'projector' && meta.endpointMemberIds === undefined) {
         var feet = Array.isArray(meta.refs) && meta.refs.map(function (id) { return points.get(id); });
         if (!feet || feet.length !== 2 || !feet[0] || !feet[1]) missing('projector-feet-missing', 'Projector ' + e.id + ' needs two explicit stations.', e);

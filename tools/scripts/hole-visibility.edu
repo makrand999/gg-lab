@@ -1,4 +1,3 @@
-# hole-visibility
 # expect: 10V 9E 1F holes=1 open=1 topHidden=0
 /datum -100 400
 /point v0 0 -10 plan

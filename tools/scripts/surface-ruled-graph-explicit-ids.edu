@@ -1,0 +1,39 @@
+# expect: 72V 168E 98F rawFaces=98 faceBindings=ok curves=3 surfaces=4 conicProjection=ok conicDefinitions=ok conicJSON=ok surfaceQueries=ok status=inferred previewParity=ok
+# surface-query: {"operation":"reconstruct","entityPatches":[{"entityId":"E34","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:p","name":"p","hidden":false}]}}},{"entityId":"E35","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:p","name":"p","hidden":false}]}}},{"entityId":"E36","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:q","name":"q","hidden":false}]}}},{"entityId":"E37","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:q","name":"q","hidden":false}]}}},{"entityId":"E38","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:a","name":"a","hidden":false}]}}},{"entityId":"E39","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:a","name":"a","hidden":false}]}}},{"entityId":"E40","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:b","name":"b","hidden":false}]}}},{"entityId":"E41","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:b","name":"b","hidden":false}]}}},{"entityId":"E42","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:c","name":"c","hidden":false}]}}},{"entityId":"E43","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:c","name":"c","hidden":false}]}}},{"entityId":"E44","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:d","name":"d","hidden":false}]}}},{"entityId":"E45","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:d","name":"d","hidden":false}]}}},{"entityId":"E68","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:r","name":"r","hidden":false}]}}},{"entityId":"E69","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:r","name":"r","hidden":false}]}}},{"entityId":"E70","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:e","name":"e","hidden":false}]}}},{"entityId":"E71","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:e","name":"e","hidden":false}]}}},{"entityId":"E72","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:f","name":"f","hidden":false}]}}},{"entityId":"E73","patch":{"meta":{"membersDeclared":true,"members":[{"id":"joint:f","name":"f","hidden":false}]}}}],"expect":{"status":"ok","determination":"inferred","vertices":72,"identity":"explicit","surfaceKinds":["implicit","plane"],"surfaceCertificateStatus":"ok","curves":3,"diagnostics":[],"previewStatus":"ok","previewIdentity":"explicit","previewVertices":72,"sourceUnchanged":true,"previewValid":true}}
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/ellipse 0 -40 10 3 8 A plan
+/ellipse 0 40 10 6 8 A elevation
+/point p 0 -10 plan
+/point "p'" 0 20 elevation
+/point q 0 -43 plan
+/point "q'" 0 46 elevation
+/point a -20 0 plan
+/point "a'" -20 0 elevation
+/point b 20 0 plan
+/point "b'" 20 0 elevation
+/point c -10 -40 plan
+/point "c'" -10 40 elevation
+/point d 10 -40 plan
+/point "d'" 10 40 elevation
+/line a c A plan
+/line b d A plan
+/line "a'" "c'" A elevation
+/line "b'" "d'" A elevation
+/line p q A plan
+/line "p'" "q'" A elevation
+/ellipse 0 -80 16 6 8 A plan
+/ellipse 0 80 16 12 8 A elevation
+/point r 0 -86 plan
+/point "r'" 0 92 elevation
+/point e -16 -80 plan
+/point "e'" -16 80 elevation
+/point f 16 -80 plan
+/point "f'" 16 80 elevation
+/line c e A plan
+/line d f A plan
+/line "c'" "e'" A elevation
+/line "d'" "f'" A elevation
+/line q r A plan
+/line "q'" "r'" A elevation

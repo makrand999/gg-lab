@@ -1,0 +1,65 @@
+# expect: V=540 E=1114 F=577 recesses=2 minRecessDepth=10 maxRecessDepth=20 curves=4 surfaces=9 surfaceKinds=cylinder,plane,sphere surfaceLoops=11 surfaceShells=0 surfaceOpen=3 surfaceBoundary=44 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-approximate-union-boundary,certificate-open-component surfaceCertificateScope=display-boolean surfaceValidation=skipped holes=1 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred previewParity=ok previewTrimStatus=partial previewTrimExactness=exact previewTrimVisible=1 previewTrimUnsupported=0 surfaceChecks=19 surfaceQueries=ok
+/datum -100 400
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/circle 20 -30 10 A plan
+/arc 20 60 10 180 360 A elevation
+/circle 20 -30 6 A plan
+/point c0 14 40 elevation
+/point c1 26 40 elevation
+/point c2 26 60 elevation
+/point c3 14 60 elevation
+/line c0 c1 A elevation
+/line c1 c2 A elevation
+/line c2 c3 A elevation
+/line c3 c0 A elevation
+
+# surface-query: {"operation":"display-holes","expect":{"count":1,"faces":[{"count":1,"vertices":[42]}]}}
+# surface-query: {"operation":"cavity","action":"summary","expect":{"volumes":2,"recesses":2,"unions":1,"absorbed":0,"approximate":1,"relations":[{"a":0,"b":1,"relation":"overlap"}]}}
+# surface-query: {"operation":"cavity","action":"volume","expect":{"unions":[{"volume":3182.6712103288824,"mouthArea":310.5828541230249,"closed":true,"openEdges":0,"nonmanifoldEdges":0,"approximate":true,"members":2}]}}
+# surface-query: {"operation":"cavity","action":"mouths","expect":{"count":1,"area":310.58285412302484,"faceHoles":1,"loops":[{"vertices":42,"closure":"host"}]}}
+# surface-query: {"operation":"reconstruct","expect":{"status":"ok","recesses":[{"kind":"spherical","depth":10,"center":{"x":20,"y":60,"z":30},"radius":10,"mouthCenter":{"x":20,"y":60,"z":30}},{"kind":"cylindrical","depth":20,"mouthCenter":{"x":20,"y":60,"z":30},"mouthRadius":6}]}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":2},"features":[{"family":"spherical","sourceIds":["E34","E35"]},{"family":"cylindrical","sourceIds":["E36","E25","E28","E43","E41","E44","E42"]}]}}
+# surface-query: {"operation":"visibility","point":{"x":20,"y":55,"z":30},"view":"top","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":20,"y":45,"z":30},"view":"top","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":10,"y":55,"z":30},"view":"top","expect":{"hidden":true}}
+# surface-query: {"operation":"cavity-spec","a":{"kind":"sphere","center":{"x":20,"y":60,"z":30},"radius":10,"pole":{"x":0,"y":-1,"z":0},"outward":{"x":0,"y":1,"z":0},"capAngle":1.5707963267948966,"mouthCenter":{"x":20,"y":60,"z":30},"mouthRadius":10},"b":{"kind":"cylinder","origin":{"x":20,"y":60,"z":30},"axis":{"x":0,"y":-1,"z":0},"radius":6,"depth":20,"outward":{"x":0,"y":1,"z":0},"mouthCenter":{"x":20,"y":60,"z":30}},"expect":{"relation":"overlap"}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":20,"y":50,"z":30},"expect":{"status":"outside","method":"boolean-domain"}}
+# surface-query: {"operation":"classify","surface":1,"point":{"x":26,"y":56,"z":30},"expect":{"status":"outside","method":"boolean-domain"}}
+# surface-query: {"operation":"classify","surface":1,"point":{"x":26,"y":45,"z":30},"expect":{"status":"inside","method":"loop-stations"}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":26,"y":52,"z":30},"expect":{"status":"boundary","method":"boolean-domain"}}
+# surface-query: {"operation":"classify","surface":1,"point":{"x":26,"y":52,"z":30},"expect":{"status":"boundary","method":"boolean-domain"}}
+# surface-query: {"operation":"visibility","point":{"x":20,"y":41,"z":30},"view":"top","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":29,"y":41,"z":30},"view":"top","expect":{"hidden":true}}
+# surface-query: {"operation":"cavity-trims","kind":"circle","expect":{"contract":"cavity-analytic-trim-v1","version":1,"status":"partial","exactness":"exact","pairCount":1,"visible":1,"matchedBoundaries":1,"boundaries":[{"kind":"circle","role":"boundary","boundsStatus":"exact","exposureStatus":"exact","center":{"x":20,"y":52,"z":30},"radius":6,"memberVolumes":[0,1],"supportKind":"circles","surfaceIds":["surface:0","surface:1"]}]}}
+# surface-query: {"operation":"cavity-trims","kind":"circle","expect":{"pairs":[{"a":0,"b":1,"relation":"overlap","status":"exact","supports":[{"aRole":"cap","bRole":"side","status":"exact","kind":"circles","supportStatus":"exact","boundsStatus":"exact","exposureStatus":"exact","support":{"kind":"circles"}}]}]}}

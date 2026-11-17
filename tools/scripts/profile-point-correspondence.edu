@@ -1,4 +1,3 @@
-# A side-view station is checked through the profile frame; unmatched ink stays reported.
 # expect: 7V 6E 0F curves=1 unresolved=1 status=partial
 /datum -30 180
 /profile 100 0 -1

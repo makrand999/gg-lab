@@ -1,0 +1,23 @@
+# expect: 48V 72E 26F rawFaces=26 faceBindings=ok curves=2 surfaces=3 conicProjection=ok conicDefinitions=ok conicJSON=ok surfaceQueries=ok status=inferred
+# surface-query: {"operation":"reference-audit","invalid":"E46","corrupt":[{"id":"E46","refs":["missing-a","missing-b"],"endpointRefs":["missing-a","missing-b"]}],"expect":{"status":"ok","determination":"partial","vertices":48,"edges":72,"faces":26,"generatorLines":0,"generatorSourceIds":[],"surfaceGeneratorSourceIds":["E47","E48","E49"],"invalidInGeneratorEvidence":false,"invalidInSurfaceGeneratorEvidence":false,"invalidInSurfaceSource":false,"diagnostics":["conic-observation-reference-missing"],"issueEntities":["E46"]}}
+/datum -100 400
+/conic 0 0 18.646546912121 -3.616154319650 -7.232308639299 -9.323273456060 8 A plan
+/conic 0 0 8.893230334834 -17.913973713601 17.913973713601 8.893230334834 8 A elevation
+/conic 0 -40 -5.048461045999 -4.316046833244 -8.632093666489 2.524230522999 8 A plan
+/conic 0 40 8.138784566625 5.810351605373 -5.810351605373 8.138784566625 8 A elevation
+/point p 14.1421356237 -7.0710678119 plan
+/point p' 14.1421356237 14.1421356237 elevation
+/point q 7.0710678119 -43.5355339059 plan
+/point q' 7.0710678119 47.0710678119 elevation
+/point g1 20 0 plan
+/point g1' 20 0 elevation
+/point h1 10 -40 plan
+/point h1' 10 40 elevation
+/point g2 -20 0 plan
+/point g2' -20 0 elevation
+/point h2 -10 -40 plan
+/point h2' -10 40 elevation
+/line g1 h1 A plan
+/line g1' h1' A elevation
+/line g2 h2 A plan
+/line g2' h2' A elevation

@@ -6,21 +6,23 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function (getDrafting, Parametric) {
   'use strict';
-  // EduCAD slash commands: draw the sheet without a mouse, Minecraft-style.
-  // Users and agents type /<cmd> into the sheet's command line; this module
-  // parses, completes, previews, and runs those lines against a live entity
-  // table. World coordinates in mm only. Zero dependencies. Dual-env:
-  // browser via window.EduCADCommand, plain Node via module.exports.
-  //
-  // Shape: parse/suggest/preview are pure (string in, data out); execute
-  // needs {table} plus optional page hooks {clear, loadDemo, startTutorial,
-  // runVerify, setMode} and gates {allowDemo, allowTutorial, readOnly}.
-  // execute never throws for user input: mistakes come back as
-  // {ok:false, message}. Only a missing table (a wiring bug) throws.
+
+
+
+
+
+
+
+
+
+
+
   var VERSION = '1.0.0-educad';
   var WORLD_UNITS = 'mm';
   var NUM_RE = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
   var SUGGEST_MAX = 12;
+  var POINT_CONTEXT_KEY = typeof Symbol === 'function' ?
+    Symbol('educadCommandPointContext') : '__educadCommandPointContext__';
 
   var DEMOS = ['line', 'points', 'prism', '3view', 'square'];
   var TUTS = ['square', 'prism'];
@@ -41,9 +43,9 @@
     return BIS_CODES.indexOf(String(word).toUpperCase()) !== -1;
   }
 
-  // parseBisRole(tail): trailing [bis] [role] in either full or split
-  // shape — [bis], [role], or [bis, role]. Single letters and role words
-  // never overlap, so one token is unambiguous.
+
+
+
   function parseBisRole(tail) {
     var out = { bis: null, role: null, error: '' };
     if (tail.length === 0) return out;
@@ -74,9 +76,9 @@
     return out;
   }
 
-  // kind: point-name (existing), point-new, number, bis-code, demo-name,
-  // tutorial-name, mode-name, command-name, entity-name (any entity),
-  // words (rest of line).
+
+
+
   var COMMANDS = [
     { name: 'help', usage: '/help [command]',
       hint: 'List commands, or detail for one',
@@ -140,6 +142,9 @@
         { name: 'p2', kind: 'point-name', variadic: true }] },
     { name: 'ellipse', usage: '/ellipse <center> <rx> <ry> [n] [bis] [role]  |  /ellipse <x> <y> <rx> <ry> [n] [bis] [role]',
       hint: 'Ellipse ring as an n-segment chain (mm)',
+      args: [] },
+    { name: 'conic', usage: '/conic <center> <ax> <ay> <bx> <by> [n] [bis] [role]  |  /conic <x> <y> <ax> <ay> <bx> <by> [n] [bis] [role]',
+      hint: 'Exact ellipse from two view basis vectors (mm)',
       args: [] },
     { name: 'hatch', usage: '/hatch <x1> <y1> <x2> <y2> <spacing> [angle] [bis] [role]',
       hint: 'Section hatching clipped to a rectangle (mm)',
@@ -205,8 +210,8 @@
     return Math.abs(value) <= 1e6 ? value : null;
   }
 
-  // splitArgs: whitespace split; double quotes group words ("a b" stays
-  // one arg). Single quotes stay literal: a' is a point name, not a quote.
+
+
   function splitArgs(text) {
     var out = [];
     var cur = '';
@@ -241,16 +246,16 @@
 
   function fail(message) { return { ok: false, message: message }; }
 
-  // isNaturalRequest(line): slash, then a space, then words — plain
-  // language for the interpreter, never a registry command. '/help' is
-  // a command; '/ draw a circle' is a request.
+
+
+
   function isNaturalRequest(line) {
     if (typeof line !== 'string') return false;
     return /^\/\s/.test(line.replace(/^\s+/, ''));
   }
 
-  // parse(input): lexical split plus command lookup. ok:false carries
-  // error in empty|missing-slash|no-command|unknown-command.
+
+
   function parse(input) {
     if (typeof input !== 'string') throw new Error('educad-command: input must be a string');
     var line = input.replace(/^\s+|\s+$/g, '');
@@ -320,10 +325,10 @@
     return [];
   }
 
-  // hasEntity: points plus every other captioned/id entity. Rename,
-  // delete, and style all run against the whole table (findEntity),
-  // so previews must too — a bare points check would call a live
-  // segment id unknown while Enter happily restyles it.
+
+
+
+
   function hasEntity(ctx, name) {
     if (hasPoint(ctx, name)) return true;
     if (ctx && ctx.entities && !Array.isArray(ctx.entities) &&
@@ -372,8 +377,8 @@
     return '';
   }
 
-  // slotKind(spec, done): expected kind for the next arg, or '' when the
-  // fixed slots are full (variadic tails repeat their last kind).
+
+
   function slotKind(spec, done) {
     if (spec.name === 'circle' || spec.name === 'arc' ||
         spec.name === 'ellipse' || spec.name === 'hatch') return '';
@@ -391,10 +396,10 @@
     return done >= fixed.length - 1;
   }
 
-  // suggest(input, ctx): Minecraft-style completions. Each entry is
-  // {text, display, hint, kind}: text replaces the whole input line,
-  // kind tells the page how to draw the row (bis-code rows render the
-  // line sample, the rest are plain text).
+
+
+
+
   function suggest(input, ctx) {
     if (typeof input !== 'string') throw new Error('educad-command: input must be a string');
     if (input === '') {
@@ -422,11 +427,11 @@
     var toks = splitArgs(after);
     var current = trailing ? '' : (toks.length > 0 ? toks[toks.length - 1] : '');
     var done = trailing ? toks.length : Math.max(0, toks.length - 1);
-    // Circle/arc/ellipse have two shapes: a <center> form and a
-    // raw-coords form, each with trailing [bis] [role] (ellipse takes
-    // an optional segment count first). Complete the center slot from
-    // point names and the trailing slots from their lists; leave
-    // numbers alone.
+
+
+
+
+
     if (spec.name === 'circle' || spec.name === 'arc' ||
         spec.name === 'ellipse') {
       var extra = spec.name === 'circle' ? 0 : (spec.name === 'arc' ? 2 : 1);
@@ -456,8 +461,8 @@
         }
       } else if (spec.name === 'ellipse' && done === base + 1 &&
           toks.length > base && isNumTok(toks[base])) {
-        // A segment count sits where the tail starts: the tail
-        // follows it, so offer both lists again.
+
+
         for (var eb = 0; eb < BIS_CODES.length; eb++) {
           items.push({ w: BIS_CODES[eb], k: 'bis-code', h: kindHint('bis-code') });
         }
@@ -484,9 +489,9 @@
       }
       return hits;
     }
-    // Hatch is five fixed numbers, then an optional angle, then the
-    // [bis] [role] tail. Numbers stay freeform; the tail seats offer
-    // their lists (an angle already typed shifts the tail one seat).
+
+
+
     if (spec.name === 'hatch') {
       var hcl = current.toLowerCase();
       var hprefix = input.slice(0, input.length - current.length);
@@ -535,14 +540,14 @@
     var kind = slotKind(spec, done);
     if (kind === '') return [];
     var cands = kindCandidates(kind, ctx);
-    // Two-point spans need two different points: never offer the
-    // from-point back as its own target.
+
+
     if ((spec.name === 'line' || spec.name === 'ray' ||
         spec.name === 'xline' || spec.name === 'dimension') && done === 1 &&
         toks.length > 0) {
       cands = cands.filter(function (c) { return c !== toks[0]; });
     }
-    // A role already banked completes the tail: nothing follows it.
+
     if (kind === 'role-name' && done > 0 && toks.length >= done &&
         normRole(toks[done - 1]) !== null) {
       return [];
@@ -550,8 +555,8 @@
     var items = cands.map(function (c) {
       return { w: c, k: kind, h: kindHint(kind) };
     });
-    // [bis] [role] tails accept a bare role in the bis seat: offer both
-    // lists there, each row tagged for its own art.
+
+
     if (kind === 'bis-code' && spec.args[done + 1] !== undefined &&
         spec.args[done + 1].kind === 'role-name') {
       var roles = kindCandidates('role-name', ctx);
@@ -582,9 +587,9 @@
   var HATCH_ANGLE_DEFAULT = 45;
   var HATCH_LINES_MAX = 200;
 
-  // arcSweepDeg(a1, a2): CCW sweep in [0, 360). A zero sweep draws
-  // nothing on every renderer (canvas and the SVG shim agree), so the
-  // command layer refuses it instead of banking an invisible entity.
+
+
+
   function arcSweepDeg(a1, a2) {
     var span = (a2 - a1) % 360;
     if (span < 0) span += 360;
@@ -592,9 +597,9 @@
     return span;
   }
 
-  // ellipseRing(cx, cy, rx, ry, n): closed ring of n chord segments as
-  // [ax, ay, bx, by] quads. Axis-aligned; plane-tilt ellipses arrive
-  // via rotated construction points instead (see /polyline).
+
+
+
   function ellipseRing(cx, cy, rx, ry, n) {
     var quads = [];
     for (var i = 0; i < n; i++) {
@@ -606,9 +611,22 @@
     return quads;
   }
 
-  // hatchLines(x1, y1, x2, y2, spacing, angleDeg): parallel chords at
-  // angleDeg clipped to the rect (slab-method clip). Lines sit strictly
-  // inside the rect so the boundary stays the owner's to draw.
+  function basisRing(cx, cy, a, b, n) {
+    var quads = [];
+    for (var i = 0; i < n; i++) {
+      var t0 = 2 * Math.PI * i / n;
+      var t1 = 2 * Math.PI * (i + 1) / n;
+      quads.push([cx + a.x * Math.cos(t0) + b.x * Math.sin(t0),
+        cy + a.y * Math.cos(t0) + b.y * Math.sin(t0),
+        cx + a.x * Math.cos(t1) + b.x * Math.sin(t1),
+        cy + a.y * Math.cos(t1) + b.y * Math.sin(t1)]);
+    }
+    return quads;
+  }
+
+
+
+
   function hatchLines(x1, y1, x2, y2, spacing, angleDeg, limit) {
     limit = limit || 10000;
     var xa = Math.min(x1, x2), xb = Math.max(x1, x2);
@@ -646,8 +664,8 @@
         hi = Math.min(hi, Math.max(u1, u2));
       }
       if (hi - lo > 1e-9) {
-        // Snap float noise onto the boundary: the clip promises
-        // chords inside the rect, not 1e-16 past its edge.
+
+
         var ax = px + dx * lo, ay = py + dy * lo;
         var bx = px + dx * hi, by = py + dy * hi;
         if (Math.abs(ax - xa) < 1e-9) ax = xa;
@@ -664,9 +682,9 @@
     return out;
   }
 
-  // splitCountTail(tail): an optional leading number (ellipse n, hatch
-  // angle) followed by [bis] [role]. Pure shape split; validation of
-  // the number itself stays with the caller.
+
+
+
   function splitCountTail(tail) {
     if (tail.length > 0 && parseNum(tail[0]) !== null) {
       return { num: parseNum(tail[0]), rest: tail.slice(1) };
@@ -679,9 +697,9 @@
     return (Math.round(Math.sqrt(dx * dx + dy * dy) * 100) / 100).toFixed(2);
   }
 
-  // preview(input, ctx): one line describing what Enter would do, or the
-  // first problem with the line. Pure; ctx.points may be names or a
-  // name->{x,y} map for length readouts.
+
+
+
   function preview(input, ctx) {
     if (typeof input !== 'string') throw new Error('educad-command: input must be a string');
     var line = input.replace(/^\s+|\s+$/g, '');
@@ -699,7 +717,10 @@
     if (p.name === 'circle' || p.name === 'arc' || p.name === 'ellipse') {
       return previewRound(p.name, args, ctx);
     }
-    if (['curve-through','circle-through','arc-through'].indexOf(p.name)!==-1) return spec.hint+' — '+spec.usage;
+    if (p.name === 'conic') return previewConic(args, ctx, spec.usage);
+    if (['curve-through','circle-through','arc-through'].indexOf(p.name)!==-1) {
+      return previewThrough(p.name, args, ctx, spec);
+    }
     if (p.name === 'hatch') return previewHatch(args, ctx);
     var fixed = spec.args;
     var need = 0;
@@ -708,7 +729,7 @@
     }
     var minNeed = need;
     var hasVariadic = fixed.length > 0 && fixed[fixed.length - 1].variadic;
-    // Variadic tails need their own slot too (polygon wants p3).
+
     for (var v = 0; v < fixed.length; v++) {
       if (fixed[v].variadic) minNeed++;
     }
@@ -739,11 +760,20 @@
       case 'dimension': {
         var verbs = { line: 'Draw segment ', ray: 'Draw ray ',
           xline: 'Draw construction line ', dimension: 'Dimension ' };
-        if (!hasPoint(ctx, args[0])) return 'Unknown point "' + args[0] + '" — place it first with /point.';
-        if (!hasPoint(ctx, args[1])) return 'Unknown point "' + args[1] + '" — place it first with /point.';
         var br = parseBisRole(args.slice(2));
         if (br.error !== '') return br.error + ' — usage: ' + spec.usage;
-        var pa = pointPos(ctx, args[0]), pb = pointPos(ctx, args[1]);
+        var ptypes = { line: 'SEGMENT', ray: 'RAY', xline: 'LINE',
+          dimension: 'DIMENSION' };
+        var popts = isAnnotationStroke(ptypes[p.name],
+          br.bis !== null ? br.bis : 'B', null) ? { annotation: true } : undefined;
+        var la = previewNeedPoint(ctx, args[0], br.role, popts);
+        if (la.fail) return la.fail;
+        var lb = previewNeedPoint(ctx, args[1], br.role, popts);
+        if (lb.fail) return lb.fail;
+        var pa = (typeof la.ent.x === 'number' && typeof la.ent.y === 'number') ?
+          { x: la.ent.x, y: la.ent.y } : null;
+        var pb = (typeof lb.ent.x === 'number' && typeof lb.ent.y === 'number') ?
+          { x: lb.ent.x, y: lb.ent.y } : null;
         var tail = (pa !== null && pb !== null) ? ' (L ' + fmtLen(pa, pb) + ' mm)' : '';
         var style = (br.bis !== null ? ', type ' + br.bis : '') +
           (br.role !== null ? ', ' + br.role + ' view' : '');
@@ -756,16 +786,14 @@
       }
       case 'polygon':
         for (var g = 0; g < args.length; g++) {
-          if (!hasPoint(ctx, args[g])) {
-            return 'Unknown point "' + args[g] + '" — place it first with /point.';
-          }
+          var gpv = previewNeedPoint(ctx, args[g]);
+          if (gpv.fail) return gpv.fail;
         }
         return 'Draw ' + args.length + '-sided polygon (' + args.join(', ') + ').';
       case 'polyline':
         for (var pl = 0; pl < args.length; pl++) {
-          if (!hasPoint(ctx, args[pl])) {
-            return 'Unknown point "' + args[pl] + '" — place it first with /point.';
-          }
+          var opv = previewNeedPoint(ctx, args[pl]);
+          if (opv.fail) return opv.fail;
         }
         return 'Draw open chain (' + args.join(', ') + ').';
       case 'rename':
@@ -839,9 +867,8 @@
     var style = (br.bis !== null ? ', type ' + br.bis : '') +
       (br.role !== null ? ', ' + br.role + ' view' : '');
     if (named) {
-      if (!hasPoint(ctx, args[0])) {
-        return 'Unknown point "' + args[0] + '" — place it first with /point.';
-      }
+      var centre = previewNeedPoint(ctx, args[0], br.role);
+      if (centre.fail) return centre.fail;
       var r = parseNum(args[1]);
       if (r === null || r <= 0) return 'Radius must be a number above 0 (mm).';
       if (name === 'arc') {
@@ -871,8 +898,8 @@
     return 'Draw circle at ' + fmtPt(nums[0], nums[1]) + ' r ' + nums[2] + ' mm' + style + '.';
   }
 
-  // previewEllipse: named <center> <rx> <ry> or raw <x> <y> <rx> <ry>,
-  // then an optional segment count, then [bis] [role].
+
+
   function previewEllipse(args, ctx, usage) {
     if (args.length < 3) return 'Usage: ' + usage;
     var named = !isNumTok(args[0]);
@@ -892,9 +919,8 @@
       (br.role !== null ? ', ' + br.role + ' view' : '');
     var at, rx, ry;
     if (named) {
-      if (!hasPoint(ctx, args[0])) {
-        return 'Unknown point "' + args[0] + '" — place it first with /point.';
-      }
+      var centre = previewNeedPoint(ctx, args[0], br.role);
+      if (centre.fail) return centre.fail;
       rx = parseNum(args[1]);
       ry = parseNum(args[2]);
       at = 'at "' + args[0] + '"';
@@ -909,6 +935,59 @@
       return 'rx and ry must be numbers above 0 (mm).';
     }
     return 'Draw ellipse ' + at + ' ' + rx + ' × ' + ry + ' mm (' + segs + ' segments)' + style + '.';
+  }
+
+  function previewConic(args, ctx, usage) {
+    var named = !isNumTok(args[0]);
+    var need = named ? 5 : 6;
+    if (args.length < need) return 'Usage: ' + usage;
+    var split = splitCountTail(args.slice(need));
+    var segs = split.num === null ? ELLIPSE_SEGS_DEFAULT : split.num;
+    if (split.num !== null &&
+        (Math.floor(split.num) !== split.num || segs < ELLIPSE_SEGS_MIN ||
+          segs > ELLIPSE_SEGS_MAX)) {
+      return 'Segments must be a whole number from ' + ELLIPSE_SEGS_MIN +
+        ' to ' + ELLIPSE_SEGS_MAX + ' — usage: ' + usage;
+    }
+    var br = parseBisRole(split.rest);
+    if (br.error !== '') return br.error + ' — usage: ' + usage;
+    var style = (br.bis !== null ? ', type ' + br.bis : '') +
+      (br.role !== null ? ', ' + br.role + ' view' : '');
+    var at;
+    if (named) {
+      var centre = previewNeedPoint(ctx, args[0], br.role);
+      if (centre.fail) return centre.fail;
+      at = 'at "' + args[0] + '"';
+    } else {
+      var cx = parseNum(args[0]), cy = parseNum(args[1]);
+      if (cx === null || cy === null) return 'Usage: ' + usage;
+      at = 'at ' + fmtPt(cx, cy);
+    }
+    var base = named ? 1 : 2, ax = parseNum(args[base]), ay = parseNum(args[base+1]);
+    var bx = parseNum(args[base+2]), by = parseNum(args[base+3]);
+    if (ax === null || ay === null || bx === null || by === null)
+      return 'Conic basis vectors must be numbers (mm) — usage: ' + usage;
+    if (Math.abs(ax*by-ay*bx) <= 1e-12*Math.max(1, Math.hypot(ax,ay)*Math.hypot(bx,by)))
+      return 'The two conic basis vectors must be independent.';
+    return 'Draw analytic ellipse ' + at + ' (' + segs + ' segments)' + style + '.';
+  }
+
+  function previewThrough(name, args, ctx, spec) {
+    var tokens = args.slice(), role = null, closed = false;
+    if (tokens.length && ['plan', 'elevation', 'profile']
+        .indexOf(tokens[tokens.length - 1].toLowerCase()) !== -1) {
+      role = tokens.pop().toUpperCase();
+    }
+    if (tokens[tokens.length - 1] === 'closed') { closed = true; tokens.pop(); }
+    if (name !== 'curve-through' && (closed || tokens.length !== 3)) {
+      return 'Usage: ' + spec.usage;
+    }
+    if (!tokens.length) return 'Usage: ' + spec.usage;
+    for (var i = 0; i < tokens.length; i++) {
+      var found = previewNeedPoint(ctx, tokens[i], role, { sameView: true });
+      if (found.fail) return found.fail;
+    }
+    return spec.hint + ' — ' + spec.usage;
   }
 
   function previewHatch(args, ctx) {
@@ -968,9 +1047,175 @@
     return matches.length === 1 ? matches[0] : null;
   }
 
-  // displayName: the name users see and type. Sheet labels live in
-  // caption (demo points are E1, E2 internally but lettered on the
-  // sheet); the internal name is only a fallback for uncaptioned dots.
+  function viewOfPoint(p) {
+    if (p.viewRole === 'PLAN' || p.viewRole === 'ELEVATION' || p.viewRole === 'PROFILE') {
+      return p.viewRole;
+    }
+    return roleForY(p.y);
+  }
+
+  function pointInRole(p, role) {
+    if (!role || role === 'BOTH') return true;
+    if (p.viewRole === 'BOTH') return true;
+    return viewOfPoint(p) === role;
+  }
+
+  function baseLabel(text) {
+    return String(text === undefined || text === null ? '' : text)
+      .replace(/['’′]+$/, '').trim();
+  }
+
+  function labelParts(text) {
+    return String(text === undefined || text === null ? '' : text).split(',')
+      .map(function (part) {
+        var s = part.trim();
+        if (/^\(.*\)$/.test(s)) s = s.slice(1, -1).trim();
+        return s;
+      }).filter(Boolean);
+  }
+
+  function pointBaseLabels(p) {
+    var out = [];
+    function add(value) {
+      labelParts(value).forEach(function (part) {
+        var b = baseLabel(part);
+        if (b !== '' && out.indexOf(b) === -1) out.push(b);
+      });
+    }
+    add(p.name);
+    add(p.caption);
+    ((p.meta && p.meta.members) || []).forEach(function (m) { add(m.name); });
+    return out;
+  }
+
+  function pointExactLabels(p) {
+    var out = [];
+    function add(value) {
+      if (value !== undefined && value !== null && String(value) !== '' &&
+          out.indexOf(String(value)) === -1) out.push(String(value));
+    }
+    add(p.name);
+    add(p.caption);
+    return out;
+  }
+
+  function pointMemberLabels(p) {
+    var out = [];
+    ((p.meta && p.meta.members) || []).forEach(function (m) {
+      if (m && typeof m.name === 'string' && out.indexOf(m.name) === -1) out.push(m.name);
+    });
+    return out;
+  }
+
+  function uniquePoints(points) {
+    var seen = Object.create(null), out = [];
+    points.forEach(function (p) {
+      if (!p || seen[p.id]) return;
+      seen[p.id] = true;
+      out.push(p);
+    });
+    return out;
+  }
+
+  function isAnnotationStroke(type, bis, meta) {
+    if (type === 'DIMENSION') return true;
+    if (['G', 'H', 'K'].indexOf(bis) !== -1) return true;
+    var kind = meta && meta.kind;
+    if (kind && ['axis', 'locus', 'projector', 'construction'].indexOf(kind) !== -1) return true;
+    return !!(meta && meta.reconstructionRole === 'construction');
+  }
+
+  function resolvePoint(table, name, role, options) {
+    options = options || {};
+    var annotation = options.annotation === true;
+    var list = table.list();
+    var points = list.filter(function (e) { return e.type === 'POINT'; });
+    var byId = list.find(function (e) { return e.id === name; });
+    if (byId) {
+      if (byId.type !== 'POINT') return { fail: 'not-a-point' };
+      if (!pointInRole(byId, role) && !annotation) {
+        return { fail: 'view', view: viewOfPoint(byId) };
+      }
+      return { ent: byId };
+    }
+    var scoped = points.filter(function (p) { return pointInRole(p, role); });
+    var scopedRole = role && role !== 'BOTH';
+    var tiers = scopedRole ? [
+      scoped.filter(function (p) {
+        return pointExactLabels(p).indexOf(name) !== -1 ||
+          pointMemberLabels(p).indexOf(name) !== -1;
+      }),
+      baseLabel(name) === String(name).trim() ?
+        scoped.filter(function (p) {
+          return pointBaseLabels(p).indexOf(baseLabel(name)) !== -1;
+        }) : []
+    ] : [
+      scoped.filter(function (p) { return pointExactLabels(p).indexOf(name) !== -1; }),
+      scoped.filter(function (p) { return pointMemberLabels(p).indexOf(name) !== -1; }),
+      baseLabel(name) === String(name).trim() ?
+        scoped.filter(function (p) {
+          return pointBaseLabels(p).indexOf(baseLabel(name)) !== -1;
+        }) : []
+    ];
+    var tier = [];
+    for (var ti = 0; ti < tiers.length; ti++) {
+      tier = uniquePoints(tiers[ti]);
+      if (tier.length) break;
+    }
+    if (tier.length === 1) return { ent: tier[0] };
+    if (tier.length > 1) return { fail: 'ambiguous' };
+    if (scopedRole) {
+      var elsewhere = uniquePoints(points.filter(function (p) {
+        return pointExactLabels(p).indexOf(name) !== -1 ||
+          pointMemberLabels(p).indexOf(name) !== -1 ||
+          (baseLabel(name) === String(name).trim() &&
+            pointBaseLabels(p).indexOf(baseLabel(name)) !== -1);
+      }));
+      if (annotation) {
+        if (elsewhere.length === 1) return { ent: elsewhere[0] };
+        if (elsewhere.length > 1) return { fail: 'ambiguous', sheet: true };
+        return { fail: 'unknown' };
+      }
+      if (elsewhere.length) {
+        var views = [];
+        elsewhere.forEach(function (p) {
+          var v = viewOfPoint(p);
+          if (views.indexOf(v) === -1) views.push(v);
+        });
+        return { fail: 'view', view: views.join('/') };
+      }
+    }
+    return { fail: 'unknown' };
+  }
+
+  function resolvePointFailure(result, name, role, options) {
+    options = options || {};
+    if (result.fail === 'not-a-point') {
+      return fail('"' + name + '" is not a point.');
+    }
+    if (result.fail === 'ambiguous') {
+      if (result.sheet === true) {
+        return fail('"' + name + '" matches more than one sheet point — use an entity ID.');
+      }
+      return fail(role && role !== 'BOTH' ?
+        ('"' + name + '" matches more than one point in the ' + role +
+          ' view — use an entity ID.') :
+        ('"' + name + '" matches more than one point — name a view or use an entity ID.'));
+    }
+    if (result.fail === 'view') {
+      if (options.sameView === true) {
+        return fail('"' + name + '" is in the ' + result.view + ' view, not ' +
+          role + ' — all defining points must belong to the same declared view.');
+      }
+      return fail('"' + name + '" is in the ' + result.view + ' view, not ' +
+        role + '.');
+    }
+    return fail('Unknown point "' + name + '" — place it first with /point.');
+  }
+
+
+
+
   function displayName(ent) {
     if (!ent || typeof ent !== 'object') {
       throw new Error('educad-command: entity needed');
@@ -983,8 +1228,8 @@
     return '';
   }
 
-  // pointMap(entities): display-name -> {x,y} over POINTs for completion
-  // and previews. Ambiguous labels offer stable IDs instead of guessing.
+
+
   function pointMap(entities) {
     if (!Array.isArray(entities)) {
       throw new Error('educad-command: entities must be an array');
@@ -998,12 +1243,64 @@
       if (label === '' || Object.prototype.hasOwnProperty.call(map, label)) continue;
       Object.defineProperty(map, label, { value: { x: e.x, y: e.y }, enumerable: true, writable: true, configurable: true });
     }
+    if (!Object.prototype.hasOwnProperty.call(map, POINT_CONTEXT_KEY)) {
+      Object.defineProperty(map, POINT_CONTEXT_KEY, {
+        value: entities.filter(function (e) { return e && e.type === 'POINT'; }),
+        enumerable: false, writable: false, configurable: true
+      });
+    }
     return map;
   }
 
-  // entityMap(entities): display-name -> id over every entity for the
-  // /style seat and rename/delete previews. Ambiguous labels use IDs; uncaptioned
-  // geometry keeps its engine id (the only handle it has).
+
+
+
+  function previewCandidates(ctx) {
+    if (!ctx) return [];
+    var map = ctx.points;
+    if (map && typeof map === 'object' && !Array.isArray(map) &&
+        Array.isArray(map[POINT_CONTEXT_KEY])) {
+      return map[POINT_CONTEXT_KEY].slice();
+    }
+    var out = [];
+    function add(name, value) {
+      if (value && typeof value === 'object' && value.type === 'POINT') {
+        out.push(value);
+        return;
+      }
+      var point = { type: 'POINT', id: String(name), name: String(name),
+        caption: String(name), x: null, y: null, viewRole: 'BOTH', meta: {} };
+      if (value && typeof value === 'object') {
+        if (typeof value.x === 'number') point.x = value.x;
+        if (typeof value.y === 'number') point.y = value.y;
+        if (value.viewRole) point.viewRole = value.viewRole;
+        if (value.meta) point.meta = value.meta;
+        if (value.id) point.id = value.id;
+        if (value.name) point.name = value.name;
+        if (value.caption) point.caption = value.caption;
+      }
+      out.push(point);
+    }
+    if (Array.isArray(map)) {
+      map.forEach(function (item) {
+        if (item && typeof item === 'object') add(item.id || item.name, item);
+        else add(item, null);
+      });
+    } else if (map && typeof map === 'object') {
+      Object.keys(map).forEach(function (name) { add(name, map[name]); });
+    }
+    return out;
+  }
+
+  function previewNeedPoint(ctx, name, role, options) {
+    var found = resolvePoint({ list: function () { return previewCandidates(ctx); } },
+      name, role, options);
+    if (found.fail) {
+      return { fail: resolvePointFailure(found, name, role, options).message };
+    }
+    return { ent: found.ent };
+  }
+
   function entityMap(entities) {
     if (!Array.isArray(entities)) {
       throw new Error('educad-command: entities must be an array');
@@ -1026,9 +1323,9 @@
 
   function roleForY(y) { return y >= 0 ? 'ELEVATION' : 'PLAN'; }
 
-  // execute(input, env): run one line. env.table is required; hooks
-  // (clear, loadDemo, startTutorial, runVerify, setMode) default to safe
-  // fallbacks; gates (allowDemo, allowTutorial, readOnly) default open.
+
+
+
   function execute(input, env) {
     if (!env || typeof env !== 'object' || !env.table) {
       throw new Error('educad-command: env.table needed');
@@ -1042,11 +1339,11 @@
 
     var readOnly = env.readOnly === true;
     var mutating = ['curve-through', 'circle-through', 'arc-through', 'point', 'line', 'ray', 'xline', 'circle', 'arc', 'text',
-      'dimension', 'polygon', 'polyline', 'ellipse', 'hatch', 'rename',
+      'dimension', 'polygon', 'polyline', 'ellipse', 'conic', 'hatch', 'rename',
       'delete', 'style', 'datum', 'clear', 'undo', 'demo',
       'tutorial'].indexOf(p.name) !== -1;
-    // Mobile inspection still loads demos (the page replaces the sheet
-    // and stays in View); every other mutating command stays refused.
+
+
     if (p.name === 'demo' && env.mobileDemoLoad === true) mutating = false;
     if (readOnly && mutating) {
       if (env.mobileNoEdit === true) {
@@ -1063,15 +1360,10 @@
       return null;
     }
 
-    function needPoint(name) {
-      var ent = findEntity(table, name);
-      if (ent === null) {
-        return { fail: fail('Unknown point "' + name + '" — place it first with /point.') };
-      }
-      if (ent.type !== 'POINT') {
-        return { fail: fail('"' + name + '" is not a point.') };
-      }
-      return { ent: ent };
+    function needPoint(name, role, options) {
+      var found = resolvePoint(table, name, role, options);
+      if (found.fail) return { fail: resolvePointFailure(found, name, role, options) };
+      return { ent: found.ent };
     }
 
     function create(type, opts) {
@@ -1127,15 +1419,17 @@
         if (xbr.error !== '') return fail(xbr.error + ' — usage: ' + spec.usage);
         var bis = xbr.bis !== null ? xbr.bis : 'B';
         var xrole = xbr.role !== null ? xbr.role : 'BOTH';
-        var la = needPoint(args[0]);
+        var xtypes = { line: 'SEGMENT', ray: 'RAY', xline: 'LINE',
+          dimension: 'DIMENSION' };
+        var xannotation = isAnnotationStroke(xtypes[p.name], bis, null);
+        var xopts = xannotation ? { annotation: true } : undefined;
+        var la = needPoint(args[0], xrole, xopts);
         if (la.fail) return la.fail;
-        var lb = needPoint(args[1]);
+        var lb = needPoint(args[1], xrole, xopts);
         if (lb.fail) return lb.fail;
         if (la.ent.id === lb.ent.id) {
           return fail('Two different points needed — "' + args[0] + '" twice is one point.');
         }
-        var xtypes = { line: 'SEGMENT', ray: 'RAY', xline: 'LINE',
-          dimension: 'DIMENSION' };
         var xverbs = { line: 'Drew segment ', ray: 'Drew ray ',
           xline: 'Drew construction line ', dimension: 'Drew dimension ' };
         var seg = create(xtypes[p.name],
@@ -1158,7 +1452,7 @@
         if(tokens[tokens.length-1]==='closed') {closed=true;tokens.pop();}
         if(p.name!=='curve-through' && (closed||tokens.length!==3)) return fail('Usage: '+spec.usage);
         var through=[];
-        for(var ti=0;ti<tokens.length;ti++) {var found=needPoint(tokens[ti]);if(found.fail)return found.fail;through.push(found.ent);}
+        for(var ti=0;ti<tokens.length;ti++) {var found=needPoint(tokens[ti],curveRole,{sameView:true});if(found.fail)return found.fail;through.push(found.ent);}
         if(!through.length)return fail('Usage: '+spec.usage);
         curveRole=curveRole||through[0].viewRole;
         if(['PLAN','ELEVATION','PROFILE'].indexOf(curveRole)===-1 || through.some(function(e){return e.viewRole!==curveRole;}))
@@ -1186,9 +1480,10 @@
         var xbr2 = parseBisRole(args.slice(xneed));
         if (xbr2.error !== '') return fail(xbr2.error + ' — usage: ' + spec.usage);
         var xbis = xbr2.bis !== null ? xbr2.bis : 'A';
+        var xrole2 = xbr2.role !== null ? xbr2.role : null;
         var cx, cy, crr, crole, cref;
         if (xnamed) {
-          var cc = needPoint(args[0]);
+          var cc = needPoint(args[0], xrole2);
           if (cc.fail) return cc.fail;
           crr = parseNum(args[1]);
           if (crr === null || crr <= 0) {
@@ -1218,7 +1513,8 @@
             return fail('Angles differ by a full turn — a 0° arc draws nothing (use /circle for a full ring).');
           }
         }
-        crole = xbr2.role !== null ? xbr2.role : roleForY(cy);
+        crole = xrole2 !== null ? xrole2 :
+          (xnamed ? viewOfPoint(cc.ent) : roleForY(cy));
         var nc = create(xnoun, { x: cx, y: cy, radius: crr,
           startAngle: aa1, endAngle: aa2, bisCode: xbis, viewRole: crole,
           caption: '', showLabel: false,
@@ -1324,8 +1620,9 @@
         var ebr = parseBisRole(esplit.rest);
         if (ebr.error !== '') return fail(ebr.error + ' — usage: ' + spec.usage);
         var ex, ey, erx, ery;
+        var erolePick = ebr.role !== null ? ebr.role : null;
         if (enamed) {
-          var ecc = needPoint(args[0]);
+          var ecc = needPoint(args[0], erolePick);
           if (ecc.fail) return ecc.fail;
           ex = ecc.ent.x;
           ey = ecc.ent.y;
@@ -1342,7 +1639,8 @@
           return fail('rx and ry must be numbers above 0 (mm).');
         }
         var ebis = ebr.bis !== null ? ebr.bis : 'A';
-        var erole = ebr.role !== null ? ebr.role : roleForY(ey);
+        var erole = erolePick !== null ? erolePick :
+          (enamed ? viewOfPoint(ecc.ent) : roleForY(ey));
         var ring = ellipseRing(ex, ey, erx, ery, esegs);
         var eids = [];
         for (var ei = 0; ei < ring.length; ei++) {
@@ -1353,10 +1651,84 @@
           if (qe.fail) return qe.fail;
           eids.push(qe.ent.id);
         }
+        var egroup = eids[0];
+        var ebatch = {};
+        for (var ej = 0; ej < eids.length; ej++) {
+          var edef = { group: egroup, kind: 'ellipse', exact: true,
+            center: { x: ex, y: ey }, a: { x: erx, y: 0 }, b: { x: 0, y: ery },
+            count: esegs, index: ej, role: erole,
+            centerRef: enamed ? ecc.ent.id : null };
+          var emeta = { ellipse: edef };
+          if (enamed) emeta.centerRef = ecc.ent.id;
+          ebatch[eids[ej]] = { meta: emeta };
+        }
+        table.updateMany(ebatch);
         return { ok: true,
           message: 'Drew ellipse ' + fmtPt(ex, ey) + ' ' + erx + ' × ' + ery +
             ' mm (' + esegs + ' segments).',
           ids: eids };
+      }
+      case 'conic': {
+        var bc = arity(5, 10);
+        if (bc) return bc;
+        var cn = !isNumTok(args[0]);
+        var cbase = cn ? 1 : 2;
+        if (args.length < cbase + 4) return fail('Usage: ' + spec.usage);
+        var csplit = splitCountTail(args.slice(cbase + 4));
+        var csegs = csplit.num === null ? ELLIPSE_SEGS_DEFAULT : csplit.num;
+        if (csplit.num !== null &&
+            (Math.floor(csplit.num) !== csplit.num || csegs < ELLIPSE_SEGS_MIN ||
+              csegs > ELLIPSE_SEGS_MAX)) {
+          return fail('Segments must be a whole number from ' + ELLIPSE_SEGS_MIN +
+            ' to ' + ELLIPSE_SEGS_MAX + ' — usage: ' + spec.usage);
+        }
+        var cbr = parseBisRole(csplit.rest);
+        if (cbr.error !== '') return fail(cbr.error + ' — usage: ' + spec.usage);
+        var cbx, cby, ccref = null, ccEnt = null;
+        if (cn) {
+          var cc = needPoint(args[0], cbr.role);
+          if (cc.fail) return cc.fail;
+          cbx = cc.ent.x; cby = cc.ent.y; ccref = cc.ent.id; ccEnt = cc.ent;
+        } else {
+          cbx = parseNum(args[0]); cby = parseNum(args[1]);
+          if (cbx === null || cby === null) return fail('Usage: ' + spec.usage);
+        }
+        var cax = parseNum(args[cbase]), cay = parseNum(args[cbase + 1]);
+        var cbvx = parseNum(args[cbase + 2]), cbvy = parseNum(args[cbase + 3]);
+        if (cax === null || cay === null || cbvx === null || cbvy === null)
+          return fail('Conic basis vectors must be numbers (mm) — usage: ' + spec.usage);
+        if (Math.abs(cax*cbvy - cay*cbvx) <=
+            1e-12 * Math.max(1, Math.hypot(cax,cay) * Math.hypot(cbvx,cbvy))) {
+          return fail('The two conic basis vectors must be independent.');
+        }
+        var cbis = cbr.bis !== null ? cbr.bis : 'A';
+        var crole = cbr.role !== null ? cbr.role :
+          (cn ? viewOfPoint(ccEnt) : roleForY(cby));
+        var cring = basisRing(cbx, cby, {x:cax,y:cay}, {x:cbvx,y:cbvy}, csegs);
+        var cids = [];
+        for (var ci2 = 0; ci2 < cring.length; ci2++) {
+          var cq = cring[ci2];
+          var cqe = create('SEGMENT', { x: cq[0], y: cq[1], x2: cq[2], y2: cq[3],
+            bisCode: cbis, viewRole: crole, caption: '', showLabel: false,
+            meta: {} });
+          if (cqe.fail) return cqe.fail;
+          cids.push(cqe.ent.id);
+        }
+        var cgroup = cids[0], cbatch = {};
+        for (var cj = 0; cj < cids.length; cj++) {
+          var cdef = { group: cgroup, kind: 'ellipse', exact: true,
+            center: { x: cbx, y: cby },
+            a: { x: cax, y: cay }, b: { x: cbvx, y: cbvy },
+            count: csegs, index: cj, role: crole, centerRef: ccref };
+          var cmeta = { ellipse: cdef };
+          if (ccref) cmeta.centerRef = ccref;
+          cbatch[cids[cj]] = { meta: cmeta };
+        }
+        table.updateMany(cbatch);
+        return { ok: true,
+          message: 'Drew analytic ellipse ' + fmtPt(cbx, cby) + ' (' +
+            csegs + ' segments).',
+          ids: cids };
       }
       case 'hatch': {
         var bh = arity(5, 8);

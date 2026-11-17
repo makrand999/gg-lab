@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-geometry.js'), require('./educad-entities.js'), require('./educad-parametric.js'));
-  else root.EduCADDrafting = factory(root.EduCADGeometry, root.EduCADEntities, root.EduCADParametric);
-})(typeof window !== 'undefined' ? window : globalThis, function (Geometry, Entities, Parametric) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-geometry.js'), require('./educad-entities.js'), require('./educad-parametric.js'), require('./educad-conic.js'));
+  else root.EduCADDrafting = factory(root.EduCADGeometry, root.EduCADEntities, root.EduCADParametric, root.EduCADConic);
+})(typeof window !== 'undefined' ? window : globalThis, function (Geometry, Entities, Parametric, Conic) {
   'use strict';
   var EPS = 1e-6;
   var LINE_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION'];
@@ -87,7 +87,7 @@
         if (!member) return;
         if (e.locked) throw new Error('A linked station is locked.');
         member.name = names[0].name;
-        // A deliberate linked rename refreshes all affected station labels.
+
         setMemberLabel(e);
       });
     }
@@ -97,12 +97,23 @@
     });
     commitIdentitySnapshot(table, list);
   }
-  // Membership is a separate operation. Callers may supply exact IDs, or
-  // explicitly resolve base names at this input boundary. Ambiguity rejects.
-  function assignMembers(table, id, input) {
+
+
+  function assignMembers(table, id, input, options) {
     var list = Entities.identitySnapshot(table.list()), point = editablePoint(list, id);
     var requested = typeof input === 'string' ? Entities.parseMembers(input) : clone(input);
     if (!Array.isArray(requested)) throw new Error('Members must be a caption or an array.');
+    var labelOnly = !!(options && options.labelOnly);
+    if (labelOnly) {
+      point.meta.members = requested.map(function (m, i) {
+        return { id: 'point:' + id + ':' + i, name: m.name, hidden: m.hidden === undefined ? false : !!m.hidden };
+      });
+      delete point.meta.membersDeclared;
+      clearMemberClaims(list);
+      Entities.validateMembers(point); setMemberLabel(point);
+      commitIdentitySnapshot(table, list);
+      return;
+    }
     var registry = Object.create(null), declared = Object.create(null);
     list.forEach(function (e) { if (e.type === 'POINT') e.meta.members.forEach(function (m) {
       registry[m.id] = m;
@@ -129,6 +140,15 @@
     Entities.validateMembers(point); validateProjectionMembers(list); setMemberLabel(point);
     commitIdentitySnapshot(table, list);
   }
+  function clearMemberClaims(list) {
+    list.forEach(function (e) {
+      if (!e.meta || e.type === 'POINT') return;
+      delete e.meta.endpointMemberIds;
+      delete e.meta.endpointMembers;
+      delete e.meta.fromMemberId;
+      delete e.meta.toMemberId;
+    });
+  }
   function linkPoints(table, sourceId, targetId, map) {
     var list = Entities.identitySnapshot(table.list());
     var source = editablePoint(list, sourceId), target = editablePoint(list, targetId);
@@ -137,7 +157,7 @@
     var plan = role(source) === 'PLAN' ? source : role(target) === 'PLAN' ? target : null;
     var side = role(source) === 'PROFILE' ? source : role(target) === 'PROFILE' ? target : null;
     if (front && plan && Math.abs(front.x - plan.x) > EPS || front && side && Math.abs(front.y - side.y) > EPS || plan && side && map && Math.abs(side.x - (map.xRef + map.s * (-plan.y - map.dRef))) > EPS) throw new Error('The stations do not satisfy the projection equations.');
-    // Assignment is deliberate; coincidence and equal labels never merge IDs.
+
     target.meta.members = clone(source.meta.members);
     source.meta.membersDeclared = true; target.meta.membersDeclared = true;
     validateProjectionMembers(list, map);
@@ -183,7 +203,7 @@
     var zMin = geometry && geometry.vertices.length ? Math.min.apply(null, geometry.vertices.map(function (v) { return v.z; })) : 0;
     return { three: true, side: s === 1 ? 'left' : 'right', xRef: ref ? ref.x : (s === 1 ? pb.x0 : pb.x1), dRef: zMin, s: s };
   }
-  // One history entry per completed gesture; drag previews stay in one transaction.
+
   function createHistory(table, restore, onChange) {
     var past = [], future = [], base = clone(table.list()), pending = false, restoring = false, depth = 0;
     function emit() { if (onChange) onChange(past.length, future.length); }
@@ -228,8 +248,8 @@
       counts: function () { flush(); return { undo: past.length, redo: future.length }; }
     };
   }
-  // Move the selected point, its declared counterparts, and attached endpoints.
-  // Validate the complete patch before committing, including collapsed edges.
+
+
   function movePoints(table, E, targets, map, extra) {
     var list = Entities.identitySnapshot(table.list()), points = list.filter(function (e) { return e.type === 'POINT'; });
     var changes = Object.create(null), constraints = Object.create(null), queue = [];
@@ -240,8 +260,8 @@
         if (Math.abs(constraint[key] - value) > EPS) throw new Error('The requested positions disagree across linked views.');
         return;
       }
-      // An explicitly unchanged coordinate still constrains the final graph.
-      // Otherwise another target could move it and silently detach its edge.
+
+
       constraint[key] = value;
       if (Math.abs(value - p[key]) < EPS) return;
       if (p.locked) throw new Error('A linked point is locked.');
@@ -301,6 +321,23 @@
           }
         }
       }
+      if (e.type === 'SEGMENT' && meta.ellipse && Conic) {
+        var conicDef = Conic.definitionSummary(e);
+        if (conicDef && conicDef.centerRef && changes[conicDef.centerRef]) {
+          var centerPoint = list.find(function (row) { return row.id === conicDef.centerRef; });
+          if (!centerPoint) throw new Error('The ellipse centre point is missing.');
+          var moved = final(centerPoint), tau = 2 * Math.PI;
+          var t0 = tau * conicDef.index / conicDef.count;
+          var t1 = tau * (conicDef.index + 1) / conicDef.count;
+          patch.x = moved.x + conicDef.a.x * Math.cos(t0) + conicDef.b.x * Math.sin(t0);
+          patch.y = moved.y + conicDef.a.y * Math.cos(t0) + conicDef.b.y * Math.sin(t0);
+          patch.x2 = moved.x + conicDef.a.x * Math.cos(t1) + conicDef.b.x * Math.sin(t1);
+          patch.y2 = moved.y + conicDef.a.y * Math.cos(t1) + conicDef.b.y * Math.sin(t1);
+          patch.meta = Object.assign({}, meta, {
+            ellipse: Object.assign({}, meta.ellipse, { center: { x: moved.x, y: moved.y } })
+          });
+        }
+      }
       if (e.locked && Object.keys(patch).some(function (key) { return key !== 'meta' && patch[key] !== e[key]; })) throw new Error('A dependent entity is locked.');
       if (Object.keys(patch).length) changes[e.id] = Object.assign(changes[e.id] || {}, patch);
     });
@@ -358,8 +395,8 @@
     });
     return table.updateMany(patches);
   }
-  // Compare projected wire coverage in both directions. Extra drawn edges are
-  // disagreements; missing edges are unfinished work, never a reason to hide 3D.
+
+
   function validateProfile(list, geometry, map, Project) {
     if (!map.three || !geometry) return { status: 'idle', issues: [], missing: [] };
     var drawn = list.filter(function (e) { return e.visible !== false && e.viewRole === 'PROFILE' && ['DIMENSION', 'TEXT', 'DATUM_AXIS'].indexOf(e.type) === -1 && (!e.meta || ['axis', 'locus', 'projector'].indexOf(e.meta.kind) === -1); });
@@ -369,7 +406,7 @@
     var projectedPoints = geometry.vertices.map(function (v) { return toView(v, 'PROFILE', map); });
     function segmentsFor(e) {
       if (LINE_TYPES.indexOf(e.type) !== -1) return [{ a: e, b: { x: e.x2, y: e.y2 } }];
-      if(e.type==='CURVE') return null; // Display samples cannot certify curve coverage.
+      if(e.type==='CURVE') return null;
       if (e.type === 'CIRCLE' || e.type === 'CIRCULAR_ARC') return Geometry.roundSegments(e, curveError);
       return [];
     }
@@ -394,8 +431,8 @@
     });
     return { status: issues.length ? 'mismatch' : missing.length || !drawn.length ? 'incomplete' : 'ok', issues: issues, missing: missing };
   }
-  // Project the actual connected edge portions represented by this ink.
-  // Coincident readings split as their owning 3D edges separate under pose.
+
+
   function profileCopies(ent, geometry, posed, map) {
     if (ent.viewRole !== 'PROFILE' || !geometry) return null;
     var originals = geometry.vertices, out = [];
@@ -523,7 +560,7 @@
       }
       var point = candidates.find(function (e) { return e.type === 'POINT' && near(e, result); });
       if (point) { result.id = point.id; result.viewRole = role(point); }
-      // Carry front heights horizontally and top depths through the miter.
+
       if (guides && r === 'PROFILE' && !point) {
         var xs = [], ys = [];
         h.table.visibleEntities().filter(function (e) { return isVisible(e) && e.type === 'POINT' && e.id !== exclude; }).forEach(function (e) {
@@ -654,7 +691,7 @@
             if (LINE_TYPES.indexOf(e.type) !== -1) patch.x2 = next.xRef + next.s * (old.dRef + old.s * (e.x2 - old.xRef) - next.dRef);
             h.table.update(e.id, patch);
           });
-          // Keep assisted front-to-side helper endpoints attached after a layout flip.
+
           h.table.list().forEach(function (e) {
             if (!e.meta || e.meta.kind !== 'projector' || !e.meta.refs || e.locked) return;
             var a = h.table.get(e.meta.refs[0]), b = h.table.get(e.meta.refs[1]);
@@ -684,8 +721,8 @@
       redraw();
     }
     function isVisible(e) {
-      // The bounded reference and miter drawn by drawSheet replace the demo's
-      // infinite LINE, which otherwise cuts through the text controls.
+
+
       if (e.caption === 'ref-X1Y1' || e.caption === 'miter') return false;
       if (!guides && ((e.meta && ['axis', 'projector', 'locus'].indexOf(e.meta.kind) !== -1) || /^proj-/.test(e.caption || ''))) return false;
       if (map().three) return true;
@@ -802,8 +839,8 @@
       redraw();
     });
     sideSelect.addEventListener('change', function () { setLayout(true, sideSelect.value); });
-    // Pane-relative pointer math: the sheet canvas fills the window on
-    // desktop (identical values) and one split pane on mobile.
+
+
     function surfacePx(event) {
       try {
         var r = surface.getBoundingClientRect();
@@ -812,7 +849,7 @@
         return { x: event.clientX, y: event.clientY };
       }
     }
-    // Touch on a split layout belongs to the pane gesture controllers.
+
     function mobileTouchOwned(event) {
       var t = event && event.pointerType;
       if (t === undefined || t === null || t === '' || t === 'mouse') return false;
@@ -872,8 +909,8 @@
     }, true);
     var typed = '';
     window.addEventListener('keydown', function (event) {
-      // The mobile shell owns its controls and transient menus. Do not
-      // cancel a drawing gesture or consume Escape/Tab under that UI.
+
+
       if (window.EduCADMobile && window.EduCADMobile.splitActive()) {
         var mobileMenu = document.getElementById('mobile-menu');
         var mobileChooser = document.getElementById('mobile-chooser');
@@ -885,8 +922,8 @@
         closeMenu(); editorOpen = false; document.activeElement.blur(); sync();
         event.preventDefault(); event.stopImmediatePropagation(); return;
       }
-      // Menu mode uses native Tab navigation; shortcuts keep the earlier
-      // canvas Tab-to-Pose gesture. Settings fields always navigate normally.
+
+
       var settingsKey = event.target && event.target.closest && event.target.closest('#settings-panel, .drafting-controls');
       if (event.key === 'Tab' && ((menuDrawing() && h.measure.mode !== 'pose') || settingsKey)) { event.stopImmediatePropagation(); return; }
       var field = event.target && (['INPUT', 'TEXTAREA', 'SELECT'].indexOf(event.target.tagName) !== -1 || event.target.isContentEditable);

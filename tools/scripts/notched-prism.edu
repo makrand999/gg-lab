@@ -1,4 +1,3 @@
-# notched-prism
 # expect: 12V 18E 8F closed=1 boundary=0
 /datum -100 400
 /point v0 0 -10 plan

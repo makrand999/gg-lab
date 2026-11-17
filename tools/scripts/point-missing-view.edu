@@ -1,5 +1,4 @@
 # expect: 8V 12E 6F unresolved=1 status=partial
-# hidden-box
 /datum -100 400
 /point v0 0 -10 plan
 /point "v0'" 0 20 elevation

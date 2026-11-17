@@ -1,0 +1,10 @@
+# expect: 96V 96E 4F curves=4 unresolved=2 status=partial
+/datum -30 180
+/circle 20 -20 20 A plan
+/circle 20 -60 20 A plan
+/point e1 0 20 elevation
+/point e2 40 20 elevation
+/line e1 e2 A elevation
+/point e3 0 60 elevation
+/point e4 40 60 elevation
+/line e3 e4 A elevation

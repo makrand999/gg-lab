@@ -1,0 +1,35 @@
+# expect: 8V 12E 6F recesses=0 curves=0 surfaces=6 surfaceKinds=plane surfaceLoops=6 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok diagnostics=curve-projection-missing,recess-depth-missing unresolved=2 status=partial
+/datum -100 400
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/circle 30 -30 10 A plan

@@ -1,0 +1,7 @@
+# expect: 73V 192E 120F recesses=1 surfaces=1 surfaceKinds=sphere surfaceLoops=1 surfaceShells=0 surfaceOpen=1 surfaceBoundary=1 surfaceModel=partial surfaceValidation=ok unresolved=1 diagnostics=recess-mouth-unclosed status=partial
+/datum -30 80
+/circle 20 -30 20 A plan
+/arc 20 100 20 180 360 A elevation
+
+# expect: surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":100,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":20}}

@@ -1,0 +1,30 @@
+# expect: 5V 8E 5F status=inferred unresolved=0
+/datum -40 95
+/profile 47.5 8 1
+/point b1 -17.5 -8 plan
+/point b2 17.5 -8 plan
+/point b3 17.5 -43 plan
+/point b4 -17.5 -43 plan
+/point s 0 -25.5 plan
+/line b1 b2 A plan
+/line b2 b3 A plan
+/line b3 b4 A plan
+/line b4 b1 A plan
+/line b1 s B plan
+/line b2 s B plan
+/line b3 s E plan
+/line b4 s E plan
+/point "b1'" -17.5 0 elevation
+/point "b2'" 17.5 0 elevation
+/point "b4'" -17.5 0 elevation
+/point "b3'" 17.5 0 elevation
+/point "s'" 0 70 elevation
+/line "b1'" "b2'" A elevation
+/line "b1'" "s'" A elevation
+/line "b2'" "s'" A elevation
+/point pb1 47.5 0 profile
+/point pb2 82.5 0 profile
+/point ps 65 70 profile
+/line pb1 pb2 A profile
+/line pb1 ps A profile
+/line pb2 ps A profile

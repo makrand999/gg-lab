@@ -1,0 +1,19 @@
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceModel=ok status=inferred
+/datum -30 80
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 0 0 elevation
+/point b 40 0 elevation
+/point c 40 50 elevation
+/point d 0 10 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+
+# expect: surfaceChecks=5 surfaceQueries=ok
+# surface-query: {"operation":"classify","surface":0,"point":{"x":40,"y":10,"z":30},"expect":{"status":"inside","method":"loop-stations","residual":0}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":40,"y":0,"z":30},"expect":{"status":"boundary","reason":"boundary"}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":20,"y":0,"z":30},"expect":{"status":"outside","reason":"off-surface","residual":20}}
+# surface-query: {"operation":"classify","surface":1,"point":{"x":20,"y":0,"z":30},"expect":{"status":"inside","method":"plane-loops"}}
+# surface-query: {"operation":"classify","surface":2,"point":{"x":20,"y":30,"z":30},"expect":{"status":"inside","method":"plane-loops"}}

@@ -1,0 +1,9 @@
+# expect: 24V 24E 1F curves=1 oblique=1 obliqueReprojection=ok obliquePoints=1 obliquePointFit=ok unresolved=0 status=inferred
+/datum -100 400
+/profile 100 17 -1
+/ellipse 20 -30 10 20 A plan
+/ellipse 87 40 20 17.3205080757 A profile
+/point p 10.6767265439 -37.2323086393 plan
+/point q 79.7676913607 56.1483833188 profile
+/rename p a members
+/rename q a members

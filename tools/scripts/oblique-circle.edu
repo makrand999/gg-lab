@@ -1,0 +1,4 @@
+# expect: curves=0 diagnostics=conic-lift-ambiguous status=conic-lift-ambiguous
+/datum -100 400
+/ellipse 0 0 20 10 A plan
+/ellipse 0 0 20 17.320508 A elevation

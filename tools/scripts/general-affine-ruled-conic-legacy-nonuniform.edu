@@ -1,0 +1,32 @@
+# expect: 50V 100E 52F rawFaces=52 faceBindings=ok curves=2 surfaces=3 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred previewParity=ok
+# conic-query: {"index":0,"expect":{"analyticVolume":14660.76571675237,"volumePatch":{"kind":"homothetic-conic-volume","k":0.4999999999999807}}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":14498.173302883588,"vertices":50,"edges":100,"faces":52,"euler":2,"oriented":true,"sameDirectionEdges":0}}
+# surface-query: {"operation":"implicit-equation","surface":2,"expect":{"kind":"ruledConic","degree":2,"paramChart":{"kind":"ruledConic","k":0.4999999999999807},"domain":{"compiled":["parameter-range","profile-nonnegative"],"unresolved":[]}}}
+# surface-query: {"operation":"generator-lines","expect":{"count":3,"checkedEdges":3,"edgeBacked":true,"reprojectionError":0,"surfaceResidual":0,"angles":[-1.5707963267948966,-0.9707963267950734,1.5707963267948966],"sourceIds":["E45","E46","E47","E48","E53","E54"],"ok":true}}
+# surface-query: {"operation":"preview-implicit","expect":{"valid":true,"count":3,"missing":0,"equationParity":"ok","generatorLineCount":3,"generatorSourceIds":["E45","E46","E47","E48","E53","E54"],"generatorLineParity":"ok","surfaces":[{"kind":"plane"},{"kind":"plane"},{"kind":"implicit","degree":2,"displayTessellation":{"samples":25,"nonplanar":"triangulated"}}]}}
+/conic 0 0 18.646546912121 -3.616154319650 -7.232308639299 -9.323273456060 8 A plan
+/conic 0 0 8.893230334834 -17.913973713601 17.913973713601 8.893230334834 8 A elevation
+/conic 0 -40 -5.048461045999 -4.316046833244 -8.632093666489 2.524230522999 8 A plan
+/conic 0 40 8.138784566625 5.810351605373 -5.810351605373 8.138784566625 8 A elevation
+/point p 14.1421356237 -7.0710678119 plan
+/point p' 14.1421356237 14.1421356237 elevation
+/point q 7.0710678119 -43.5355339059 plan
+/point q' 7.0710678119 47.0710678119 elevation
+/point g1 20 0 plan
+/point g1' 20 0 elevation
+/point h1 10 -40 plan
+/point h1' 10 40 elevation
+/point g2 -20 0 plan
+/point g2' -20 0 elevation
+/point h2 -10 -40 plan
+/point h2' -10 40 elevation
+/line g1 h1 A plan
+/line g1' h1' A elevation
+/line g2 h2 A plan
+/line g2' h2' A elevation
+/point w 16.5067122982 -5.64642473395 plan
+/point "w'" 16.5067122982 11.2928494679 elevation
+/point v 8.2533561491 -42.823212367 plan
+/point "v'" 8.2533561491 45.6464247339 elevation
+/line w v A plan
+/line "w'" "v'" A elevation

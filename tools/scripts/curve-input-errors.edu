@@ -1,0 +1,11 @@
+# expect: rejected=5
+/datum -60 180
+/point a 0 -10 plan
+/point b 20 -10 plan
+/point c 40 -10 plan
+/point d 40 10 elevation
+# reject: {"command":"/circle-through a b c plan","contains":"non-collinear"}
+# reject: {"command":"/arc-through a a b plan","contains":"non-collinear"}
+# reject: {"command":"/curve-through a a b plan","contains":"distinct"}
+# reject: {"command":"/curve-through a b closed plan","contains":"at least 3"}
+# reject: {"command":"/curve-through a b d plan","contains":"same declared view"}

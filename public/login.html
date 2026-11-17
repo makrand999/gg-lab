@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login - EduCAD</title>
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+  <div class="cf-page">
+    <header class="cf-header">
+      <a class="cf-logo" href="login.html">Edu<span>CAD</span></a>
+      <div class="cf-head-right">Engineering Graphics &middot; First-Angle Monge Projection</div>
+    </header>
+    <nav class="cf-menu">
+      <div class="menu-list-container">
+        <ul class="menu-list">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="tutorials.html">Tutorials</a></li>
+          <li id="menu-login" class="current"><a href="login.html" id="tab-login">Login</a></li>
+        </ul>
+      </div>
+    </nav>
+    <main id="login-view" class="cf-content">
+      <h1>Login to EduCAD</h1>
+      <div class="cf-tabs">
+        <button type="button" data-role="academics">Academics</button>
+        <button type="button" data-role="teacher">Teacher</button>
+        <button type="button" data-role="student" class="active">Student</button>
+      </div>
+      <form id="login-form" action="api/login" method="post" autocomplete="off">
+        <table class="cf-form">
+          <tr>
+            <td class="lbl"><label for="username">College ERP email:</label></td>
+            <td><input id="username" name="username" type="email" maxlength="254" autocomplete="username" required></td>
+          </tr>
+          <tr>
+            <td class="lbl"><label for="password">Password:</label></td>
+            <td><input id="password" name="password" type="password" maxlength="1024" autocomplete="current-password" required></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>
+              <button type="submit" class="cf-btn">Login</button>
+              <span id="login-error" class="cf-error" hidden></span>
+            </td>
+          </tr>
+        </table>
+        <p class="cf-hint" id="demo-hint"></p>
+      </form>
+      <p class="cf-guest">Just looking around? <a href="index.html" id="guest-link">Continue as guest</a></p>
+    </main>
+    <footer class="cf-footer">EduCAD &middot; zero-dependency teaching CAD &middot; College digital lab</footer>
+  </div>
+  <script src="menu-lava.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>

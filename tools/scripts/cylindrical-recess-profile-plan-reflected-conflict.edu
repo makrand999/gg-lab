@@ -1,0 +1,45 @@
+# expect: 8V 12E 6F recesses=0 curves=0 surfaces=6 surfaceKinds=plane surfaceLoops=6 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok diagnostics=curve-projection-missing,point-correspondence-missing,recess-depth-conflict,unresolved-edge unresolved=10 status=partial previewParity=ok
+/datum -100 400
+/profile 100 -7 -1
+/point "v0''" 93 0 profile
+/point "v0" 20 0 plan
+/point "v1''" 33 0 profile
+/point "v1" 20 -60 plan
+/point "v2''" 33 60 profile
+/point "v2" 20 -60 plan
+/point "v3''" 93 60 profile
+/point "v3" 20 0 plan
+/point "v8''" 93 0 profile
+/point "v8" 60 0 plan
+/point "v9''" 33 0 profile
+/point "v9" 60 -60 plan
+/point "v10''" 33 60 profile
+/point "v10" 60 -60 plan
+/point "v11''" 93 60 profile
+/point "v11" 60 0 plan
+/line "v0''" "v1''" A profile
+/line "v0" "v1" A plan
+/line "v1''" "v2''" A profile
+/line "v2''" "v3''" A profile
+/line "v2" "v3" A plan
+/line "v3''" "v0''" A profile
+/line "v8''" "v9''" A profile
+/line "v8" "v9" A plan
+/line "v9''" "v10''" A profile
+/line "v10''" "v11''" A profile
+/line "v10" "v11" A plan
+/line "v11''" "v8''" A profile
+/line "v0" "v8" A plan
+/line "v1" "v9" A plan
+/line "v2" "v10" A plan
+/line "v3" "v11" A plan
+/circle 63 30 10 A profile
+/point "h0" 60 -20 plan
+/point "h1" 60 -40 plan
+/point "h2" 40 -40 plan
+/point "h3" 40 -20 plan
+/point "h4" 40 -30 plan
+/line "h0" "h1" A plan
+/line "h1" "h2" A plan
+/line "h3" "h0" A plan
+/line "h3" "h4" A plan

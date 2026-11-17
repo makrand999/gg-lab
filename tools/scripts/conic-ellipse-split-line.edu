@@ -1,0 +1,8 @@
+# expect: 24V 24E 1F curves=1 analyticConics=1 conicProjection=ok conicDefinitions=ok conicJSON=ok status=inferred
+/datum -100 400
+/ellipse 20 -30 14.1421356237 20 8 A plan
+/point a 5.8578643763 44.1421356237 elevation
+/point m 20 30 elevation
+/point b 34.1421356237 15.8578643763 elevation
+/line a m A elevation
+/line m b A elevation

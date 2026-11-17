@@ -1,0 +1,9 @@
+# expect: 2V 1E 0F unresolved=0 diagnostics=none status=ok
+/datum -30 180
+/profile 100 0 1
+/point a 10 -20 plan
+/point b 60 -20 plan
+/point a'' 120 40 profile
+/point b'' 120 60 profile
+/line a b A plan
+/line a'' b'' A profile

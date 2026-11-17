@@ -1,0 +1,12 @@
+# expect: 24V 24E 1F curves=1 surfaces=1 surfaceKinds=plane surfaceOpen=1 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component diagnostics=curve-inclined-arc-unsupported,point-correspondence-missing,unresolved-edge unresolved=6 status=partial
+/datum -30 80
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 0 0 elevation
+/point b 40 0 elevation
+/point c 35 40 elevation
+/point d 5 10 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation

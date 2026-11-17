@@ -1,0 +1,20 @@
+# expect: 25V 48E 25F curves=1 surfaces=2 surfaceKinds=implicit,plane surfaceModel=ok surfaceValidation=ok surfaceCertificate=ok diagnostics=none unresolved=0 status=inferred
+/datum -100 400
+/profile 100 0 1
+/circle 20 -30 10 A plan
+/point A 25 -35 plan
+/point "A'" 25 140 elevation
+/point "A''" 135 140 profile
+/point f0 10 100 elevation
+/point f1 30 100 elevation
+/line f0 f1 A elevation
+/line f0 "A'" A elevation
+/line f1 "A'" A elevation
+/point s0 120 100 profile
+/point s1 140 100 profile
+/line s0 s1 A profile
+/line s0 "A''" A profile
+/line s1 "A''" A profile
+# surface-query: {"operation":"mesh-audit","expect":{"volume":4141.104721640334,"sameDirectionEdges":0,"oppositeEdges":48,"euler":2,"oriented":true}}
+# surface-query: {"operation":"normal","surface":1,"point":{"x":30,"y":100,"z":30},"expect":{"normal":{"x":0.9922778767136677,"y":0.12403473458920844,"z":0}}}
+# expect: surfaceChecks=2 surfaceQueries=ok

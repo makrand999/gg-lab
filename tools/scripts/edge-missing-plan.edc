@@ -1,0 +1,7 @@
+# expect: 2V 0E 0F status=wire unresolved=0
+/datum -30 30
+/point "a'" 0 40 elevation
+/point "b'" 40 40 elevation
+/point a 0 -10 plan
+/point b 40 -10 plan
+/line "a'" "b'" A elevation

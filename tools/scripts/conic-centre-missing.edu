@@ -1,0 +1,10 @@
+# expect: curves=0 diagnostics=conic-center-reference-invalid,conic-projection-missing ellipseCentreRefs=issues status=partial
+/datum -100 400
+/point c 0 0 plan
+/point c' 0 0 elevation
+/point q 0 0 elevation
+/ellipse c 20 10 8 A plan
+/ellipse c' 20 20 8 A elevation
+# conic-corrupt: {"group":"E5","mode":"missing","point":"q"}
+/point p 16.5067122982 -5.64642473395 plan
+/point p' 16.5067122982 11.2928494679 elevation

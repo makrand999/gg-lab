@@ -1,0 +1,10 @@
+# expect: 73V 192E 120F recesses=1 surfaces=2 surfaceKinds=plane,sphere surfaceShells=1 surfaceOpen=0 surfaceModel=ok surfaceCertificate=ok diagnostics=none previewParity=ok
+/datum -40 200
+/profile 100 0 1
+/circle 130 100 20 A profile
+/arc 20 100 20 90 270 A elevation
+/point rim1 20 120 elevation
+/point rim2 20 80 elevation
+/line rim1 rim2 A elevation
+# expect: surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":10,"y":100,"z":30},"normal":{"x":1,"y":0,"z":0}},"expect":{"kind":"circle","radius":17.3205080757,"center":{"x":10,"y":100,"z":30}}}

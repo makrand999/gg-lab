@@ -1,0 +1,10 @@
+# expect: 49V 120E 72F recesses=1 surfaces=2 surfaceKinds=plane,sphere surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+/datum -30 80
+/circle 20 -30 20 A plan
+/arc 20 115 25 216.869898 323.130102 A elevation
+/point a 0 100 elevation
+/point b 40 100 elevation
+/line a b A elevation
+
+# expect: surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":100,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":20}}

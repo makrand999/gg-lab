@@ -1,0 +1,9 @@
+# expect: 24V 24E 1F curves=1 unresolved=0 status=inferred minRadius=20 maxRadius=20
+/datum -30 70
+/circle 20 -30 20 A plan
+/point a' 0 15 elevation
+/point b' 20 15 elevation
+/point c' 40 15 elevation
+/line a' b' A elevation
+/line b' c' A elevation
+/line a' c' A elevation

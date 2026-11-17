@@ -1,0 +1,7 @@
+# expect: 24V 24E 1F curves=1 unresolved=0 status=inferred
+/datum -30 180
+/profile 100 0 1
+/circle 130 40 20 A profile
+/point a 130 -10 plan
+/point b 130 -50 plan
+/line a b A plan

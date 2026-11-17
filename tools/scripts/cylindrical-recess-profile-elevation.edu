@@ -1,0 +1,51 @@
+# expect: 56V 84E 31F recesses=1 minRecessDepth=20 maxRecessDepth=20 curves=2 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=10 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok holes=1 surfaceValidation=partial displaySync=ok displaySyncIssues=none diagnostics=none status=inferred previewParity=ok
+/datum -100 400
+/profile 100 -7 1
+/point "v0''" 107 0 profile
+/point "v0'" 20 0 elevation
+/point "v1''" 107 60 profile
+/point "v1'" 20 60 elevation
+/point "v2''" 167 60 profile
+/point "v2'" 20 60 elevation
+/point "v3''" 167 0 profile
+/point "v3'" 20 0 elevation
+/point "v8''" 107 0 profile
+/point "v8'" 60 0 elevation
+/point "v9''" 107 60 profile
+/point "v9'" 60 60 elevation
+/point "v10''" 167 60 profile
+/point "v10'" 60 60 elevation
+/point "v11''" 167 0 profile
+/point "v11'" 60 0 elevation
+/line "v0''" "v1''" A profile
+/line "v0'" "v1'" A elevation
+/line "v1''" "v2''" A profile
+/line "v2''" "v3''" A profile
+/line "v2'" "v3'" A elevation
+/line "v3''" "v0''" A profile
+/line "v8''" "v9''" A profile
+/line "v8'" "v9'" A elevation
+/line "v9''" "v10''" A profile
+/line "v10''" "v11''" A profile
+/line "v10'" "v11'" A elevation
+/line "v11''" "v8''" A profile
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/circle 137 30 10 A profile
+/point "h0'" 60 20 elevation
+/point "h1'" 60 40 elevation
+/point "h2'" 40 40 elevation
+/point "h3'" 40 20 elevation
+/line "h0'" "h1'" A elevation
+/line "h1'" "h2'" A elevation
+/line "h2'" "h3'" A elevation
+/line "h3'" "h0'" A elevation
+# expect: surfaceChecks=6 surfaceQueries=ok
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":50,"y":30,"z":30},"normal":{"x":1,"y":0,"z":0}},"expect":{"kind":"circle","radius":10,"center":{"x":50,"y":30,"z":30}}}
+# surface-query: {"operation":"display-holes","expect":{"count":1,"faces":[{"count":1,"vertices":[24]}]}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":1},"features":[{"type":"recess","family":"cylindrical","closure":"host","faces":["surface:0"]}]}}
+# surface-query: {"operation":"visibility","point":{"x":50,"y":30,"z":30},"view":"right","expect":{"hidden":false}}
+# surface-query: {"operation":"visibility","point":{"x":50,"y":30,"z":50},"view":"right","expect":{"hidden":true}}
+# surface-query: {"operation":"edge-visibility","point":{"x":40,"y":30,"z":40},"view":"right","expect":{"hidden":false}}

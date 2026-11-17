@@ -1,0 +1,9 @@
+# expect: 86V 252E 168F spheres=1 surfaces=1 surfaceKinds=sphere surfaceLoops=0 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+
+# expect: surfaceChecks=3 surfaceQueries=ok
+# surface-query: {"operation":"trim","surface":0,"plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"keepPositive":true,"save":"trimmed","expect":{"surface":{"kind":"sphere","closed":false},"validation":{"status":"partial","openBoundaries":1}}}
+# surface-query: {"operation":"split","from":"trimmed","plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":1,"y":0,"z":0}},"expect":{"refused":true,"diagnostic":{"code":"split-sphere-cap-unknown","surfaceId":"surface:0/trim"}}}
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"refused":false,"section":{"kind":"circle","radius":20},"sectionArcCount":0,"surfaces":[{"kind":"sphere"},{"kind":"sphere"}],"validation":{"status":"ok","closedShells":1}}}

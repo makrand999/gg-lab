@@ -1,0 +1,25 @@
+# expect: parametricCurves=0 diagnostics=curve-projection-conflict unresolved=2
+/datum -60 180
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/rename a pa members
+/rename b pb members
+/rename c pc members
+/rename pa a local
+/rename pb b local
+/rename pc c local
+/curve-through a b c plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/rename a' ea members
+/rename b' eb members
+/rename c' ec members
+/rename ea' a' local
+/rename eb' b' local
+/rename ec' c' local
+/curve-through a' b' c' elevation
+
+# expect: surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"reconstruct","entityPatches":[{"entityId":"E2","patch":{"meta":{"membersDeclared":false}}},{"entityId":"E3","patch":{"meta":{"membersDeclared":false}}},{"entityId":"E4","patch":{"meta":{"membersDeclared":false}}},{"entityId":"E6","patch":{"meta":{"membersDeclared":false}}},{"entityId":"E7","patch":{"meta":{"membersDeclared":false}}},{"entityId":"E8","patch":{"meta":{"membersDeclared":false}}}],"expect":{"status":"unavailable","identity":"explicit","curves":0,"diagnostics":["curve-projection-conflict"],"previewStatus":"unavailable","previewIdentity":"explicit","sourceUnchanged":true}}

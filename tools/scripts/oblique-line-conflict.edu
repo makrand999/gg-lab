@@ -1,0 +1,6 @@
+# expect: 24V 24E 1F curves=1 oblique=1 analyticConics=1 obliqueReprojection=ok conicProjection=ok status=inferred diagnostics=none
+/datum -100 400
+/ellipse 20 -30 14.1421356237 20 A plan
+/point a 0 30 elevation
+/point b 40 30 elevation
+/line a b A elevation

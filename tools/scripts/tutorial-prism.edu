@@ -1,0 +1,32 @@
+# expect: 12V 18E 8F status=inferred unresolved=0
+/datum -35 0
+/point "g,(a)" 17.5 -25.5 plan
+/point "h,(b)" 8.75 -10.344555 plan
+/point "i,(c)" -8.75 -10.344555 plan
+/point "j,(d)" -17.5 -25.5 plan
+/point "k,(e)" -8.75 -40.655445 plan
+/point "l,(f)" 8.75 -40.655445 plan
+/point "a'" 17.5 0 elevation
+/point "g'" 17.5 70 elevation
+/point "d'" -17.5 0 elevation
+/point "j'" -17.5 70 elevation
+/point "f',(b')" 8.75 0 elevation
+/point "l',(h')" 8.75 70 elevation
+/point "e',(c')" -8.75 0 elevation
+/point "k',(i')" -8.75 70 elevation
+/line "g,(a)" "h,(b)" A plan
+/line "h,(b)" "i,(c)" A plan
+/line "i,(c)" "j,(d)" A plan
+/line "j,(d)" "k,(e)" A plan
+/line "k,(e)" "l,(f)" A plan
+/line "l,(f)" "g,(a)" A plan
+/line "a'" "d'" A elevation
+/line "d'" "j'" A elevation
+/line "j'" "g'" A elevation
+/line "g'" "a'" A elevation
+/line "e',(c')" "k',(i')" A elevation
+/line "f',(b')" "l',(h')" A elevation
+/line "g,(a)" "g'" G both
+/line "j,(d)" "j'" G both
+/line "l,(f)" "l',(h')" G both
+/line "k,(e)" "k',(i')" G both

@@ -1,0 +1,17 @@
+# expect: 0V 0E 0F parametricCurves=0 status=coordinate-conflict diagnostics=coordinate-conflict
+/datum -60 200
+/point p 100 -10 plan
+/point q 100.0000005 20 elevation
+/rename p joint members
+/rename q joint members
+/rename joint p local
+/rename joint' q local
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/curve-through a b c plan
+/curve-through a' b' c' elevation
+# expect: determination=inconsistent previewStatus=unavailable previewDetermination=inconsistent previewDiagnostics=coordinate-conflict previewParity=ok

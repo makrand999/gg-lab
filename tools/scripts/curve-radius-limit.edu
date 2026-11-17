@@ -1,0 +1,12 @@
+# expect: rejected=2 throughEdit=ok
+/datum -60 180
+/point a 0 -10 plan
+/point b 0.005 -9.995 plan
+/point c 0.01 -10 plan
+# reject: {"command":"/circle-through a b c plan","contains":"at least 0.01 mm"}
+# reject: {"command":"/arc-through a b c plan","contains":"at least 0.01 mm"}
+/point d -0.01 0 elevation
+/point e 0 0.01 elevation
+/point f 0.01 0 elevation
+/circle-through d e f elevation
+/arc-through d e f elevation

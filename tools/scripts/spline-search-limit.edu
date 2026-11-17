@@ -1,0 +1,38 @@
+# expect: parametricCurves=0 diagnostics=curve-correspondence-search-limit unresolved=12
+/datum -60 180
+/point p0a 0 -10 plan
+/point p0b 20 -15 plan
+/curve-through p0a p0b plan
+/point p1a 0 -20 plan
+/point p1b 20 -25 plan
+/curve-through p1a p1b plan
+/point p2a 0 -30 plan
+/point p2b 20 -35 plan
+/curve-through p2a p2b plan
+/point p3a 0 -40 plan
+/point p3b 20 -45 plan
+/curve-through p3a p3b plan
+/point p4a 0 -50 plan
+/point p4b 20 -55 plan
+/curve-through p4a p4b plan
+/point p5a 0 -60 plan
+/point p5b 20 -65 plan
+/curve-through p5a p5b plan
+/point e0a 0 10 elevation
+/point e0b 20 15 elevation
+/curve-through e0a e0b elevation
+/point e1a 0 20 elevation
+/point e1b 20 25 elevation
+/curve-through e1a e1b elevation
+/point e2a 0 30 elevation
+/point e2b 20 35 elevation
+/curve-through e2a e2b elevation
+/point e3a 0 40 elevation
+/point e3b 20 45 elevation
+/curve-through e3a e3b elevation
+/point e4a 0 50 elevation
+/point e4b 20 55 elevation
+/curve-through e4a e4b elevation
+/point e5a 0 60 elevation
+/point e5b 20 65 elevation
+/curve-through e5a e5b elevation

@@ -1,0 +1,5 @@
+# expect: curves=0 diagnostics=conic-definition-invalid,conic-projection-missing,oblique-curve-projection-missing status=oblique-curve-projection-missing
+/datum -100 400
+/ellipse 0 0 20 10 12 A plan
+/ellipse 0 0 20 20 12 A elevation
+# conic-corrupt: {"group":"E2","mode":"edit-segment","index":2}

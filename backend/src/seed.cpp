@@ -1,6 +1,6 @@
-// educad-seed: import tools/users.json into educad.db with hashed passwords.
-// Runs once per database; afterwards the server never reads plain-text
-// passwords. Usage: educad-seed <users.json> <educad.db>
+
+
+
 #include <cstdio>
 #include <ctime>
 #include <filesystem>

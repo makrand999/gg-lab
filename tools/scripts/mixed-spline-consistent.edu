@@ -1,0 +1,17 @@
+# expect: 19V 17E 0F parametricCurves=1 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok status=partial diagnostics=curve-surface-unresolved
+/datum -60 200
+/point p 100 -10 plan
+/point q 100 20 elevation
+/rename p joint members
+/rename q joint members
+/rename joint p local
+/rename joint' q local
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/curve-through a b c plan
+/curve-through a' b' c' elevation
+# expect: determination=partial previewStatus=ok previewDetermination=partial previewDiagnostics=curve-surface-unresolved previewParity=ok

@@ -1,0 +1,17 @@
+# expect: 72V 96E 27F curves=3 surfaces=4 surfaceKinds=cylinder,plane surfaceOpen=1 surfaceModel=partial diagnostics=curve-projection-ambiguous,curve-surface-missing,unresolved-edge unresolved=3 status=partial
+/datum -30 80
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 0 0 elevation
+/point b 40 0 elevation
+/point c 40 50 elevation
+/point d 0 10 elevation
+/point e 40 20 elevation
+/point f 0 40 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+/line b e A elevation
+/line e f A elevation
+/line f a A elevation

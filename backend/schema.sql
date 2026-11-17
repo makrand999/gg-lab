@@ -1,6 +1,6 @@
--- EduCAD C++ backend schema. Single source of truth; embedded into the
--- binaries at build time (see CMakeLists.txt -> schema.h). The database file
--- itself lives outside the served root (see EDUCAD_DB in main.cpp).
+
+
+
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   role TEXT NOT NULL CHECK (role IN ('academics','teacher','student')),
@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS student_profiles (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  profile_json TEXT NOT NULL,
+  synced_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE TABLE IF NOT EXISTS drawings (

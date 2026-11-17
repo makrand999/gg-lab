@@ -1,0 +1,8 @@
+# expect: 2V 1E curves=1 parametricCurves=1 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved
+/datum -60 180
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/curve-through a b plan
+/curve-through a' b' elevation

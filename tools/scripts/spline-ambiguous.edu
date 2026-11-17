@@ -1,0 +1,10 @@
+# expect: parametricCurves=0 diagnostics=curve-correspondence-ambiguous unresolved=2
+/datum -60 180
+/point a 0 -10 plan
+/point b 0 -30 plan
+/point c 0 -60 plan
+/point u 0 10 elevation
+/point v 0 40 elevation
+/point w 0 60 elevation
+/curve-through a b c plan
+/curve-through u v w elevation

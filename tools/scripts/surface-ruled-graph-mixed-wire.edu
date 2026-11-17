@@ -1,0 +1,48 @@
+# expect: 74V 169E 98F rawFaces=98 faceBindings=ok curves=3 surfaces=4 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred previewParity=ok
+# conic-query: {"index":0,"expect":{"analyticVolume":12985.249634837812}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":20291.413136037616,"vertices":74,"edges":169,"faces":98,"euler":3,"oriented":true,"sameDirectionEdges":0,"openEdges":0,"nonmanifoldEdges":0,"invalidVertexCount":0,"invalidFaces":0,"missingDisplayEdgeCount":0,"faceComponents":1,"faceEuler":2,"allFaceEdgesOpposite":true,"unusedDisplayEdgeCount":1,"allDisplayEdgesFaceBacked":false}}
+# surface-query: {"operation":"generator-lines","expect":{"count":6,"checkedEdges":6,"edgeBacked":true,"sourceIntervalError":0,"invalidSourceIntervals":0,"ownershipFailures":0,"ownershipParity":true,"ownerPatchIndices":[2,3],"reprojectionError":0,"surfaceResidual":0,"ok":true}}
+# surface-query: {"operation":"preview-implicit","expect":{"valid":true,"count":4,"missing":0,"declared":0,"inferred":4,"equationParity":"ok","generatorLineCount":6,"generatorLineParity":"ok"}}
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/ellipse 0 -40 10 3 8 A plan
+/ellipse 0 40 10 6 8 A elevation
+/point p 0 -10 plan
+/point "p'" 0 20 elevation
+/point q 0 -43 plan
+/point "q'" 0 46 elevation
+/point a -20 0 plan
+/point "a'" -20 0 elevation
+/point b 20 0 plan
+/point "b'" 20 0 elevation
+/point c -10 -40 plan
+/point "c'" -10 40 elevation
+/point d 10 -40 plan
+/point "d'" 10 40 elevation
+/line a c A plan
+/line b d A plan
+/line "a'" "c'" A elevation
+/line "b'" "d'" A elevation
+/line p q A plan
+/line "p'" "q'" A elevation
+/ellipse 0 -80 16 6 8 A plan
+/ellipse 0 80 16 12 8 A elevation
+/point r 0 -86 plan
+/point "r'" 0 92 elevation
+/point e -16 -80 plan
+/point "e'" -16 80 elevation
+/point f 16 -80 plan
+/point "f'" 16 80 elevation
+/line c e A plan
+/line d f A plan
+/line "c'" "e'" A elevation
+/line "d'" "f'" A elevation
+/line q r A plan
+/line "q'" "r'" A elevation
+/point w1 60 0 plan
+/point "w1'" 60 0 elevation
+/point w2 65 -10 plan
+/point "w2'" 65 20 elevation
+/line w1 w2 A plan
+/line "w1'" "w2'" A elevation

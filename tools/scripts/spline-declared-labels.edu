@@ -1,0 +1,19 @@
+# expect: parametricCurves=1 curveFit=ok curveReprojection=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=1
+/datum -60 180
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/rename a pa members
+/rename b pb members
+/rename c pc members
+/curve-through pa pb pc plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/rename a' pa members
+/rename b' pb members
+/rename c' pc members
+/rename pa' topstart local
+/rename pb' topmiddle local
+/rename pc' topend local
+/curve-through topstart topmiddle topend elevation

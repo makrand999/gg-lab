@@ -1,0 +1,18 @@
+# expect: parametricCurves=1 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=1 status=partial
+/datum -60 180
+/profile 100 0 1
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point d 60 -50 plan
+/curve-through a b c d plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/point d' 60 60 elevation
+/curve-through a' b' c' d' elevation
+/point a'' 110 10 profile
+/point b'' 130 40 profile
+/point c'' 120 20 profile
+/point d'' 150 60 profile
+/curve-through a'' b'' c'' d'' profile

@@ -1,0 +1,8 @@
+# expect: curves=1 diagnostics=point-correspondence-missing status=partial
+/datum -30 70
+/circle 20 30 20 A elevation
+/point a 0 -15 plan
+/point b 40 -15 plan
+/line a b A plan
+/point isolated 100 -10 plan
+# expect: determination=partial previewStatus=ok previewDetermination=partial previewDiagnostics=point-correspondence-missing previewParity=ok

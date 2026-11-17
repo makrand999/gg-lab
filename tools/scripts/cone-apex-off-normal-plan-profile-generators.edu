@@ -1,0 +1,17 @@
+# expect: 25V 48E 25F curves=1 surfaces=2 surfaceKinds=implicit,plane surfaceModel=ok surfaceValidation=ok surfaceCertificate=ok diagnostics=none unresolved=0 status=inferred
+/datum -100 400
+/profile 100 0 1
+/circle 20 -30 10 A plan
+/point A 25 -35 plan
+/point b0 30 -30 plan
+/point b1 20 -40 plan
+/line b0 A A plan
+/line b1 A A plan
+/point "A''" 135 40 profile
+/point s0 120 0 profile
+/point s1 140 0 profile
+/line s0 s1 A profile
+/line s0 "A''" A profile
+/line s1 "A''" A profile
+# surface-query: {"operation":"normal","surface":1,"point":{"x":30,"y":0,"z":30},"expect":{"normal":{"x":0.9922778767136677,"y":0.12403473458920844,"z":0}}}
+# expect: surfaceChecks=1 surfaceQueries=ok

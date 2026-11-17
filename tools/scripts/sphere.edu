@@ -1,0 +1,9 @@
+# expect: 86V 252E 168F spheres=1 surfaces=1 surfaceKinds=sphere surfaceLoops=0 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+
+# expect: surfaceChecks=3 surfaceQueries=ok
+# surface-query: {"operation":"trim","surface":0,"save":"hemisphere","plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"surface":{"closed":false},"validation":{"status":"partial","openBoundaries":1,"closedShells":0,"openSurfaces":1},"certificate":{"status":"partial","counts":{"surfaces":1,"openBoundaries":1,"closedShells":0}}}}
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":50,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"point","point":{"x":20,"y":50,"z":30}}}
+# surface-query: {"operation":"trim","from":"hemisphere","plane":{"origin":{"x":45,"y":30,"z":30},"normal":{"x":1,"y":0,"z":1}},"expect":null}

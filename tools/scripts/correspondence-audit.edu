@@ -1,0 +1,6 @@
+# expect: surfaceChecks=1 surfaceQueries=ok
+/datum -100 100
+/point a 0 0 plan
+/point "a'" 0 20 elevation
+
+# surface-query: {"operation":"correspondence-spec","entities":[{"id":"u1","type":"POINT","caption":"u","x":0,"y":-10,"viewRole":"PLAN"},{"id":"u2","type":"POINT","caption":"u'","x":0,"y":20,"viewRole":"ELEVATION"},{"id":"m1","type":"POINT","caption":"m","x":20,"y":-10,"viewRole":"PLAN"},{"id":"c1","type":"POINT","caption":"c","x":30,"y":-10,"viewRole":"PLAN"},{"id":"c2","type":"POINT","caption":"c'","x":40,"y":20,"viewRole":"ELEVATION"},{"id":"q1","type":"POINT","caption":"q","x":50,"y":-10,"viewRole":"PLAN"},{"id":"q2","type":"POINT","caption":"q'","x":50,"y":20,"viewRole":"ELEVATION"},{"id":"q3","type":"POINT","caption":"q''","x":50,"y":40,"viewRole":"ELEVATION"}],"expect":{"contract":"correspondence-audit-v1","status":"partial","summary":{"bases":4,"unique":1,"ambiguous":1,"conflict":1,"missing":1},"groups":[{"base":"c","status":"conflict"},{"base":"m","status":"missing"},{"base":"q","status":"ambiguous"},{"base":"u","status":"unique"}]}}

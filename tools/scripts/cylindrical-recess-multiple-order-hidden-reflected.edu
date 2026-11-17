@@ -1,0 +1,48 @@
+# expect: V=104 E=156 F=56 recesses=2 minRecessDepth=20 maxRecessDepth=20 curves=4 surfaces=10 surfaceKinds=cylinder,plane surfaceLoops=14 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=partial holes=2 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred previewParity=ok surfaceChecks=3 surfaceQueries=ok
+/datum -100 400
+/profile 100 -7 -1
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/point h0 20 60 elevation
+/point h1 40 60 elevation
+/point h2 40 40 elevation
+/point h3 20 40 elevation
+/line h0 h1 H elevation
+/line h1 h2 H elevation
+/line h2 h3 H elevation
+/line h3 h0 H elevation
+/circle 30 -45 10 A plan
+/circle 30 -15 10 A plan
+# surface-query: {"operation":"display-holes","expect":{"count":2}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":2}}}
+# surface-query: {"operation":"reconstruct","expect":{"status":"ok","recesses":[{"depth":20},{"depth":20}]}}

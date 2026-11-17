@@ -1,0 +1,14 @@
+# expect: 25V 48E 25F curves=1 surfaces=2 surfaceKinds=cone,plane surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok poseChecks=3 poseStatus=ok
+/datum -30 70
+/point o 20 -30 plan
+/point a' 0 0 elevation
+/point b' 40 0 elevation
+/point c' 20 50 elevation
+/circle o 20 A plan
+/line a' b' A elevation
+/line b' c' A elevation
+/line c' a' A elevation
+
+# pose-check: {"name":"spin-z","rotate":{"axis":[0,0,1],"deg":45}}
+# pose-check: {"name":"tilt-x","rotate":{"axis":[1,0,0],"deg":30}}
+# pose-check: {"name":"shift-scale","translate":[10,15,-5],"scale":1.3}

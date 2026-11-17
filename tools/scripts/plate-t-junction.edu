@@ -1,0 +1,23 @@
+# expect: 6V 6E 1F open=1 boundary=5
+/datum -100 400
+/point v0 0 -10 plan
+/point "v0'" 0 20 elevation
+/point v1 40 -10 plan
+/point "v1'" 40 20 elevation
+/point v2 80 -10 plan
+/point "v2'" 80 20 elevation
+/point v3 80 -70 plan
+/point "v3'" 80 20 elevation
+/point v4 0 -70 plan
+/point "v4'" 0 20 elevation
+/point v5 40 0 plan
+/point "v5'" 40 20 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line "v1'" "v2'" A elevation
+/line v2 v3 A plan
+/line v3 v4 A plan
+/line "v3'" "v4'" A elevation
+/line v4 v0 A plan
+/line v1 v5 A plan

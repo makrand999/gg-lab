@@ -1,0 +1,6 @@
+# expect: curves=0 diagnostics=conic-third-view-conflict status=conic-third-view-conflict
+/datum -2000 400
+/profile 0 0 1
+/conic 0 0 1000 -0.004 0 -0.02 8 A plan
+/conic 0 0 1000 0.003 0 0.02 8 A elevation
+/conic 0 0 0.004 0.003 0.01 0.02 8 A profile

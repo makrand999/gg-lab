@@ -1,0 +1,22 @@
+# expect: 6V 5E 1F holes=0 open=1 topHidden=1 splitHidden=1
+/datum -100 400
+/point v0 0 -10 plan
+/point "v0'" 0 20 elevation
+/point v1 80 -10 plan
+/point "v1'" 80 20 elevation
+/point v2 80 -90 plan
+/point "v2'" 80 20 elevation
+/point v3 0 -90 plan
+/point "v3'" 0 20 elevation
+/point v4 -10 -50 plan
+/point "v4'" -10 10 elevation
+/point v5 90 -50 plan
+/point "v5'" 90 10 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v4 v5 A plan
+/line "v4'" "v5'" A elevation

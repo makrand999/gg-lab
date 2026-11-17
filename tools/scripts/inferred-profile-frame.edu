@@ -1,0 +1,6 @@
+# expect: 24V 24E 1F curves=1 profileInferred=1 unresolved=0 status=inferred
+/datum -30 180
+/circle 130 40 20 A profile
+/point a 10 20 elevation
+/point b 10 60 elevation
+/line a b A elevation

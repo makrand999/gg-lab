@@ -1,6 +1,4 @@
-# LN-1 (EduCAD Script): AB 75 long, 30 to HP, 45 to VP.
-# A is 12 above HP, 10 in front of VP. FV + TV with loci,
-# TL rotation arcs, projector, and measured span.
+# expect: 2V 1E 0F status=partial unresolved=11
 /datum -60 120
 /point a' 0 12
 /point a 0 -10

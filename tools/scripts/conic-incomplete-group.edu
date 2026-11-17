@@ -1,0 +1,5 @@
+# expect: curves=0 diagnostics=conic-definition-invalid,conic-projection-missing status=conic-definition-invalid
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/delete E3

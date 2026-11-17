@@ -1,0 +1,94 @@
+# expect: 548V 1044E 500F recesses=4 minRecessDepth=8 maxRecessDepth=20 curves=9 surfaces=14 surfaceKinds=cylinder,plane surfaceLoops=20 surfaceShells=0 surfaceOpen=4 surfaceBoundary=89 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-approximate-union-boundary,certificate-open-component surfaceCertificateScope=display-boolean surfaceValidation=skipped holes=2 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred previewParity=ok surfaceChecks=8 surfaceQueries=ok
+/datum -100 400
+/point v0 0 0 plan
+/point "v0'" 0 20 elevation
+/point v1 60 0 plan
+/point "v1'" 60 20 elevation
+/point v2 60 -60 plan
+/point "v2'" 60 20 elevation
+/point v3 0 -60 plan
+/point "v3'" 0 20 elevation
+/point v8 0 0 plan
+/point "v8'" 0 60 elevation
+/point v9 60 0 plan
+/point "v9'" 60 60 elevation
+/point v10 60 -60 plan
+/point "v10'" 60 60 elevation
+/point v11 0 -60 plan
+/point "v11'" 0 60 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v0 A plan
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/point s10a 10 60 elevation
+/point s10b 10 40 elevation
+/line s10a s10b A elevation
+/point b10a 10 40 elevation
+/point b10b 30 40 elevation
+/line b10a b10b A elevation
+/point s23a 23 60 elevation
+/point s23b 23 40 elevation
+/line s23a s23b A elevation
+/point b23a 23 40 elevation
+/point b23b 43 40 elevation
+/line b23a b23b A elevation
+/point s36a 36 60 elevation
+/point s36b 36 40 elevation
+/line s36a s36b A elevation
+/point b36a 36 40 elevation
+/point b36b 56 40 elevation
+/line b36a b36b A elevation
+/point r30a 30 60 elevation
+/point r30b 30 40 elevation
+/line r30a r30b A elevation
+/point r43a 43 60 elevation
+/point r43b 43 40 elevation
+/line r43a r43b A elevation
+/point r56a 56 60 elevation
+/point r56b 56 40 elevation
+/line r56a r56b A elevation
+/point u2a 2 60 elevation
+/point u2b 2 52 elevation
+/line u2a u2b A elevation
+/point u8a 8 60 elevation
+/point u8b 8 52 elevation
+/line u8a u8b A elevation
+/point ub0 2 52 elevation
+/point ub1 8 52 elevation
+/line ub0 ub1 A elevation
+/circle 20 -30 10 A plan
+/circle 33 -30 10 A plan
+/circle 46 -30 10 A plan
+/circle 5 -5 3 A plan
+/point um0 2 60 elevation
+/point um1 8 60 elevation
+/line um0 um1 A elevation
+/point m10a 10 60 elevation
+/point m10b 30 60 elevation
+/line m10a m10b A elevation
+/point m23a 23 60 elevation
+/point m23b 43 60 elevation
+/line m23a m23b A elevation
+/point m36a 36 60 elevation
+/point m36b 56 60 elevation
+/line m36a m36b A elevation
+# surface-query: {"operation":"display-holes","expect":{"count":2,"faces":[{"count":2,"vertices":[24,86]}]}}
+# surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":4}}}
+# surface-query: {"operation":"cavity","action":"summary","expect":{"volumes":4,"recesses":4,"unions":1,"absorbed":0,"approximate":1,"relations":[{"a":0,"b":1,"relation":"overlap"},{"a":0,"b":2,"relation":"separate"},{"a":0,"b":3,"relation":"separate"},{"a":1,"b":2,"relation":"overlap"},{"a":1,"b":3,"relation":"separate"},{"a":2,"b":3,"relation":"separate"}]}}
+# surface-query: {"operation":"cavity","action":"volume","expect":{"unions":[{"volume":15757.20553048503,"mouthArea":787.8602765242507,"closed":true,"openEdges":0,"nonmanifoldEdges":0,"approximate":true,"members":3}]}}
+# surface-query: {"operation":"cavity","action":"mouths","expect":{"count":1,"area":787.8602765242506,"faceHoles":2,"loops":[{"vertices":86,"closure":"host"}]}}
+# surface-query: {"operation":"cavity","action":"buried","tolerance":0.01,"expect":{"count":0,"maxDepth":0,"tolerance":0.01,"minVolumes":2}}
+# surface-query: {"operation":"reconstruct","expect":{"status":"ok","recesses":[{"depth":20},{"depth":20},{"depth":20},{"depth":8}]}}
+# surface-query: {"operation":"visibility","point":{"x":20,"y":59,"z":30},"view":"top","expect":{"hidden":false}}

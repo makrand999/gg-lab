@@ -1,0 +1,6 @@
+# expect: parametricCurves=0 diagnostics=curve-correspondence-missing unresolved=1 throughEdit=ok
+/datum -60 180
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/curve-through a b c plan

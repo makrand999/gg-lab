@@ -1,0 +1,5 @@
+# expect: 0V 0E 0F unresolved=2 diagnostics=coordinates-missing status=coordinates-missing
+/datum -30 180
+/profile 100 0 1
+/point a 10 -20 plan
+/point a'' 130 40 profile

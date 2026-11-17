@@ -1,0 +1,12 @@
+# expect: recesses=0 status=partial diagnostics=curve-projection-missing,recess-evidence-conflict previewParity=ok
+/datum -30 80
+/circle 20 -30 20 A plan
+/arc 20 100 20 180 360 A elevation
+/point a 0 100 elevation
+/point b 40 100 elevation
+/line a b A elevation
+/profile 100 0 1
+/arc 130 100 25 180 360 A profile
+/point side1 110 100 profile
+/point side2 150 100 profile
+/line side1 side2 A profile

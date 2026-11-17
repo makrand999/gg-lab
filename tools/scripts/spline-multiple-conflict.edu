@@ -1,0 +1,27 @@
+# expect: parametricCurves=0 diagnostics=curve-projection-conflict unresolved=6
+/datum -60 180
+/profile 100 0 1
+/point a 0 -10 plan
+/point b 20 -30 plan
+/point c 40 -20 plan
+/point d 100 -50 plan
+/point e 120 -70 plan
+/point f 140 -60 plan
+/curve-through a b c plan
+/curve-through d e f plan
+/point a' 0 10 elevation
+/point b' 20 40 elevation
+/point c' 40 20 elevation
+/point d' 100 60 elevation
+/point e' 120 90 elevation
+/point f' 140 70 elevation
+/curve-through a' b' c' elevation
+/curve-through d' e' f' elevation
+/point a'' 110 10 profile
+/point b'' 130 40 profile
+/point c'' 120 20 profile
+/curve-through a'' b'' c'' profile
+/point d'' 160 60 profile
+/point e'' 180 90 profile
+/point f'' 170 70 profile
+/curve-through d'' e'' f'' profile

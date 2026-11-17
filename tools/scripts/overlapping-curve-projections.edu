@@ -1,0 +1,17 @@
+# expect: 48V 48E 2F curves=2 unresolved=0 status=inferred
+/datum -30 180
+/profile 100 0 1
+/circle 20 -20 20 A plan
+/circle 20 -60 20 A plan
+/point e1 0 20 elevation
+/point e2 40 20 elevation
+/line e1 e2 A elevation
+/point e3 0 60 elevation
+/point e4 40 60 elevation
+/line e3 e4 A elevation
+/point p1 100 20 profile
+/point p2 140 20 profile
+/line p1 p2 A profile
+/point p3 140 60 profile
+/point p4 180 60 profile
+/line p3 p4 A profile

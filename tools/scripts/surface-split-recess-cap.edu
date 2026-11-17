@@ -1,0 +1,11 @@
+# expect: 73V 192E 120F recesses=1 surfaces=2 surfaceKinds=plane,sphere surfaceLoops=2 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred
+/datum -30 80
+/circle 20 -30 20 A plan
+/arc 20 100 20 180 360 A elevation
+/point a 0 100 elevation
+/point b 40 100 elevation
+/line a b A elevation
+
+# expect: surfaceChecks=2 surfaceQueries=ok
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":100,"z":30},"normal":{"x":0,"y":1,"z":1}},"expect":{"refused":false,"section":{"kind":"circle","radius":20,"center":{"x":20,"y":100,"z":30}},"sectionArcCount":1,"surfaces":[{"kind":"sphere","closed":false},{"kind":"sphere","closed":false}],"positive":{"loops":[{"kind":"outer"}]},"negative":{"loops":[{"kind":"outer"}]},"validation":{"status":"partial","openBoundaries":2,"closedShells":0},"certificate":{"status":"partial","counts":{"sharedBoundaries":1,"openBoundaries":2,"boundaryLoops":2,"closedShells":0}}}}
+# surface-query: {"operation":"split","surface":0,"plane":{"origin":{"x":20,"y":100,"z":30},"normal":{"x":1,"y":0,"z":0}},"expect":{"refused":false,"section":{"kind":"circle","radius":20},"sectionArcCount":1,"surfaces":[{"kind":"sphere"},{"kind":"sphere"}],"certificate":{"counts":{"sharedBoundaries":1,"boundaryLoops":2}}}}

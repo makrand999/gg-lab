@@ -1,0 +1,18 @@
+# expect: 72V 120E 50F curves=3 surfaces=4 surfaceKinds=cone,plane surfaceLoops=6 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=ok unresolved=0 status=inferred minRadius=10 maxRadius=20
+/datum -30 70
+/circle 20 -30 20 A plan
+/circle 20 -30 10 A plan
+/circle 20 -30 15 A plan
+/point a' 0 0 elevation
+/point b' 40 0 elevation
+/point c' 30 40 elevation
+/point d' 10 40 elevation
+/point e' 35 80 elevation
+/point f' 5 80 elevation
+/line a' b' A elevation
+/line d' c' A elevation
+/line f' e' A elevation
+/line a' d' A elevation
+/line b' c' A elevation
+/line d' f' A elevation
+/line c' e' A elevation

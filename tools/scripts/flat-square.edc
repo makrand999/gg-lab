@@ -1,0 +1,13 @@
+# expect: 4V 4E 1F status=inferred unresolved=0
+/datum -30 70
+/point "a',d'" 0 40 elevation
+/point "b',c'" 40 40 elevation
+/point a 0 -10 plan
+/point b 40 -10 plan
+/point c 40 -50 plan
+/point d 0 -50 plan
+/line "a',d'" "b',c'" A elevation
+/line a b A plan
+/line b c A plan
+/line c d A plan
+/line d a A plan

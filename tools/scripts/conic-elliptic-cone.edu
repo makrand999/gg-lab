@@ -1,0 +1,18 @@
+# expect: 25V 48E 25F curves=1 surfaces=2 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred
+# conic-query: {"expect":{"count":1,"kind":"ellipse","axes":[22.360679774997898,20],"sourceExact":true,"inferred":true,"fitted":false,"projectionOk":true,"jsonParity":true,"analyticVolume":6283.185307179586}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":6211.65708246,"vertices":25,"edges":48,"faces":25}}
+/datum -100 400
+/ellipse 0 0 20 10 8 A plan
+/ellipse 0 0 20 20 8 A elevation
+/point p 16.5067122982 -5.64642473395 plan
+/point p' 16.5067122982 11.2928494679 elevation
+/point a -20 0 plan
+/point a' -20 0 elevation
+/point b 20 0 plan
+/point b' 20 0 elevation
+/point d 5 -35 plan
+/point d' 5 40 elevation
+/line a d A plan
+/line a' d' A elevation
+/line b d A plan
+/line b' d' A elevation

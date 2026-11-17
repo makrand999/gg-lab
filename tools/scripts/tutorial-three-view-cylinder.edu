@@ -1,0 +1,21 @@
+# expect: 48V 72E 26F curves=2 status=partial unresolved=2
+/datum -40 95
+/profile 47.5 8 1
+/point o 0 -25.5 plan
+/circle o 17.5 A plan
+/point a -17.5 0 elevation
+/point b 17.5 0 elevation
+/point c 17.5 70 elevation
+/point d -17.5 70 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+/point pa 47.5 0 profile
+/point pb 82.5 0 profile
+/point pc 82.5 70 profile
+/point pd 47.5 70 profile
+/line pa pb G profile
+/line pb pc G profile
+/line pc pd G profile
+/line pd pa G profile

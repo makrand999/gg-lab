@@ -1,0 +1,111 @@
+
+.edugraphics-mount {
+  position: relative;
+  overflow: hidden;
+}
+.edugraphics-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+}
+.edugraphics-layer1 { z-index: 1; }
+.edugraphics-layer2 { z-index: 2; }
+.edugraphics-hud {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+.edugraphics-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  font: 14px/1 sans-serif;
+  cursor: pointer;
+}
+.edugraphics-menu {
+  position: absolute;
+  z-index: 4;
+  display: none;
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid #888;
+  font: 13px/1.4 sans-serif;
+}
+.edugraphics-menu.open { display: block; }
+.edugraphics-menu-item {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+button.edugraphics-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.edugraphics-menu-item:focus-visible { outline: 2px solid #0284c7; outline-offset: -2px; }
+.edugraphics-menu-item:hover { background: #eef; }
+
+.educad-solid {
+  position: absolute;
+  z-index: 5;
+  background: transparent;
+  touch-action: none;
+}
+.educad-solid-canvas {
+  display: block;
+  background: transparent;
+  cursor: grab;
+}
+.educad-solid-handle {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  font: 11px/1.6 sans-serif;
+  letter-spacing: 0.02em;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 1px 10px;
+  white-space: nowrap;
+  cursor: move;
+  user-select: none;
+  -webkit-user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: auto;
+}
+.educad-solid:hover .educad-solid-handle,
+.educad-solid-handle:active {
+  opacity: 1;
+}
+
+
+
+
+
+
+.educad-solid-glass {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  background: transparent;
+  pointer-events: none;
+  touch-action: none;
+  overflow: hidden;
+}
+.educad-solid-glass-canvas {
+  display: block;
+  background: transparent;
+  pointer-events: none;
+}

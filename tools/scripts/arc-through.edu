@@ -1,0 +1,9 @@
+# expect: curves=1 minRadius=20 maxRadius=20 throughEdit=ok unresolved=0
+/datum -60 180
+/point a 0 -30 plan
+/point b 20 -10 plan
+/point c 40 -30 plan
+/arc-through a b c plan
+/point l 0 20 elevation
+/point r 40 20 elevation
+/line l r A elevation

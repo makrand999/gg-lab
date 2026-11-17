@@ -1,0 +1,30 @@
+# expect: 48V 96E 50F rawFaces=50 faceBindings=ok curves=2 surfaces=3 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok surfaceQueries=ok status=inferred previewParity=ok
+# conic-query: {"index":0,"expect":{"analyticVolume":103881.9970787025,"volumePatch":{"kind":"affine-ruled-conic-volume"}}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":102699.39709667914,"vertices":48,"edges":96,"faces":50,"euler":2,"oriented":true,"sameDirectionEdges":0}}
+# surface-query: {"operation":"normal","surface":2,"point":{"x":1040,"y":2000,"z":3000},"expect":{"normal":{"x":0.8728715609439699,"y":-0.2182178902359921,"z":0.4364357804719842}}}
+# surface-query: {"operation":"section","surface":2,"plane":{"origin":{"x":1000,"y":2040,"z":3040},"normal":{"x":0,"y":-0.4472135954999579,"z":0.8944271909999159}},"expect":{"kind":"ellipse","center":{"x":1000,"y":2040,"z":3040},"radiusU":30,"radiusV":29.068883707497256,"sectionType":"parallel-affine-conic"}}
+# surface-query: {"operation":"generator-lines","expect":{"count":3,"checkedEdges":3,"edgeBacked":true,"reprojectionError":0,"surfaceResidual":0,"ok":true}}
+# surface-query: {"operation":"preview-implicit","expect":{"valid":true,"count":3,"missing":0,"equationParity":"ok"}}
+/datum -1000 4000
+/ellipse 1000 -3000 40 20 8 A plan
+/ellipse 1000 2000 40 40 8 A elevation
+/ellipse 1000 -3080 20 6 8 A plan
+/ellipse 1000 2080 20 12 8 A elevation
+/point p 1000 -3020 plan
+/point "p'" 1000 2040 elevation
+/point q 1000 -3086 plan
+/point "q'" 1000 2092 elevation
+/point a 960 -3000 plan
+/point "a'" 960 2000 elevation
+/point b 1040 -3000 plan
+/point "b'" 1040 2000 elevation
+/point c 980 -3080 plan
+/point "c'" 980 2080 elevation
+/point d 1020 -3080 plan
+/point "d'" 1020 2080 elevation
+/line a c A plan
+/line b d A plan
+/line "a'" "c'" A elevation
+/line "b'" "d'" A elevation
+/line p q A plan
+/line "p'" "q'" A elevation

@@ -1,0 +1,9 @@
+# expect: 25V 24E 1F curves=1 diagnostics=none status=inferred
+/datum -30 70
+/circle 20 30 20 A elevation
+/point a 0 -15 plan
+/point b 40 -15 plan
+/line a b A plan
+/point isolated 100 -10 plan
+/point isolated' 100 30 elevation
+# expect: determination=inferred previewStatus=ok previewDetermination=inferred previewDiagnostics=none previewParity=ok

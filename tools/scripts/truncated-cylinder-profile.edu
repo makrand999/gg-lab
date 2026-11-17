@@ -1,0 +1,13 @@
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=cylinder,plane surfaceLoops=4 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceValidation=ok unresolved=0 status=inferred
+/datum -30 80
+/profile 100 17 -1
+/point o 20 -30 plan
+/circle o 20 A plan
+/point a 67 0 profile
+/point b 107 0 profile
+/point c 107 50 profile
+/point d 67 10 profile
+/line a b A profile
+/line b c A profile
+/line c d A profile
+/line d a A profile

@@ -1,0 +1,26 @@
+# expect: 6V 9E 5F closed=1 open=0 boundary=0 surfaceValidation=ok poseChecks=5 poseStatus=ok
+/datum -30 70
+/point a' 0 0 elevation
+/point b' 40 0 elevation
+/point c' 40 0 elevation
+/point d' 0 0 elevation
+/point e' 0 40 elevation
+/point f' 40 40 elevation
+/point "a,e" 0 -10 plan
+/point "b,f" 40 -10 plan
+/point c 40 -50 plan
+/point d 0 -50 plan
+/line "a,e" "b,f" A plan
+/line "b,f" c A plan
+/line c d A plan
+/line d "a,e" A plan
+/line a' b' A elevation
+/line e' f' A elevation
+/line e' a' A elevation
+/line f' b' A elevation
+
+# pose-check: {"name":"tilt-x","rotate":{"axis":[1,0,0],"deg":30}}
+# pose-check: {"name":"spin-y","rotate":{"axis":[0,1,0],"deg":90}}
+# pose-check: {"name":"spin-y-scale","rotate":{"axis":[0,1,0],"deg":30},"translate":[-9,4,11],"scale":1.15}
+# pose-check: {"name":"shift-scale","translate":[12,-7,9],"scale":1.2}
+# pose-check: {"name":"oblique","rotate":{"axis":[1,1,0],"deg":25},"translate":[4,5,-6],"scale":0.9}

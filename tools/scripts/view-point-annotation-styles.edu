@@ -1,0 +1,22 @@
+# expect: rejected=6
+/datum -100 400
+/point k1 -60 -5
+/point k2 60 -5
+/rename k1 cutLeft members
+/rename k2 cutRight members
+/line cutLeft cutRight H elevation
+/line cutLeft cutRight K elevation
+/xline cutLeft cutRight G elevation
+/dimension cutLeft cutRight elevation
+/line E2 E3 H elevation
+/point dup1 10 -5 plan
+/point "dup2'" 10 20 elevation
+/rename dup1 dup members
+/rename "dup2'" dup members
+/line dup cutLeft H elevation
+# reject: {"command":"/line cutLeft cutRight B elevation","contains":"not ELEVATION"}
+# reject: {"command":"/line cutLeft cutRight A elevation","contains":"not ELEVATION"}
+# reject: {"command":"/line cutLeft cutRight E elevation","contains":"not ELEVATION"}
+# reject: {"command":"/circle cutLeft 10 A elevation","contains":"not ELEVATION"}
+# reject: {"command":"/curve-through cutLeft cutRight cutLeft elevation","contains":"same declared view"}
+# reject: {"command":"/line dup dup H profile","contains":"more than one sheet point"}

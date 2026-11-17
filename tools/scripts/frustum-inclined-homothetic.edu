@@ -1,0 +1,22 @@
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=implicit,plane surfaceModel=ok surfaceValidation=ok surfaceCertificate=ok diagnostics=none unresolved=0 status=inferred
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 -30 10 A plan
+/point a 0 0 elevation
+/point b 40 20 elevation
+/point c 30 55 elevation
+/point d 10 45 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+# surface-query: {"operation":"normal","surface":0,"point":{"x":40,"y":20,"z":30},"expect":{"normal":{"x":0.9615239476408232,"y":0.27472112789737796,"z":0}}}
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":20,"z":30},"normal":{"x":-0.4472135954999579,"y":0.8944271909999159,"z":0}},"expect":{"kind":"ellipse","radiusU":19.56559480312316,"radiusV":17.5,"center":{"x":20,"y":20,"z":30}}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":40,"y":20,"z":30},"expect":{"status":"inside"}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":30,"y":55,"z":30},"expect":{"status":"inside"}}
+# surface-query: {"operation":"topology","expect":{"summary":{"status":"closed"}}}
+# surface-query: {"operation":"preview-implicit","expect":{"valid":true,"count":3,"missing":0,"equationParity":"ok"}}
+# surface-query: {"operation":"implicit-equation","surface":0,"expect":{"degree":2,"identity":{"status":"inferred"},"paramChart":{"kind":"ruledConic"},"domain":{"compiled":["parameter-range","profile-nonnegative"],"unresolved":[]}}}
+# surface-query: {"operation":"mesh-audit","expect":{"sameDirectionEdges":0,"oppositeEdges":72,"euler":2,"oriented":true}}
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":20,"y":20,"z":30},"normal":{"x":0,"y":0,"z":1}},"expect":{"kind":"implicit-section","display":{"status":"partial","unresolved":[{"reason":"interval-survivor-without-seed"}]}}}
+# expect: surfaceChecks=9 surfaceQueries=ok

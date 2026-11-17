@@ -1,0 +1,15 @@
+# expect: 48V 72E 26F curves=2 surfaces=3 surfaceKinds=implicit,plane surfaceModel=ok surfaceValidation=ok surfaceCertificate=ok diagnostics=none unresolved=0 status=inferred
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 -30 10 A plan
+/point a 0 0 elevation
+/point b 40 0.04 elevation
+/point c 30 40.03 elevation
+/point d 10 40.01 elevation
+/line a b A elevation
+/line b c A elevation
+/line c d A elevation
+/line d a A elevation
+# surface-query: {"operation":"mesh-audit","expect":{"sameDirectionEdges":0,"oppositeEdges":72,"euler":2,"oriented":true}}
+# surface-query: {"operation":"implicit-equation","surface":0,"expect":{"degree":2,"identity":{"status":"inferred"}}}
+# expect: surfaceChecks=2 surfaceQueries=ok

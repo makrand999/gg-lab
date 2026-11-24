@@ -1,0 +1,25 @@
+/datum -40 130
+/point a 0 -10 plan
+/point b 15 -22 plan
+/point c 30 -12 plan
+/point d 5 -16 plan
+/point e 20 -30 plan
+/point f 35 -18 plan
+/point "a'" 0 10 elevation
+/point "b'" 15 10 elevation
+/point "c'" 30 10 elevation
+/point "d'" 5 30 elevation
+/point "e'" 20 38 elevation
+/point "f'" 35 46 elevation
+/curve-through a b c plan
+/curve-through "a'" "b'" "c'" elevation
+/curve-through d e f plan
+/curve-through "d'" "e'" "f'" elevation
+/line a d A plan
+/line b e A plan
+/line c f A plan
+/line "a'" "d'" A elevation
+/line "b'" "e'" A elevation
+/line "c'" "f'" A elevation
+# expect: parametricCurves=2 curveFit=ok curveReprojection=ok rawFaces=96 surfaces=1 surfaceKinds=parametric surfaceOpen=1 surfaceShells=0 surfaceCertificate=partial surfaceCertificateIssues=certificate-open-component status=inferred unresolved=0 previewParity=ok surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"parametric-surface-point","surface":0,"u":0.5,"v":0.25,"expect":{"kind":"ruled-spline","point":{"x":16.25,"y":17,"z":24}}}

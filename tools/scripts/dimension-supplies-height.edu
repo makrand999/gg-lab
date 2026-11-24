@@ -1,0 +1,8 @@
+/datum -40 100
+/point a 0 -10 plan
+/point b 30 -18 plan
+/point "a'" 0 20 elevation
+/line a b A plan
+/dimension a b -5 dy plan
+# expect: 2V 1E dimensionStatus=ok dimensionDriving=1 dimensionSatisfied=1 dimensionConflicts=0 previewParity=ok unresolved=0 surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"dimension-constraints-persisted","expect":{"status":"ok","dimensions":[{"axis":"y","targetMm":-5,"measuredMm":-5,"status":"satisfied"}]}}

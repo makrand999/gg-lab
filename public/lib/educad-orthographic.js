@@ -3,6 +3,13 @@
   else root.EduCADOrthographic = factory(root.EduCADMeasure, root.EduCADGeometry, root.EduCADSettings);
 })(typeof window !== 'undefined' ? window : globalThis, function (Measure, Geometry, Settings) {
   'use strict';
+  var THEME_ROOT = typeof window !== 'undefined' ? window :
+    (typeof globalThis !== 'undefined' ? globalThis : null);
+
+  function themeColor(name, fallback) {
+    var theme = THEME_ROOT && THEME_ROOT.EduCADTheme;
+    return (theme && typeof theme.color === 'function') ? theme.color(name) : fallback;
+  }
   var SPANS = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION', 'DATUM_AXIS'];
   var TYPES = { POINT: 'Point', SEGMENT: 'Segment', LINE: 'Line', RAY: 'Ray', DIMENSION: 'Dimension', DATUM_AXIS: 'Datum', CIRCLE: 'Circle', CIRCULAR_ARC: 'Arc' };
   var VIEW_NAMES = { ELEVATION: 'Front · VP', PLAN: 'Top · HP', PROFILE: 'Side · profile', SHARED: 'Shared / XY' };
@@ -368,9 +375,9 @@
           var x = candidates[i][0], y = candidates[i][1], rect = { x0: x - 3, y0: y - 3, x1: x + width + 3, y1: y + height + 3 };
           if (x < 6 || y < 6 || rect.x1 > view.w - 6 || rect.y1 > view.h - 6 || occupied.some(function (box) { return overlap(rect, box); })) continue;
           occupied.push(rect);
-          ctx.strokeStyle = '#a8b8c7'; ctx.lineWidth = 0.6;
+          ctx.strokeStyle = themeColor('viewFrame', '#a8b8c7'); ctx.lineWidth = 0.6;
           segment(anchor, { x: Math.max(x, Math.min(x + width, anchor.x)), y: Math.max(y, Math.min(y + height, anchor.y)) });
-          ctx.fillStyle = 'rgba(248, 250, 252, 0.97)'; ctx.fillRect(x, y, width, height); ctx.fillStyle = color; ctx.textAlign = 'left';
+          ctx.fillStyle = themeColor('viewLabelBg', 'rgba(248, 250, 252, 0.97)'); ctx.fillRect(x, y, width, height); ctx.fillStyle = color; ctx.textAlign = 'left';
           lines.forEach(function (line, index) { ctx.fillText(line, x + 5, y + 3 + (prefs.textSize + 4) * (index + 0.5)); });
           return true;
         }
@@ -378,7 +385,8 @@
       }
       items.forEach(function (item) {
         var e = item.entity, spec = record(e.id), anchor = Measure.inspectAnchor(e, view); if (!spec || !anchor) return;
-        var color = e.id === handle.measure.inspectId ? '#415c74' : '#7d8997';
+        var color = e.id === handle.measure.inspectId ?
+          themeColor('viewInspect', '#415c74') : themeColor('viewMuted', '#7d8997');
         ctx.strokeStyle = color; ctx.lineWidth = item.focused ? 1.5 : 0.75; ctx.setLineDash([]);
         if (item.focused) {
           if (SPANS.indexOf(e.type) !== -1) segment({ x: e.x * view.s + view.tx, y: view.ty - e.y * view.s }, { x: e.x2 * view.s + view.tx, y: view.ty - e.y2 * view.s });
@@ -390,7 +398,7 @@
           }
         }
         if (item.focused && prefs.dimensions) {
-          ctx.lineWidth = 0.8; ctx.strokeStyle = '#8a9dad';
+          ctx.lineWidth = 0.8; ctx.strokeStyle = themeColor('viewGuide', '#8a9dad');
           if (SPANS.indexOf(e.type) !== -1 && prefs.lengths && e.type !== 'LINE' && e.type !== 'RAY' && e.type !== 'DATUM_AXIS') {
             var linear = Measure.linearDimLayout(e, view, { side: item.side, measure: function (text) { return ctx.measureText(text).width; }, offsetMm: Math.max(10, 24 / view.s), lineH: prefs.textSize + 4 });
             if (linear) {

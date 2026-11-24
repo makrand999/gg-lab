@@ -1,4 +1,4 @@
-# expect: parametricCurves=1 curveFit=ok curveReprojection=ok curvePreview=ok status=partial diagnostics=coordinates-missing,curve-surface-unresolved
+# expect: parametricCurves=1 curveFit=ok curveReprojection=ok curveStationReprojection=ok curveEvidence=2 curvePreview=ok status=partial diagnostics=coordinates-missing,curve-surface-unresolved
 /datum -60 200
 /point p 100 -10 plan
 /rename p joint members
@@ -11,4 +11,4 @@
 /point c' 40 20 elevation
 /curve-through a b c plan
 /curve-through a' b' c' elevation
-# expect: determination=partial previewStatus=ok previewDetermination=partial previewDiagnostics=coordinates-missing,curve-surface-unresolved previewParity=ok
+# expect: determination=partial previewStatus=ok previewDetermination=partial previewDiagnostics=coordinates-missing,curve-surface-unresolved previewParity=ok previewCurveParity=ok

@@ -1,0 +1,94 @@
+# expect: 14V 21E 9F auxFrames=1 auxFrameStatus=ok auxPointRank=3 auxPointConflicts=0 auxReprojection=ok auxUnresolved=0 previewAux=ok previewAuxParity=ok determination=determined status=inferred surfaceModel=ok
+/datum -100 220
+/auxframe A1 0 0 0 0 0.7071067811865476 0.7071067811865476 1 0 0 100 0
+/point "p0" 0 0 plan
+/point "p0a" 100.0000000000 0.0000000000 aux:A1
+/point "p10" 0 -30 plan
+/point "p10a" 100.0000000000 7.0710678119 aux:A1
+/point "p11" 70 -30 plan
+/point "p11a" 170.0000000000 7.0710678119 aux:A1
+/point "p12" 0 -50 plan
+/point "p12a" 100.0000000000 -7.0710678119 aux:A1
+/point "p13" 70 -50 plan
+/point "p13a" 170.0000000000 -7.0710678119 aux:A1
+/point "p1" 70 0 plan
+/point "p1a" 170.0000000000 0.0000000000 aux:A1
+/point "p2" 70 -50 plan
+/point "p2a" 170.0000000000 -35.3553390593 aux:A1
+/point "p3" 0 -50 plan
+/point "p3a" 100.0000000000 -35.3553390593 aux:A1
+/point "p4" 0 0 plan
+/point "p4a" 100.0000000000 24.0416305603 aux:A1
+/point "p5" 45 0 plan
+/point "p5a" 145.0000000000 12.7279220614 aux:A1
+/point "p6" 70 0 plan
+/point "p6a" 170.0000000000 12.7279220614 aux:A1
+/point "p7" 0 -30 plan
+/point "p7a" 100.0000000000 2.8284271247 aux:A1
+/point "p8" 45 -30 plan
+/point "p8a" 145.0000000000 -8.4852813742 aux:A1
+/point "p9" 70 -30 plan
+/point "p9a" 170.0000000000 -8.4852813742 aux:A1
+/line "p0" "p1" E plan
+/line "p2" "p1" E plan
+/line "p12" "p13" A plan
+/line "p3" "p0" E plan
+/line "p4" "p5" A plan
+/line "p5" "p6" A plan
+/line "p10" "p11" A plan
+/line "p8" "p9" E plan
+/line "p7" "p8" E plan
+/line "p4" "p7" A plan
+/line "p5" "p8" A plan
+/line "p6" "p9" A plan
+/line "p10" "p12" A plan
+/line "p11" "p13" A plan
+/line "p0a" "p1a" A aux:A1
+/line "p2a" "p1a" A aux:A1
+/line "p12a" "p13a" A aux:A1
+/line "p3a" "p0a" A aux:A1
+/line "p4a" "p5a" A aux:A1
+/line "p5a" "p6a" A aux:A1
+/line "p10a" "p11a" A aux:A1
+/line "p8a" "p9a" A aux:A1
+/line "p7a" "p8a" A aux:A1
+/line "p4a" "p7a" A aux:A1
+/line "p5a" "p8a" A aux:A1
+/line "p6a" "p9a" A aux:A1
+/line "p10a" "p12a" A aux:A1
+/line "p11a" "p13a" A aux:A1
+/line "p2a" "p3a" A aux:A1
+/line "p0a" "p4a" A aux:A1
+/line "p1a" "p6a" A aux:A1
+/line "p2a" "p13a" A aux:A1
+/line "p3a" "p12a" A aux:A1
+/line "p7a" "p10a" A aux:A1
+/line "p9a" "p11a" A aux:A1
+/rename "p0" "p0" members
+/rename "p0a" "p0" members
+/rename "p10" "p10" members
+/rename "p10a" "p10" members
+/rename "p11" "p11" members
+/rename "p11a" "p11" members
+/rename "p12" "p12" members
+/rename "p12a" "p12" members
+/rename "p13" "p13" members
+/rename "p13a" "p13" members
+/rename "p1" "p1" members
+/rename "p1a" "p1" members
+/rename "p2" "p2" members
+/rename "p2a" "p2" members
+/rename "p3" "p3" members
+/rename "p3a" "p3" members
+/rename "p4" "p4" members
+/rename "p4a" "p4" members
+/rename "p5" "p5" members
+/rename "p5a" "p5" members
+/rename "p6" "p6" members
+/rename "p6a" "p6" members
+/rename "p7" "p7" members
+/rename "p7a" "p7" members
+/rename "p8" "p8" members
+/rename "p8a" "p8" members
+/rename "p9" "p9" members
+/rename "p9a" "p9" members

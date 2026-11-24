@@ -1,0 +1,6 @@
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/section A-A elevation 0 30 40 30
+# expect: sectionPlanes=1 sectionQueries=1 sectionRetained=0 sectionStatus=ok sectionUnresolved=0 sectionDiagnostics=none sectionBoundaryStatus=missing previewSections=ok previewSectionPlanes=1 previewParity=ok surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"section-boundary","surface":0,"plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"status":"ok","summary":{"components":1,"loops":1,"unresolved":0}}}

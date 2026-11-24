@@ -1,4 +1,4 @@
-# expect: 19V 17E 0F parametricCurves=1 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok status=partial diagnostics=curve-surface-unresolved
+# expect: 19V 17E 0F parametricCurves=1 curveFit=ok curveReprojection=ok curveStationReprojection=ok curveEvidence=2 curvePreview=ok throughEdit=ok status=partial diagnostics=curve-surface-unresolved
 /datum -60 200
 /point p 100 -10 plan
 /point q 100 20 elevation
@@ -14,4 +14,4 @@
 /point c' 40 20 elevation
 /curve-through a b c plan
 /curve-through a' b' c' elevation
-# expect: determination=partial previewStatus=ok previewDetermination=partial previewDiagnostics=curve-surface-unresolved previewParity=ok
+# expect: determination=partial previewStatus=ok previewDetermination=partial previewDiagnostics=curve-surface-unresolved previewParity=ok previewCurveParity=ok

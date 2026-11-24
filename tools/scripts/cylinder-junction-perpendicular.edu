@@ -1,0 +1,84 @@
+# expect: 362V 605E 245F curves=5 surfaces=5 surfaceKinds=cylinder,plane surfaceLoops=8 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceValidation=skipped status=partial unresolved=3 diagnostics=curve-projection-ambiguous,recess-depth-missing previewParity=ok previewJunction=1 previewJunctionEvidence=1
+/datum -160 120
+/profile 100 0 1
+/point a0 -20 0 elevation
+/point a1 20 0 elevation
+/point a2 20 70 elevation
+/point a3 -20 70 elevation
+/line a0 a1 A elevation
+/line a1 a2 A elevation
+/line a2 a3 A elevation
+/line a3 a0 A elevation
+/point ac 0 -35 plan
+/circle ac 20 A plan
+/point ap0 115 0 profile
+/point ap1 155 0 profile
+/point ap2 155 70 profile
+/point ap3 115 70 profile
+/line ap0 ap1 A profile
+/line ap1 ap2 A profile
+/line ap2 ap3 A profile
+/line ap3 ap0 A profile
+/point b0 -45 27 elevation
+/point b1 5 27 elevation
+/point b2 5 43 elevation
+/point b3 -45 43 elevation
+/line b0 b1 A elevation
+/line b1 b2 A elevation
+/line b2 b3 A elevation
+/line b3 b0 A elevation
+/point bc 135 35 profile
+/circle bc 8 A profile
+/point bp0 -45 -27 plan
+/point bp1 -45 -43 plan
+/point bp2 5 -43 plan
+/point bp3 5 -27 plan
+/line bp0 bp1 A plan
+/line bp1 bp2 A plan
+/line bp2 bp3 A plan
+/line bp3 bp0 A plan
+# seam
+/point se0 -20.000000000 27.000000000 elevation
+/point se1 -19.621416870 28.000000000 elevation
+/point se2 -19.287301522 29.000000000 elevation
+/point se3 -19.000000000 30.000000000 elevation
+/point se4 -18.761663039 31.000000000 elevation
+/point se5 -18.574175621 32.000000000 elevation
+/point se6 -18.439088915 33.000000000 elevation
+/point se7 -18.357559751 34.000000000 elevation
+/point se8 -18.330302780 35.000000000 elevation
+/point se9 -18.357559751 36.000000000 elevation
+/point se10 -18.439088915 37.000000000 elevation
+/point se11 -18.574175621 38.000000000 elevation
+/point se12 -18.761663039 39.000000000 elevation
+/point se13 -19.000000000 40.000000000 elevation
+/point se14 -19.287301522 41.000000000 elevation
+/point se15 -19.621416870 42.000000000 elevation
+/point se16 -20.000000000 43.000000000 elevation
+/line se0 se1 A elevation
+/line se1 se2 A elevation
+/line se2 se3 A elevation
+/line se3 se4 A elevation
+/line se4 se5 A elevation
+/line se5 se6 A elevation
+/line se6 se7 A elevation
+/line se7 se8 A elevation
+/line se8 se9 A elevation
+/line se9 se10 A elevation
+/line se10 se11 A elevation
+/line se11 se12 A elevation
+/line se12 se13 A elevation
+/line se13 se14 A elevation
+/line se14 se15 A elevation
+/line se15 se16 A elevation
+# surface-query: {"operation":"topology","expect":{"summary":{"openEdges":0,"nonmanifoldEdges":0,"sharedEdges":4,"status":"closed"}}}
+# surface-query: {"operation":"topology","expect":{"contract":"analytic-topology-v1","summary":{"faces":5,"edges":4,"vertices":4,"loops":8,"openEdges":0,"sharedEdges":4,"nonmanifoldEdges":0,"status":"closed"}}}
+# surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":5,"edges":4,"convex":3,"concave":1,"smooth":0,"open":0,"unknown":0,"recesses":0,"fillets":0}}}
+# surface-query: {"operation":"topology","curveKind":"cylinder-intersection","expect":{"summary":{"edges":1},"edges":[{"id":"c:4","kind":"curve","curveKind":"cylinder-intersection","useCount":2,"status":"shared","uses":[{"surfaceId":"surface:0","orientation":1},{"surfaceId":"surface:1","orientation":-1}]}]}}
+# surface-query: {"operation":"mesh-audit","expect":{"volume":92462.55578818434,"faces":245,"edges":605,"vertices":362,"euler":2,"oppositeEdges":605,"sameDirectionEdges":0,"oriented":true,"openEdges":0,"nonmanifoldEdges":0,"missingDisplayEdgeCount":0,"unusedDisplayEdgeCount":0,"allDisplayEdgesFaceBacked":true,"faceComponents":1,"componentEulers":[2],"componentOpenEdges":[0],"componentNonmanifoldEdges":[0],"allFaceEdgesOpposite":true}}
+# surface-query: {"operation":"projection-segments","view":"front","expect":{"seamCurves":1,"seamDashed":48,"seamVisible":48,"seamHidden":0,"seamSplit":0,"seamUnique":48,"seamDuplicate":0,"seamOwnedByBoth":true,"seamOwnership":[{"surfaceIds":["surface:1","surface:0"],"largerSurfaceId":"surface:1","smallerSurfaceId":"surface:0","largerPatch":1,"smallerPatch":0}]}}
+# surface-query: {"operation":"projection-segments","view":"top","expect":{"seamCurves":1,"seamDashed":0,"seamVisible":0,"seamHidden":0,"seamSplit":0}}
+# surface-query: {"operation":"projection-segments","view":"left","expect":{"seamCurves":1,"seamDashed":0,"seamVisible":0,"seamHidden":0,"seamSplit":0}}
+# surface-query: {"operation":"solid-junction","expect":{"contract":"analytic-solid-junction-v1","status":"bounded","exactness":"analytic-quartic","displayTrim":"trimmed","displayDiagnostic":null,"seams":1,"curveCount":1,"payloadParity":true,"junctionParity":true,"loopsParity":true,"revalidationStatus":"ok","certificateStatus":"ok","seamDisplayEdges":96,"seamIncidentEdges":96,"seamTwoSidedEdges":96,"seamIncidentTwoSided":true}}
+# surface-query: {"operation":"solid-edges","yaw":0,"pitch":0,"expect":{"seamEdges":96,"seamVisible":48,"seamHidden":48}}
+# surface-query: {"operation":"visibility","point":{"x":-18.3303027798,"y":35,"z":43},"view":"front","expect":{"hidden":false}}

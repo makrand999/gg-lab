@@ -3,6 +3,13 @@
   else root.EduCADDrafting = factory(root.EduCADGeometry, root.EduCADEntities, root.EduCADParametric, root.EduCADConic);
 })(typeof window !== 'undefined' ? window : globalThis, function (Geometry, Entities, Parametric, Conic) {
   'use strict';
+  var THEME_ROOT = typeof window !== 'undefined' ? window :
+    (typeof globalThis !== 'undefined' ? globalThis : null);
+
+  function themeColor(name, fallback) {
+    var theme = THEME_ROOT && THEME_ROOT.EduCADTheme;
+    return (theme && typeof theme.color === 'function') ? theme.color(name) : fallback;
+  }
   var EPS = 1e-6;
   var LINE_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION'];
   function clone(v) { return JSON.parse(JSON.stringify(v)); }
@@ -465,10 +472,21 @@
     var h = options.handle, E = options.entities, V = options.viewport, C = options.canvas, P = options.project;
     var surface = h.mount.layer2, tool = 'select', activeRole = 'AUTO', style = 'A', anchor = null, dimensionEnd = null;
     var selected = null, solidSelection = null, cursor = null, drag = null, suppressClick = false, warning = '', validation = { issues: [], missing: [] };
+    var issueRowsCache = null, issueRowsRevision = -1, issueRows = [], issueOpen = false;
+    var issueFocus = null, issueFocusEntity = null, issueFocusPoints = [], issueFocusRevision = -1, issueFocusReconstruction = null;
+    var issueListSignature = '';
     var root = document.createElement('div'); root.className = 'drafting-controls';
-    root.innerHTML = '<button type="button" class="drafting-launch" aria-expanded="false" aria-controls="drafting-menu">Draw</button>' +
+    root.innerHTML = '<div class="drafting-launch-row">' +
+      '<button type="button" class="drafting-launch" aria-expanded="false" aria-controls="drafting-menu">Draw</button>' +
+      '<button type="button" class="drafting-learn-launch" aria-expanded="false" aria-controls="drafting-learn-menu" hidden>Learn</button>' +
+      '<span class="drafting-tool-hint" role="status" aria-live="polite" hidden></span>' +
+      '<div id="drafting-learn-menu" class="drafting-learn-menu" hidden></div>' +
+      '</div>' +
       '<div id="drafting-menu" class="drafting-menu" hidden><nav class="drafting-tools" aria-label="Drawing tools"></nav>' +
       '<div class="drafting-history"><button type="button" data-action="fit">Fit views</button><button type="button" data-action="undo">Undo</button><button type="button" data-action="redo">Redo</button></div></div>' +
+      '<div class="drafting-issues" hidden role="region" aria-label="3D reconstruction issues">' +
+      '<button type="button" class="drafting-issues-toggle" aria-expanded="false" aria-controls="drafting-issues-list">3D issues (0)</button>' +
+      '<ul id="drafting-issues-list" class="drafting-issues-list" hidden></ul></div>' +
       '<div class="drafting-options"><label>Draw in <select aria-label="Drawing view"><option value="AUTO">Auto view</option><option value="ELEVATION">Front</option><option value="PLAN">Top</option><option value="PROFILE">Side</option></select></label>' +
       '<label>Line style <select aria-label="Line style"><option value="A">Visible</option><option value="B">Thin</option><option value="E">Hidden</option><option value="G">Centre</option><option value="K">Construction</option></select></label>' +
       '<button type="button" data-action="layout" aria-pressed="false">3 views</button><select aria-label="Side view"><option value="left">Left side</option><option value="right">Right side</option></select></div>' +
@@ -484,6 +502,7 @@
       '<label>R <input name="radius" aria-label="Radius" type="number" min="0.01" step="any"></label><span>mm</span><button type="submit">Apply</button><button type="button" data-action="delete">Delete</button></form>';
     document.body.appendChild(root);
     var status = document.createElement('p'); status.className = 'drafting-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); document.body.appendChild(status);
+    var issuesPanel = root.querySelector('.drafting-issues'), issuesToggle = root.querySelector('.drafting-issues-toggle'), issuesList = root.querySelector('.drafting-issues-list');
     var nav = root.querySelector('nav'), editor = root.querySelector('form'), roleSelect = root.querySelector('[aria-label="Drawing view"]');
     var styleSelect = root.querySelector('[aria-label="Line style"]'), sideSelect = root.querySelector('[aria-label="Side view"]');
     var preferences = root.querySelector('.drafting-options');
@@ -491,27 +510,62 @@
     if (settingsSlot) { settingsSlot.classList.add('drafting-settings'); settingsSlot.appendChild(preferences); }
     function control(selector) { return root.querySelector(selector) || preferences.querySelector(selector); }
     var menu = root.querySelector('.drafting-menu'), launch = root.querySelector('.drafting-launch');
-    var selectionRow = root.querySelector('.drafting-selection'), menuOpen = false, editorOpen = false, editorId = null;
+    var learnLaunch = root.querySelector('.drafting-learn-launch'), learnMenu = root.querySelector('.drafting-learn-menu');
+    var toolHint = root.querySelector('.drafting-tool-hint');
+    var selectionRow = root.querySelector('.drafting-selection'), menuOpen = false, learnOpen = false, editorOpen = false, editorId = null;
     function closeMenu() { menuOpen = false; menu.hidden = true; launch.setAttribute('aria-expanded', 'false'); }
+    function closeLearn(restoreFocus) {
+      if (!learnOpen) return;
+      learnOpen = false; learnMenu.hidden = true; learnLaunch.setAttribute('aria-expanded', 'false');
+      if (restoreFocus && !learnLaunch.hidden) learnLaunch.focus();
+    }
+    function openLearn() {
+      if (learnLaunch.hidden) return;
+      closeMenu();
+      learnOpen = true; learnMenu.hidden = false; learnLaunch.setAttribute('aria-expanded', 'true');
+      var items = learnMenu.querySelectorAll('select:not([disabled]), button:not([disabled]), [tabindex]');
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].offsetParent !== null) { items[i].focus(); break; }
+      }
+    }
+    function setLearnVisible(show) {
+      if (!options.learn || !learnLaunch || !learnMenu.children.length) return;
+      learnLaunch.hidden = !show;
+      if (!show) closeLearn(false);
+    }
+    var learnSelectors = !!options.learn;
     var sheetSettings = document.getElementById('settings-sheet'), bar = document.querySelector('.demo-bar');
-    if (sheetSettings && bar) {
-      bar.querySelectorAll('.clean-select-wrap, #btn-clear, #btn-check').forEach(function (el) { sheetSettings.appendChild(el); });
-      bar.querySelectorAll('.bar-divider').forEach(function (el) { el.remove(); });
-      ['click', 'change'].forEach(function (name) {
-        sheetSettings.addEventListener(name, function (event) {
-          if ((name === 'change' && event.target.tagName === 'SELECT') || (name === 'click' && event.target.closest('button'))) document.getElementById('settings-panel').hidden = true;
-        });
+    if (bar) {
+      bar.querySelectorAll('.clean-select-wrap').forEach(function (el) {
+        if (learnSelectors) {
+          var select = el.querySelector('select');
+          var label = select && (select.id === 'sel-demo' ? 'Examples' : select.id === 'sel-tut' ? 'Tutorials' : '');
+          if (label) {
+            if (select.id === 'sel-demo') select.setAttribute('aria-label', 'Example selection');
+            if (select.id === 'sel-tut') select.setAttribute('aria-label', 'Tutorial selection');
+            for (var i = 0; i < el.childNodes.length; i++) {
+              if (el.childNodes[i].nodeType === 3) { el.childNodes[i].nodeValue = label + ': '; break; }
+            }
+          }
+          learnMenu.appendChild(el);
+        } else if (sheetSettings) sheetSettings.appendChild(el);
       });
+      if (sheetSettings) {
+        bar.querySelectorAll('#btn-clear, #btn-check').forEach(function (el) { sheetSettings.appendChild(el); });
+        ['click', 'change'].forEach(function (name) {
+          sheetSettings.addEventListener(name, function (event) {
+            if ((name === 'change' && event.target.tagName === 'SELECT') || (name === 'click' && event.target.closest('button'))) document.getElementById('settings-panel').hidden = true;
+          });
+        });
+      }
+      bar.querySelectorAll('.bar-divider').forEach(function (el) { el.remove(); });
     }
-    var guides = true, solidVisible = true, projectTarget = null, drawingMode = 'menu';
-    function menuDrawing() { return drawingMode === 'menu'; }
-    function setDrawingMode(value) {
-      if (value !== 'menu' && value !== 'shortcuts') throw new Error('Choose Draw menu or Shortcuts.');
-      if (drawingMode === value) return;
-      cancel(); options.cancelLegacy(); closeMenu(); editorOpen = false;
-      selected = null; solidSelection = null; editorId = null; tool = 'select';
-      drawingMode = value; sync();
-    }
+    if (learnSelectors && learnMenu.children.length) learnLaunch.hidden = false;
+    learnMenu.addEventListener('change', function (event) {
+      if (event.target && event.target.tagName === 'SELECT') closeLearn(true);
+    });
+    var guides = true, solidVisible = true, projectTarget = null;
+    function menuDrawing() { return false; }
     var labels = { select: 'Select', point: 'Point', line: 'Line', polyline: 'Polyline', circle: 'Circle', projector: 'Projector', dimension: 'Dimension' };
     Object.keys(labels).forEach(function (key) {
       var button = document.createElement('button'); button.type = 'button'; button.dataset.tool = key; button.textContent = labels[key]; button.setAttribute('aria-pressed', String(key === tool)); nav.appendChild(button);
@@ -530,6 +584,7 @@
     function entity() { return selected && h.table.get(selected); }
     function cancel() {
       anchor = null; dimensionEnd = null; projectTarget = null; typed = ''; warning = ''; suppressClick = false;
+      if (issueFocus) { clearIssueFocus(); renderIssues(); options.redrawDynamic(cursor); }
       var previous = drag; drag = null;
       if (previous && previous.moved) options.history.cancel();
       surface.style.cursor = '';
@@ -635,6 +690,7 @@
     }
     function click(px, forced) {
       warning = ''; var id = hit(px), e = id && h.table.get(id), pt = forced || snap(px);
+      if (issueFocus) { clearIssueFocus(); renderIssues(); }
       if (tool === 'select') { choose(id); redraw(); return; }
       if (tool === 'point') { transaction(function () { selected = ensurePoint(pt).id; }); sync(); redraw(); return; }
       if (tool === 'projector') {
@@ -730,10 +786,193 @@
       if (e.meta && e.meta.kind === 'projector' && e.meta.refs) return !e.meta.refs.some(function (id) { var p = h.table.get(id); return p && role(p) === 'PROFILE'; });
       return !e.caption || !/^proj-pf-|^miter$|^ref-X1Y1$/.test(e.caption);
     }
+    function issueViewLabel(value) {
+      if (value === 'PLAN') return 'Top view';
+      if (value === 'ELEVATION') return 'Front view';
+      if (value === 'PROFILE') return map().side === 'left' ? 'Left side view' : 'Right side view';
+      return '';
+    }
+    function issueKindLabel(e) {
+      if (!e) return '';
+      if (e.type === 'POINT') return 'Point';
+      if (e.type === 'CIRCLE') return 'Circle';
+      if (e.type === 'CIRCULAR_ARC') return 'Arc';
+      if (e.type === 'CURVE') return 'Spline';
+      if (e.type === 'DIMENSION') return 'Dimension';
+      if (LINE_TYPES.indexOf(e.type) !== -1) return 'Line';
+      if (e.type === 'DATUM_AXIS') return 'Axis';
+      if (e.type === 'TEXT') return 'Text';
+      return 'Drawing item';
+    }
+    function issueLocation(e, fallbackRole) {
+      var parts = [], view = issueViewLabel(e ? role(e) : fallbackRole);
+      if (view) parts.push(view);
+      if (!e) return parts.join(' · ');
+      parts.push(issueKindLabel(e));
+      var name = String(e.caption || e.name || '').trim();
+      if (name) parts.push(name);
+      if (e.visible === false) parts.push('Hidden');
+      else if (!isVisible(e)) parts.push(e.viewRole === 'PROFILE' && !map().three ? 'view not shown' : 'not shown');
+      return parts.join(' · ');
+    }
+    function issueRowsNow() {
+      var result = h.reconstruction, revision = h.table.revision();
+      if (result === issueRowsCache && revision === issueRowsRevision) return issueRows;
+      issueRowsCache = result; issueRowsRevision = revision;
+      var rows = [], seen = Object.create(null);
+      (result && Array.isArray(result.issues) ? result.issues : []).forEach(function (diagnostic) {
+        if (!diagnostic) return;
+        var ids = [diagnostic.entityId].concat(Array.isArray(diagnostic.sourceIds) ? diagnostic.sourceIds : []), entity = null;
+        for (var i = 0; i < ids.length && !entity; i++) if (ids[i] && h.table.has(ids[i])) entity = h.table.get(ids[i]);
+        var message = String(diagnostic.message || (diagnostic.code ? diagnostic.code.replace(/-/g, ' ') : 'Unresolved geometry'));
+        var key = [diagnostic.code || '', diagnostic.entityId || '', message].join('|');
+        if (seen[key]) return;
+        seen[key] = true;
+        rows.push({ key: key, message: message, id: entity ? entity.id : null, viewRole: diagnostic.viewRole || (entity ? role(entity) : '') });
+      });
+      issueRows = rows;
+      return rows;
+    }
+    function issuePoints(e) {
+      if (!e) return null;
+      if (e.type === 'POINT') return [{ x: e.x, y: e.y }];
+      if (LINE_TYPES.indexOf(e.type) !== -1) return [{ x: e.x, y: e.y }, { x: e.x2, y: e.y2 }];
+      if (e.type !== 'CIRCLE' && e.type !== 'CIRCULAR_ARC' && e.type !== 'CURVE') return null;
+      var segments = Geometry.curveSegments(e, 0.5 / Math.max(h.view.s, 0.05));
+      if (!segments || !segments.length) return null;
+      var points = [];
+      segments.forEach(function (segment, index) {
+        if (!index) points.push({ x: segment.a.x, y: segment.a.y });
+        points.push({ x: segment.b.x, y: segment.b.y });
+      });
+      return points;
+    }
+    function issueFocusable(e) {
+      return !!e && (e.type === 'POINT' || LINE_TYPES.indexOf(e.type) !== -1 ||
+        e.type === 'CIRCLE' || e.type === 'CIRCULAR_ARC' || e.type === 'CURVE');
+    }
+    function issueActionable(e) {
+      return !!e && e.visible !== false && isVisible(e);
+    }
+    function clearIssueFocus() {
+      issueFocus = null; issueFocusEntity = null; issueFocusPoints = []; issueFocusRevision = -1; issueFocusReconstruction = null;
+    }
+    function renderIssues() {
+      var rows = issueRowsNow(), revision = h.table.revision();
+      var views = rows.map(function (row) {
+        var entity = row.id ? h.table.get(row.id) : null;
+        return {
+          row: row, entity: entity,
+          location: issueLocation(entity, row.viewRole),
+          focusable: !!entity && issueActionable(entity) && issueFocusable(entity)
+        };
+      });
+      if (issueFocus) {
+        var focusedView = null;
+        views.forEach(function (view) { if (view.row.key === issueFocus) focusedView = view; });
+        if (!focusedView || !focusedView.focusable) clearIssueFocus();
+        else {
+          issueFocusEntity = focusedView.entity.id;
+          if (issueFocusRevision !== revision || issueFocusReconstruction !== h.reconstruction) {
+            var points = issuePoints(focusedView.entity);
+            if (points && points.length) {
+              issueFocusPoints = points; issueFocusRevision = revision; issueFocusReconstruction = h.reconstruction;
+            } else clearIssueFocus();
+          }
+        }
+      }
+      issuesPanel.hidden = !rows.length;
+      if (!rows.length) { issueOpen = false; clearIssueFocus(); }
+      issuesToggle.textContent = '3D issues (' + rows.length + ')';
+      issuesToggle.setAttribute('aria-expanded', String(issueOpen && !!rows.length));
+      issuesList.hidden = !(issueOpen && rows.length);
+      if (!rows.length) {
+        if (issuesList.firstChild) { issuesList.replaceChildren(); issueListSignature = ''; }
+        return;
+      }
+      if (!issueOpen) return;
+      var signature = views.map(function (view) {
+        return [view.row.key, view.row.id || '', view.row.message, view.location || '', view.focusable ? 1 : 0, issueFocus === view.row.key ? 1 : 0].join('\u0001');
+      }).join('\u0002');
+      if (signature === issueListSignature) return;
+      issueListSignature = signature;
+      var restoreKey = issuesList.contains(document.activeElement) ? document.activeElement.getAttribute('data-issue-key') : null;
+      issuesList.replaceChildren();
+      views.forEach(function (view) {
+        var entity = view.entity, location = view.location, focusable = view.focusable;
+        var item = document.createElement('li'), rowElement;
+        if (focusable) {
+          rowElement = document.createElement('button');
+          rowElement.type = 'button';
+          rowElement.className = 'drafting-issue-row';
+          rowElement.setAttribute('data-issue-key', view.row.key);
+          if (issueFocus === view.row.key) rowElement.setAttribute('aria-current', 'true');
+        } else {
+          rowElement = document.createElement('span');
+          rowElement.className = 'drafting-issue-row is-static';
+          if (entity) rowElement.setAttribute('aria-disabled', 'true');
+          if (entity && issueActionable(entity) && !issueFocusable(entity)) location = location ? location + ' · no sheet shape' : 'No sheet shape';
+        }
+        var message = document.createElement('span'); message.className = 'drafting-issue-message'; message.textContent = view.row.message;
+        rowElement.appendChild(message);
+        if (location) {
+          var place = document.createElement('span'); place.className = 'drafting-issue-location'; place.textContent = location;
+          rowElement.appendChild(place);
+        }
+        item.appendChild(rowElement); issuesList.appendChild(item);
+      });
+      if (restoreKey) {
+        var restore = null;
+        Array.prototype.forEach.call(issuesList.querySelectorAll('[data-issue-key]'), function (row) {
+          if (!restore && row.getAttribute('data-issue-key') === restoreKey) restore = row;
+        });
+        if (restore) restore.focus({ preventScroll: true });
+      }
+    }
+    function focusIssue(key) {
+      var row = null;
+      issueRowsNow().forEach(function (candidate) { if (candidate.key === key) row = candidate; });
+      var e = row && row.id ? h.table.get(row.id) : null;
+      if (!e || !issueActionable(e) || !issueFocusable(e)) return;
+      var points = issuePoints(e);
+      if (!points || !points.length) return;
+      var box = { x0: points[0].x, x1: points[0].x, y0: points[0].y, y1: points[0].y };
+      points.forEach(function (p) {
+        box.x0 = Math.min(box.x0, p.x); box.x1 = Math.max(box.x1, p.x);
+        box.y0 = Math.min(box.y0, p.y); box.y1 = Math.max(box.y1, p.y);
+      });
+      var mobileSplit = typeof EduCADMobile !== 'undefined' && EduCADMobile.splitActive();
+      var solidRoom = !mobileSplit && solidVisible && h.solidMm ? Math.min(330, h.view.w * 0.28) : 0;
+      var safe = mobileSplit ?
+        { x0: Math.max(18, h.view.w * 0.04), x1: h.view.w - 24, y0: 56, y1: h.view.h - 64 } :
+        { x0: Math.max(70, h.view.w * 0.06), x1: h.view.w - solidRoom - 42, y0: 150, y1: h.view.h - 112 };
+      if (safe.x1 - safe.x0 < 160) safe.x1 = Math.max(safe.x0 + 80, h.view.w - 24);
+      if (safe.y1 - safe.y0 < 120) { safe.y0 = mobileSplit ? 48 : 80; safe.y1 = Math.max(safe.y0 + 80, h.view.h - 40); }
+      var width = box.x1 - box.x0, height = box.y1 - box.y0, scale = h.view.s;
+      if (width * scale > safe.x1 - safe.x0 || height * scale > safe.y1 - safe.y0) {
+        var fit = Math.min(width > EPS ? (safe.x1 - safe.x0) / width : Infinity, height > EPS ? (safe.y1 - safe.y0) / height : Infinity);
+        scale = V.clampScale(Math.min(scale, fit * 0.9));
+      }
+      h.view.s = scale;
+      var screen = { x0: box.x0 * scale + h.view.tx, x1: box.x1 * scale + h.view.tx, y0: h.view.ty - box.y1 * scale, y1: h.view.ty - box.y0 * scale };
+      if (screen.x0 < safe.x0 || screen.x1 > safe.x1 || screen.y0 < safe.y0 || screen.y1 > safe.y1) {
+        h.view.tx = (safe.x0 + safe.x1) / 2 - (box.x0 + box.x1) / 2 * scale;
+        h.view.ty = (safe.y0 + safe.y1) / 2 + (box.y0 + box.y1) / 2 * scale;
+      }
+      issueFocus = key; issueFocusEntity = e.id; issueFocusPoints = points; issueFocusRevision = h.table.revision(); issueFocusReconstruction = h.reconstruction;
+      renderIssues();
+      var active = null;
+      Array.prototype.forEach.call(issuesList.querySelectorAll('[data-issue-key]'), function (element) {
+        if (!active && element.getAttribute('data-issue-key') === key) active = element;
+      });
+      if (active) active.focus({ preventScroll: true });
+      redraw();
+    }
     function updateStatus() {
       var text = warning;
       if (!text && options.getPose()) text = 'Pose preview · stored drawing unchanged';
-      if (!text && h.reconstruction) text = h.reconstruction.determination !== 'determined' ? h.reconstruction.label :
+      var blank = options.learn && (options.hasGeometry ? !options.hasGeometry() : !h.table.list().length);
+      if (!text && !blank && h.reconstruction) text = h.reconstruction.determination !== 'determined' ? h.reconstruction.label :
         h.reconstruction.geometry.topologyStatus ? (h.reconstruction.geometry.topologyStatus === 'inferred' ? 'Projections agree · inferred surface preview' : 'Wire preview · ' + h.reconstruction.geometry.topologyStatus.replace(/-/g, ' ')) :
         h.reconstruction.geometry.solids && h.reconstruction.geometry.solids.length ? 'Explicit projections agree · closed surface defines a solid' :
         h.reconstruction.geometry.faces.length ? 'Explicit projections agree · open surface' : 'Explicit projections agree · wireframe; no surface declared';
@@ -753,7 +992,9 @@
       root.querySelectorAll('[data-tool]').forEach(function (button) { button.setAttribute('aria-pressed', String(button.dataset.tool === tool)); button.disabled = !authoring; });
       nav.hidden = !authoring;
       launch.textContent = !editing ? 'Views' : !menuDrawing() ? 'Sheet' : tool === 'select' ? 'Draw' : labels[tool];
-      if (!editing) closeMenu();
+      var lineHint = authoring && tool === 'line' ? (anchor ? 'Click the second endpoint in the same view.' : 'Click the first endpoint') : '';
+      toolHint.textContent = lineHint; toolHint.hidden = !lineHint;
+      if (!editing) { closeMenu(); closeLearn(false); }
       roleSelect.value = activeRole; roleSelect.disabled = !authoring;
       styleSelect.value = style; styleSelect.disabled = !editing;
       control('[data-action="layout"]').setAttribute('aria-pressed', String(m.three));
@@ -788,7 +1029,9 @@
       }
       document.body.classList.toggle('drafting-readonly', !editing);
       surface.style.cursor = !authoring || tool === 'select' ? '' : 'crosshair';
+      renderIssues();
       updateStatus();
+      if (typeof options.onSync === 'function') options.onSync();
     }
     function refresh() {
       if (selected && !h.table.has(selected)) selected = null;
@@ -815,7 +1058,15 @@
     });
     function onControlClick(event) {
       var button = event.target.closest('button'); if (!button) return;
-      if (button === launch) { menuOpen = !menuOpen; menu.hidden = !menuOpen; launch.setAttribute('aria-expanded', String(menuOpen)); if (menuOpen) (editMode() && menuDrawing() ? nav.querySelector('[data-tool="' + tool + '"]') : root.querySelector('[data-action="fit"]')).focus(); return; }
+      if (button === issuesToggle) {
+        issueOpen = !issueOpen;
+        if (!issueOpen) { clearIssueFocus(); renderIssues(); redraw(); return; }
+        renderIssues();
+        return;
+      }
+      if (button.getAttribute('data-issue-key')) { focusIssue(button.getAttribute('data-issue-key')); return; }
+      if (button === learnLaunch) { if (learnOpen) closeLearn(true); else openLearn(); return; }
+      if (button === launch) { closeLearn(false); menuOpen = !menuOpen; menu.hidden = !menuOpen; launch.setAttribute('aria-expanded', String(menuOpen)); if (menuOpen) (editMode() && menuDrawing() ? nav.querySelector('[data-tool="' + tool + '"]') : root.querySelector('[data-action="fit"]')).focus(); return; }
       if (button.dataset.action === 'edit-selection') { editorOpen = !editorOpen; sync(); if (editorOpen) editor.elements.x.focus(); return; }
       if (button.dataset.tool) { setTool(button.dataset.tool); return; }
       if (button.dataset.target) {
@@ -831,7 +1082,19 @@
     }
     root.addEventListener('click', onControlClick);
     preferences.addEventListener('click', onControlClick);
-    window.addEventListener('pointerdown', function (event) { if (!root.contains(event.target)) closeMenu(); }, true);
+    issuesPanel.addEventListener('click', function (event) { onControlClick(event); event.stopPropagation(); });
+    issuesPanel.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape' || !issueOpen) return;
+      issueOpen = false; clearIssueFocus(); renderIssues(); issuesToggle.focus(); redraw();
+      event.preventDefault();
+    });
+    ['pointerdown', 'pointerup', 'dblclick', 'wheel', 'keydown'].forEach(function (name) {
+      issuesPanel.addEventListener(name, function (event) { event.stopPropagation(); });
+    });
+    window.addEventListener('pointerdown', function (event) {
+      if (!root.contains(event.target)) { closeMenu(); closeLearn(false); return; }
+      if (learnOpen && event.target !== learnLaunch && !learnMenu.contains(event.target)) closeLearn(false);
+    }, true);
     roleSelect.addEventListener('change', function () { cancel(); activeRole = roleSelect.value; sync(); redraw(); });
     styleSelect.addEventListener('change', function () {
       style = styleSelect.value; var e = entity();
@@ -909,6 +1172,7 @@
     }, true);
     var typed = '';
     window.addEventListener('keydown', function (event) {
+      if (issuesPanel.contains(event.target)) return;
 
 
       if (window.EduCADMobile && window.EduCADMobile.splitActive()) {
@@ -917,6 +1181,9 @@
         if ((mobileMenu && !mobileMenu.hidden) || (mobileChooser && !mobileChooser.hidden) ||
             (event.target && event.target.closest && event.target.closest(
               '#mobile-header, #mobile-pose, #mobile-sheet, #mobile-expandbar, .mobile-pane-bar'))) return;
+      }
+      if (event.key === 'Escape' && learnOpen) {
+        closeLearn(true); event.preventDefault(); event.stopImmediatePropagation(); return;
       }
       if (event.key === 'Escape' && (menuOpen || editorOpen)) {
         closeMenu(); editorOpen = false; document.activeElement.blur(); sync();
@@ -990,20 +1257,44 @@
     }
     function stroke(ctx, a, b) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
     function ring(ctx, p, radius) { ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.stroke(); }
+    function strokeIssueFocus(ctx, view, width, color) {
+      if (!issueFocusPoints.length) return;
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
+      var focused = issueFocusEntity ? h.table.get(issueFocusEntity) : null;
+      if (focused && focused.type === 'CIRCLE') {
+        var center = V.forward(view, focused);
+        ctx.arc(center.x, center.y, focused.radius * view.s, 0, Math.PI * 2);
+      } else if (focused && focused.type === 'CIRCULAR_ARC') {
+        var arcCenter = V.forward(view, focused);
+        var sweep = Geometry.arcSweep(focused.startAngle, focused.endAngle);
+        ctx.arc(arcCenter.x, arcCenter.y, focused.radius * view.s,
+          -focused.startAngle * Geometry.RAD,
+          -(focused.startAngle + sweep) * Geometry.RAD, true);
+      } else if (issueFocusPoints.length === 1) {
+        var point = V.forward(view, issueFocusPoints[0]);
+        ctx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+      } else {
+        issueFocusPoints.forEach(function (value, index) {
+          var p = V.forward(view, value);
+          if (!index) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        });
+      }
+      ctx.stroke();
+    }
     function drawSheet(ctx, view) {
       var m = map(); if (!m.three) return;
       var eb = extent(h.table.visibleEntities().filter(function (e) { return role(e) === 'ELEVATION'; }));
       var pb = extent(h.table.visibleEntities().filter(function (e) { return role(e) === 'PLAN'; }));
-      ctx.save(); ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 0.7; ctx.setLineDash([4, 5]);
+      ctx.save(); ctx.strokeStyle = themeColor('faint', '#94a3b8'); ctx.lineWidth = 0.7; ctx.setLineDash([4, 5]);
       var top = eb ? Math.max(50, eb.y1 + 15) : 70, depth = pb ? Math.max(30, -pb.y0 - m.dRef) : 50;
       if (guides) {
         stroke(ctx, V.forward(view, { x: m.xRef, y: 0 }), V.forward(view, { x: m.xRef, y: top }));
         stroke(ctx, V.forward(view, { x: m.xRef, y: -m.dRef }), V.forward(view, { x: m.xRef + m.s * depth, y: -m.dRef - depth }));
         var label = V.forward(view, { x: m.xRef + m.s * depth / 2, y: -m.dRef - depth / 2 });
-        C.drawKnockoutLabel(ctx, '45°', label.x + 6, label.y + 13, { font: '11px sans-serif', fillStyle: '#94a3b8' });
+        C.drawKnockoutLabel(ctx, '45°', label.x + 6, label.y + 13, { font: '11px sans-serif', fillStyle: themeColor('faint', '#94a3b8') });
       }
       var pos = V.forward(view, { x: m.xRef + m.s * depth / 2, y: top });
-      C.drawKnockoutLabel(ctx, m.side === 'left' ? 'Left side view' : 'Right side view', pos.x - 32, pos.y - 10, { font: '11px sans-serif', fillStyle: '#64748b' });
+      C.drawKnockoutLabel(ctx, m.side === 'left' ? 'Left side view' : 'Right side view', pos.x - 32, pos.y - 10, { font: '11px sans-serif', fillStyle: themeColor('muted', '#64748b') });
       ctx.restore();
     }
     function drawDimension(ctx, view, ent) {
@@ -1011,7 +1302,7 @@
       var dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy); if (length < EPS) return;
       var nx = dy / length, ny = -dx / length, offset = (ent.meta && ent.meta.offsetMm !== undefined ? ent.meta.offsetMm : 10) * view.s;
       var p = { x: a.x + nx * offset, y: a.y + ny * offset }, q = { x: b.x + nx * offset, y: b.y + ny * offset };
-      ctx.save(); ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.save(); ctx.strokeStyle = themeColor('muted', '#64748b'); ctx.lineWidth = 1; ctx.setLineDash([]);
       stroke(ctx, a, { x: p.x + nx * Math.sign(offset) * 4, y: p.y + ny * Math.sign(offset) * 4 });
       stroke(ctx, b, { x: q.x + nx * Math.sign(offset) * 4, y: q.y + ny * Math.sign(offset) * 4 }); stroke(ctx, p, q);
       [ [p, q], [q, p] ].forEach(function (pair) {
@@ -1019,12 +1310,12 @@
         stroke(ctx, from, { x: from.x + ux * 7 - uy * 2.5, y: from.y + uy * 7 + ux * 2.5 });
         stroke(ctx, from, { x: from.x + ux * 7 + uy * 2.5, y: from.y + uy * 7 - ux * 2.5 });
       });
-      C.drawKnockoutLabel(ctx, fmt(Math.hypot(ent.x2 - ent.x, ent.y2 - ent.y)) + ' mm', (p.x + q.x) / 2 + nx * 6, (p.y + q.y) / 2 + ny * 6, { font: '12px sans-serif', fillStyle: '#475569' });
+      C.drawKnockoutLabel(ctx, fmt(Math.hypot(ent.x2 - ent.x, ent.y2 - ent.y)) + ' mm', (p.x + q.x) / 2 + nx * 6, (p.y + q.y) / 2 + ny * 6, { font: '12px sans-serif', fillStyle: themeColor('construction', '#475569') });
       ctx.restore();
     }
     function drawDynamic(ctx, view) {
       var m = map(), g = h.solidMm, keys = linked(), rlist = m.three ? ['ELEVATION', 'PLAN', 'PROFILE'] : ['ELEVATION', 'PLAN'];
-      ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#58738c'; ctx.setLineDash([]);
+      ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = themeColor('draftingLine', '#58738c'); ctx.setLineDash([]);
       if (g) rlist.forEach(function (r) {
         keys.vertices.forEach(function (index) { ring(ctx, V.forward(view, toView(g.vertices[index], r, m)), 6); });
         keys.edges.forEach(function (index) { var edge = g.edges[index]; stroke(ctx, V.forward(view, toView(g.vertices[edge[0]], r, m)), V.forward(view, toView(g.vertices[edge[1]], r, m))); });
@@ -1033,13 +1324,21 @@
       if (e && e.type !== 'POINT' && LINE_TYPES.indexOf(e.type) !== -1) stroke(ctx, V.forward(view, e), V.forward(view, { x: e.x2, y: e.y2 }));
       if (e && e.type === 'CIRCLE') ring(ctx, V.forward(view, e), e.radius * view.s);
       if (!options.getPose()) {
-        ctx.strokeStyle = '#b7793a'; ctx.setLineDash([3, 5]);
+        ctx.strokeStyle = themeColor('warmStrong', '#b7793a'); ctx.setLineDash([3, 5]);
         validation.issues.forEach(function (id) { var item = h.table.get(id); if (!item) return; if (item.type === 'POINT') ring(ctx, V.forward(view, item), 7); else if (LINE_TYPES.indexOf(item.type) !== -1) stroke(ctx, V.forward(view, item), V.forward(view, { x: item.x2, y: item.y2 })); });
         if (validation.status !== 'ok' && m.three && guides) validation.missing.forEach(function (s) { stroke(ctx, V.forward(view, { x: s.ax, y: s.ay }), V.forward(view, { x: s.bx, y: s.by })); });
       }
+      if (issueFocus && issueFocusPoints.length && !options.getPose()) {
+        var focused = issueFocusEntity ? h.table.get(issueFocusEntity) : null;
+        if (focused && issueActionable(focused)) {
+          ctx.setLineDash([]);
+          strokeIssueFocus(ctx, view, 6, themeColor('spatialMarkFill', '#f8fafc'));
+          strokeIssueFocus(ctx, view, 2.5, themeColor('warmStrong', '#b7793a'));
+        }
+      }
       if (editMode() && anchor && cursor) {
         var pt = tool === 'projector' ? projectedCandidate(cursor) : snap(cursor), start = V.forward(view, anchor);
-        ctx.strokeStyle = '#58738c'; ctx.setLineDash([3, 4]); ring(ctx, start, 5);
+        ctx.strokeStyle = themeColor('draftingLine', '#58738c'); ctx.setLineDash([3, 4]); ring(ctx, start, 5);
         if (pt) {
           var end = V.forward(view, pt);
           if (tool === 'circle') ring(ctx, start, Math.hypot(end.x - start.x, end.y - start.y));
@@ -1052,28 +1351,27 @@
           }
         }
         var instruction = typed ? typed + ' mm · Enter' : tool === 'projector' ? 'Place matching projection · type distance' : tool === 'dimension' && dimensionEnd ? 'Place dimension' : tool === 'circle' ? 'Choose radius · type distance' : 'Choose endpoint · type length · Esc to finish';
-        C.drawKnockoutLabel(ctx, instruction, Math.min(cursor.x + 14, view.w - 265), Math.max(140, cursor.y - 12), { font: '11px sans-serif', fillStyle: '#64748b' });
+        C.drawKnockoutLabel(ctx, instruction, Math.min(cursor.x + 14, view.w - 265), Math.max(140, cursor.y - 12), { font: '11px sans-serif', fillStyle: themeColor('muted', '#64748b') });
       }
       ctx.restore();
     }
     function drawSolid(ctx, st) {
       if (!solidVisible || !h.solidMm || !window.EduCADSpatial || options.getPose()) return;
       var keys = linked(), g = h.solidMm, Solid = window.EduCADSolid, Spatial = window.EduCADSpatial;
-      ctx.save(); ctx.strokeStyle = '#58738c'; ctx.lineWidth = 2; ctx.setLineDash([]);
+      ctx.save(); ctx.strokeStyle = themeColor('draftingLine', '#58738c'); ctx.lineWidth = 2; ctx.setLineDash([]);
       keys.vertices.forEach(function (i) { ring(ctx, Spatial.projectMm(g.vertices[i], st, Solid), 6); });
       keys.edges.forEach(function (i) { var edge = g.edges[i]; stroke(ctx, Spatial.projectMm(g.vertices[edge[0]], st, Solid), Spatial.projectMm(g.vertices[edge[1]], st, Solid)); });
       ctx.restore();
     }
     var refreshQueued = false;
     h.table.subscribe(function (op) {
-      if (op === 'clear') { editorOpen = false; closeMenu(); anchor = null; dimensionEnd = null; selected = null; solidSelection = null; typed = ''; projectTarget = null; }
+      if (op === 'clear') { editorOpen = false; closeMenu(); closeLearn(false); anchor = null; dimensionEnd = null; selected = null; solidSelection = null; typed = ''; projectTarget = null; }
       if (refreshQueued) return; refreshQueued = true;
       requestAnimationFrame(function () { refreshQueued = false; refresh(); redraw(); });
     });
     sync();
     return {
       preferences: function (values) {
-        if (values.drawingMode !== undefined) setDrawingMode(values.drawingMode);
         guides = !!values.guides; solidVisible = !!values.solid;
         if (h.solid && h.solid.canvas) { h.solid.canvas.hidden = !solidVisible; h.solid.canvas.style.display = solidVisible ? '' : 'none'; }
         if (h.orthographicView) h.orthographicView.sync();
@@ -1083,7 +1381,10 @@
       root: root, refresh: refresh, cancel: function () { cancel(); selected = null; solidSelection = null; typed = ''; sync(); },
       layout: map, isVisible: isVisible, fit: fit, notify: hint, drawSheet: drawSheet, drawDynamic: drawDynamic, drawSolid: drawSolid, drawDimension: drawDimension,
       active: function () { return menuDrawing() && editMode() && (tool !== 'select' || !!drag); }, solidVisible: function () { return solidVisible; },
-      drawingMode: function () { return drawingMode; },
+      drawingMode: function () { return 'shortcuts'; },
+      currentTool: function () { return tool; },
+      startTool: function (value) { if (!Object.prototype.hasOwnProperty.call(labels, value)) return false; setTool(value); return tool === value; },
+      setLearnVisible: setLearnVisible,
       setStyle: function (value) { style = value; styleSelect.value = value; },
       select: function (id) { selected = id; solidSelection = null; sync(); redraw(); },
       selectSolid: function (value) { selected = null; solidSelection = value; sync(); options.redrawDynamic(cursor); if (h.solid) h.solid.scheduleDraw(); },

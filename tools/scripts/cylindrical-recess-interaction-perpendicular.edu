@@ -1,4 +1,4 @@
-# expect: 391V 747E 358F recesses=2 minRecessDepth=20 maxRecessDepth=35 curves=6 surfaces=10 surfaceKinds=cylinder,plane surfaceLoops=14 surfaceShells=0 surfaceOpen=3 surfaceBoundary=62 surfaceModel=partial surfaceCertificate=partial surfaceCertificateIssues=certificate-approximate-union-boundary,certificate-open-component surfaceCertificateScope=display-boolean surfaceValidation=skipped holes=2 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred previewParity=ok previewTrimStatus=partial previewTrimExactness=unresolved previewTrimVisible=0 previewTrimUnsupported=0 surfaceChecks=12 surfaceQueries=ok
+# expect: 487V 843E 358F recesses=2 minRecessDepth=20 maxRecessDepth=35 curves=7 surfaces=9 surfaceKinds=cylinder,plane surfaceLoops=14 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceCertificateScope=none surfaceValidation=skipped holes=2 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred previewParity=ok previewTrimStatus=partial previewTrimExactness=numeric previewTrimVisible=1 previewTrimUnsupported=0 surfaceChecks=26 surfaceQueries=ok
 /datum -100 400
 /point v0 0 0 plan
 /point "v0'" 0 20 elevation
@@ -52,6 +52,7 @@
 /line fb0 fb1 A plan
 # surface-query: {"operation":"display-holes","expect":{"count":2,"faces":[{"count":1,"vertices":[36]},{"count":1,"vertices":[24]}]}}
 # surface-query: {"operation":"feature-graph","expect":{"summary":{"recesses":2}}}
+# surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":9,"edges":16,"convex":12,"concave":4,"smooth":0,"open":0,"unknown":0,"recesses":2,"fillets":0}}}
 # surface-query: {"operation":"cavity","action":"summary","expect":{"volumes":2,"recesses":2,"unions":1,"absorbed":0,"approximate":1,"relations":[{"a":0,"b":1,"relation":"overlap"}]}}
 # surface-query: {"operation":"cavity","action":"volume","expect":{"unions":[{"volume":10372.822810426924,"mouthArea":509.3558807617609,"closed":true,"openEdges":0,"nonmanifoldEdges":0,"approximate":true,"members":2}]}}
 # surface-query: {"operation":"cavity","action":"mouths","expect":{"count":2,"area":509.3558807617609,"faceHoles":2,"loops":[{"vertices":36,"closure":"host"},{"vertices":24,"closure":"host"}]}}
@@ -61,4 +62,17 @@
 # surface-query: {"operation":"visibility","point":{"x":10,"y":48,"z":30},"view":"top","expect":{"hidden":true}}
 # surface-query: {"operation":"classify","surface":0,"point":{"x":40,"y":50,"z":30},"expect":{"status":"inside"}}
 # surface-query: {"operation":"visibility","point":{"x":30,"y":59,"z":30},"view":"top","expect":{"hidden":false}}
-# surface-query: {"operation":"cavity-trims","expect":{"status":"partial","exactness":"unresolved","unsupported":0,"unresolved":1,"unresolvedSupports":[{"a":0,"b":1,"aRole":"side","bRole":"side","status":"unresolved","kind":"implicit-intersection"}]}}
+# surface-query: {"operation":"cavity-trims","expect":{"status":"partial","exactness":"numeric","unsupported":0,"unresolved":0,"visible":1,"contact":1,"boundaryCount":2,"boundaries":[{"kind":"cylinder-intersection","role":"boundary","status":"exact","supportStatus":"exact","boundsStatus":"exact","exposureStatus":"exact","origin":{"x":30,"y":48,"z":30},"u":{"x":-1,"y":0,"z":0},"v":{"x":0,"y":-1,"z":0},"direction":{"x":0,"y":0,"z":1},"radius":8,"otherRadius":10,"startAngle":1.5707963267948966,"sweepAngle":6.283185307179586,"start":{"x":30,"y":40,"z":40},"end":{"x":30,"y":40,"z":40},"closed":true,"largerVolume":0,"smallerVolume":1,"floorContact":true,"supportKind":"cylinder-intersection","supportRelation":"transverse","memberVolumes":[0,1],"surfaceIds":["surface:0","surface:2"]}],"contactBoundaries":[{"kind":"line","role":"contact","start":{"x":30,"y":40,"z":40},"end":{"x":30,"y":40,"z":25},"memberVolumes":[0,1]}]}}
+# surface-query: {"operation":"topology","expect":{"summary":{"openEdges":0,"nonmanifoldEdges":0,"sharedEdges":16,"status":"closed"}}}
+# surface-query: {"operation":"topology","curveKind":"cylinder-intersection","expect":{"summary":{"edges":1},"edges":[{"id":"c:6","kind":"curve","curveKind":"cylinder-intersection","useCount":2,"status":"shared","uses":[{"surfaceId":"surface:0","orientation":-1},{"surfaceId":"surface:2","orientation":1}]}]}}
+# surface-query: {"operation":"projection-segments","view":"top","expect":{"seamCurves":1,"seamDashed":0,"seamUnique":0,"seamDuplicate":0}}
+# surface-query: {"operation":"projection-segments","view":"front","expect":{"seamCurves":1,"seamDashed":0,"seamUnique":0,"seamDuplicate":0}}
+# surface-query: {"operation":"projection-segments","view":"left","profileMap":{"xRef":0,"dRef":0,"s":1},"expect":{"seamCurves":1,"seamDashed":48,"seamUnique":48,"seamDuplicate":0}}
+# surface-query: {"operation":"projection-segments","view":"right","profileMap":{"xRef":0,"dRef":0,"s":1},"expect":{"seamCurves":1,"seamDashed":48,"seamUnique":48,"seamDuplicate":0}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":40,"z":40},"view":"top","expect":{"hidden":true}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":40,"z":40},"view":"front","expect":{"hidden":true}}
+# surface-query: {"operation":"visibility","point":{"x":30,"y":40,"z":40},"view":"left","expect":{"hidden":true}}
+# surface-query: {"operation":"visibility","point":{"x":22,"y":48,"z":36},"view":"top","expect":{"hidden":true}}
+# surface-query: {"operation":"visibility","point":{"x":22,"y":48,"z":36},"view":"left","expect":{"hidden":true}}
+# surface-query: {"operation":"topology","expect":{"contract":"analytic-topology-v1","summary":{"faces":9,"edges":16,"vertices":11,"loops":14,"openEdges":0,"sharedEdges":16,"nonmanifoldEdges":0,"status":"closed"}}}
+# surface-query: {"operation":"solid-edges","yaw":0,"pitch":0,"expect":{"seamEdges":0}}

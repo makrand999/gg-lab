@@ -1,0 +1,10 @@
+# expect: dimensionStatus=inconsistent dimensionDriving=2 dimensionConflicts=2 dimensionDiagnostics=dimension-axis-conflict dimensionRefs=ok determination=inconsistent previewParity=ok previewDimensionStatus=inconsistent
+/datum -50 100
+/profile 100 0 1
+/point "a'" 0 20 elevation
+/point "b'" 0 30 elevation
+/point "a''" 100 20 profile
+/point "b''" 100 40 profile
+/dimension "a'" "b'" 10 elevation
+/dimension "a''" "b''" 20 profile
+# surface-query: {"operation":"dimension-constraints","expect":{"contract":"dimension-constraints-v1","status":"inconsistent","summary":{"dimensions":2,"driving":2,"conflicts":2,"unresolved":0,"ambiguous":0},"diagnostics":[{"code":"dimension-axis-conflict"}]}}

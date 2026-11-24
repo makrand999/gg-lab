@@ -1,0 +1,7 @@
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/point l0 0 0 elevation
+/point l1 40 0 elevation
+/line l0 l1 H elevation
+# expect: sectionPlanes=0 sectionQueries=0 sectionRetained=0 sectionStatus=none sectionDiagnostics=none

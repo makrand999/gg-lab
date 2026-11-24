@@ -75,6 +75,7 @@
         label: (res && res.label) || 'could not build 3D preview',
         determination: res && res.determination,
         pipeline: res && res.pipeline,
+        dimensionConstraints: JSON.parse(JSON.stringify(res && res.dimensionConstraints || null)),
         issues: JSON.parse(JSON.stringify(res && res.issues || []))
       };
     }
@@ -94,22 +95,28 @@
         label: res.label || '',
         issues: res.issues || [],
         pipeline: res.pipeline,
+        dimensionConstraints: res.dimensionConstraints || null,
         geometry: {
           name: String(g.name === undefined ? 'wireframe' : g.name),
           vertices: verts, edges: edges, faces: faces,
           curves: g.curves || [], surfacePatches: g.surfacePatches || [],
           surfaces: g.surfaces || [], surfaceModel: g.surfaceModel || null,
+          silhouetteEvidence: g.silhouetteEvidence || [],
           generatorLines: g.generatorLines || [],
           recesses: g.recesses || [], fillets: g.fillets || [],
           cavityVolumes: g.cavityVolumes || [], cavityRelations: g.cavityRelations || [],
           cavityUnions: g.cavityUnions || [],
           cavityTrims: g.cavityTrims || null,
+          cylinderJunction: g.cylinderJunction || null,
+          cylinderJunctionEvidence: g.cylinderJunctionEvidence || [],
           analyticSurfaceValidation: g.analyticSurfaceValidation || null,
           analyticCertificate: g.analyticCertificate || null,
           smoothSideFaces: g.smoothSideFaces, topologyStatus: g.topologyStatus,
           partialSubset: g.partialSubset === true,
           profileMap: g.profileMap, profileInferred: g.profileInferred,
+          viewFrames: g.viewFrames || [], frameAudit: g.frameAudit || null,
           surfaceValidation: g.surfaceValidation, displaySync: g.displaySync || null,
+          sections: g.sections || null,
           faceHoles: (g.faceHoles || faces.map(function() { return []; })).map(function(holes) { return holes.map(function(hole) { return copyFace(hole, verts.length); }); })
         }
       };
@@ -157,6 +164,19 @@
           holes.forEach(function(hole) { copyFace(hole, g.vertices.length); });
         });
       }
+      if (g.viewFrames !== undefined) {
+        if (!Array.isArray(g.viewFrames)) return false;
+        for (var vi = 0; vi < g.viewFrames.length; vi++) {
+          var vf = g.viewFrames[vi];
+          if (!vf || typeof vf.id !== 'string' || !vf.id) return false;
+          ['origin', 'u', 'v', 'n'].forEach(function (key) { copyVertex(vf[key]); });
+          if (!vf.sheet || !isFiniteNumber(vf.sheet.x) || !isFiniteNumber(vf.sheet.y)) return false;
+        }
+      }
+      if (g.frameAudit !== undefined && g.frameAudit !== null) {
+        if (typeof g.frameAudit !== 'object' || !Array.isArray(g.frameAudit.issues) ||
+            !Array.isArray(g.frameAudit.consumedIds) || !Array.isArray(g.frameAudit.unresolvedIds)) return false;
+      }
       if (g.displaySync !== undefined && g.displaySync !== null) {
         if (typeof g.displaySync !== 'object' ||
             ['ok','issues'].indexOf(g.displaySync.status) === -1 ||
@@ -168,6 +188,53 @@
       }
       function indices(values, count) {
         return Array.isArray(values) && values.every(function(v) {return Number.isInteger(v) && v>=0 && v<count;});
+      }
+      function sectionPoint(p) {
+        try { copyVertex(p); return true; } catch (err) { return false; }
+      }
+      function sectionPoints(list) {
+        return Array.isArray(list) && list.every(sectionPoint);
+      }
+      if (g.sections !== undefined && g.sections !== null) {
+        var sections = g.sections;
+        if (typeof sections !== 'object' || typeof sections.contract !== 'string' ||
+            typeof sections.status !== 'string' ||
+            !Array.isArray(sections.evidence) || !Array.isArray(sections.queries) ||
+            !Array.isArray(sections.retained) || !Array.isArray(sections.diagnostics)) return false;
+        for (var se = 0; se < sections.evidence.length; se++) {
+          var evidence = sections.evidence[se];
+          if (!evidence || typeof evidence !== 'object') return false;
+          if (evidence.plane !== undefined && evidence.plane !== null &&
+              (!sectionPoint(evidence.plane.origin) || !sectionPoint(evidence.plane.normal))) return false;
+        }
+        for (var sq = 0; sq < sections.queries.length; sq++) {
+          var query = sections.queries[sq];
+          if (!query || typeof query !== 'object' || !Array.isArray(query.components) ||
+              !Array.isArray(query.loops) || !Array.isArray(query.diagnostics)) return false;
+          if (query.plane && (!sectionPoint(query.plane.origin) || !sectionPoint(query.plane.normal))) return false;
+          for (var sc = 0; sc < query.components.length; sc++) {
+            var component = query.components[sc];
+            if (!component || typeof component !== 'object') return false;
+            if (component.kind === 'line') {
+              if (!sectionPoint(component.start) || !sectionPoint(component.end)) return false;
+            } else if (!sectionPoint(component.center) || !sectionPoint(component.u) ||
+                !sectionPoint(component.v)) return false;
+          }
+          var display = query.display;
+          if (display !== undefined && display !== null) {
+            if (typeof display !== 'object' || !Array.isArray(display.components) ||
+                !Array.isArray(display.loops)) return false;
+            if (!display.components.every(function (item) { return item && sectionPoints(item.points); })) return false;
+            if (!display.loops.every(function (item) { return item && sectionPoints(item.points); })) return false;
+          }
+        }
+        for (var sr = 0; sr < sections.retained.length; sr++) {
+          var retained = sections.retained[sr];
+          if (!retained || typeof retained !== 'object' || !Array.isArray(retained.surfaces) ||
+              !Array.isArray(retained.diagnostics)) return false;
+          if (retained.section && (!Array.isArray(retained.section.components) ||
+              !Array.isArray(retained.section.loops))) return false;
+        }
       }
       if (g.smoothSideFaces !== undefined && !indices(g.smoothSideFaces,g.faces.length)) return false;
       if (g.surfaces !== undefined && !Array.isArray(g.surfaces)) return false;
@@ -217,6 +284,16 @@
             if(!Array.isArray(c.points)||c.points.length<2)return false;
             c.points.forEach(copyVertex);
             if(!indices(c.displayVertices,g.vertices.length)||!indices(c.displayEdges,g.edges.length))return false;
+            continue;
+          }
+          if(c && c.kind==='cylinder-intersection') {
+            copyVertex(c.origin); copyVertex(c.u); copyVertex(c.v);
+            copyVertex(c.direction);
+            if(!isFiniteNumber(c.radius)||c.radius<=0)return false;
+            if(!isFiniteNumber(c.otherRadius)||c.otherRadius<=c.radius)return false;
+            if(!isFiniteNumber(c.startAngle)||!isFiniteNumber(c.sweepAngle)||c.sweepAngle<=0)return false;
+            if(!indices(c.displayVertices,g.vertices.length)||
+                !indices(c.displayEdges,g.edges.length))return false;
             continue;
           }
           if (!c || ['circle','circular-arc','ellipse','arc'].indexOf(c.kind)===-1 ||

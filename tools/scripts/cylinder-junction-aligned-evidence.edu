@@ -1,0 +1,75 @@
+# expect: 96V 144E 52F curves=4 surfaces=6 surfaceShells=2 surfaceModel=ok surfaceValidation=issues status=partial unresolved=35 diagnostics=curve-inclined-arc-unsupported,curve-projection-ambiguous,point-correspondence-missing,recess-depth-missing,unresolved-edge previewParity=ok previewJunction=0 previewJunctionEvidence=0
+/datum -160 120
+/profile 100 0 1
+/point a0 -20 0 elevation
+/point a1 20 0 elevation
+/point a2 20 70 elevation
+/point a3 -20 70 elevation
+/line a0 a1 A elevation
+/line a1 a2 A elevation
+/line a2 a3 A elevation
+/line a3 a0 A elevation
+/point ac 0 -35 plan
+/circle ac 20 A plan
+/point ap0 115 0 profile
+/point ap1 155 0 profile
+/point ap2 155 70 profile
+/point ap3 115 70 profile
+/line ap0 ap1 A profile
+/line ap1 ap2 A profile
+/line ap2 ap3 A profile
+/line ap3 ap0 A profile
+/point b0 -45 27 elevation
+/point b1 5 27 elevation
+/point b2 5 43 elevation
+/point b3 -45 43 elevation
+/line b0 b1 A elevation
+/line b1 b2 A elevation
+/line b2 b3 A elevation
+/line b3 b0 A elevation
+/point bc 135 35 profile
+/circle bc 8 A profile
+/point bp0 -45 -27 plan
+/point bp1 -45 -43 plan
+/point bp2 5 -43 plan
+/point bp3 5 -27 plan
+/line bp0 bp1 A plan
+/line bp1 bp2 A plan
+/line bp2 bp3 A plan
+/line bp3 bp0 A plan
+# aligned seam
+/point sp0 -20.000000000 -27.000000000 plan
+/point sp1 -19.621416870 -28.000000000 plan
+/point sp2 -19.287301522 -29.000000000 plan
+/point sp3 -19.000000000 -30.000000000 plan
+/point sp4 -18.761663039 -31.000000000 plan
+/point sp5 -18.574175621 -32.000000000 plan
+/point sp6 -18.439088915 -33.000000000 plan
+/point sp7 -18.357559751 -34.000000000 plan
+/point sp8 -18.330302780 -35.000000000 plan
+/point sp9 -18.357559751 -36.000000000 plan
+/point sp10 -18.439088915 -37.000000000 plan
+/point sp11 -18.574175621 -38.000000000 plan
+/point sp12 -18.761663039 -39.000000000 plan
+/point sp13 -19.000000000 -40.000000000 plan
+/point sp14 -19.287301522 -41.000000000 plan
+/point sp15 -19.621416870 -42.000000000 plan
+/point sp16 -20.000000000 -43.000000000 plan
+/line sp0 sp1 A plan
+/line sp1 sp2 A plan
+/line sp2 sp3 A plan
+/line sp3 sp4 A plan
+/line sp4 sp5 A plan
+/line sp5 sp6 A plan
+/line sp6 sp7 A plan
+/line sp7 sp8 A plan
+/line sp8 sp9 A plan
+/line sp9 sp10 A plan
+/line sp10 sp11 A plan
+/line sp11 sp12 A plan
+/line sp12 sp13 A plan
+/line sp13 sp14 A plan
+/line sp14 sp15 A plan
+/line sp15 sp16 A plan
+# surface-query: {"operation":"topology","curveKind":"cylinder-intersection","expect":{"summary":{"edges":0},"edges":[]}}
+# surface-query: {"operation":"solid-junction","expect":{"contract":null,"seams":0,"curveCount":0}}

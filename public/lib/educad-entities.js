@@ -20,7 +20,7 @@
 
 
   var TWO_POINT_TYPES = ['SEGMENT', 'LINE', 'RAY', 'DIMENSION', 'DATUM_AXIS'];
-  var VIEW_ROLES = ['PLAN', 'ELEVATION', 'BOTH', 'PROFILE'];
+  var VIEW_ROLES = ['PLAN', 'ELEVATION', 'BOTH', 'PROFILE', 'AUX'];
   var BIS_CODES = ['A', 'B', 'E', 'G', 'H', 'K'];
   var LAYER_STATIC = 'layer1';
   var LAYER_DYNAMIC = 'layer2';

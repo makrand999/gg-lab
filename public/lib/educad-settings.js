@@ -23,17 +23,6 @@
 
   var VERSION = '1.0.0-educad';
   var STORAGE_KEY = 'educad_settings_v1';
-  var DRAWING_MODES = ['menu', 'shortcuts'];
-  function getDrawingMode(store) {
-    checkStore(store);
-    return DRAWING_MODES.indexOf(store.drawingMode) !== -1 ? store.drawingMode : 'menu';
-  }
-  function setDrawingMode(store, value) {
-    checkStore(store);
-    if (DRAWING_MODES.indexOf(value) === -1) throw new Error('educad-settings: invalid drawing method');
-    store.drawingMode = value;
-    return value;
-  }
 
   var DEFAULTS = {
     commandPreview: true,
@@ -170,7 +159,7 @@
         values[names[j]] = initial[names[j]];
       }
     }
-    return { values: values, drawingMode: 'menu', inspection: normalizeInspection(), sheetInspection: normalizeSheetInspection() };
+    return { values: values, inspection: normalizeInspection(), sheetInspection: normalizeSheetInspection() };
   }
 
   function get(store, key) {
@@ -203,7 +192,6 @@
     }
     store.inspection = normalizeInspection();
     store.sheetInspection = normalizeSheetInspection();
-    store.drawingMode = 'menu';
     return store;
   }
 
@@ -213,7 +201,6 @@
     for (var i = 0; i < KEYS.length; i++) out[KEYS[i]] = !!store.values[KEYS[i]];
     out.inspection = getInspection(store);
     out.sheetInspection = getSheetInspection(store);
-    out.drawingMode = getDrawingMode(store);
     return JSON.stringify(out);
   }
 
@@ -234,7 +221,6 @@
     }
     store.inspection = normalizeInspection(obj.inspection);
     store.sheetInspection = normalizeSheetInspection(obj.sheetInspection);
-    if (DRAWING_MODES.indexOf(obj.drawingMode) !== -1) store.drawingMode = obj.drawingMode;
     return store;
   }
 
@@ -273,9 +259,6 @@
     DEFAULTS: DEFAULTS,
     KEYS: KEYS,
     LABELS: LABELS,
-    DRAWING_MODES: DRAWING_MODES,
-    getDrawingMode: getDrawingMode,
-    setDrawingMode: setDrawingMode,
     INSPECTION_FIELDS: INSPECTION_FIELDS,
     normalizeInspection: normalizeInspection,
     getInspection: getInspection,

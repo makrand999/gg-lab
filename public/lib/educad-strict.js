@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
-  else root.EduCADStrict = factory();
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-view-frame.js'));
+  else root.EduCADStrict = factory(root.EduCADViewFrame);
+})(typeof window !== 'undefined' ? window : globalThis, function (ViewFrame) {
   'use strict';
 
 
@@ -65,14 +65,37 @@
     var point = interpolate(a, b, div(da, sub(da, db)));
     return insideTriangle(point, triangle, n) ? [point] : [];
   }
-  function improperIntersection(a, b, positions) {
-    var ta = a.map(function (i) { return positions[i]; }), tb = b.map(function (i) { return positions[i]; });
-
+  function triangleGeometry(face, positions) {
+    var points = face.map(function (index) { return positions[index]; });
+    var bounds = points[0].map(function (coordinate, axis) {
+      var lo = coordinate, hi = coordinate;
+      for (var i = 1; i < points.length; i++) {
+        var next = points[i][axis];
+        if (cmp(next, lo) < 0) lo = next;
+        if (cmp(next, hi) > 0) hi = next;
+      }
+      return {lo: lo, hi: hi};
+    });
+    return {face: face, points: points, bounds: bounds, normal: normal(points)};
+  }
+  function improperIntersection(left, right, positions) {
     for (var axis = 0; axis < 3; axis++) {
-      var aa = ta.map(function (p) { return p[axis]; }).sort(cmp), bb = tb.map(function (p) { return p[axis]; }).sort(cmp);
-      if (cmp(aa[2], bb[0]) < 0 || cmp(bb[2], aa[0]) < 0) return false;
+      var aa = left.bounds[axis], bb = right.bounds[axis];
+      if (cmp(aa.hi, bb.lo) < 0 || cmp(bb.hi, aa.lo) < 0) return false;
     }
+    var a = left.face, b = right.face, ta = left.points, tb = right.points;
+    var na = left.normal, nb = right.normal;
     var common = a.filter(function (id) { return b.indexOf(id) !== -1; });
+    if (common.length === 2 && na.some(function (v) { return v.n !== 0n; }) &&
+        nb.some(function (v) { return v.n !== 0n; })) {
+      var edgeStart = positions[common[0]];
+      var otherB = vector(positions[b.find(function (id) { return common.indexOf(id) < 0; })], edgeStart);
+      if (dot(na, otherB).n !== 0n) return false;
+      var edge = vector(positions[common[1]], edgeStart);
+      var sideB = dot(na, cross(edge, otherB)).n;
+      var forward = a[(a.indexOf(common[0]) + 1) % 3] === common[1];
+      if (forward ? sideB < 0n : sideB > 0n) return false;
+    }
     function allowed(point) {
       if (!common.length) return false;
       var start = positions[common[0]];
@@ -80,7 +103,6 @@
       var end = positions[common[1]], side = cross(vector(point, start), vector(end, start));
       return side.every(function (v) { return v.n === 0n; }) && dot(vector(point, start), vector(point, end)).n <= 0n;
     }
-    var na = normal(ta), nb = normal(tb);
     for (var i = 0; i < 3; i++) {
       var contacts = segmentTriangle(ta[i], ta[(i + 1) % 3], tb, nb).concat(segmentTriangle(tb[i], tb[(i + 1) % 3], ta, na));
       if (contacts.some(function (p) { return !allowed(p); })) return true;
@@ -120,9 +142,10 @@
     });
 
 
+    var triangleData = faces.map(function (face) { return triangleGeometry(face, positions); });
     for (var i = 0; i < faces.length; i++) {
       for (var j = i + 1; j < faces.length; j++) {
-        if (improperIntersection(faces[i], faces[j], positions)) invalid('surface-self-intersection', 'Triangles ' + i + ' and ' + j + ' intersect outside their declared shared edge or vertex.');
+        if (improperIntersection(triangleData[i], triangleData[j], positions)) invalid('surface-self-intersection', 'Triangles ' + i + ' and ' + j + ' intersect outside their declared shared edge or vertex.');
       }
     }
     var orientation = new Map();
@@ -161,7 +184,7 @@
   function reconstruct(entities, options) {
     options = options || {};
     var issues = [], points = new Map(), members = new Map(), seen = new Set();
-    var vertices = [], vertexIds = [], exactVertices = [], index = new Map(), edges = [], faces = [], edgeKeys = new Set();
+    var vertices = [], vertexIds = [], exactVertices = [], index = new Map(), edges = [], faces = [], edgeKeys = new Set(), frameEvidence = [];
     function issue(state, code, message, entityId, memberId) {
       issues.push({ state: state, code: code, message: message, entityId: entityId || null, memberId: memberId || null });
     }
@@ -176,6 +199,7 @@
     var frames = entities.filter(function (e) { return e && e.meta && e.meta.draftingLayout; }).map(function (e) { return e.meta.draftingLayout; });
     if (options.profile) frames.push(options.profile);
     var profile = frames[0], profileExact = null;
+    var registry = options.frames || (ViewFrame ? ViewFrame.resolve(entities, options) : null);
     if (frames.some(function (f) { return f.xRef !== profile.xRef || f.dRef !== profile.dRef || f.s !== profile.s; })) inconsistent('profile-frame-conflict', 'Declared side-view frames disagree.');
     var declarations = entities.filter(function (e) { return e && e.meta && e.meta.reconstructionTopology; }).map(function (e) { return e.meta.reconstructionTopology; });
     if (options.topology) declarations.push(options.topology);
@@ -205,24 +229,118 @@
         var member = members.get(m.id);
         if (!member) { member = { id: m.id, observations: [] }; members.set(m.id, member); }
         member.observations.push(e.id);
-        if (e.viewRole === 'ELEVATION') { assign(member, 'x', x, e); assign(member, 'height', y, e); }
-        else if (e.viewRole === 'PLAN') { assign(member, 'x', x, e); assign(member, 'depth', neg(y), e); }
+        var observationFrame = null;
+        if (e.viewRole === 'ELEVATION') { assign(member, 'x', x, e); assign(member, 'height', y, e); observationFrame = ViewFrame && ViewFrame.standard('ELEVATION'); }
+        else if (e.viewRole === 'PLAN') { assign(member, 'x', x, e); assign(member, 'depth', neg(y), e); observationFrame = ViewFrame && ViewFrame.standard('PLAN'); }
         else if (e.viewRole === 'PROFILE') {
           assign(member, 'height', y, e);
           if (!profileExact) missing('profile-frame-missing', 'Side projections need an explicitly declared profile frame.', e, m.id);
-          else assign(member, 'depth', add(profileExact.dRef, mul(profileExact.s, sub(x, profileExact.xRef))), e);
+          else { assign(member, 'depth', add(profileExact.dRef, mul(profileExact.s, sub(x, profileExact.xRef))), e); observationFrame = ViewFrame && ViewFrame.fromProfile(profile); }
+        } else if (e.viewRole === 'AUX') {
+          member.hasAux = true;
+          observationFrame = registry && registry.frameFor ? registry.frameFor(e) : null;
+          if (!observationFrame) missing('aux-frame-missing', 'Auxiliary point ' + e.id + ' needs a declared frame.', e, m.id);
         } else missing('view-missing', 'Point ' + e.id + ' needs an explicit front, top or side view; its position does not determine the view.', e, m.id);
+        if (observationFrame) {
+          if (!member.numericObservations) member.numericObservations = [];
+          member.numericObservations.push({ frame: observationFrame, x: e.x, y: e.y, entityId: e.id });
+        }
       });
     });
+    var dimensionAxes = [];
+    var coordinateNames = {x:'x', y:'height', z:'depth'};
+    var links = {x:new Map(), height:new Map(), depth:new Map()};
+    entities.forEach(function (e) {
+      var meta = e && e.meta || {};
+      var axis = ['x','y','z'].indexOf(meta.dimensionAxis) !== -1 ? coordinateNames[meta.dimensionAxis] : null;
+      if (!e || e.type !== 'DIMENSION' || !axis || !Number.isFinite(meta.valueMm)) return;
+      var stations = (Array.isArray(meta.refs) ? meta.refs : []).map(function (id) {
+        return stationMembers(points.get(id));
+      });
+      var record = {id:e.id, axis:meta.dimensionAxis, status:'unresolved', measuredMm:null};
+      dimensionAxes.push(record);
+      if (stations.length !== 2 || stations.some(function (station) { return station.length !== 1; })) return;
+      var a = members.get(stations[0][0].id), b = members.get(stations[1][0].id);
+      if (a === b || a.hasAux || b.hasAux) return;
+      var delta = exact(meta.valueMm), byMember = links[axis];
+      function link(from, to, value) {
+        if (!byMember.has(from)) byMember.set(from, []);
+        byMember.get(from).push({to:to, value:value, entity:e});
+      }
+      link(a, b, delta);
+      link(b, a, neg(delta));
+      record.check = function () {
+        if (!a[axis] || !b[axis]) return;
+        var actual = sub(b[axis].value, a[axis].value);
+        record.measuredMm = numeric(actual);
+        record.status = equal(delta, actual) ? 'satisfied' : 'conflict';
+        if (record.status === 'conflict')
+          inconsistent('dimension-axis-offset-conflict',
+            'The signed dimension disagrees with the reconstructed world-axis span.', e);
+      };
+    });
+    Object.keys(links).forEach(function (axis) {
+      var byMember = links[axis];
+      var queue = Array.from(byMember.keys()).filter(function (member) { return member[axis]; });
+      for (var i = 0; i < queue.length; i++) {
+        var source = queue[i];
+        byMember.get(source).forEach(function (link) {
+          if (link.to[axis]) return;
+          assign(link.to, axis, add(source[axis].value, link.value), link.entity);
+          queue.push(link.to);
+        });
+      }
+    });
+    dimensionAxes.forEach(function (record) {
+      if (record.check) record.check();
+      delete record.check;
+    });
+    var frameArithmetic = false;
     Array.from(members.keys()).sort().forEach(function (id) {
       var member = members.get(id), absent = ['x', 'height', 'depth'].filter(function (axis) { return !member[axis]; });
-      if (absent.length) { missing('coordinates-missing', 'Member ' + id + ' needs ' + absent.join(', ') + ' from another projection.', null, id); return; }
-      var coords = [member.x.value, member.height.value, member.depth.value];
-      var values = coords.map(numeric);
+      if (member.hasAux) frameArithmetic = true;
+      if (!member.hasAux && absent.length) { missing('coordinates-missing', 'Member ' + id + ' needs ' + absent.join(', ') + ' from another projection.', null, id); return; }
+      if (member.hasAux && !ViewFrame) { missing('aux-frame-missing', 'Auxiliary frame support is unavailable.', null, id); return; }
+      var values, coords = null, solved = null;
+      if (member.hasAux) {
+        var observations = member.numericObservations || [];
+        if (!absent.length) {
+          coords = [member.x.value, member.height.value, member.depth.value];
+          var exactPoint = { x: numeric(coords[0]), y: numeric(coords[1]), z: numeric(coords[2]) };
+          var residual = ViewFrame.residualAt(observations, exactPoint);
+          solved = { rank: 3, point: exactPoint, residual: residual };
+        } else {
+          solved = ViewFrame.solveObservations(observations);
+        }
+        member.auxResidual = solved.residual;
+        member.frameEvidence = { memberId: id, rank: solved.rank, residual: solved.residual,
+          conflict: solved.rank === 3 && solved.residual > ViewFrame.RESIDUAL_MM,
+          frameIds: observations.map(function (o) { return o.frame.id; }) };
+        frameEvidence.push(member.frameEvidence);
+        if (solved.rank < 3) {
+          missing('aux-point-underdetermined', 'Member ' + id + ' is observed in auxiliary views but rank ' + solved.rank + ' leaves its position unresolved.', null, id);
+          return;
+        }
+        if (solved.residual > ViewFrame.RESIDUAL_MM) {
+          inconsistent('aux-point-conflict', 'Member ' + id + ' has contradictory auxiliary observations (residual ' + solved.residual + ' mm).', null, id);
+          return;
+        }
+        values = [solved.point.x, solved.point.y, solved.point.z];
+        if (!absent.length) coords = [member.x.value, member.height.value, member.depth.value];
+      } else {
+        coords = [member.x.value, member.height.value, member.depth.value];
+        values = coords.map(numeric);
+      }
       if (values.some(function (v) { return !Number.isFinite(v); })) { issue('unsupported', 'render-range', 'Reconstructed coordinates exceed the renderer range.', null, id); return; }
       index.set(id, vertices.length); vertexIds.push(id);
       vertices.push({ x: values[0], y: values[1], z: values[2] });
-      exactVertices.push({ id: id, x: serial(coords[0]), height: serial(coords[1]), depth: serial(coords[2]), observations: member.observations.slice().sort() });
+      exactVertices.push({ id: id,
+        x: coords ? serial(coords[0]) : values[0],
+        height: coords ? serial(coords[1]) : values[1],
+        depth: coords ? serial(coords[2]) : values[2],
+        numeric: member.hasAux, rank: member.frameEvidence ? member.frameEvidence.rank : 3,
+        residual: member.frameEvidence ? member.frameEvidence.residual : 0,
+        observations: member.observations.slice().sort() });
     });
     function addEdge(a, b) {
       var key = JSON.stringify([a, b].sort());
@@ -263,7 +381,14 @@
       if (ids[0] === ids[1]) { inconsistent('edge-loop', 'A straight edge needs two different vertex identities.', e); return; }
       if (index.has(ids[0]) && index.has(ids[1])) {
         var a = members.get(ids[0]), b = members.get(ids[1]);
-        if (['x', 'height', 'depth'].every(function (axis) { return equal(a[axis].value, b[axis].value); })) inconsistent('edge-degenerate', 'Distinct identities define a zero-length spatial edge.', e);
+        var exactEdge = a.x && a.height && a.depth && b.x && b.height && b.depth;
+        var degenerate = exactEdge ?
+          ['x', 'height', 'depth'].every(function (axis) { return equal(a[axis].value, b[axis].value); }) :
+          (function () {
+            var va = vertices[index.get(ids[0])], vb = vertices[index.get(ids[1])];
+            return Math.hypot(va.x - vb.x, va.y - vb.y, va.z - vb.z) <= 1e-9;
+          })();
+        if (degenerate) inconsistent('edge-degenerate', 'Distinct identities define a zero-length spatial edge.', e);
         else addEdge(ids[0], ids[1]);
       }
     });
@@ -274,6 +399,10 @@
     });
     var triangles = topology.triangles === undefined ? [] : topology.triangles, triangleKeys = new Set();
     if (!Array.isArray(triangles)) { inconsistent('triangles-invalid', 'Declared triangles must be an array.'); triangles = []; }
+    if (frameArithmetic && triangles.length) {
+      issue('unsupported', 'aux-topology-unsupported', 'Declared triangle topology is not combined with auxiliary frame observations.');
+      triangles = [];
+    }
     triangles.forEach(function (triangle) {
       if (!Array.isArray(triangle) || triangle.length !== 3 || new Set(triangle).size !== 3 || triangle.some(function (id) { return typeof id !== 'string'; })) { inconsistent('triangle-invalid', 'Each triangle needs three distinct member IDs.'); return; }
       if (triangle.some(function (id) { return !index.has(id); })) { missing('triangle-vertices-missing', 'A declared triangle has unresolved vertices.'); return; }
@@ -287,7 +416,11 @@
       faces.push(triangle.map(function (id) { return index.get(id); }));
       addEdge(triangle[0], triangle[1]); addEdge(triangle[1], triangle[2]); addEdge(triangle[2], triangle[0]);
     });
-    var positions = vertexIds.map(function (id) { var m = members.get(id); return [m.x.value, m.height.value, m.depth.value]; });
+    var positions = vertexIds.map(function (id, i) {
+      var m = members.get(id);
+      return m.x && m.height && m.depth ? [m.x.value, m.height.value, m.depth.value] :
+        [vertices[i].x, vertices[i].y, vertices[i].z];
+    });
     var surfaces = classifySurfaces(faces, positions, issue);
     if (topology.solid !== undefined && typeof topology.solid !== 'boolean') inconsistent('solid-request-invalid', 'The solid requirement must be true or false.');
     if (topology.solid === true && (!faces.length || surfaces.openSurfaces.length)) missing('surface-open', 'A solid needs a closed surface; some boundary faces are missing.');
@@ -298,8 +431,10 @@
     return {
       status: state === 'determined' ? 'ok' : 'unavailable', determination: state,
       reason: first ? first.code : null, label: first ? first.message : '', issues: issues,
-      geometry: state === 'determined' ? { name: surfaces.solids.length ? 'explicit solid' : faces.length ? 'declared triangular surface' : 'explicit wireframe', vertices: vertices, edges: edges, faces: faces, vertexIds: vertexIds, solids: surfaces.solids, openSurfaces: surfaces.openSurfaces } : null,
-      certificate: state === 'determined' ? { contract: 'educad-explicit-v1', arithmetic: 'exact-decimal-rational', vertices: exactVertices, edgeMembers: edges.map(function (edge) { return edge.map(function (i) { return vertexIds[i]; }); }), triangles: faces.map(function (face) { return face.map(function (i) { return vertexIds[i]; }); }), solids: surfaces.solids.map(function (solid) { return { volumeMm3Exact: solid.volumeMm3Exact, boundary: solid.faceIndices.map(function (fi) { return faces[fi].map(function (i) { return vertexIds[i]; }); }) }; }) } : null,
+      frameEvidence: frameEvidence,
+      dimensionAxes: dimensionAxes,
+      geometry: state === 'determined' ? { name: surfaces.solids.length ? 'explicit solid' : faces.length ? 'declared triangular surface' : 'explicit wireframe', vertices: vertices, edges: edges, faces: faces, vertexIds: vertexIds, frameEvidence: frameEvidence, solids: surfaces.solids, openSurfaces: surfaces.openSurfaces } : null,
+      certificate: state === 'determined' ? { contract: 'educad-explicit-v1', arithmetic: frameArithmetic ? 'numeric-frame-v1' : 'exact-decimal-rational', vertices: exactVertices, edgeMembers: edges.map(function (edge) { return edge.map(function (i) { return vertexIds[i]; }); }), triangles: faces.map(function (face) { return face.map(function (i) { return vertexIds[i]; }); }), solids: surfaces.solids.map(function (solid) { return { volumeMm3Exact: solid.volumeMm3Exact, boundary: solid.faceIndices.map(function (fi) { return faces[fi].map(function (i) { return vertexIds[i]; }); }) }; }) } : null,
       stats: { seen: points.size, paired: vertices.length, edges: edges.length, solids: surfaces.solids.length }
     };
   }

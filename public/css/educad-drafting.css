@@ -1,5 +1,10 @@
 
 .drafting-controls { position: absolute; z-index: 11; top: 12px; left: 12px; width: max-content; max-width: calc(100vw - 24px); color: #64748b; font: 12px/1.6 system-ui,sans-serif; }
+.drafting-launch-row { position: relative; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 14px; row-gap: 3px; min-height: 28px; }
+.drafting-tool-hint { color: #64748b; }
+.drafting-learn-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 12; display: grid; gap: 5px; min-width: 190px; padding: 7px 10px 7px 0; background: #f8fafc; }
+.drafting-learn-menu .clean-select-wrap { display: flex; white-space: nowrap; }
+.drafting-learn-menu .clean-select { max-width: 210px; }
 .drafting-tools, .drafting-options, .drafting-editor, .drafting-selection, .drafting-history { display: flex; align-items: center; flex-wrap: wrap; column-gap: 15px; row-gap: 3px; min-height: 28px; }
 .drafting-controls [hidden], .drafting-status[hidden] { display: none !important; }
 .drafting-controls button, .drafting-controls select, .drafting-controls input, .drafting-settings button, .drafting-settings select { background: transparent; border: 0; border-radius: 0; box-shadow: none; font: inherit; color: inherit; }
@@ -17,10 +22,23 @@
 .drafting-editor { margin-top: 4px; column-gap: 11px; }
 .drafting-kind { color: #415c74; }
 .drafting-project-actions { display: inline-flex; gap: 8px; }
-.drafting-launch::after { content: ' ▾'; font-size: 10px; color: #94a3b8; }
+.drafting-launch::after, .drafting-learn-launch::after { content: ' ▾'; font-size: 10px; color: #94a3b8; }
 .drafting-menu { margin-top: 5px; padding: 8px 0; background: #f8fafc; }
 .drafting-selection { margin-top: 8px; }
 .drafting-history { column-gap: 18px; color: #8190a0; }
+.drafting-issues { margin-top: 4px; max-width: min(360px, calc(100vw - 24px)); }
+.drafting-issues[hidden], .drafting-issues [hidden] { display: none !important; }
+.drafting-issues-toggle { color: #a46d37; }
+.drafting-issues-toggle::after { content: ' ▸'; font-size: 10px; color: #94a3b8; }
+.drafting-issues-toggle[aria-expanded="true"]::after { content: ' ▾'; }
+.drafting-issues-list { display: grid; gap: 3px; list-style: none; margin: 5px 0 0; padding: 5px 0 0; border-top: 1px solid #e2e8f0; max-height: min(38vh, 240px); overflow-y: auto; overscroll-behavior: contain; }
+.drafting-issues-list li { min-width: 0; }
+.drafting-controls .drafting-issue-row { display: block; width: 100%; box-sizing: border-box; padding: 4px 7px; border-left: 2px solid #dcc3a4; background: #f8fafc; color: #64748b; font-size: 11px; line-height: 1.45; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.drafting-controls button.drafting-issue-row:hover { background: #f1f5f9; color: #334155; }
+.drafting-controls .drafting-issue-row[aria-current="true"] { border-left-color: #a46d37; background: #f1f5f9; color: #334155; }
+.drafting-controls .drafting-issue-row.is-static { color: #8190a0; cursor: default; }
+.drafting-issue-message { display: block; }
+.drafting-issue-location { display: block; margin-top: 1px; font-size: 10px; color: #8190a0; }
 .drafting-settings .drafting-options { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 8px; }
 .drafting-settings label { display: contents; }
 .drafting-settings select { cursor: pointer; padding: 2px 0; }
@@ -28,9 +46,6 @@
 .drafting-settings button[aria-pressed="true"] { text-decoration: underline; text-underline-offset: 4px; }
 .drafting-settings button:disabled, .drafting-settings select:disabled { opacity: .4; }
 .drafting-settings [hidden] { display: none !important; }
-.drafting-settings .drafting-method label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.drafting-method { margin-bottom: 12px; }
-#drawing-method-help { margin: 5px 0 0; color: #8190a0; font-size: 11px; }
 #settings-panel { max-height: calc(100vh - 72px); overflow-y: auto; border: 0; border-radius: 0; box-shadow: none; padding: 16px; color: #64748b; font: 12px/1.6 system-ui,sans-serif; }
 #settings-panel .cmd-settings-head { font-size: 13px; font-weight: 500; border: 0; padding-bottom: 8px; }
 #settings-panel .cmd-settings-section { color: #334155; font-weight: 500; border: 0; margin-top: 12px; margin-bottom: 5px; }
@@ -56,4 +71,6 @@ body:has(#cmd-bar:not([hidden])) .drafting-status { bottom: 100px; }
   .demo-bar .clean-select { max-width: 135px; }
   .drafting-tools, .drafting-options { column-gap: 11px; }
   .drafting-controls { max-width: calc(100vw - 24px); }
+  .drafting-issues { max-width: calc(100vw - 24px); }
+  .drafting-issues-list { max-height: 32vh; }
 }

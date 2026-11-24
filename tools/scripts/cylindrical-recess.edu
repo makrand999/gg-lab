@@ -1,4 +1,4 @@
-# expect: 56V 84E 31F recesses=1 curves=2 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=10 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceValidation=partial holes=1 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred
+# expect: 56V 84E 31F recesses=1 curves=2 surfaces=8 surfaceKinds=cylinder,plane surfaceLoops=10 surfaceShells=1 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceCertificateIssues=none surfaceCertificateChecks=86 surfaceCertificateScope=none surfaceValidation=partial surfaceValidationScope=none holes=1 displaySync=ok displaySyncIssues=none diagnostics=none unresolved=0 status=inferred
 /datum -100 400
 /point v0 0 0 plan
 /point "v0'" 0 20 elevation
@@ -42,7 +42,8 @@
 /line h2 h3 A elevation
 /line h3 h0 A elevation
 
-# expect: surfaceChecks=10 surfaceQueries=ok
+# expect: surfaceChecks=11 surfaceQueries=ok
+# surface-query: {"operation":"cavity","action":"summary","expect":{"volumes":1,"recesses":1,"unions":0,"absorbed":0,"approximate":0,"relations":[]}}
 # surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":30,"y":50,"z":30},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circle","radius":10,"center":{"x":30,"y":50,"z":30}}}
 # surface-query: {"operation":"intersect","surfaces":[0,1],"expect":{"kind":"circle","radius":10,"relation":"transverse","center":{"x":30,"y":40,"z":30}}}
 # surface-query: {"operation":"intersect","surfaces":[0,4],"expect":{"kind":"circle","radius":10,"relation":"transverse","center":{"x":30,"y":60,"z":30}}}

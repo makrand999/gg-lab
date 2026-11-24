@@ -294,5 +294,224 @@
     });
     return {curves:curves,issues:issues};
   }
-  return {reconstruct:reconstruct};
+  function inferPatches(geometry, entities) {
+    var byId = new Map(entities.map(function (row) { return [row.id, row]; }));
+    var strokes = entities.filter(function (row) {
+      return row.type === 'SEGMENT' && row.meta && row.meta.reconstructionRole !== 'construction' &&
+        Array.isArray(row.meta.refs) && row.meta.refs.length === 2;
+    });
+    var curves = geometry.curves, candidates = [];
+    function observations(curve, index) {
+      var result = new Map();
+      curve.sourceEvidence.forEach(function (record) {
+        var row = byId.get(record.entityId);
+        var ref = row && row.meta.throughRefs[record.order[index]];
+        if (ref) result.set(row.viewRole, ref);
+      });
+      return result;
+    }
+    function matchedStrokes(a, b, index, otherIndex) {
+      var first = observations(a, index), second = observations(b, otherIndex);
+      return strokes.filter(function (row) {
+        var from = first.get(row.viewRole), to = second.get(row.viewRole);
+        if (!from || !to || from === to) return false;
+        var refs = row.meta.refs;
+        if (!((refs[0] === from && refs[1] === to) || (refs[1] === from && refs[0] === to))) return false;
+        var a = byId.get(refs[0]), b = byId.get(refs[1]);
+        return Math.hypot(row.x-a.x, row.y-a.y) <= EPS &&
+          Math.hypot(row.x2-b.x, row.y2-b.y) <= EPS;
+      });
+    }
+    function sourceDefinition(curve) {
+      return {kind:curve.kind, degree:curve.degree, knots:curve.knots.slice(),
+        controlPoints:curve.controlPoints.slice(), weights:curve.weights.slice(), closed:curve.closed};
+    }
+    function stationMatches(a, at, b, bt) {
+      var first = observations(a, at), second = observations(b, bt), count = 0;
+      first.forEach(function (ref, role) { if (second.get(role) === ref) count++; });
+      return count >= 2;
+    }
+    function translatedPair(a, b, reverse) {
+      if (!P.plane(a) || a.controlPoints.length !== b.controlPoints.length ||
+          a.weights.some(function (weight) { return weight !== 1; }) ||
+          b.weights.some(function (weight) { return weight !== 1; })) return false;
+      var last = b.controlPoints.length - 1, first = a.controlPoints[0];
+      var second = b.controlPoints[reverse ? last : 0];
+      return a.knots.length === b.knots.length && a.knots.every(function (knot, i) {
+        return Math.abs(knot - (reverse ? 1 - b.knots[b.knots.length - 1 - i] : b.knots[i])) <= EPS;
+      }) && a.controlPoints.every(function (p, i) {
+        var q = b.controlPoints[reverse ? last - i : i];
+        return Math.hypot((q.x-p.x)-(second.x-first.x), (q.y-p.y)-(second.y-first.y),
+          (q.z-p.z)-(second.z-first.z)) <= EPS;
+      });
+    }
+    curves.forEach(function (a, ai) {
+      if (a.kind !== 'nurbs' || a.closed || a.interpolationPoints.length < 3) return;
+      for (var bi = ai + 1; bi < curves.length; bi++) {
+        var b = curves[bi], n = a.interpolationPoints.length;
+        if (b.kind !== 'nurbs' || b.closed || b.interpolationPoints.length !== n) continue;
+        [false, true].forEach(function (reverse) {
+          if (translatedPair(a, b, reverse)) curves.forEach(function (rail, ri) {
+            if (ri === ai || ri === bi || rail.kind !== 'nurbs' || rail.closed ||
+                rail.interpolationPoints.length < 3) return;
+            var end = rail.interpolationPoints.length - 1, bStart = reverse ? n - 1 : 0;
+            [false, true].forEach(function (railReverse) {
+              if (!stationMatches(a, 0, rail, railReverse ? end : 0) ||
+                  !stationMatches(b, bStart, rail, railReverse ? 0 : end)) return;
+              var chart = {kind:'translated-spline', first:sourceDefinition(a), second:sourceDefinition(b),
+                reverse:reverse, rail:sourceDefinition(rail), railReverse:railReverse};
+              var sourceIds = Array.from(new Set(a.sourceIds.concat(b.sourceIds, rail.sourceIds)));
+              candidates.push({a:ai, b:bi, rail:ri, chart:chart, strokeIds:[], sourceIds:sourceIds});
+            });
+          });
+          var generators = a.interpolationPoints.map(function (p, i) {
+            var other = reverse ? n - 1 - i : i, q = b.interpolationPoints[other];
+            if (Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z) <= EPS) return [];
+            return matchedStrokes(a, b, i, other);
+          });
+          if (candidates.some(function (candidate) {
+            return candidate.a === ai && candidate.b === bi && candidate.rail !== undefined;
+          }) || generators.some(function (rows) {
+            return new Set(rows.map(function (row) { return row.viewRole; })).size < 2;
+          })) return;
+          var chart = {kind:'ruled-spline', first:sourceDefinition(a), second:sourceDefinition(b), reverse:reverse};
+          var strokeIds = generators.flat().map(function (row) { return row.id; });
+          var sourceIds = Array.from(new Set(a.sourceIds.concat(b.sourceIds, strokeIds)));
+          candidates.push({a:ai, b:bi, chart:chart, strokeIds:strokeIds, sourceIds:sourceIds});
+        });
+      }
+    });
+    var ringIndices = curves.map(function (curve, i) {
+      var bound = (geometry.surfacePatches || []).some(function (patch) {
+        return patch.kind !== 'plane' && (patch.boundaryCurves || []).indexOf(i) !== -1;
+      });
+      return curve.kind === 'circle' && !bound ? i : -1;
+    }).filter(function (i) { return i !== -1; });
+    function ringDefinition(ring) {
+      return {kind:'circle', center:ring.center, radius:ring.radius, u:ring.u, v:ring.v};
+    }
+    function alignedRims(first, second, chart) {
+      var indices = first.displayVertices || [];
+      if (indices.length < 3 || !second.displayVertices || second.displayVertices.length !== indices.length) return null;
+      var frame = chart.frame;
+      var tangent = {
+        x:frame.axis.y * frame.radial.z - frame.axis.z * frame.radial.y,
+        y:frame.axis.z * frame.radial.x - frame.axis.x * frame.radial.z,
+        z:frame.axis.x * frame.radial.y - frame.axis.y * frame.radial.x
+      };
+      var rim = indices.map(function (index) {
+        var p = geometry.vertices[index];
+        var x = p.x - frame.origin.x, y = p.y - frame.origin.y, z = p.z - frame.origin.z;
+        var angle = Math.atan2(x*tangent.x + y*tangent.y + z*tangent.z,
+          x*frame.radial.x + y*frame.radial.y + z*frame.radial.z);
+        var u = ((angle / (2*Math.PI)) + 1) % 1;
+        var expected = P.surfacePoint(chart, u, 1);
+        var next = second.displayVertices.find(function (other) {
+          var p = geometry.vertices[other];
+          return Math.hypot(p.x-expected.x, p.y-expected.y, p.z-expected.z) <= EPS;
+        });
+        return {u:u, first:index, second:next};
+      });
+      return rim.every(function (entry) { return entry.second !== undefined; }) ?
+        rim.sort(function (a, b) { return a.u - b.u; }) : null;
+    }
+    function bindCaps(candidate) {
+      [candidate.a, candidate.b].forEach(function (index, which) {
+        var curve = curves[index];
+        var patch = geometry.surfacePatches.find(function (item) {
+          return item.kind === 'plane' && item.outer && !(item.holes || []).length &&
+            (item.boundaryCurves || []).length === 1 && item.boundaryCurves[0] === index &&
+            item.outer.length === curve.displayVertices.length;
+        });
+        if (!patch) return;
+        var axis = candidate.chart.frame.axis, sign = which ? 1 : -1;
+        patch.origin = curve.center;
+        patch.normal = {x:sign*axis.x, y:sign*axis.y, z:sign*axis.z};
+        patch.loops = [{kind:'outer', curves:[index]}];
+        patch.sourceIds = curve.sourceIds.slice();
+        (patch.faceIndices || []).forEach(function (fi) {
+          var face = geometry.faces[fi], normals = [0, 0, 0];
+          face.forEach(function (vertex, k) {
+            var a = geometry.vertices[vertex], b = geometry.vertices[face[(k+1) % face.length]];
+            normals[0] += (a.y-b.y)*(a.z+b.z);
+            normals[1] += (a.z-b.z)*(a.x+b.x);
+            normals[2] += (a.x-b.x)*(a.y+b.y);
+          });
+          if (normals[0]*patch.normal.x + normals[1]*patch.normal.y + normals[2]*patch.normal.z < 0)
+            face.reverse();
+        });
+      });
+    }
+    curves.forEach(function (curve, index) {
+      if (curve.kind !== 'nurbs' || curve.closed || curve.interpolationPoints.length < 3) return;
+      ringIndices.forEach(function (ai, i) {
+        ringIndices.slice(i + 1).forEach(function (bi) {
+          [false, true].forEach(function (reverse) {
+            var a = curves[ai], b = curves[bi];
+            var chart = {kind:'revolved-spline', first:ringDefinition(a), second:ringDefinition(b),
+              meridian:sourceDefinition(curve), reverse:reverse};
+            chart.frame = P.revolutionFrame(chart);
+            if (!chart.frame) return;
+            var sourceIds = Array.from(new Set(a.sourceIds.concat(b.sourceIds, curve.sourceIds)));
+            candidates.push({a:ai, b:bi, rail:index, chart:chart, strokeIds:[], sourceIds:sourceIds});
+          });
+        });
+      });
+    });
+    var resolved = new Set(), diagnostics = [];
+    candidates.forEach(function (candidate) {
+      var a = curves[candidate.a], b = curves[candidate.b];
+      if (candidates.some(function (other) {
+        return other !== candidate && [other.a, other.b, other.rail].some(function (index) {
+          return index !== undefined && [candidate.a, candidate.b, candidate.rail].indexOf(index) !== -1;
+        });
+      })) {
+        diagnostics.push({code:'spline-patch-ambiguous', entityId:a.sourceIds[0],
+          sourceIds:candidate.sourceIds, message:'The generator strokes admit more than one spline station pairing.'});
+        return;
+      }
+      var chart = candidate.chart;
+      var revolved = chart.kind === 'revolved-spline';
+      var rims = revolved ? alignedRims(a, b, chart) : null;
+      var nu = revolved ? (rims ? rims.length : 36) :
+        Math.min(96, Math.max(24, (a.interpolationPoints.length - 1) * 4));
+      var nv = candidate.rail === undefined ? 4 : 24;
+      var grid = [], faces = [];
+      var faceHoles = geometry.faceHoles || (geometry.faceHoles = geometry.faces.map(function () { return []; }));
+      var rowCount = revolved ? nu : nu + 1;
+      for (var i = 0; i < rowCount; i++) {
+        var row = [];
+        for (var j = 0; j <= nv; j++) {
+          if (rims && (j === 0 || j === nv)) row.push(j === 0 ? rims[i].first : rims[i].second);
+          else {
+            row.push(geometry.vertices.length);
+            geometry.vertices.push(P.surfacePoint(chart, rims ? rims[i].u : i / nu, j / nv));
+          }
+        }
+        grid.push(row);
+      }
+      for (var u = 0; u < nu; u++) {
+        for (var v = 0; v < nv; v++) {
+          var first = grid[u], next = grid[(u + 1) % rowCount];
+          var face = [first[v], next[v], next[v + 1], first[v + 1]];
+          faces.push(geometry.faces.length);
+          geometry.faces.push(face);
+          faceHoles.push([]);
+          if (geometry.faceRegions) geometry.faceRegions.push({outer:face, holes:[]});
+        }
+      }
+      geometry.surfacePatches.push({kind:'parametric', chart:chart,
+        boundaryCurves:[candidate.a, candidate.b], faceIndices:faces, sourceIds:candidate.sourceIds});
+      geometry.smoothSideFaces.push.apply(geometry.smoothSideFaces, faces);
+      if (rims) bindCaps(candidate);
+      var members = candidate.rail === undefined ? [a, b] : [a, b, curves[candidate.rail]];
+      members.forEach(function (curve) {
+        if (curve.kind === 'nurbs') curve.surfaceInference = {status:'inferred', family:chart.kind};
+        (curve.sourceIds || []).forEach(function (id) { resolved.add(id); });
+      });
+      candidate.strokeIds.forEach(function (id) { resolved.add(id); });
+    });
+    return {sourceIds:resolved, diagnostics:diagnostics};
+  }
+  return {reconstruct:reconstruct,inferPatches:inferPatches};
 });

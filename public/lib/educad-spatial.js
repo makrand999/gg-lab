@@ -3,6 +3,13 @@
   else root.EduCADSpatial = factory(root.EduCADSettings);
 })(typeof window !== 'undefined' ? window : globalThis, function (Settings) {
   'use strict';
+  var THEME_ROOT = typeof window !== 'undefined' ? window :
+    (typeof globalThis !== 'undefined' ? globalThis : null);
+
+  function themeColor(name, fallback) {
+    var theme = THEME_ROOT && THEME_ROOT.EduCADTheme;
+    return (theme && typeof theme.color === 'function') ? theme.color(name) : fallback;
+  }
 
 
 
@@ -37,9 +44,9 @@
       vp: [{ x: x0, y: y0, z: 0 }, { x: x1, y: y0, z: 0 }, { x: x1, y: y1, z: 0 }, { x: x0, y: y1, z: 0 }],
       xy: [{ x: x0, y: 0, z: 0 }, { x: x1, y: 0, z: 0 }],
       labels: [
-        { text: 'HP · Top view', p: { x: (x0 + x1) / 2, y: 0, z: z1 }, color: '#817a6c' },
-        { text: 'VP · Front view', p: { x: (x0 + x1) / 2, y: y1, z: 0 }, color: '#718399' },
-        { text: 'XY', p: { x: x0, y: 0, z: 0 }, color: '#64748b' }
+        { text: 'HP · Top view', p: { x: (x0 + x1) / 2, y: 0, z: z1 }, color: themeColor('spatialHpLabel', '#817a6c') },
+        { text: 'VP · Front view', p: { x: (x0 + x1) / 2, y: y1, z: 0 }, color: themeColor('spatialVpLabel', '#718399') },
+        { text: 'XY', p: { x: x0, y: 0, z: 0 }, color: themeColor('muted', '#64748b') }
       ]
     };
   }
@@ -186,8 +193,8 @@
           lines.push(Math.abs(p.z) < EPS ? 'On VP' : 'VP ' + numberText(Math.abs(p.z), prefs) + ' mm ' + (p.z < 0 ? 'behind' : 'in front'));
         }
         if (prefs.planes && prefs.guides && prefs.planeDistances && (active || pinned)) {
-          [{ p: { x: p.x, y: 0, z: p.z }, color: '#9a8c72' },
-            { p: { x: p.x, y: p.y, z: 0 }, color: '#7a91ab' }].forEach(function (guide) {
+          [{ p: { x: p.x, y: 0, z: p.z }, color: themeColor('spatialHpGuide', '#9a8c72') },
+            { p: { x: p.x, y: p.y, z: 0 }, color: themeColor('spatialVpGuide', '#7a91ab') }].forEach(function (guide) {
             layout.guides.push({ from: point, to: projectMm(guide.p, st, solid), color: guide.color });
           });
         }
@@ -200,7 +207,8 @@
         if (prefs.inclinations) lines.push('HP ' + (info.hp === null ? '—' : numberText(info.hp, prefs) + '°') +
           ' · VP ' + (info.vp === null ? '—' : numberText(info.vp, prefs) + '°'));
       }
-      if (lines.length > 1 || (item.kind === 'edge' && prefs.lengths)) label(point, lines, active ? '#415c74' : '#64748b');
+      if (lines.length > 1 || (item.kind === 'edge' && prefs.lengths)) label(point, lines, active ? themeColor('viewInspect', '#415c74') :
+        themeColor('muted', '#64748b'));
     });
     if (prefs.planes) refs.labels.forEach(function (entry) {
       label(projectMm(entry.p, st, solid), [entry.text], entry.color);
@@ -290,8 +298,15 @@
     return merged;
   }
   function underlay(ctx, st, solid, refs) {
-    var planes = [{ points: refs.hp, fill: 'rgba(160, 147, 120, 0.065)', stroke: 'rgba(142, 132, 110, 0.22)' },
-      { points: refs.vp, fill: 'rgba(120, 148, 175, 0.065)', stroke: 'rgba(116, 140, 162, 0.22)' }];
+    var planes = [{
+      points: refs.hp,
+      fill: themeColor('spatialHpFill', 'rgba(160, 147, 120, 0.065)'),
+      stroke: themeColor('spatialHpStroke', 'rgba(142, 132, 110, 0.22)')
+    }, {
+      points: refs.vp,
+      fill: themeColor('spatialVpFill', 'rgba(120, 148, 175, 0.065)'),
+      stroke: themeColor('spatialVpStroke', 'rgba(116, 140, 162, 0.22)')
+    }];
 
     planes.forEach(function (p) {
       p.screen = p.points.map(function (v) { return projectMm(v, st, solid); });
@@ -304,7 +319,7 @@
       ctx.strokeStyle = p.stroke; ctx.stroke();
     });
     path(ctx, refs.xy.map(function (p) { return projectMm(p, st, solid); }));
-    ctx.strokeStyle = 'rgba(90, 105, 123, 0.5)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = themeColor('spatialFrame', 'rgba(90, 105, 123, 0.5)'); ctx.lineWidth = 1; ctx.stroke();
     ctx.restore();
   }
   function drawOverlay(ctx, layout, prefs) {
@@ -313,10 +328,11 @@
       ctx.strokeStyle = guide.color; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
       path(ctx, [guide.from, guide.to]); ctx.stroke(); ctx.setLineDash([]);
       ctx.beginPath(); ctx.arc(guide.to.x, guide.to.y, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#f8fafc'; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = themeColor('spatialMarkFill', '#f8fafc'); ctx.fill(); ctx.stroke();
     });
     layout.marks.forEach(function (mark) {
-      ctx.strokeStyle = mark.active ? '#58738c' : '#8a9dad'; ctx.setLineDash([]);
+      ctx.strokeStyle = mark.active ? themeColor('draftingLine', '#58738c') :
+        themeColor('viewGuide', '#8a9dad'); ctx.setLineDash([]);
       if (mark.kind === 'point') {
         ctx.lineWidth = mark.active ? 1.5 : 1;
         ctx.beginPath(); ctx.arc(mark.points[0].x, mark.points[0].y, mark.active ? 6 : 5, 0, Math.PI * 2); ctx.stroke();
@@ -329,9 +345,9 @@
       var rect = label.rect;
       var nearX = Math.max(rect.x0, Math.min(rect.x1, label.anchor.x));
       var nearY = Math.max(rect.y0, Math.min(rect.y1, label.anchor.y));
-      ctx.strokeStyle = 'rgba(138, 157, 173, 0.45)'; ctx.lineWidth = 0.6; ctx.setLineDash([]);
+      ctx.strokeStyle = themeColor('spatialLeader', 'rgba(138, 157, 173, 0.45)'); ctx.lineWidth = 0.6; ctx.setLineDash([]);
       path(ctx, [label.anchor, { x: nearX, y: nearY }]); ctx.stroke();
-      ctx.fillStyle = 'rgba(248, 250, 252, 0.96)'; ctx.fillRect(rect.x0, rect.y0, rect.x1 - rect.x0, rect.y1 - rect.y0);
+      ctx.fillStyle = themeColor('spatialLabelBg', 'rgba(248, 250, 252, 0.96)'); ctx.fillRect(rect.x0, rect.y0, rect.x1 - rect.x0, rect.y1 - rect.y0);
       ctx.fillStyle = label.color; ctx.textAlign = 'left';
       label.lines.forEach(function (line, i) {
         ctx.fillText(line, rect.x0 + 6, rect.y0 + 4 + (prefs.textSize + 4) * (i + 0.5));

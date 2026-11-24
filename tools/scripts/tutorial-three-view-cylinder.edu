@@ -1,4 +1,4 @@
-# expect: 48V 72E 26F curves=2 status=partial unresolved=2
+# expect: 48V 72E 26F curves=2 silhouettes=2 status=inferred unresolved=0
 /datum -40 95
 /profile 47.5 8 1
 /point o 0 -25.5 plan
@@ -15,7 +15,7 @@
 /point pb 82.5 0 profile
 /point pc 82.5 70 profile
 /point pd 47.5 70 profile
-/line pa pb G profile
-/line pb pc G profile
-/line pc pd G profile
-/line pd pa G profile
+/line pa pb A profile
+/line pb pc A profile
+/line pc pd A profile
+/line pd pa A profile

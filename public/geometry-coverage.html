@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geometry coverage — EduCAD</title>
+  <style>
+    * { box-sizing: border-box; }
+    html { background: #f8fafc; }
+    body {
+      margin: 0;
+      color: #0f172a;
+      background: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    a { color: #0369a1; }
+    .page {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 20px 56px;
+    }
+    .back {
+      display: inline-block;
+      margin-bottom: 18px;
+      color: #475569;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .back:hover { color: #0284c7; text-decoration: underline; }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 30px;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+    .lede {
+      max-width: 780px;
+      margin: 0;
+      color: #475569;
+      font-size: 15px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: 1.35fr repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .stat {
+      min-height: 82px;
+      padding: 12px 14px;
+      background: #fff;
+      border: 1px solid #d8e0e9;
+      border-radius: 8px;
+    }
+    .stat.primary { background: #f0f9ff; border-color: #bae6fd; }
+    .stat-number {
+      display: block;
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-label {
+      display: block;
+      margin-top: 5px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    .denominator {
+      margin: 12px 0 0;
+      padding: 11px 14px;
+      color: #334155;
+      background: #fff;
+      border: 1px solid #d8e0e9;
+      border-left: 3px solid #0284c7;
+      border-radius: 0 8px 8px 0;
+      font-size: 13px;
+    }
+    .denominator strong { color: #0f172a; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 12px;
+      margin: 24px 0 8px;
+      padding: 14px;
+      background: #fff;
+      border: 1px solid #d8e0e9;
+      border-radius: 8px;
+    }
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 190px;
+    }
+    .control label {
+      color: #475569;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    select,
+    .clear {
+      min-height: 36px;
+      padding: 7px 10px;
+      color: #0f172a;
+      background: #fff;
+      border: 1px solid #94a3b8;
+      border-radius: 5px;
+      font: inherit;
+      font-size: 14px;
+    }
+    select:focus,
+    .clear:focus {
+      outline: 2px solid #0284c7;
+      outline-offset: 2px;
+    }
+    .clear {
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .clear:hover { background: #f1f5f9; }
+    .clear[disabled] { color: #94a3b8; cursor: default; background: #fff; }
+    .result-count {
+      margin-left: auto;
+      align-self: center;
+      color: #475569;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .group { margin-top: 26px; }
+    .group[hidden] { display: none; }
+    .group-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 6px 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    .group-head h2 { margin: 0; font-size: 20px; line-height: 1.2; }
+    .group-meta {
+      color: #64748b;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .items {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px 16px;
+      padding: 14px 16px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .item[hidden] { display: none; }
+    .item h3 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+    .item p {
+      margin: 0;
+      grid-column: 1 / -1;
+      color: #334155;
+      font-size: 14px;
+    }
+    .item .limit { color: #475569; font-size: 13px; }
+    .item .limit strong,
+    .fixture-label {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .item .limit strong { margin-right: 6px; }
+    .fixtures {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 8px;
+      align-items: center;
+      color: #64748b;
+      font-size: 12px;
+    }
+    .fixtures code {
+      padding: 1px 5px;
+      color: #334155;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 11px;
+      overflow-wrap: anywhere;
+    }
+    .badge {
+      align-self: start;
+      justify-self: end;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .badge.verified { color: #14532d; background: #dcfce7; border: 1px solid #86efac; }
+    .badge.partial { color: #78350f; background: #fef3c7; border: 1px solid #fcd34d; }
+    .badge.kernel { color: #1e3a8a; background: #dbeafe; border: 1px solid #93c5fd; }
+    .badge.planned { color: #334155; background: #e2e8f0; border: 1px solid #cbd5e1; }
+    .empty {
+      margin-top: 26px;
+      padding: 24px;
+      text-align: center;
+      color: #475569;
+      background: #fff;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+    }
+    .empty[hidden] { display: none; }
+    @media (max-width: 860px) {
+      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stat.primary { grid-column: 1 / -1; }
+    }
+    @media (max-width: 620px) {
+      .page { padding: 20px 14px 44px; }
+      h1 { font-size: 25px; }
+      .summary { gap: 8px; }
+      .stat { min-height: 72px; padding: 10px 12px; }
+      .stat-number { font-size: 23px; }
+      .controls { align-items: stretch; gap: 10px; }
+      .control { flex: 1 1 160px; min-width: 0; }
+      .result-count { margin-left: 0; }
+      .item { grid-template-columns: minmax(0, 1fr); padding: 13px 14px; }
+      .badge { justify-self: start; }
+      .item h3,
+      .item p,
+      .item .limit,
+      .fixtures { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <a class="back" href="index.html">← Back to the drawing sheet</a>
+    <h1>Geometry coverage</h1>
+    <p class="lede">
+      The target is to reconstruct every sufficiently specified geometric solid in Major’s scope,
+      including combinations of its geometric surfaces, holes, recesses and cuts.
+      Verified rows show the cases covered by drawing scripts. To-build rows give the
+      remaining capabilities and what a drawing script must show to verify them.
+    </p>
+    <p class="lede">
+      A drawing can specify geometry through orthographic views, dimensions, sections, member
+      identities and geometric definitions. With incomplete, ambiguous or contradictory evidence,
+      Major should retain resolved geometry and identify the missing constraint or conflict.
+    </p>
+
+    <section class="summary" aria-label="Coverage summary">
+      <div class="stat primary">
+        <span class="stat-number" id="stat-verified">0</span>
+        <span class="stat-label">verified from drawing views</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number" id="stat-partial">0</span>
+        <span class="stat-label">partial or limited</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number" id="stat-kernel">0</span>
+        <span class="stat-label">kernel demo only</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number" id="stat-planned">0</span>
+        <span class="stat-label">to build</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number" id="stat-remaining">0</span>
+        <span class="stat-label">remaining (non-verified)</span>
+      </div>
+    </section>
+
+    <p class="denominator" id="denominator">
+      <strong id="denominator-total">Counts cover the listed capabilities.</strong>
+      <span id="denominator-text"></span>
+    </p>
+
+    <div class="controls" role="group" aria-label="Filter coverage items">
+      <div class="control">
+        <label for="filter-status">Status</label>
+        <select id="filter-status">
+          <option value="all">All statuses</option>
+          <option value="verified">Verified</option>
+          <option value="remaining">Remaining (non-verified)</option>
+          <option value="partial">Partial or limited</option>
+          <option value="kernel">Kernel demo only</option>
+          <option value="planned">To build</option>
+        </select>
+      </div>
+      <div class="control">
+        <label for="filter-group">Category</label>
+        <select id="filter-group">
+          <option value="all">All categories</option>
+        </select>
+      </div>
+      <button class="clear" id="clear-filters" type="button">Show all</button>
+      <span class="result-count" id="result-count" role="status" aria-live="polite"></span>
+    </div>
+
+    <div id="groups"></div>
+    <p class="empty" id="empty" hidden>Nothing matches these filters. Adjust the status or category.</p>
+  </main>
+
+  <script>
+    (function () {
+      var STATUS = {
+        verified: { label: 'Verified from views', badge: 'verified' },
+        partial: { label: 'Partial / limited', badge: 'partial' },
+        kernel: { label: 'Kernel only', badge: 'kernel' },
+        planned: { label: 'To build', badge: 'planned' }
+      };
+      var GROUPS = {
+        surfaces: 'Surfaces & primitives',
+        operations: 'Operations & relationships',
+        evidence: 'Drawing evidence & workflows'
+      };
+      var ITEMS = [
+        {
+          group: 'surfaces', status: 'verified', title: 'Planar polyhedra and prisms',
+          text: 'Prisms, pyramids, wedges and stepped blocks reconstruct from matched vertices and edges. Closed planar shells pass.',
+          limit: 'Planar faces only.',
+          fixtures: ['tutorial-three-view-prism', 'tutorial-three-view-pyramid', 'tutorial-three-view-stepped-notch']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Inclined flat-faced blocks',
+          text: 'A block with inclined planar faces reconstructs across plan, elevation and profile.',
+          limit: 'All faces are planar. Inclined curved cuts and arbitrary auxiliary frames are separate items.',
+          fixtures: ['tutorial-three-view-inclined-block']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Circular cylinders',
+          text: 'A right circular cylinder lifts from its circular view and rectangular outlines.',
+          limit: 'The fixtures cover right circular cylinders. Other cylinder geometries and sweep profiles have their own rows.',
+          fixtures: ['tutorial-three-view-cylinder', 'profile-cylinder']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Truncated cylinders',
+          text: 'A cylinder with a planar truncation reconstructs its wall, cut face and closed shell.',
+          limit: 'One planar cut. General curved trimming is a build item.',
+          fixtures: ['truncated-cylinder']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Circular cones',
+          text: 'A circular cone reconstructs from its base circle and elevation or profile apex.',
+          limit: 'The fixtures cover circular cones with the tested base and apex evidence.',
+          fixtures: ['tutorial-three-view-cone', 'cone-apex-off-normal']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Spheres',
+          text: 'Circular silhouettes reconstruct an analytic sphere with a closed surface certificate.',
+          limit: 'Isolated analytic spheres. General blended-sphere networks need a separate surface item.',
+          fixtures: ['sphere']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Through holes',
+          text: 'Straight cylindrical holes through a plate reconstruct inner walls and mouth loops.',
+          limit: 'Normal circular holes. Inclined and intersecting holes are unverified.',
+          fixtures: ['through-hole']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Cylindrical recesses and pockets',
+          text: 'Blind cylindrical pockets reconstruct when their depth is present in the views.',
+          limit: 'A bounded blind pocket needs depth evidence. The analytic shell certificate covers its shared mouth and floor boundaries.',
+          fixtures: ['cylindrical-recess', 'cylindrical-recess-three-view', 'cylindrical-recess-missing-depth']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Spherical recesses',
+          text: 'A hemispherical recess reconstructs from its view pairs with a plane-and-sphere shell.',
+          limit: 'Depth and centre must be evidenced. Freeform cavities need a separate surface item.',
+          fixtures: ['spherical-recess', 'spherical-recess-three-view']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Torus',
+          text: 'Concentric contours and a compatible semicircular side silhouette reconstruct a closed analytic ring torus.',
+          limit: 'The axis aligns with a principal view. Conflicting axial stations remain unresolved.',
+          fixtures: ['torus-from-views']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'General ruled-conic surfaces',
+          text: 'Restricted affine-ruled conic charts reconstruct with analytic patches and generator lines.',
+          limit: 'Requires supported generators and chart evidence. Arbitrary ruled surfaces stay unresolved.',
+          fixtures: ['general-affine-ruled-conic', 'general-affine-ruled-conic-nonuniform-generator']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Surfaces of revolution and general sweeps',
+          text: 'Two coaxial rings and a spline meridian determine a revolved shell. Matching spline sections and a rail determine a fixed-orientation sweep.',
+          limit: 'Revolution uses a monotone meridian. Sweeps with a changing profile frame remain open.',
+          fixtures: ['spline-revolved-meridian', 'spline-translated-sweep', 'torus-from-views']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Skew lofts',
+          text: 'Two spline sections in skew planes form a ruled loft when generator strokes identify corresponding stations across views.',
+          limit: 'The verified loft is an open patch with two section curves and straight generators.',
+          fixtures: ['spline-skew-loft']
+        },
+        {
+          group: 'surfaces', status: 'verified', title: 'Spline surface patches',
+          text: 'Corresponding spline sections generate analytic ruled patches. The display mesh is sampled from the analytic chart.',
+          limit: 'An isolated spline leaves the spanning surface unresolved. The patch certificate reports open boundaries.',
+          fixtures: ['spline-skew-loft', 'spline-three-view']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Fillet boundary joins',
+          text: 'A cylindrical fillet welds to its neighbouring faces and exposes a feature-graph relationship.',
+          limit: 'The certified join uses straight tangency boundaries. Cross-patch splitting remains unsupported.',
+          fixtures: ['fillet-line-boundary', 'fillet-line-boundary-missing']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Perpendicular cylinder branches',
+          text: 'A one-sided welded perpendicular branch is reconstructed with junction evidence.',
+          limit: 'The certified shell covers one evidenced perpendicular branch. Other stroke ambiguities and general branch networks remain unresolved.',
+          fixtures: ['cylinder-junction-perpendicular', 'cylinder-junction-perpendicular-no-evidence']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Analytic surface intersections',
+          text: 'Drawing-derived cylinder walls share an analytic intersection seam, and section traces recover bounded intersections with planar and spherical faces.',
+          limit: 'Supported surface pairs and bounded branches only.',
+          fixtures: ['cylinder-junction-perpendicular', 'cylindrical-recess-interaction-perpendicular', 'section-evidence-query']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Plane sections and splits',
+          text: 'A marked drawing trace supplies the cutting plane. Bounded face intersections form analytic section loops.',
+          limit: 'A retained split needs a supported cut, an explicit retained side, and compatible section boundary evidence.',
+          fixtures: ['section-evidence-query', 'full-section-sphere-retain', 'section-evidence-wrong-boundary']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Cylindrical cavity relations and trim specs',
+          text: 'Cylindrical recesses reconstructed from views report overlap, touch, separation, and supported trim events.',
+          limit: 'Relations cover the supported bounded cylinders. General solid booleans remain open.',
+          fixtures: ['cylindrical-recess-interaction-perpendicular', 'cylindrical-recess-interaction-tangent', 'cylindrical-recess-multiple-independent']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Cavity trim boundary reconstruction',
+          text: 'A supported perpendicular cavity intersection reconstructs an exact shared wall seam from drawing evidence.',
+          limit: 'The broader trim report may use numerical exposure checks. General trim curves remain unresolved.',
+          fixtures: ['cylindrical-recess-interaction-perpendicular']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Closed-shell certificates',
+          text: 'Reconstructed planar, cylindrical and spherical shells report boundaries and closed-shell status.',
+          limit: 'Certifies the built shell. Open or partial topology is reported.',
+          fixtures: ['sphere', 'through-hole']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Ambiguity and conflict reports',
+          text: 'Missing, ambiguous and conflicting correspondences are named in the result.',
+          limit: 'Reports the unresolved evidence. Missing constraints stay unresolved.',
+          fixtures: ['correspondence-audit', 'constraint-report']
+        },
+        {
+          group: 'operations', status: 'verified', title: 'Multi-face trimming and topology',
+          text: 'A section trace trims multiple faces of a convex polyhedron, welds the cut, and certifies the capped retained shell.',
+          limit: 'Concave shells, crossing holes, and general curved trims need additional topology support.',
+          fixtures: ['full-section-planar-prism']
+        },
+        {
+          group: 'evidence', status: 'verified', title: 'Three-view correspondence',
+          text: 'Shared point bases and view roles align plan, elevation and profile geometry.',
+          limit: 'Automatic matching works for supported evidence. Ambiguous or missing groups are reported.',
+          fixtures: ['tutorial-three-view-prism', 'tutorial-three-view-cylinder', 'tutorial-three-view-cone']
+        },
+        {
+          group: 'evidence', status: 'verified', title: 'Declared cross-view identities',
+          text: 'Explicit member identities link matching geometry across views.',
+          limit: 'Explicit identities only. Duplicate or conflicting declarations are reported.',
+          fixtures: ['oblique-declared-point', 'spline-distinct-identities']
+        },
+        {
+          group: 'evidence', status: 'verified', title: 'Oblique and non-axis-aligned arcs',
+          text: 'Supported oblique arc and circle evidence reconstructs and reprojects through the three views.',
+          limit: 'Tested arc and circle cases. Some visibility evidence remains ambiguous.',
+          fixtures: ['oblique-three-view-arc', 'oblique-three-view-circle']
+        },
+        {
+          group: 'evidence', status: 'verified', title: 'Hidden-line visibility',
+          text: 'Occluder tests and visibility intervals distinguish hidden and visible strokes.',
+          limit: 'Tested plate and oblique cases. Other surface families remain unverified.',
+          fixtures: ['hidden-box', 'plate-occlusion', 'oblique-visibility']
+        },
+        {
+          group: 'evidence', status: 'verified', title: 'Splines and freeform curves',
+          text: 'Cross-view spline stations fit a 3D curve and reproject back to the source views.',
+          limit: 'Station-based splines with unambiguous matches. An unsupported spanning surface leaves the lifted curve intact.',
+          fixtures: ['spline-three-view', 'spline-closed', 'spline-closed-ambiguous']
+        },
+        {
+          group: 'evidence', status: 'verified', title: 'Dimensions as solver constraints',
+          text: 'Driving dimensions check drawn distances. Signed world-axis offsets can supply a missing coordinate from an anchored point.',
+          limit: 'Linked point references and an anchored coordinate are required for coordinate recovery.',
+          fixtures: ['dimension-constraints', 'dimension-supplies-height', 'dimension-axis-conflict']
+        },
+        {
+          group: 'evidence', status: 'verified', title: 'Full sections',
+          text: 'Cutting-plane traces and drawn section boundaries support full retained sections of spheres and convex planar shells.',
+          limit: 'The retained shell is analytic. General oblique retained cuts and mixed-face repairs remain open.',
+          fixtures: ['full-section-sphere-retain', 'full-section-planar-prism', 'section-evidence-missing-boundary']
+        },
+        {
+          group: 'evidence', status: 'verified', title: 'Arbitrary auxiliary view frames',
+          text: 'An orthonormal auxiliary frame at a declared sheet position supplies point and straight-edge evidence to the shared reconstruction.',
+          limit: 'Auxiliary curve lifting and hidden-line visibility remain open. Rank-deficient and contradictory point observations are reported.',
+          fixtures: ['aux-frame-face', 'aux-frame-point-supply', 'aux-frame-conflict', 'aux-frame-underdetermined']
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'General planar shell reconstruction',
+          text: 'Recover planar faces from projected boundaries with concave outlines, inner loops, coplanar subdivisions and partial hidden-edge evidence.',
+          limit: 'Verify face regions and closed shell topology for nonconvex, perforated and multi-component drawings when the evidence determines them.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'General spatial curves and conics',
+          text: 'Lift bounded circles, conic arcs, exact splines and other defined spatial curves from their projections, including edge-on and partially visible projections.',
+          limit: 'Recover each curve’s 3D definition, span and source evidence. Verify its reprojection independently of display sampling.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'Inclined and general quadric patches',
+          text: 'Extend drawing lift to general bounded cylinder, cone, ellipsoid, paraboloid and hyperboloid patches, including oblique axes and noncircular sections.',
+          limit: 'Recover the analytic support, bounded domains and joins from compatible evidence. Verify orientation, section geometry and closure where the drawing defines a shell.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'Inclined-axis tori and bounded toroidal patches',
+          text: 'Recover toroidal surfaces from inclined projected contours, section curves and trim boundaries.',
+          limit: 'Verify the axis, both radii, angular domains and shared boundaries for an inclined ring torus and a trimmed toroidal patch.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'General meridians for surfaces of revolution',
+          text: 'Revolve evidenced meridians with several branches, nonmonotone stations or endpoints on the axis.',
+          limit: 'Verify the axis, angular extent, poles and joins, including a case with multiple meridian branches and a case with an unresolved station.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'Changing-frame sweeps',
+          text: 'Use drawing evidence to reconstruct how a profile translates, rotates, twists or scales along a straight or curved rail.',
+          limit: 'Verify a pipe elbow and a varying profile from resolved orientation or guide evidence. An unconstrained profile orientation produces a specific diagnostic.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'General ruled surfaces',
+          text: 'Extend generator-based inference to supported open or closed boundary curves with nonuniform correspondence, singular stations and multiple bands.',
+          limit: 'Verify chosen generator correspondences, bounded analytic patches and joins, including competing generator assignments.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'Closed and multi-section lofts',
+          text: 'Recover lofts with more than two sections, closed profiles, skew section frames and guide curves.',
+          limit: 'Verify section order, phase, interpolation and capped or periodic closure when those choices are evidenced. Surface alternatives remain visible when a choice is unresolved.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'General bounded spline and parametric patches',
+          text: 'Recover defined non-ruled patches from analytic curves, boundary conditions, control data and geometric constraints.',
+          limit: 'Verify analytic evaluation, parameter domains, trims and joins for representative independent boundary and control-data inputs.',
+          fixtures: []
+        },
+        {
+          group: 'surfaces', status: 'planned', title: 'General bounded implicit patches',
+          text: 'Lift defined implicit surfaces and select their bounded branches from sections, projections, trim curves or an explicit geometric equation.',
+          limit: 'Verify branch and domain selection, intersections and reproducible display near regular points and singularities.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'Inclined holes and curved hosts',
+          text: 'Recover through and blind holes whose axes are inclined to the host, including openings in curved faces.',
+          limit: 'Verify the axis, depth or exit, opening curves and shared host boundaries from the drawing.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'Intersecting holes and mixed cavities',
+          text: 'Resolve interactions among through holes and blind, stepped, tapered, spherical or otherwise defined recesses.',
+          limit: 'Verify overlap, contact and separation, exposed trim branches and material boundaries for several intersecting cavity types.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'Noncircular pockets, slots and channels',
+          text: 'Recover pockets and openings defined by arbitrary supported profiles, swept channels or bounded wall and floor surfaces.',
+          limit: 'Verify mouth loops, walls, floors or exits and closed host topology. Report the specific missing depth or profile evidence when it is unresolved.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'General fillets, blends and chamfers',
+          text: 'Reconstruct curved-edge and variable-radius fillets, spherical and other blends, and chamfers across planar or curved faces.',
+          limit: 'Verify boundaries, tangent or chamfer-angle constraints, corner transitions, and splitting across the resulting patches.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'General junctions and branch networks',
+          text: 'Extend evidenced junctions to inclined and offset axes, multiple branches and mixed surface families.',
+          limit: 'Verify each shared seam and the resulting shell for a multi-branch junction. Conflicting or incomplete junction evidence produces a specific diagnostic.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'Bounded intersections across surface families',
+          text: 'Compute the intersection branches needed by joins and cuts across planar, quadric, toroidal, ruled, lofted, swept and defined freeform patches.',
+          limit: 'Verify bounded transverse, tangent, coincident and near-degenerate cases. Record whether branches are exact or have numerical error bounds.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'General curved trimming and topology repair',
+          text: 'Trim several planar or curved faces along analytic intersections, keeping the selected regions and rebuilding shared boundary loops.',
+          limit: 'Verify retained regions, loop orientation, shared seams and shell closure when trims cross existing boundaries or meet at junctions.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'Concave multi-face cuts and sections through holes',
+          text: 'Slice concave or perforated shells and assemble multiple outer and inner cut loops.',
+          limit: 'Verify a cut with disconnected caps, a cut through a hole and a cut that separates a solid into multiple retained components.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'Oblique and compound sections of mixed solids',
+          text: 'Resolve full, partial and offset cutting traces where section evidence defines a plane or a sequence of planes through mixed planar and curved faces.',
+          limit: 'Verify section loops and, when a retained side is specified, the capped retained shell and its displayed section.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'General solid booleans',
+          text: 'Unite, subtract and intersect bounded solids made from the supported surface families when drawing evidence defines the material relationships.',
+          limit: 'Verify resulting boundaries, overlapping, touching and nested volumes, and disconnected components with valid shell topology.',
+          fixtures: []
+        },
+        {
+          group: 'operations', status: 'planned', title: 'Mixed shells, multiple bodies and singular contacts',
+          text: 'Assemble general shells with mixed faces, inner loops, distinct bodies and point or edge contacts.',
+          limit: 'Verify component ownership, consistent orientation and shared-boundary incidence. Open or nonmanifold geometry carries a specific diagnostic.',
+          fixtures: []
+        },
+        {
+          group: 'evidence', status: 'planned', title: 'Auxiliary curve lifting',
+          text: 'Use circular, conic and spline observations in arbitrary orthographic frames to determine or check ordinary 3D curves.',
+          limit: 'Verify a curve whose auxiliary projection supplies an independent missing constraint, and report an incompatible or rank-deficient projection.',
+          fixtures: []
+        },
+        {
+          group: 'evidence', status: 'planned', title: 'Hidden lines and silhouettes across surfaces and frames',
+          text: 'Use visible and hidden portions of edges, curves and silhouettes across supported surface families in principal and auxiliary views.',
+          limit: 'Verify partial occlusion, tangency, depth ordering and overlapping strokes. Only source-supported visibility constraints resolve competing models.',
+          fixtures: []
+        },
+        {
+          group: 'evidence', status: 'planned', title: 'General dimensional and geometric constraints',
+          text: 'Resolve distances, angles, radii, diameters, depth, relationships to datums and parallel, perpendicular, tangent or concentric constraints.',
+          limit: 'Verify dimensions that recover missing coordinates, curves or surfaces, with separately tested ambiguous and conflicting systems.',
+          fixtures: []
+        },
+        {
+          group: 'evidence', status: 'planned', title: 'Degenerate, coincident and repeated projections',
+          text: 'Match primitives and members when edges collapse to points, profiles repeat or overlap, or partial strokes share a projected location.',
+          limit: 'Verify unique solutions, alternative matches and conflicts across view combinations. Explicit identities constrain the same underlying reconstruction.',
+          fixtures: []
+        },
+        {
+          group: 'evidence', status: 'planned', title: 'Surface definitions and missing geometric constraints',
+          text: 'Accept the geometric definitions needed to resolve otherwise ambiguous supports, trims and material relationships when the drawing supplies them.',
+          limit: 'Verify that adding a specific missing constraint resolves the affected part and preserves unrelated resolved geometry. Equally supported alternatives remain visible.',
+          fixtures: []
+        },
+        {
+          group: 'evidence', status: 'planned', title: 'Scale, orientation and tolerance coverage',
+          text: 'Apply supported reconstruction consistently to reflected, translated, rotated, small and large drawings, with tolerances appropriate to the evidence.',
+          limit: 'Verify equivalent geometry under those changes and distinguish near-degenerate geometry, measurement tolerance and contradictory evidence.',
+          fixtures: []
+        },
+        {
+          group: 'evidence', status: 'planned', title: 'End-to-end reconstruction of supported combinations',
+          text: 'Exercise every listed surface family with its applicable combinations of features, orientations, intersections, trims and drawing evidence through the shared pipeline.',
+          limit: 'Verified cases reconstruct and reproject through the app, saved previews and drawing scripts. Analytic geometry and certificates survive saving. Unresolved cases identify the missing or conflicting constraint.',
+          fixtures: []
+        }
+      ];
+
+      var statusSelect = document.getElementById('filter-status');
+      var groupSelect = document.getElementById('filter-group');
+      var clearButton = document.getElementById('clear-filters');
+      var resultCount = document.getElementById('result-count');
+      var groupsRoot = document.getElementById('groups');
+      var empty = document.getElementById('empty');
+
+      function countByStatus(status) {
+        return ITEMS.filter(function (item) { return item.status === status; }).length;
+      }
+
+      function isRemaining(item) {
+        return item.status !== 'verified';
+      }
+
+      function summaryCounts() {
+        return {
+          verified: countByStatus('verified'),
+          partial: countByStatus('partial'),
+          kernel: countByStatus('kernel'),
+          planned: countByStatus('planned'),
+          remaining: ITEMS.filter(isRemaining).length,
+          total: ITEMS.length
+        };
+      }
+
+      function populateGroupOptions() {
+        Object.keys(GROUPS).forEach(function (key) {
+          var count = ITEMS.filter(function (item) { return item.group === key; }).length;
+          var option = document.createElement('option');
+          option.value = key;
+          option.textContent = GROUPS[key] + ' (' + count + ')';
+          groupSelect.appendChild(option);
+        });
+      }
+
+      function updateSummary() {
+        var counts = summaryCounts();
+        document.getElementById('stat-verified').textContent = counts.verified;
+        document.getElementById('stat-partial').textContent = counts.partial;
+        document.getElementById('stat-kernel').textContent = counts.kernel;
+        document.getElementById('stat-planned').textContent = counts.planned;
+        document.getElementById('stat-remaining').textContent = counts.remaining;
+        document.getElementById('denominator-total').textContent =
+          'Counts cover ' + counts.total + ' listed capabilities.';
+        document.getElementById('denominator-text').textContent =
+          ' Remaining ' + counts.remaining + ' = ' + counts.partial + ' partial + ' +
+          counts.kernel + ' kernel-only + ' + counts.planned +
+          ' to build. Items differ in effort.';
+      }
+
+      function createBadge(status) {
+        var badge = document.createElement('span');
+        badge.className = 'badge ' + STATUS[status].badge;
+        badge.textContent = STATUS[status].label;
+        return badge;
+      }
+
+      function createItem(item) {
+        var article = document.createElement('article');
+        article.className = 'item';
+        article.dataset.status = item.status;
+        article.dataset.group = item.group;
+
+        var title = document.createElement('h3');
+        title.textContent = item.title;
+        article.appendChild(title);
+        article.appendChild(createBadge(item.status));
+
+        var text = document.createElement('p');
+        text.textContent = item.text;
+        article.appendChild(text);
+
+        var limit = document.createElement('p');
+        limit.className = 'limit';
+        var limitLabel = document.createElement('strong');
+        limitLabel.textContent = item.status === 'planned' ? 'Done when' : 'Scope';
+        limit.appendChild(limitLabel);
+        limit.appendChild(document.createTextNode(item.limit));
+        article.appendChild(limit);
+
+        if (item.fixtures.length) {
+          var fixtures = document.createElement('div');
+          fixtures.className = 'fixtures';
+          var fixtureLabel = document.createElement('span');
+          fixtureLabel.className = 'fixture-label';
+          fixtureLabel.textContent = 'Drawing scripts';
+          fixtures.appendChild(fixtureLabel);
+          item.fixtures.forEach(function (name) {
+            var code = document.createElement('code');
+            code.textContent = name;
+            fixtures.appendChild(code);
+          });
+          article.appendChild(fixtures);
+        }
+
+        return article;
+      }
+
+      function render() {
+        groupsRoot.textContent = '';
+        Object.keys(GROUPS).forEach(function (key) {
+          var groupItems = ITEMS.filter(function (item) { return item.group === key; });
+          var section = document.createElement('section');
+          section.className = 'group';
+          section.dataset.group = key;
+
+          var head = document.createElement('div');
+          head.className = 'group-head';
+          var heading = document.createElement('h2');
+          heading.textContent = GROUPS[key];
+          var meta = document.createElement('span');
+          meta.className = 'group-meta';
+          var verified = groupItems.filter(function (item) { return item.status === 'verified'; }).length;
+          var remaining = groupItems.length - verified;
+          meta.textContent = verified + ' verified · ' + remaining + ' remaining';
+          head.appendChild(heading);
+          head.appendChild(meta);
+          section.appendChild(head);
+
+          var list = document.createElement('div');
+          list.className = 'items';
+          groupItems.forEach(function (item) { list.appendChild(createItem(item)); });
+          section.appendChild(list);
+          groupsRoot.appendChild(section);
+        });
+        applyFilters();
+      }
+
+      function applyFilters() {
+        var status = statusSelect.value;
+        var group = groupSelect.value;
+        var shown = 0;
+
+        Array.prototype.forEach.call(groupsRoot.querySelectorAll('.group'), function (section) {
+          var visibleInGroup = 0;
+          Array.prototype.forEach.call(section.querySelectorAll('.item'), function (item) {
+            var statusMatch = status === 'all' ||
+              (status === 'remaining' ? isRemaining({ status: item.dataset.status }) : item.dataset.status === status);
+            var groupMatch = group === 'all' || item.dataset.group === group;
+            var show = statusMatch && groupMatch;
+            item.hidden = !show;
+            if (show) visibleInGroup++;
+          });
+          section.hidden = visibleInGroup === 0;
+          if (!section.hidden) shown += visibleInGroup;
+        });
+
+        resultCount.textContent = 'Showing ' + shown + ' of ' + ITEMS.length + ' listed capabilities';
+        empty.hidden = shown !== 0;
+        clearButton.disabled = status === 'all' && group === 'all';
+      }
+
+      statusSelect.addEventListener('change', applyFilters);
+      groupSelect.addEventListener('change', applyFilters);
+      clearButton.addEventListener('click', function () {
+        statusSelect.value = 'all';
+        groupSelect.value = 'all';
+        applyFilters();
+      });
+
+      populateGroupOptions();
+      updateSummary();
+      render();
+    })();
+  </script>
+</body>
+</html>

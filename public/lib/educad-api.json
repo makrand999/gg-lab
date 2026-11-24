@@ -27,6 +27,17 @@
       "implicitEquation",
       "implicitLineIntervals"
     ],
+    "DrawingSections": [
+      "analyze",
+      "collectEvidence",
+      "collectBoundaries",
+      "sectionBoundary",
+      "compareBoundaries",
+      "retain",
+      "retainSection",
+      "worldPointForView",
+      "viewRoleForNormal"
+    ],
     "Predicates": [
       "orient2d",
       "orient3d",
@@ -91,6 +102,11 @@
     "constraint-report-v1",
     "view-state-v1",
     "implicit-surface-v1",
-    "implicit-intersection-v1"
+    "implicit-intersection-v1",
+    "drawing-sections-v1",
+    "section-boundary-v1",
+    "section-split-v1",
+    "cutting-plane-evidence-v1",
+    "section-boundary-evidence-v1"
   ]
 }

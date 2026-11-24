@@ -64,3 +64,5 @@
 /line "v5'" "v13'" A elevation
 /line "v6'" "v14'" A elevation
 /line "v7'" "v15'" A elevation
+# surface-query: {"operation":"topology","expect":{"contract":"analytic-topology-v1","summary":{"faces":10,"edges":24,"vertices":16,"loops":12,"openEdges":0,"sharedEdges":24,"nonmanifoldEdges":0,"status":"closed"}}}
+# surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":10,"edges":24,"convex":20,"concave":4,"smooth":0,"open":0,"unknown":0,"recesses":0,"fillets":0}}}

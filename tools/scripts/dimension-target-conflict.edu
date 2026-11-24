@@ -1,0 +1,3 @@
+# expect: surfaceChecks=1 surfaceQueries=ok dimensionStatus=none
+/datum -50 100
+# surface-query: {"operation":"dimension-constraints-spec","entities":[{"id":"p1","type":"POINT","caption":"a","x":0,"y":-10,"viewRole":"PLAN"},{"id":"p2","type":"POINT","caption":"b","x":10,"y":-10,"viewRole":"PLAN"},{"id":"d1","type":"DIMENSION","x":0,"y":-10,"x2":10,"y2":-10,"viewRole":"PLAN","meta":{"refs":["p1","p2"],"valueMm":10}},{"id":"d2","type":"DIMENSION","x":0,"y":-10,"x2":10,"y2":-10,"viewRole":"PLAN","meta":{"refs":["p2","p1"],"valueMm":20}}],"expect":{"contract":"dimension-constraints-v1","status":"inconsistent","summary":{"dimensions":2,"driving":2,"conflicts":2},"diagnostics":[{"code":"dimension-residual"},{"code":"dimension-target-conflict"}]}}

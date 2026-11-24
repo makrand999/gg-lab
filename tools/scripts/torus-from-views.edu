@@ -1,0 +1,16 @@
+/datum -50 150
+/circle 30 -40 19 A plan
+/circle 30 -40 11 A plan
+/point leftBottom 15 31 elevation
+/point rightBottom 45 31 elevation
+/point leftTop 15 39 elevation
+/point rightTop 45 39 elevation
+/point cLeft 15 35 elevation
+/point cRight 45 35 elevation
+/arc cLeft 4 90 270 A elevation
+/arc cRight 4 270 90 A elevation
+/line leftBottom rightBottom A elevation
+/line leftTop rightTop A elevation
+# expect: surfaces=1 surfaceKinds=torus surfaceShells=1 surfaceOpen=0 surfaceCertificate=ok status=inferred unresolved=0 previewParity=ok surfaceChecks=2 surfaceQueries=ok
+# surface-query: {"operation":"section","surface":0,"plane":{"origin":{"x":30,"y":35,"z":40},"normal":{"x":0,"y":1,"z":0}},"expect":{"kind":"circles","circles":[{"radius":11},{"radius":19}]}}
+# surface-query: {"operation":"classify","surface":0,"point":{"x":49,"y":35,"z":40},"expect":{"status":"inside"}}

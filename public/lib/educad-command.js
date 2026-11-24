@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory(function () { return require('./educad-drafting.js'); }, require('./educad-parametric.js'));
+    module.exports = factory(function () { return require('./educad-drafting.js'); }, require('./educad-parametric.js'), require('./educad-view-frame.js'));
   } else {
-    root.EduCADCommand = factory(function () { return root.EduCADDrafting; }, root.EduCADParametric);
+    root.EduCADCommand = factory(function () { return root.EduCADDrafting; }, root.EduCADParametric, root.EduCADViewFrame);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function (getDrafting, Parametric) {
+})(typeof window !== 'undefined' ? window : globalThis, function (getDrafting, Parametric, ViewFrame) {
   'use strict';
 
 
@@ -25,7 +25,7 @@
     Symbol('educadCommandPointContext') : '__educadCommandPointContext__';
 
   var DEMOS = ['line', 'points', 'prism', '3view', 'square'];
-  var TUTS = ['square', 'prism'];
+  var TUTS = ['square', 'prism', 'three-view-stepped-notch', 'three-view-inclined-block'];
   var MODES = ['edit', 'view'];
   var BIS_CODES = ['A', 'B', 'E', 'G', 'H', 'K'];
   var ROLES = ['plan', 'elevation', 'both', 'profile'];
@@ -39,6 +39,20 @@
     return null;
   }
 
+  function parseRoleSpec(word) {
+    var raw = String(word || '').trim();
+    var low = raw.toLowerCase();
+    if (low === 'plan') return { viewRole: 'PLAN', frameId: null, key: 'PLAN' };
+    if (low === 'elevation') return { viewRole: 'ELEVATION', frameId: null, key: 'ELEVATION' };
+    if (low === 'both') return { viewRole: 'BOTH', frameId: null, key: 'BOTH' };
+    if (low === 'profile') return { viewRole: 'PROFILE', frameId: null, key: 'PROFILE' };
+    if (low.indexOf('aux:') === 0) {
+      var id = raw.slice(4).trim();
+      return id ? { viewRole: 'AUX', frameId: id, key: 'AUX:' + id } : null;
+    }
+    return null;
+  }
+
   function isBis(word) {
     return BIS_CODES.indexOf(String(word).toUpperCase()) !== -1;
   }
@@ -46,20 +60,24 @@
 
 
 
-  function parseBisRole(tail) {
-    var out = { bis: null, role: null, error: '' };
+  function parseBisRole(tail, allowAux) {
+    var out = { bis: null, role: null, frameId: null, roleKey: null, error: '' };
     if (tail.length === 0) return out;
     if (tail.length > 2) {
       out.error = 'Too many arguments.';
       return out;
     }
-    var first = tail[0];
+    var first = tail[0], firstSpec = parseRoleSpec(first);
     if (isBis(first)) {
       out.bis = String(first).toUpperCase();
-    } else if (normRole(first) !== null) {
-      out.role = normRole(first);
+    } else if (firstSpec !== null) {
+      if (firstSpec.viewRole === 'AUX' && !allowAux) {
+        out.error = 'Auxiliary frames currently support points and straight edges.';
+        return out;
+      }
+      out.role = firstSpec.viewRole; out.frameId = firstSpec.frameId; out.roleKey = firstSpec.key;
     } else {
-      out.error = '"' + first + '" is neither a BIS type (A B E G H K) nor a view (plan elevation both profile).';
+      out.error = '"' + first + '" is neither a BIS type (A B E G H K) nor a view (plan elevation both profile aux:<id>).';
       return out;
     }
     if (tail.length === 2) {
@@ -67,11 +85,16 @@
         out.error = 'Too many arguments.';
         return out;
       }
-      if (normRole(tail[1]) === null) {
-        out.error = 'Role must be one of plan elevation both profile.';
+      var secondSpec = parseRoleSpec(tail[1]);
+      if (secondSpec === null) {
+        out.error = 'Role must be one of plan elevation both profile aux:<id>.';
         return out;
       }
-      out.role = normRole(tail[1]);
+      if (secondSpec.viewRole === 'AUX' && !allowAux) {
+        out.error = 'Auxiliary frames currently support points and straight edges.';
+        return out;
+      }
+      out.role = secondSpec.viewRole; out.frameId = secondSpec.frameId; out.roleKey = secondSpec.key;
     }
     return out;
   }
@@ -116,10 +139,12 @@
       hint: 'Write words at a spot (mm)',
       args: [{ name: 'x', kind: 'number' }, { name: 'y', kind: 'number' },
         { name: 'words', kind: 'words' }] },
-    { name: 'dimension', usage: '/dimension <from> <to> [bis] [role]',
-      hint: 'Measured span between two named points',
+    { name: 'dimension', usage: '/dimension <from> <to> [value [dx|dy|dz]] [bis] [role]',
+      hint: 'Measured span, projected target, or signed world-axis offset',
       args: [{ name: 'from', kind: 'point-name' },
         { name: 'to', kind: 'point-name' },
+        { name: 'value', kind: 'number', optional: true },
+        { name: 'axis', kind: 'words', optional: true },
         { name: 'bis', kind: 'bis-code', optional: true },
         { name: 'role', kind: 'role-name', optional: true }] },
     { name: 'polygon', usage: '/polygon <p1> <p2> <p3> [p4 ...]',
@@ -163,9 +188,27 @@
       args: [{ name: 'name', kind: 'entity-name' },
         { name: 'bis', kind: 'bis-code' },
         { name: 'role', kind: 'role-name', optional: true }] },
+    { name: 'section', usage: '/section <id> <view> <x1> <y1> <x2> <y2> [positive|negative] [retain]',
+      hint: 'Mark a cutting-plane trace for a drawing section',
+      args: [{ name: 'id', kind: 'words' },
+        { name: 'view', kind: 'role-name' },
+        { name: 'x1', kind: 'number' }, { name: 'y1', kind: 'number' },
+        { name: 'x2', kind: 'number' }, { name: 'y2', kind: 'number' },
+        { name: 'side', kind: 'words', optional: true },
+        { name: 'retain', kind: 'words', optional: true }] },
+    { name: 'section-boundary', usage: '/section-boundary <id> <view> <x1> <y1> <x2> <y2> [x3 y3 ...] | /section-boundary <id> <view> circle <x> <y> <r>',
+      hint: 'Mark a closed drawn section-boundary loop',
+      args: [{ name: 'id', kind: 'words' },
+        { name: 'view', kind: 'role-name' },
+        { name: 'x1', kind: 'number' }, { name: 'y1', kind: 'number' },
+        { name: 'x2', kind: 'number' }, { name: 'y2', kind: 'number' },
+        { name: 'more', kind: 'number', variadic: true }] },
     { name: 'profile', usage: '/profile <xRef> <dRef> [s]',
       hint: 'Set the side-view frame: sheet x = xRef + s * (depth - dRef)',
       args: [{name:'xRef',kind:'number'}, {name:'dRef',kind:'number'}, {name:'s',kind:'number',optional:true}] },
+    { name: 'auxframe', usage: '/auxframe <id> <ox> <oy> <oz> <nx> <ny> <nz> <ux> <uy> <uz> [u0] [v0]',
+      hint: 'Declare an orthonormal auxiliary view frame',
+      args: [{name:'id',kind:'word'}, {name:'geometry',kind:'number',variadic:true}] },
     { name: 'datum', usage: '/datum [x1] [x2]',
       hint: 'XY ground datum (default -30 to 30)',
       args: [{ name: 'x1', kind: 'number', optional: true },
@@ -208,6 +251,23 @@
     if (!isNumTok(tok)) return null;
     var value = parseFloat(tok);
     return Math.abs(value) <= 1e6 ? value : null;
+  }
+
+  function parseDimensionTail(tail) {
+    var value = null, axis = null;
+    if (tail.length && parseNum(tail[0]) !== null) {
+      value = parseNum(tail[0]);
+      tail = tail.slice(1);
+      if (tail.length && /^d[xyz]$/i.test(tail[0])) {
+        axis = tail[0].toLowerCase().charAt(1);
+        tail = tail.slice(1);
+      }
+      if (!axis && value < 0) return { error:'Dimension target must be >= 0 mm.' };
+    }
+    var br = parseBisRole(tail, true);
+    br.value = value;
+    br.axis = axis;
+    return br;
   }
 
 
@@ -748,10 +808,11 @@
         var px = parseNum(args[1]), py = parseNum(args[2]);
         if (px === null || py === null) return 'x and y must be numbers (mm) — usage: ' + spec.usage;
         if (hasPoint(ctx, args[0])) return 'There is already a point "' + args[0] + '".';
-        if (args.length > 3 && normRole(args[3]) === null) {
-          return 'Role must be one of plan elevation both profile.';
+        var pvSpec = args.length > 3 ? parseRoleSpec(args[3]) : null;
+        if (args.length > 3 && pvSpec === null) {
+          return 'Role must be one of plan elevation both profile aux:<id>.';
         }
-        var prole = args.length > 3 ? ' in ' + normRole(args[3]) + ' view' : '';
+        var prole = pvSpec ? ' in ' + pvSpec.key + ' view' : '';
         return 'Place point "' + args[0] + '" at ' + fmtPt(px, py) + ' mm' + prole + '.';
       }
       case 'line':
@@ -760,22 +821,24 @@
       case 'dimension': {
         var verbs = { line: 'Draw segment ', ray: 'Draw ray ',
           xline: 'Draw construction line ', dimension: 'Dimension ' };
-        var br = parseBisRole(args.slice(2));
+        var dt = p.name === 'dimension' ? parseDimensionTail(args.slice(2)) : null;
+        var br = dt || parseBisRole(args.slice(2), true);
         if (br.error !== '') return br.error + ' — usage: ' + spec.usage;
         var ptypes = { line: 'SEGMENT', ray: 'RAY', xline: 'LINE',
           dimension: 'DIMENSION' };
         var popts = isAnnotationStroke(ptypes[p.name],
           br.bis !== null ? br.bis : 'B', null) ? { annotation: true } : undefined;
-        var la = previewNeedPoint(ctx, args[0], br.role, popts);
+        var la = previewNeedPoint(ctx, args[0], br.roleKey, popts);
         if (la.fail) return la.fail;
-        var lb = previewNeedPoint(ctx, args[1], br.role, popts);
+        var lb = previewNeedPoint(ctx, args[1], br.roleKey, popts);
         if (lb.fail) return lb.fail;
         var pa = (typeof la.ent.x === 'number' && typeof la.ent.y === 'number') ?
           { x: la.ent.x, y: la.ent.y } : null;
         var pb = (typeof lb.ent.x === 'number' && typeof lb.ent.y === 'number') ?
           { x: lb.ent.x, y: lb.ent.y } : null;
         var tail = (pa !== null && pb !== null) ? ' (L ' + fmtLen(pa, pb) + ' mm)' : '';
-        var style = (br.bis !== null ? ', type ' + br.bis : '') +
+        var style = (dt && dt.value !== null ? ', target ' + dt.value + ' mm' : '') +
+          (br.bis !== null ? ', type ' + br.bis : '') +
           (br.role !== null ? ', ' + br.role + ' view' : '');
         return verbs[p.name] + args[0] + ' → ' + args[1] + tail + style + '.';
       }
@@ -817,6 +880,8 @@
         var srole = args.length > 2 ? ', ' + normRole(args[2]) + ' view' : '';
         return 'Restyle "' + args[0] + '" as type ' + String(args[1]).toUpperCase() + srole + '.';
       }
+      case 'auxframe':
+        return 'Declare auxiliary frame "' + args[0] + '" on the XY datum.';
       case 'profile':
         return 'Set the side-view coordinate frame on the XY datum.';
       case 'datum': {
@@ -1048,6 +1113,7 @@
   }
 
   function viewOfPoint(p) {
+    if (p.viewRole === 'AUX') return 'AUX:' + String((p.meta && p.meta.frameId) || '');
     if (p.viewRole === 'PLAN' || p.viewRole === 'ELEVATION' || p.viewRole === 'PROFILE') {
       return p.viewRole;
     }
@@ -1340,7 +1406,7 @@
     var readOnly = env.readOnly === true;
     var mutating = ['curve-through', 'circle-through', 'arc-through', 'point', 'line', 'ray', 'xline', 'circle', 'arc', 'text',
       'dimension', 'polygon', 'polyline', 'ellipse', 'conic', 'hatch', 'rename',
-      'delete', 'style', 'datum', 'clear', 'undo', 'demo',
+      'delete', 'style', 'section', 'section-boundary', 'datum', 'auxframe', 'clear', 'undo', 'demo',
       'tutorial'].indexOf(p.name) !== -1;
 
 
@@ -1394,16 +1460,19 @@
         if (findEntity(table, args[0]) !== null) {
           return fail('There is already a point "' + args[0] + '".');
         }
-        var prole = roleForY(py);
+        var prole = roleForY(py), pframeId = null;
         if (args.length === 4) {
-          if (normRole(args[3]) === null) {
-            return fail('Role must be one of plan elevation both profile.');
+          var pspec = parseRoleSpec(args[3]);
+          if (pspec === null) {
+            return fail('Role must be one of plan elevation both profile aux:<id>.');
           }
-          prole = normRole(args[3]);
+          prole = pspec.viewRole;
+          pframeId = pspec.frameId;
         }
+        var pmeta = pframeId ? { frameId: pframeId } : {};
         var made = create('POINT', { x: px, y: py, name: args[0],
           caption: args[0], showLabel: true, bisCode: 'B',
-          viewRole: prole });
+          viewRole: prole, meta: pmeta });
         if (made.fail) return made.fail;
         return { ok: true,
           message: 'Placed point "' + args[0] + '" at ' + fmtPt(px, py) + ' mm.',
@@ -1413,32 +1482,42 @@
       case 'ray':
       case 'xline':
       case 'dimension': {
-        var bl = arity(2, 4);
+        var bl = arity(2, p.name === 'dimension' ? 6 : 4);
         if (bl) return bl;
-        var xbr = parseBisRole(args.slice(2));
+        var xdt = p.name === 'dimension' ? parseDimensionTail(args.slice(2)) : null;
+        var xbr = xdt || parseBisRole(args.slice(2), true);
         if (xbr.error !== '') return fail(xbr.error + ' — usage: ' + spec.usage);
         var bis = xbr.bis !== null ? xbr.bis : 'B';
         var xrole = xbr.role !== null ? xbr.role : 'BOTH';
+        var xroleKey = xbr.roleKey !== null ? xbr.roleKey : 'BOTH';
         var xtypes = { line: 'SEGMENT', ray: 'RAY', xline: 'LINE',
           dimension: 'DIMENSION' };
         var xannotation = isAnnotationStroke(xtypes[p.name], bis, null);
         var xopts = xannotation ? { annotation: true } : undefined;
-        var la = needPoint(args[0], xrole, xopts);
+        var la = needPoint(args[0], xroleKey, xopts);
         if (la.fail) return la.fail;
-        var lb = needPoint(args[1], xrole, xopts);
+        var lb = needPoint(args[1], xroleKey, xopts);
         if (lb.fail) return lb.fail;
         if (la.ent.id === lb.ent.id) {
           return fail('Two different points needed — "' + args[0] + '" twice is one point.');
         }
         var xverbs = { line: 'Drew segment ', ray: 'Drew ray ',
           xline: 'Drew construction line ', dimension: 'Drew dimension ' };
+        var xmeta = { refs: [la.ent.id, lb.ent.id] };
+        if (xbr.frameId) xmeta.frameId = xbr.frameId;
+        var xcaption = p.name === 'dimension' ?
+          String(Math.round(Math.sqrt(Math.pow(lb.ent.x - la.ent.x, 2) +
+            Math.pow(lb.ent.y - la.ent.y, 2)) * 1000) / 1000) : '';
+        if (p.name === 'dimension' && xdt && xdt.value !== null) {
+          xmeta.valueMm = xdt.value;
+          xmeta.dimensionMode = 'driving';
+          if (xdt.axis) xmeta.dimensionAxis = xdt.axis;
+          xcaption = String(xdt.value);
+        }
         var seg = create(xtypes[p.name],
           { x: la.ent.x, y: la.ent.y, x2: lb.ent.x,
             y2: lb.ent.y, bisCode: bis, viewRole: xrole,
-            caption: p.name === 'dimension' ?
-              String(Math.round(Math.sqrt(Math.pow(lb.ent.x - la.ent.x, 2) +
-                Math.pow(lb.ent.y - la.ent.y, 2)) * 1000) / 1000) : '',
-            showLabel: false, meta: { refs: [la.ent.id, lb.ent.id] } });
+            caption: xcaption, showLabel: false, meta: xmeta });
         if (seg.fail) return seg.fail;
         return { ok: true,
           message: xverbs[p.name] + args[0] + ' → ' + args[1] + '.',
@@ -1851,6 +1930,120 @@
             ('Restyled "' + args[0] + '" as type ' + patch.bisCode + ', ' + patch.viewRole + ' view.') :
             ('Restyled "' + args[0] + '" as type ' + patch.bisCode + '.'),
           ids: [se.id] };
+      }
+      case 'auxframe': {
+        var afArity = arity(10, 12);
+        if (afArity) return afArity;
+        if (!ViewFrame) return fail('Auxiliary frame support is unavailable.');
+        var afNums = args.slice(1).map(parseNum);
+        if (afNums.some(function (v) { return v === null; }))
+          return fail('Auxiliary frame geometry must be numeric.');
+        var afRaw = {
+          id: args[0], origin: { x: afNums[0], y: afNums[1], z: afNums[2] },
+          n: { x: afNums[3], y: afNums[4], z: afNums[5] },
+          u: { x: afNums[6], y: afNums[7], z: afNums[8] },
+          sheet: { x: afNums.length > 9 ? afNums[9] : 0, y: afNums.length > 10 ? afNums[10] : 0 }
+        };
+        var afFrame;
+        try { afFrame = ViewFrame.declaration(afRaw); }
+        catch (error) { return fail(error.message); }
+        var afDatum = table.list().find(function (e) { return e.type === 'DATUM_AXIS'; });
+        if (!afDatum) return fail('Draw /datum before declaring an auxiliary frame.');
+        var afMeta = Object.assign({}, afDatum.meta || {});
+        var afList = Array.isArray(afMeta.viewFrames) ? afMeta.viewFrames.slice() : [];
+        var afIndex = afList.findIndex(function (f) { return f && f.id === afFrame.id; });
+        if (afIndex === -1) afList.push(afFrame); else afList[afIndex] = afFrame;
+        afMeta.viewFrames = afList;
+        table.update(afDatum.id, { meta: afMeta });
+        return { ok: true, message: 'Declared auxiliary frame ' + afFrame.id + '.', ids: [afDatum.id] };
+      }
+      case 'section': {
+        var scArity = arity(6, 8);
+        if (scArity) return scArity;
+        var scId = args[0], scView = normRole(args[1]), scSide = null, scRetain = false;
+        if (scView === null || scView === 'BOTH')
+          return fail('Section needs a plan, elevation or profile view.');
+        var scNums = [2,3,4,5].map(function (i) { return parseNum(args[i]); });
+        if (scNums.some(function (v) { return v === null; }))
+          return fail('Section trace needs four numeric coordinates — usage: ' + spec.usage);
+        for (var sci = 6; sci < args.length; sci++) {
+          var scToken = String(args[sci]).toLowerCase();
+          if (scToken === 'positive' || scToken === 'negative') scSide = scToken;
+          else if (scToken === 'none') scSide = null;
+          else if (scToken === 'retain') scRetain = true;
+          else return fail('Section needs positive/negative or retain — usage: ' + spec.usage);
+        }
+        var scMade = create('SEGMENT', {
+          x: scNums[0], y: scNums[1], x2: scNums[2], y2: scNums[3],
+          bisCode: 'H', viewRole: scView, caption: '', showLabel: false,
+          meta: { kind: 'section-trace', reconstructionRole: 'construction',
+            section: { contract: 'cutting-plane-evidence-v1', id: scId,
+              role: 'cutting-plane', view: scView, side: scSide,
+              retain: scRetain, full: scRetain } }
+        });
+        if (scMade.fail) return scMade.fail;
+        return { ok: true,
+          message: 'Marked section ' + scId + ' on the ' + scView + ' trace' +
+            (scSide ? ', retaining the ' + scSide + ' side' : '') +
+            (scRetain ? ', retained split requested' : '') + '.',
+          ids: [scMade.ent.id] };
+      }
+      case 'section-boundary': {
+        var sbArity = arity(6, -1);
+        if (sbArity) return sbArity;
+        var sbId = args[0], sbView = normRole(args[1]);
+        if (sbView === null || sbView === 'BOTH')
+          return fail('Section boundary needs a plan, elevation or profile view.');
+        if (String(args[2]).toLowerCase() === 'circle') {
+          var sbcX = parseNum(args[3]), sbcY = parseNum(args[4]), sbcR = parseNum(args[5]);
+          if (sbcX === null || sbcY === null || sbcR === null || sbcR <= 0 || args.length !== 6)
+            return fail('Section boundary circle needs x, y and a positive radius — usage: ' + spec.usage);
+          var sbCircle = create('CIRCLE', {
+            x: sbcX, y: sbcY, radius: sbcR, bisCode: 'A', viewRole: sbView,
+            caption: '', showLabel: false,
+            meta: { kind: 'section-boundary', reconstructionRole: 'construction',
+              sectionBoundary: { contract: 'section-boundary-evidence-v1',
+                planeId: sbId, role: 'section-boundary', view: sbView,
+                loopId: 'boundary:' + sbId, shape: 'circle',
+                center: {x:sbcX, y:sbcY}, radius: sbcR } }
+          });
+          if (sbCircle.fail) return sbCircle.fail;
+          return { ok: true,
+            message: 'Marked a circle section boundary for ' + sbId + '.',
+            ids: [sbCircle.ent.id] };
+        }
+        var sbNums = args.slice(2).map(parseNum);
+        if (sbNums.some(function (v) { return v === null; }) || sbNums.length % 2 !== 0 || sbNums.length < 6)
+          return fail('Section boundary needs an even list of at least three coordinates — usage: ' + spec.usage);
+        var sbPoints = [], sbIds = [], sbMade = [];
+        for (var sbi = 0; sbi < sbNums.length; sbi += 2) {
+          var sbPoint = create('POINT', {
+            x: sbNums[sbi], y: sbNums[sbi + 1], name: '', caption: '',
+            showLabel: false, bisCode: 'B', viewRole: sbView,
+            meta: { kind: 'section-boundary-point', reconstructionRole: 'construction' }
+          });
+          if (sbPoint.fail) return sbPoint.fail;
+          sbPoints.push(sbPoint.ent);
+          sbIds.push(sbPoint.ent.id);
+        }
+        for (var sbj = 0; sbj < sbPoints.length; sbj++) {
+          var sbA = sbPoints[sbj], sbB = sbPoints[(sbj + 1) % sbPoints.length];
+          var sbSeg = create('SEGMENT', {
+            x: sbA.x, y: sbA.y, x2: sbB.x, y2: sbB.y,
+            bisCode: 'A', viewRole: sbView, caption: '', showLabel: false,
+            meta: { kind: 'section-boundary', reconstructionRole: 'construction',
+              refs: [sbA.id, sbB.id],
+              sectionBoundary: { contract: 'section-boundary-evidence-v1',
+                planeId: sbId, role: 'section-boundary', view: sbView,
+                loopId: 'boundary:' + sbId, points: sbIds,
+                order: sbj, count: sbPoints.length } }
+          });
+          if (sbSeg.fail) return sbSeg.fail;
+          sbMade.push(sbSeg.ent.id);
+        }
+        return { ok: true,
+          message: 'Marked a ' + sbPoints.length + '-point section boundary for ' + sbId + '.',
+          ids: sbMade };
       }
       case 'profile': {
         var pfArity = arity(2, 3);

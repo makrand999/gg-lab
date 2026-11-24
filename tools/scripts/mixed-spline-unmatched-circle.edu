@@ -11,4 +11,4 @@
 /curve-through a b c d plan
 /curve-through a' b' c' d' elevation
 /circle 140 -30 10 A plan
-# expect: determination=partial previewStatus=ok previewDetermination=partial previewDiagnostics=curve-projection-missing,curve-surface-unresolved previewParity=ok
+# expect: determination=partial previewStatus=ok previewDetermination=partial previewDiagnostics=curve-projection-missing,curve-surface-unresolved previewParity=ok previewCurveParity=ok

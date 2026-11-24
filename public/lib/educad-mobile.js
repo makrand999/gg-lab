@@ -452,6 +452,7 @@
     var poseReset = ctx.poseReset || function () {};
     var poseSyncAngles = ctx.poseSyncAngles || function () { return null; };
     var poseIsAvailable = ctx.poseIsAvailable || function () { return true; };
+    var classroom = !!ctx.classroom;
     var openDrawings = ctx.openDrawings || function () {};
     var openSets = ctx.openSets || function () {};
     var doLogout = ctx.doLogout || function () {};
@@ -915,15 +916,17 @@
     sheetSection.appendChild(btnClear);
     sheetSection.appendChild(btnCheck);
     sheetSection.appendChild(btnSettings);
-    var libSection = menuSection('Drawings & sets');
-    libSection.appendChild(menuButton('Open drawings', function () {
+    var libSection = menuSection(classroom ? 'Drawings & sets' : 'Drawings');
+    libSection.appendChild(menuButton(classroom ? 'Open drawings' : 'Saved drawings', function () {
       openDrawings();
       closeMenu();
     }));
-    libSection.appendChild(menuButton('Question sets', function () {
-      openSets();
-      closeMenu();
-    }));
+    if (classroom) {
+      libSection.appendChild(menuButton('Question sets', function () {
+        openSets();
+        closeMenu();
+      }));
+    }
     var displaySection = menuSection('Display');
     btnReset3d.textContent = 'Reset 3D camera';
     btnReset3d.className = 'mobile-menu-btn';
@@ -938,16 +941,20 @@
     }, { pressed: true });
     displaySection.appendChild(btnGrid);
     displaySection.appendChild(btnPlanes);
-    var acctSection = menuSection('Account');
-    var homeLink = document.createElement('a');
-    homeLink.className = 'mobile-menu-btn mobile-menu-link';
-    homeLink.setAttribute('role', 'menuitem');
-    homeLink.textContent = 'Studio';
-    homeLink.href = 'teacher.html';
-    acctSection.appendChild(homeLink);
-    acctSection.appendChild(menuButton('Logout', function () {
-      doLogout();
-    }));
+    var acctSection = null;
+    var homeLink = null;
+    if (classroom) {
+      acctSection = menuSection('Account');
+      homeLink = document.createElement('a');
+      homeLink.className = 'mobile-menu-btn mobile-menu-link';
+      homeLink.setAttribute('role', 'menuitem');
+      homeLink.textContent = 'Studio';
+      homeLink.href = 'teacher.html';
+      acctSection.appendChild(homeLink);
+      acctSection.appendChild(menuButton('Logout', function () {
+        doLogout();
+      }));
+    }
     menu.appendChild(demoSection);
     menu.appendChild(sheetSection);
     var poseMenuSection = menuSection('Pose options');
@@ -957,7 +964,7 @@
     menu.appendChild(poseMenuSection);
     menu.appendChild(libSection);
     menu.appendChild(displaySection);
-    menu.appendChild(acctSection);
+    if (acctSection) menu.appendChild(acctSection);
     function refreshMenu() {
       var edit = canEdit();
       poseMenuSection.hidden = getMode() !== 'pose';
@@ -970,20 +977,22 @@
       btnClear.title = edit ? '' : 'Inspection-only: the sheet cannot be cleared here.';
       btnGrid.setAttribute('aria-pressed', String(isGridOn()));
       btnPlanes.setAttribute('aria-pressed', String(planesOn()));
-      try {
-        var raw = window.localStorage.getItem('educad_session');
-        var s = raw ? JSON.parse(raw) : null;
-        if (s && s.role === 'student') {
-          homeLink.href = 'student.html';
-          homeLink.textContent = 'Workspace';
-        } else if (s && s.role !== 'guest') {
-          homeLink.href = 'teacher.html';
-          homeLink.textContent = 'Studio';
-        } else {
-          homeLink.href = 'login.html';
-          homeLink.textContent = 'Login';
-        }
-      } catch (err) {                     }
+      if (homeLink) {
+        try {
+          var raw = window.localStorage.getItem('educad_session');
+          var s = raw ? JSON.parse(raw) : null;
+          if (s && s.role === 'student') {
+            homeLink.href = 'student.html';
+            homeLink.textContent = 'Workspace';
+          } else if (s && s.role !== 'guest') {
+            homeLink.href = 'teacher.html';
+            homeLink.textContent = 'Studio';
+          } else {
+            homeLink.href = 'login.html';
+            homeLink.textContent = 'Login';
+          }
+        } catch (err) {                     }
+      }
     }
     function closeMenu() {
       menu.hidden = true;
@@ -1250,6 +1259,8 @@
         }
         if (c1) stashMove(c1, sheetSlot);
         if (c2) stashMove(c2, sheetSlot);
+        var issues = document.querySelector('.drafting-issues');
+        if (issues) stashMove(issues, bar2d, btnFit2d);
         if (hud) stashMove(hud, sheetSlot);
         if (mm) stashMove(mm, sheetSlot);
         document.querySelectorAll('#app-container .edugraphics-menu').forEach(function (m) {
@@ -1317,6 +1328,7 @@
       }
       var s2 = contentBox(sheetSlot);
       var g3 = contentBox(glassSlot);
+      pane2d.style.setProperty('--issues-pane-space', Math.max(0, s2.h - contentBox(bar2d).h - 8) + 'px');
       applySizes({ sheetW: s2.w, sheetH: s2.h,
         glassW: g3.w, glassH: g3.h, orientation: orient,
         sheetVisible: shell.expand !== '3d', glassVisible: shell.expand !== '2d' });

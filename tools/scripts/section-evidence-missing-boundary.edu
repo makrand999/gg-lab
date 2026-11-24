@@ -1,0 +1,5 @@
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/section A-A elevation 0 30 40 30 negative retain
+# expect: sectionPlanes=1 sectionQueries=1 sectionRetained=1 sectionStatus=partial sectionUnresolved=0 sectionDiagnostics=section-boundary-missing sectionBoundaryStatus=missing sectionShellStatus=refused

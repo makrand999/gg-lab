@@ -10,6 +10,7 @@
   };
   var role = 'student';
   var config = {student_auth:'erp',email_domains:['mit.asia']};
+  var INSTITUTIONAL_ROLES = { academics: true, teacher: true, student: true };
 
   function $(id) { return document.getElementById(id); }
 
@@ -30,8 +31,13 @@
   }
   function goApp(role) { window.location.replace(homeFor(role)); }
 
+  function isInstitutionalSession(s) {
+    return !!s && INSTITUTIONAL_ROLES[s.role] === true &&
+      typeof s.token === 'string' && /^[A-Za-z0-9_-]{43}$/.test(s.token);
+  }
+
   var existing = load();
-  if (existing) { goApp(existing.role); return; }
+  if (isInstitutionalSession(existing)) { goApp(existing.role); return; }
 
   var hint = $('demo-hint');
   var error = $('login-error');
@@ -118,13 +124,6 @@
       showError('Server unreachable. Is `npm start` running?');
       if (submitBtn) submitBtn.disabled = false;
     });
-  });
-
-  var guest = $('guest-link');
-  if (guest) guest.addEventListener('click', function (e) {
-    e.preventDefault();
-    save({ role: 'guest', username: 'guest', name: 'Guest', token: 'guest' });
-    goApp('guest');
   });
 
 })();

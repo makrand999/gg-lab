@@ -1,8 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) module.exports =
-    factory(require('./educad-planar.js'), require('./educad-implicit.js'));
-  else root.EduCADSurfaces = factory(root.EduCADPlanar, root.EduCADImplicit);
-})(typeof window !== 'undefined' ? window : globalThis, function (Planar, Implicit) {
+    factory(require('./educad-planar.js'), require('./educad-implicit.js'),
+      require('./educad-cavity-boolean.js'), require('./educad-parametric.js'));
+  else root.EduCADSurfaces = factory(root.EduCADPlanar, root.EduCADImplicit,
+    root.EduCADCavityBoolean, root.EduCADParametric);
+})(typeof window !== 'undefined' ? window : globalThis, function (Planar, Implicit, CavityBoolean, Parametric) {
   'use strict';
 
 
@@ -133,7 +135,10 @@
       z:c.center.z + c.frameU.z*cs + c.frameV.z*sn + c.axis.z*axial};
   }
   function curvePoint(c, t) {
+    if (c.kind === 'nurbs') return Parametric.point(c, t);
     if (c.kind === 'torusContour') return torusContourPoint(c, t);
+    if (c.kind === 'cylinder-intersection' && CavityBoolean && CavityBoolean.junctionPoint)
+      return CavityBoolean.junctionPoint(c, t);
     if (c.kind === 'torusSectionBranch') {
       var point = torusSectionPoint(c, t);
       if (point) return point;
@@ -166,10 +171,24 @@
     return finite(origin) ? {origin:origin, normal:n} : null;
   }
   function validCurve(c) {
+    if (c && c.kind === 'nurbs') return !!Parametric && Parametric.validate(c);
+    if (c && c.kind === 'cylinder-intersection') return validJunctionCurve(c);
     return c && finite(c.center) && finite(c.u) && finite(c.v) &&
       Number.isFinite(radii(c).u) && radii(c).u > 0 &&
       Number.isFinite(radii(c).v) && radii(c).v > 0 &&
       Math.abs(length(c.u)-1) <= EPS && Math.abs(length(c.v)-1) <= EPS && Math.abs(dot(c.u,c.v)) <= EPS;
+  }
+  function validJunctionCurve(c) {
+    return finite(c.origin) && finite(c.u) && finite(c.v) && finite(c.direction) &&
+      Number.isFinite(c.radius) && c.radius > 0 &&
+      Number.isFinite(c.otherRadius) && c.otherRadius > c.radius &&
+      Math.abs(length(c.u)-1) <= EPS && Math.abs(length(c.v)-1) <= EPS &&
+      Math.abs(length(c.direction)-1) <= EPS &&
+      Math.abs(dot(c.u,c.v)) <= EPS && Math.abs(dot(c.u,c.direction)) <= EPS &&
+      Math.abs(dot(c.v,c.direction)) <= EPS;
+  }
+  function isConicCurve(c) {
+    return !!c && (c.kind === 'circle' || c.kind === 'ellipse' || c.kind === 'arc');
   }
 
 
@@ -373,6 +392,1007 @@
       }
     });
     return {merged:merged};
+  }
+
+  function junctionParentCircle(geometry, volume, which) {
+    var circles = geometry && geometry.curves || [];
+    var center = which === 'mouth' ? volume.origin :
+      add(volume.origin, mul(unit(volume.axis), volume.depth));
+    var tolerance = 1e-7 * Math.max(1, volume.radius || 0);
+    for (var i = 0; i < circles.length; i++) {
+      var curve = circles[i];
+      if (!curve || curve.kind !== 'circle' || curve.recessMouth ||
+          curve.unionMouth || !finite(curve.center)) continue;
+      if (!(Math.abs(curve.radius - volume.radius) <= tolerance)) continue;
+      if (length(sub(curve.center, center)) <= tolerance) return {curve:curve, index:i};
+    }
+    return null;
+  }
+  function junctionLoopPoints(loop, geometry) {
+    if (loop.points && loop.points.length) return loop.points;
+    var points = [];
+    (loop.elements || []).forEach(function (element) {
+      if (element && element.kind === 'polyline')
+        points = points.concat(element.points || []);
+    });
+    (loop.curves || []).forEach(function (item) {
+      var curve = typeof item === 'object' && item ? item :
+        geometry && geometry.curves && geometry.curves[item];
+      if (curve && curve.points) points = points.concat(curve.points);
+      if (curve && curve.displayVertices && geometry)
+        curve.displayVertices.forEach(function (index) {
+          var point = geometry.vertices && geometry.vertices[index];
+          if (finite(point)) points.push(point);
+        });
+    });
+    return points;
+  }
+  function junctionSamePoints(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!finite(a[i]) || !finite(b[i]) || pointDistance(a[i], b[i]) > 1e-6)
+        return false;
+    }
+    return true;
+  }
+  function junctionLoopUses(loop, index) {
+    return !!loop && (loop.curves || []).some(function (item) {
+      return item === index;
+    });
+  }
+  function junctionDisplayPoints(geometry, displayIndex) {
+    var display = geometry.curves && geometry.curves[displayIndex];
+    return display ? (display.displayVertices || []).map(function (index) {
+      return geometry.vertices && geometry.vertices[index];
+    }).filter(finite) : [];
+  }
+  function junctionFindHost(geometry, model, volume, mouth) {
+    var record = (geometry.recesses || []).filter(function (candidate) {
+      return candidate && candidate.volumeIndex === volume.index &&
+        Number.isInteger(candidate.mouthCurve);
+    })[0];
+    if (!record) return null;
+    var displayIndex = record.mouthCurve;
+    var display = geometry.curves && geometry.curves[displayIndex];
+    if (!display || !display.hostSurfaceId) return null;
+    var host = (model.surfaces || []).filter(function (surface) {
+      return surface.id === display.hostSurfaceId && surface.kind === 'plane' &&
+        !surface.recessMouth && !surface.recessBottom;
+    })[0];
+    if (!host) return null;
+    var outer = (host.loops || []).filter(function (loop) {
+      return loop.kind === 'outer' && loop.vertices && loop.vertices.length >= 3;
+    })[0];
+    var containment = outer && typeof circleInPlanarFace === 'function' ?
+      circleInPlanarFace({outer:outer.vertices, holes:[]}, mouth.curve,
+        geometry.vertices) : null;
+    if (!containment || !containment.contained) return null;
+    return {surface:host, displayIndex:displayIndex, mouth:mouth};
+  }
+  function junctionHostLoops(geometry, host, mouth) {
+    if (!host || !host.surface) return null;
+    var displayPoints = junctionDisplayPoints(geometry, host.displayIndex);
+    var loops = (host.surface.loops || []).filter(function (loop) {
+      if (loop.kind !== 'inner') return true;
+      if (junctionLoopUses(loop, mouth.index)) return false;
+      if (junctionLoopUses(loop, host.displayIndex)) return false;
+      var points = junctionLoopPoints(loop, geometry);
+      return !(points.length && junctionSamePoints(points, displayPoints));
+    });
+    loops.push({kind:'inner', curves:[mouth.index]});
+    return loops;
+  }
+  function junctionAttachHost(geometry, host, mouth, loops) {
+    if (!host || !host.surface || !loops) return false;
+    host.surface.loops = loops;
+    var patches = geometry.surfacePatches || [];
+    var patch = host.surface.patchIndex !== undefined ? patches[host.surface.patchIndex] : null;
+    if (patch) {
+      patch.innerCurves = (patch.innerCurves || []).filter(function (index) {
+        return index !== host.displayIndex;
+      });
+      if (patch.innerCurves.indexOf(mouth.index) === -1)
+        patch.innerCurves.push(mouth.index);
+    }
+    return true;
+  }
+  function junctionStrictlyInside(volume, p, tolerance) {
+    if (!volume || volume.kind !== 'cylinder' || !finite(p)) return false;
+    var axis = unit(volume.axis), d = sub(p, volume.origin);
+    var axial = dot(d, axis);
+    var radial = length(sub(d, mul(axis, axial)));
+    return axial > tolerance && axial < volume.depth - tolerance &&
+      radial < volume.radius - tolerance;
+  }
+  function junctionFindSurface(model, volumeIndex, role) {
+    return (model.surfaces || []).filter(function (surface) {
+      return surface && surface.volumeIndex === volumeIndex && surface.memberRole === role;
+    })[0] || null;
+  }
+  function junctionEnsureCurve(geometry, boundary) {
+    var curves = geometry.curves || (geometry.curves = []);
+    var origin = boundary.origin, radius = boundary.radius,
+      otherRadius = boundary.otherRadius, direction = boundary.direction;
+    var tolerance = 1e-7 * Math.max(1, radius || 0, otherRadius || 0);
+    for (var i = 0; i < curves.length; i++) {
+      var existing = curves[i];
+      if (!existing || existing.kind !== 'cylinder-intersection') continue;
+      if (length(sub(existing.origin, origin)) <= tolerance &&
+          Math.abs(existing.radius - radius) <= tolerance &&
+          Math.abs(existing.otherRadius - otherRadius) <= tolerance &&
+          length(sub(existing.direction, direction)) <= tolerance)
+        return {curve:existing, index:i};
+    }
+    var curve = {kind:'cylinder-intersection', origin:copyPoint(origin),
+      center:copyPoint(origin), u:copyPoint(boundary.u), v:copyPoint(boundary.v),
+      direction:copyPoint(direction), radius:radius, otherRadius:otherRadius,
+      startAngle:Number.isFinite(boundary.startAngle) ? boundary.startAngle : 0,
+      sweepAngle:Number.isFinite(boundary.sweepAngle) ? boundary.sweepAngle : TAU,
+      closed:true, largerVolume:boundary.largerVolume,
+      smallerVolume:boundary.smallerVolume,
+      floorContact:boundary.floorContact === true,
+      analyticJunction:true,
+      sourceIds:(boundary.sourceIds || []).slice()};
+    if (boundary.solidJunction === true) curve.solidJunction = true;
+    var count = 96;
+    curve.start = copyPoint(curvePoint(curve, curve.startAngle));
+    curve.end = copyPoint(curvePoint(curve, curve.startAngle + curve.sweepAngle));
+    curve.displayVertices = [];
+    curve.displayEdges = [];
+    var offset = (geometry.vertices || (geometry.vertices = [])).length;
+    if (!geometry.edges) geometry.edges = [];
+    for (var k = 0; k < count; k++) {
+      var point = curvePoint(curve, curve.startAngle + curve.sweepAngle * k / count);
+      geometry.vertices.push({x:point.x, y:point.y, z:point.z});
+      curve.displayVertices.push(offset + k);
+    }
+    for (var e = 0; e < count; e++) {
+      curve.displayEdges.push(geometry.edges.length);
+      geometry.edges.push([offset + e, offset + (e + 1) % count]);
+    }
+    curves.push(curve);
+    return {curve:curve, index:curves.length - 1};
+  }
+  function externalCylinderInfo(surface, geometry) {
+    if (!surface || surface.kind !== 'cylinder' || surface.recess ||
+        surface.recessMouth || surface.throughOpening || surface.recessBottom ||
+        surface.approximateBoundary || surface.displayOnlyBoundary ||
+        surface.volumeIndex !== undefined || surface.unionGroup !== undefined ||
+        surface.memberRole) return null;
+    var patches = geometry && geometry.surfacePatches || [];
+    var patch = surface.patchIndex !== undefined ? patches[surface.patchIndex] : null;
+    if (!patch || patch.kind !== 'cylinder' || patch.recess ||
+        patch.recessMouth || patch.throughOpening || patch.recessBottom ||
+        patch.approximateTrim || patch.displayOnlyBoundary ||
+        patch.booleanDomain !== undefined || patch.unionGroup !== undefined ||
+        patch.volumeIndex !== undefined || patch.memberRole) return null;
+    var curves = geometry && geometry.curves || [];
+    var loops = surface.loops || [];
+    var outer = loops.filter(function (loop) {
+      return (loop.kind || 'outer') === 'outer';
+    });
+    if (loops.length !== 2 || outer.length !== 2) return null;
+    var caps = outer.map(function (loop) {
+      return fullCircleCurve(loop, curves);
+    });
+    if (!caps[0] || !caps[1] || caps[0].kind !== 'circle' ||
+        caps[1].kind !== 'circle') return null;
+    if (!(Math.abs(caps[0].radius - surface.radius) <= EPS) ||
+        !(Math.abs(caps[1].radius - surface.radius) <= EPS)) return null;
+    var axis = unitOrNull(surface.axis);
+    if (!axis || !finite(surface.origin) ||
+        !finite(caps[0].center) || !finite(caps[1].center)) return null;
+    var span = dot(sub(caps[1].center, caps[0].center), axis);
+    if (!(Math.abs(span) > EPS)) return null;
+    var forward = span > 0;
+    var base = forward ? caps[0] : caps[1];
+    var far = forward ? caps[1] : caps[0];
+    var volume = {kind:'cylinder', origin:copyPoint(base.center),
+      axis:copyPoint(forward ? axis : mul(axis, -1)),
+      radius:surface.radius, depth:Math.abs(span), index:0};
+    return {surface:surface, patch:patch, curves:curves, caps:[base, far],
+      capIndices:[curves.indexOf(base), curves.indexOf(far)], volume:volume};
+  }
+  function orientedCylinderVolume(info, reverse) {
+    var volume = info && info.volume;
+    if (!volume) return null;
+    var out = {kind:'cylinder', radius:volume.radius, depth:volume.depth, index:0};
+    if (!reverse) {
+      out.origin = copyPoint(volume.origin);
+      out.axis = copyPoint(volume.axis);
+    } else {
+      out.origin = add(volume.origin, mul(unit(volume.axis), volume.depth));
+      out.axis = mul(unit(volume.axis), -1);
+    }
+    return out;
+  }
+  function solidJunctionBounded(larger, smaller, curve, tolerance) {
+    if (!larger || !smaller || !curve) return false;
+    var largerAxis = unit(larger.axis), smallerAxis = unit(smaller.axis);
+    for (var i = 0; i < 96; i++) {
+      var p = curvePoint(curve, TAU * i / 96);
+      if (!finite(p) || !trimVolumeContains(larger, p, tolerance) ||
+          !trimVolumeContains(smaller, p, tolerance)) return false;
+      var la = dot(sub(p, larger.origin), largerAxis);
+      var sa = dot(sub(p, smaller.origin), smallerAxis);
+      if (!(la > tolerance && la < larger.depth - tolerance) ||
+          !(sa > tolerance && sa < smaller.depth - tolerance)) return false;
+    }
+    return true;
+  }
+  function solidJunctionCapState(larger, smaller) {
+    var buried = null, mouth = null;
+    for (var i = 0; i < smaller.caps.length; i++) {
+      var curve = smaller.caps[i];
+      var center = curve.center, radius = curve.radius;
+      var inside = true;
+      for (var k = 0; k < 32; k++) {
+        var angle = TAU * k / 32;
+        var p = add(center, add(mul(curve.u, radius * Math.cos(angle)),
+          mul(curve.v, radius * Math.sin(angle))));
+        if (!junctionStrictlyInside(larger, p, 0)) { inside = false; break; }
+      }
+      if (inside) buried = i;
+      else if (!trimVolumeContains(larger, center, 0)) mouth = i;
+    }
+    if (buried === null || mouth === null || buried === mouth) return null;
+    return {buried:buried, mouth:mouth};
+  }
+  function crossingCylinderCandidates(model, geometry) {
+    if (!model || !geometry || !CavityBoolean ||
+        !CavityBoolean.perpendicularBoreJunction ||
+        !CavityBoolean.junctionPoint) return [];
+    var infos = [];
+    (model.surfaces || []).forEach(function (surface) {
+      var info = externalCylinderInfo(surface, geometry);
+      if (info) infos.push(info);
+    });
+    if (infos.length < 2) return [];
+    var result = [];
+    for (var i = 0; i < infos.length; i++) {
+      for (var j = i + 1; j < infos.length; j++) {
+        var a = infos[i], b = infos[j];
+        var tolerance = trimTolerance([a.volume, b.volume]);
+        for (var ra = 0; ra < 2; ra++) {
+          for (var rb = 0; rb < 2; rb++) {
+            var av = orientedCylinderVolume(a, ra === 1);
+            var bv = orientedCylinderVolume(b, rb === 1);
+            if (!av || !bv) continue;
+            av.index = 0; bv.index = 1;
+            var junction = CavityBoolean.perpendicularBoreJunction(av, bv);
+            if (!junction || !junction.curve) continue;
+            var largerInfo = junction.larger === 0 ? a : b;
+            var smallerInfo = junction.smaller === 0 ? a : b;
+            var largerVolume = junction.larger === 0 ? av : bv;
+            var smallerVolume = junction.smaller === 0 ? av : bv;
+            if (largerInfo === smallerInfo) continue;
+            var curve = junction.curve;
+            if (!validJunctionCurve(curve)) continue;
+            if (!solidJunctionBounded(largerVolume, smallerVolume, curve, tolerance))
+              continue;
+            var capState = solidJunctionCapState(largerVolume, smallerInfo);
+            if (!capState) continue;
+            var sourceIds = Array.from(new Set(
+              (largerInfo.patch.sourceIds || []).concat(
+                largerInfo.surface.sourceIds || [],
+                smallerInfo.patch.sourceIds || [],
+                smallerInfo.surface.sourceIds || [])));
+            result.push({largerPatch:largerInfo.surface.patchIndex,
+              smallerPatch:smallerInfo.surface.patchIndex,
+              largerSurfaceId:largerInfo.surface.id,
+              smallerSurfaceId:smallerInfo.surface.id,
+              largerCapCurves:largerInfo.capIndices.slice(),
+              smallerMouthCurve:smallerInfo.capIndices[capState.mouth],
+              smallerBuriedCurve:smallerInfo.capIndices[capState.buried],
+              curve:{kind:'cylinder-intersection', origin:copyPoint(curve.origin),
+                u:copyPoint(curve.u), v:copyPoint(curve.v),
+                direction:copyPoint(curve.direction), radius:curve.radius,
+                otherRadius:curve.otherRadius, startAngle:curve.startAngle,
+                sweepAngle:curve.sweepAngle, floorContact:curve.floorContact === true},
+              sourceIds:sourceIds});
+            return result;
+          }
+        }
+      }
+    }
+    return result;
+  }
+  function solidJunctionTrimDisplay(model, geometry) {
+    var junction = geometry && geometry.cylinderJunction;
+    if (!junction || junction.displayTrim === 'trimmed' ||
+        !Array.isArray(junction.seams) || junction.seams.length !== 1) return null;
+    var record = junction.seams[0];
+    var curves = geometry.curves || [], oldVertices = geometry.vertices || [],
+      oldEdges = geometry.edges || [], oldFaces = geometry.faces || [],
+      oldHoles = geometry.faceHoles || [];
+    var seam = curves[record.curveIndex];
+    if (!seam || seam.kind !== 'cylinder-intersection') return null;
+    var larger = (model.surfaces || []).filter(function (surface) {
+      return surface.id === record.largerSurfaceId;
+    })[0];
+    var smaller = (model.surfaces || []).filter(function (surface) {
+      return surface.id === record.smallerSurfaceId;
+    })[0];
+    if (!larger || !smaller || larger.kind !== 'cylinder' || smaller.kind !== 'cylinder')
+      return null;
+    var capMouth = curves[record.smallerMouthCurve];
+    var capBuried = curves[record.smallerBuriedCurve];
+    var hostCapIndices = record.largerCapCurves || [];
+    var hostCaps = hostCapIndices.map(function (index) { return curves[index]; });
+    if (!capMouth || !capBuried || hostCaps.length < 2 ||
+        !hostCaps[0] || !hostCaps[1]) return null;
+    var seamOld = seam.displayVertices || [];
+    if (seamOld.length < 8) return null;
+    var seamPoints = seamOld.map(function (index) { return oldVertices[index]; });
+    if (seamPoints.some(function (point) { return !finite(point); })) return null;
+
+    var hostAxis = unit(larger.axis), hostOrigin = larger.origin,
+      hostRadius = larger.radius, hostFrame = basis(hostAxis);
+    function station(point) { return dot(sub(point, hostOrigin), hostAxis); }
+    var hostCapStations = hostCaps.map(function (curve) { return station(curve.center); });
+    var s0 = Math.min(hostCapStations[0], hostCapStations[1]);
+    var s1 = Math.max(hostCapStations[0], hostCapStations[1]);
+    if (!(s1 > s0)) return null;
+
+    function hostTheta(point) {
+      var delta = sub(point, hostOrigin);
+      var radial = sub(delta, mul(hostAxis, dot(delta, hostAxis)));
+      return ((Math.atan2(dot(radial, hostFrame.v), dot(radial, hostFrame.u)) %
+        TAU) + TAU) % TAU;
+    }
+
+    var groupByKey = Object.create(null), groups = [];
+    seamPoints.forEach(function (point, index) {
+      var theta = hostTheta(point);
+      var key = String(Math.round(theta * 1e8));
+      var group = groupByKey[key];
+      if (!group) {
+        group = groupByKey[key] = {theta:theta, indices:[]};
+        groups.push(group);
+      }
+      group.indices.push(index);
+    });
+    groups.sort(function (a, b) { return a.theta - b.theta; });
+    if (groups.length < 3) return null;
+    var gapIndex = -1, gapSpan = -1;
+    for (var gi = 0; gi < groups.length; gi++) {
+      var nextTheta = gi + 1 < groups.length ? groups[gi + 1].theta :
+        groups[0].theta + TAU;
+      var span = nextTheta - groups[gi].theta;
+      if (span > gapSpan) { gapSpan = span; gapIndex = gi; }
+    }
+    var outsideCount = 24;
+    var ordered = [], startGroup = (gapIndex + 1) % groups.length;
+    for (var oi = 0; oi < groups.length; oi++)
+      ordered.push(groups[(startGroup + oi) % groups.length]);
+    for (var ui = 1; ui < ordered.length; ui++) {
+      if (ordered[ui].theta + 1e-9 < ordered[ui - 1].theta)
+        ordered[ui].theta += TAU;
+    }
+    var lastGroupTheta = ordered[ordered.length - 1].theta;
+    var fillSpan = gapSpan;
+    for (var fi = 1; fi <= outsideCount; fi++)
+      ordered.push({theta:lastGroupTheta + fillSpan * fi / (outsideCount + 1),
+        indices:null});
+
+    var newVertices = [], newEdges = [], newFaces = [], newHoles = [],
+      edgeMap = new Map();
+    function pushVertex(point) {
+      newVertices.push({x:point.x, y:point.y, z:point.z});
+      return newVertices.length - 1;
+    }
+    function edgeIndex(a, b) {
+      var key = Math.min(a, b) + '_' + Math.max(a, b);
+      var existing = edgeMap.get(key);
+      if (existing === undefined) {
+        existing = newEdges.length;
+        edgeMap.set(key, existing);
+        newEdges.push([a, b]);
+      }
+      return existing;
+    }
+    function centroid(loop) {
+      var point = {x:0, y:0, z:0};
+      loop.forEach(function (index) {
+        var p = newVertices[index];
+        point.x += p.x / loop.length;
+        point.y += p.y / loop.length;
+        point.z += p.z / loop.length;
+      });
+      return point;
+    }
+    function addFace(loop, outward) {
+      if (!Array.isArray(loop) || loop.length < 3) return -1;
+      for (var i = 0; i < loop.length; i++)
+        if (!finite(newVertices[loop[i]])) return -1;
+      var normal = newell(loop.map(function (index) { return newVertices[index]; }));
+      if (!normal) return -1;
+      if (finite(outward) && dot(normal, outward) < 0)
+        loop = loop.slice().reverse();
+      var index = newFaces.length;
+      newFaces.push(loop.slice());
+      newHoles.push([]);
+      for (var j = 0; j < loop.length; j++)
+        edgeIndex(loop[j], loop[(j + 1) % loop.length]);
+      return index;
+    }
+    function radialOutward(loop, origin, axis) {
+      var delta = sub(centroid(loop), origin);
+      return sub(delta, mul(axis, dot(delta, axis)));
+    }
+
+    var seamNew = [];
+    for (var si = 0; si < seamPoints.length; si++)
+      seamNew.push(pushVertex(seamPoints[si]));
+    var seamEdges = [];
+    for (var se = 0; se < seamNew.length; se++)
+      seamEdges.push(edgeIndex(seamNew[se], seamNew[(se + 1) % seamNew.length]));
+
+    function hostPoint(theta, axial) {
+      var radial = add(mul(hostFrame.u, hostRadius * Math.cos(theta)),
+        mul(hostFrame.v, hostRadius * Math.sin(theta)));
+      return add(hostOrigin, add(mul(hostAxis, axial), radial));
+    }
+    var sMid = (s0 + s1) / 2;
+    ordered.forEach(function (entry) {
+      entry.bottom = pushVertex(hostPoint(entry.theta, s0));
+      entry.top = pushVertex(hostPoint(entry.theta, s1));
+      if (!entry.indices) {
+        entry.mid = pushVertex(hostPoint(entry.theta, sMid));
+        entry.hole = false;
+        return;
+      }
+      var lowerIndex = entry.indices[0], upperIndex = entry.indices[0];
+      var lowerStation = station(newVertices[lowerIndex]);
+      var upperStation = lowerStation;
+      entry.indices.forEach(function (index) {
+        var current = station(newVertices[index]);
+        if (current < lowerStation) { lowerStation = current; lowerIndex = index; }
+        if (current > upperStation) { upperStation = current; upperIndex = index; }
+      });
+      entry.lower = lowerIndex;
+      entry.upper = upperIndex;
+      entry.hole = true;
+    });
+
+    var hostWallFaces = [];
+    for (var hi = 0; hi < ordered.length; hi++) {
+      var current = ordered[hi], next = ordered[(hi + 1) % ordered.length];
+      var lowerCurrent = current.hole ? current.lower : current.mid;
+      var lowerNext = next.hole ? next.lower : next.mid;
+      var upperCurrent = current.hole ? current.upper : current.mid;
+      var upperNext = next.hole ? next.upper : next.mid;
+      var lowerLoop = [current.bottom, next.bottom, lowerNext, lowerCurrent];
+      var upperLoop = [upperCurrent, upperNext, next.top, current.top];
+      var lowerFace = addFace(lowerLoop, radialOutward(lowerLoop, hostOrigin, hostAxis));
+      var upperFace = addFace(upperLoop, radialOutward(upperLoop, hostOrigin, hostAxis));
+      if (lowerFace >= 0) hostWallFaces.push(lowerFace);
+      if (upperFace >= 0) hostWallFaces.push(upperFace);
+    }
+    var bottomRing = ordered.map(function (entry) { return entry.bottom; });
+    var topRing = ordered.map(function (entry) { return entry.top; });
+    var hostBottomFace = addFace(bottomRing, mul(hostAxis, -1));
+    var hostTopFace = addFace(topRing, hostAxis);
+    if (hostBottomFace < 0 || hostTopFace < 0) return null;
+
+    var branchAxis = unit(smaller.axis), capCenter = capMouth.center;
+    var capU = unit(capMouth.u), capV = unit(capMouth.v);
+    var capRadius = Number.isFinite(capMouth.radius) ? capMouth.radius : smaller.radius;
+    var capRing = seamNew.map(function (index) {
+      var delta = sub(newVertices[index], capCenter);
+      var radial = sub(delta, mul(branchAxis, dot(delta, branchAxis)));
+      var theta = Math.atan2(dot(radial, capV), dot(radial, capU));
+      return pushVertex(add(capCenter, add(mul(capU, capRadius * Math.cos(theta)),
+        mul(capV, capRadius * Math.sin(theta)))));
+    });
+    var branchWallFaces = [];
+    for (var bi = 0; bi < seamNew.length; bi++) {
+      var bj = (bi + 1) % seamNew.length;
+      var branchLoop = [seamNew[bi], seamNew[bj], capRing[bj], capRing[bi]];
+      var branchFace = addFace(branchLoop,
+        radialOutward(branchLoop, smaller.origin, branchAxis));
+      if (branchFace >= 0) branchWallFaces.push(branchFace);
+    }
+    var capSurface = (model.surfaces || []).filter(function (surface) {
+      return surface.kind === 'plane' && (surface.loops || []).some(function (loop) {
+        return (loop.curves || []).some(function (item) {
+          return typeof item === 'number' && item === record.smallerMouthCurve;
+        });
+      });
+    })[0];
+    var capOutward = capSurface && finite(capSurface.normal) ? capSurface.normal :
+      unit(sub(capCenter, capBuried.center));
+    var capFace = addFace(capRing.slice(), capOutward);
+    if (capFace < 0) return null;
+
+    var affectedCurves = [record.curveIndex].concat(hostCapIndices,
+      [record.smallerMouthCurve, record.smallerBuriedCurve]);
+    var affectedFaces = new Set(), affectedVertices = new Set();
+    (geometry.surfacePatches || []).forEach(function (patch) {
+      if (!(patch.boundaryCurves || []).some(function (index) {
+        return affectedCurves.indexOf(index) !== -1;
+      })) return;
+      (patch.faceIndices || []).forEach(function (index) {
+        affectedFaces.add(index);
+        (oldFaces[index] || []).forEach(function (vertex) { affectedVertices.add(vertex); });
+      });
+    });
+    affectedCurves.forEach(function (index) {
+      var curve = curves[index];
+      (curve && curve.displayVertices || []).forEach(function (vertex) {
+        affectedVertices.add(vertex);
+      });
+    });
+    var affectedDisplayEdges = new Set();
+    affectedCurves.forEach(function (index) {
+      var curve = curves[index];
+      (curve && curve.displayEdges || []).forEach(function (edge) {
+        affectedDisplayEdges.add(edge);
+      });
+    });
+    var affectedEdgeKeys = new Set();
+    affectedFaces.forEach(function (index) {
+      var face = oldFaces[index] || [];
+      for (var i = 0; i < face.length; i++) {
+        var a = face[i], b = face[(i + 1) % face.length];
+        affectedEdgeKeys.add(Math.min(a, b) + '_' + Math.max(a, b));
+      }
+    });
+
+    function patchIndexUsingCurve(index) {
+      var patches = geometry.surfacePatches || [];
+      for (var pi = 0; pi < patches.length; pi++) {
+        if (patches[pi].kind !== 'plane') continue;
+        if ((patches[pi].boundaryCurves || []).indexOf(index) !== -1) return pi;
+      }
+      return -1;
+    }
+    var sortedHostCaps = hostCapIndices.map(function (index, position) {
+      return {index:index, station:hostCapStations[position]};
+    }).sort(function (a, b) { return a.station - b.station; });
+    var patchFaces = {};
+    function assignPatchFace(patchIndex, faces) {
+      if (patchIndex >= 0) patchFaces[patchIndex] = faces.slice();
+    }
+    assignPatchFace(record.largerPatch, hostWallFaces);
+    assignPatchFace(record.smallerPatch, branchWallFaces);
+    assignPatchFace(patchIndexUsingCurve(sortedHostCaps[0].index), [hostBottomFace]);
+    assignPatchFace(patchIndexUsingCurve(sortedHostCaps[1].index), [hostTopFace]);
+    assignPatchFace(patchIndexUsingCurve(record.smallerMouthCurve), [capFace]);
+    assignPatchFace(patchIndexUsingCurve(record.smallerBuriedCurve), []);
+
+    var unsupported = false;
+    (geometry.surfacePatches || []).forEach(function (patch, pi) {
+      if (patchFaces[pi]) return;
+      (patch.loops || []).forEach(function (loop) {
+        (loop.vertices || []).forEach(function (vertex) {
+          if (affectedVertices.has(vertex)) unsupported = true;
+        });
+      });
+      (patch.outer || []).forEach(function (vertex) {
+        if (affectedVertices.has(vertex)) unsupported = true;
+      });
+      (patch.holes || []).forEach(function (hole) {
+        (hole || []).forEach(function (vertex) {
+          if (affectedVertices.has(vertex)) unsupported = true;
+        });
+      });
+    });
+    (geometry.faceRegions || []).forEach(function (region) {
+      (region.outer || []).forEach(function (vertex) {
+        if (affectedVertices.has(vertex)) unsupported = true;
+      });
+      (region.holes || []).forEach(function (hole) {
+        (hole || []).forEach(function (vertex) {
+          if (affectedVertices.has(vertex)) unsupported = true;
+        });
+      });
+    });
+    oldEdges.forEach(function (edge, edgeIndexValue) {
+      if (!edge || edge.length < 2) return;
+      var key = Math.min(edge[0], edge[1]) + '_' + Math.max(edge[0], edge[1]);
+      if (affectedEdgeKeys.has(key) || affectedDisplayEdges.has(edgeIndexValue)) return;
+      if (affectedVertices.has(edge[0]) || affectedVertices.has(edge[1])) unsupported = true;
+    });
+    (model.surfaces || []).forEach(function (surface) {
+      if (Number.isInteger(surface.patchIndex) && patchFaces[surface.patchIndex]) return;
+      (surface.loops || []).forEach(function (loop) {
+        (loop.vertices || []).forEach(function (vertex) {
+          if (affectedVertices.has(vertex)) unsupported = true;
+        });
+      });
+    });
+    if (unsupported) return null;
+
+    var componentFaces = hostWallFaces.concat([hostBottomFace, hostTopFace],
+      branchWallFaces, [capFace]);
+    var componentEdgeUse = new Map(), componentDirected = new Map(),
+      componentVertices = new Set();
+    for (var cfi = 0; cfi < componentFaces.length; cfi++) {
+      var componentFace = newFaces[componentFaces[cfi]];
+      if (!componentFace || componentFace.length < 3) return null;
+      for (var cvi = 0; cvi < componentFace.length; cvi++) {
+        var ca = componentFace[cvi], cb = componentFace[(cvi + 1) % componentFace.length];
+        if (ca === cb || !finite(newVertices[ca]) || !finite(newVertices[cb])) return null;
+        componentVertices.add(ca); componentVertices.add(cb);
+        var componentKey = Math.min(ca, cb) + '_' + Math.max(ca, cb);
+        componentEdgeUse.set(componentKey, (componentEdgeUse.get(componentKey) || 0) + 1);
+        var componentDirect = ca + '_' + cb;
+        componentDirected.set(componentDirect, (componentDirected.get(componentDirect) || 0) + 1);
+      }
+    }
+    var componentClosed = true;
+    componentEdgeUse.forEach(function (count) { if (count !== 2) componentClosed = false; });
+    if (!componentClosed) return null;
+    var componentWinding = true;
+    componentDirected.forEach(function (count, key) {
+      var parts = key.split('_');
+      if (count !== (componentDirected.get(parts[1] + '_' + parts[0]) || 0))
+        componentWinding = false;
+    });
+    if (!componentWinding || componentVertices.size !== newVertices.length) return null;
+    if (componentVertices.size - componentEdgeUse.size + componentFaces.length !== 2)
+      return null;
+
+    var oldVertexMap = new Map(), oldFaceMap = new Map();
+    function remapVertex(index) {
+      if (!oldVertexMap.has(index)) oldVertexMap.set(index, pushVertex(oldVertices[index]));
+      return oldVertexMap.get(index);
+    }
+    oldFaces.forEach(function (face, index) {
+      if (affectedFaces.has(index) || !Array.isArray(face) || face.length < 3) return;
+      if (face.some(function (vertex) { return !finite(oldVertices[vertex]); })) return;
+      var loop = face.map(remapVertex);
+      var mapped = addFace(loop, null);
+      if (mapped < 0) return;
+      oldFaceMap.set(index, mapped);
+      var holes = oldHoles[index] || [];
+      newHoles[mapped] = holes.map(function (hole) {
+        return hole.map(remapVertex);
+      });
+    });
+    oldEdges.forEach(function (edge, edgeIndexValue) {
+      if (!edge || edge.length < 2) return;
+      var key = Math.min(edge[0], edge[1]) + '_' + Math.max(edge[0], edge[1]);
+      if (affectedEdgeKeys.has(key) || affectedDisplayEdges.has(edgeIndexValue)) return;
+      if (affectedVertices.has(edge[0]) || affectedVertices.has(edge[1])) return;
+      edgeIndex(remapVertex(edge[0]), remapVertex(edge[1]));
+    });
+
+    function ringEdges(ring) {
+      var out = [];
+      for (var i = 0; i < ring.length; i++)
+        out.push(edgeIndex(ring[i], ring[(i + 1) % ring.length]));
+      return out;
+    }
+    var stagedCurves = new Map();
+    function stageCurve(curve, displayVertices, displayEdges) {
+      if (!curve) return;
+      stagedCurves.set(curve, {displayVertices:displayVertices.slice(),
+        displayEdges:displayEdges.slice()});
+    }
+    stageCurve(seam, seamNew, seamEdges);
+    stageCurve(curves[sortedHostCaps[0].index], bottomRing, ringEdges(bottomRing));
+    stageCurve(curves[sortedHostCaps[1].index], topRing, ringEdges(topRing));
+    stageCurve(capMouth, capRing, ringEdges(capRing));
+    stageCurve(capBuried, [], []);
+
+    function edgeIndexForNew(a, b) {
+      var key = Math.min(a, b) + '_' + Math.max(a, b);
+      var existing = edgeMap.get(key);
+      return existing === undefined ? edgeIndex(a, b) : existing;
+    }
+    (curves || []).forEach(function (curve, index) {
+      if (!curve || affectedCurves.indexOf(index) !== -1) return;
+      var display = curve.displayVertices || [];
+      if (!display.length) return;
+      var stagedVertices = display.map(remapVertex);
+      var stagedEdges = [];
+      (curve.displayEdges || []).forEach(function (edgeIndexValue) {
+        var edge = oldEdges[edgeIndexValue];
+        if (!edge) return;
+        var a = oldVertexMap.get(edge[0]), b = oldVertexMap.get(edge[1]);
+        if (a === undefined || b === undefined) return;
+        stagedEdges.push(edgeIndexForNew(a, b));
+      });
+      if (!stagedEdges.length) {
+        var closed = curve.kind === 'circle' || curve.kind === 'ellipse' ||
+          curve.closed === true;
+        var count = closed ? stagedVertices.length : stagedVertices.length - 1;
+        for (var ci = 0; ci < count; ci++)
+          stagedEdges.push(edgeIndex(stagedVertices[ci],
+            stagedVertices[(ci + 1) % stagedVertices.length]));
+      }
+      stageCurve(curve, stagedVertices, stagedEdges);
+    });
+
+    var stagedPatchFaces = (geometry.surfacePatches || []).map(function (patch, pi) {
+      if (patchFaces[pi]) return patchFaces[pi].slice();
+      if (!Array.isArray(patch.faceIndices)) return null;
+      return patch.faceIndices.map(function (index) {
+        return oldFaceMap.get(index);
+      }).filter(function (index) { return index !== undefined; });
+    });
+    var stagedPatchLoops = new Map();
+    (geometry.surfacePatches || []).forEach(function (patch, pi) {
+      if (patchFaces[pi] || !patch.loops) return;
+      stagedPatchLoops.set(pi, patch.loops.map(function (loop) {
+        var out = {};
+        Object.keys(loop).forEach(function (key) { out[key] = loop[key]; });
+        if (Array.isArray(loop.vertices)) out.vertices = loop.vertices.map(remapVertex);
+        return out;
+      }));
+    });
+    var stagedPatchBounds = new Map();
+    (geometry.surfacePatches || []).forEach(function (patch, pi) {
+      if (patchFaces[pi]) return;
+      if (!Array.isArray(patch.outer) && !Array.isArray(patch.holes)) return;
+      stagedPatchBounds.set(pi, {
+        outer:(patch.outer || []).map(remapVertex),
+        holes:(patch.holes || []).map(function (hole) {
+          return (hole || []).map(remapVertex);
+        })
+      });
+    });
+    var stagedRegions = null;
+    if (Array.isArray(geometry.faceRegions) && geometry.faceRegions.length) {
+      stagedRegions = geometry.faceRegions.map(function (region) {
+        var out = {};
+        Object.keys(region).forEach(function (key) { out[key] = region[key]; });
+        out.outer = (region.outer || []).map(remapVertex);
+        out.holes = (region.holes || []).map(function (hole) {
+          return (hole || []).map(remapVertex);
+        });
+        return out;
+      });
+    }
+    var stagedSurfaceLoops = new Map();
+    (model.surfaces || []).forEach(function (surface) {
+      if (Number.isInteger(surface.patchIndex) && patchFaces[surface.patchIndex]) return;
+      if (!Array.isArray(surface.loops)) return;
+      stagedSurfaceLoops.set(surface, surface.loops.map(function (loop) {
+        var out = {};
+        Object.keys(loop).forEach(function (key) { out[key] = loop[key]; });
+        if (Array.isArray(loop.vertices)) out.vertices = loop.vertices.map(remapVertex);
+        return out;
+      }));
+    });
+    var stagedSurfaceFaces = new Map();
+    (model.surfaces || []).forEach(function (surface) {
+      if (Number.isInteger(surface.patchIndex) && patchFaces[surface.patchIndex]) {
+        stagedSurfaceFaces.set(surface, patchFaces[surface.patchIndex].slice());
+        return;
+      }
+      if (!Array.isArray(surface.displayFaceIndices)) return;
+      stagedSurfaceFaces.set(surface, surface.displayFaceIndices.map(function (index) {
+        return oldFaceMap.get(index);
+      }).filter(function (index) { return index !== undefined; }));
+    });
+
+    var smoothFaces = hostWallFaces.concat(branchWallFaces);
+    (geometry.smoothSideFaces || []).forEach(function (index) {
+      var mapped = oldFaceMap.get(index);
+      if (mapped !== undefined && smoothFaces.indexOf(mapped) === -1) smoothFaces.push(mapped);
+    });
+
+    geometry.vertices = newVertices;
+    geometry.edges = newEdges;
+    geometry.faces = newFaces;
+    geometry.faceHoles = newHoles;
+    geometry.smoothSideFaces = smoothFaces.sort(function (a, b) { return a - b; });
+    stagedCurves.forEach(function (display, curve) {
+      curve.displayVertices = display.displayVertices;
+      curve.displayEdges = display.displayEdges;
+    });
+    (geometry.surfacePatches || []).forEach(function (patch, pi) {
+      if (stagedPatchFaces[pi]) patch.faceIndices = stagedPatchFaces[pi].slice();
+      if (stagedPatchLoops.has(pi)) patch.loops = stagedPatchLoops.get(pi);
+      if (stagedPatchBounds.has(pi)) {
+        var bounds = stagedPatchBounds.get(pi);
+        if (Array.isArray(patch.outer)) patch.outer = bounds.outer;
+        if (Array.isArray(patch.holes)) patch.holes = bounds.holes;
+      }
+    });
+    if (stagedRegions) geometry.faceRegions = stagedRegions;
+    stagedSurfaceFaces.forEach(function (faces, surface) {
+      surface.displayFaceIndices = faces.slice();
+    });
+    stagedSurfaceLoops.forEach(function (loops, surface) {
+      surface.loops = loops;
+    });
+    junction.displayTrim = 'trimmed';
+    delete junction.displayDiagnostic;
+    junction.displayMesh = {faces:newFaces.length, edges:newEdges.length,
+      vertices:newVertices.length, saddleEdges:seamEdges.length,
+      hostWallFaces:hostWallFaces.length, branchWallFaces:branchWallFaces.length};
+    return junction;
+  }
+
+  function applyAnalyticSolidJunction(model, geometry) {
+    var evidence = geometry && geometry.cylinderJunctionEvidence;
+    if (!model || !geometry || !Array.isArray(evidence) || !evidence.length)
+      return null;
+    var applied = [];
+    evidence.forEach(function (record) {
+      if (!record || record.contract !== 'analytic-solid-junction-evidence-v1')
+        return;
+      var larger = (model.surfaces || []).filter(function (surface) {
+        return surface.patchIndex === record.largerPatch;
+      })[0];
+      var smaller = (model.surfaces || []).filter(function (surface) {
+        return surface.patchIndex === record.smallerPatch;
+      })[0];
+      if (!larger || !smaller || larger === smaller) return;
+      if (larger.kind !== 'cylinder' || smaller.kind !== 'cylinder') return;
+      var seam = junctionEnsureCurve(geometry, {
+        origin:record.curve.origin, u:record.curve.u, v:record.curve.v,
+        direction:record.curve.direction, radius:record.curve.radius,
+        otherRadius:record.curve.otherRadius, startAngle:record.curve.startAngle,
+        sweepAngle:record.curve.sweepAngle, floorContact:record.curve.floorContact,
+        sourceIds:record.sourceIds});
+      if (!seam || !validJunctionCurve(seam.curve)) return;
+      var seamLoop = function (loop) { return junctionLoopUses(loop, seam.index); };
+      var largerLoops = (larger.loops || []).filter(function (loop) {
+        return !seamLoop(loop);
+      });
+      largerLoops.push({kind:'inner', curves:[seam.index], orientation:-1});
+      var smallerLoops = (smaller.loops || []).filter(function (loop) {
+        return !seamLoop(loop) && !junctionLoopUses(loop, record.smallerBuriedCurve);
+      });
+      if (!smallerLoops.length) return;
+      smallerLoops.push({kind:'outer', curves:[seam.index], orientation:1});
+      larger.loops = largerLoops;
+      smaller.loops = smallerLoops;
+      larger.boundaryCurves = (larger.boundaryCurves || []).filter(function (index) {
+        return index !== seam.index;
+      }).concat(seam.index);
+      smaller.boundaryCurves = (smaller.boundaryCurves || []).filter(function (index) {
+        return index !== seam.index && index !== record.smallerBuriedCurve;
+      }).concat(seam.index);
+      var removed = [];
+      model.surfaces = model.surfaces.filter(function (surface) {
+        if (surface === larger || surface === smaller) return true;
+        var usesBuried = (surface.loops || []).some(function (loop) {
+          return junctionLoopUses(loop, record.smallerBuriedCurve);
+        });
+        if (usesBuried) { removed.push(surface.id); return false; }
+        return true;
+      });
+      seam.curve.solidJunction = true;
+      seam.curve.surfaceIds = [larger.id, smaller.id];
+      seam.curve.largerSurfaceId = larger.id;
+      seam.curve.smallerSurfaceId = smaller.id;
+      seam.curve.largerPatch = record.largerPatch;
+      seam.curve.smallerPatch = record.smallerPatch;
+      larger.analyticJunction = true;
+      smaller.analyticJunction = true;
+      var patches = geometry.surfacePatches || [];
+      [larger, smaller].forEach(function (surface) {
+        var patch = surface.patchIndex !== undefined ? patches[surface.patchIndex] : null;
+        if (patch) {
+          patch.boundaryCurves = (surface.boundaryCurves || []).slice();
+          patch.analyticJunction = true;
+        }
+      });
+      applied.push({curveIndex:seam.index, curveId:seam.curve.id || null,
+        largerPatch:record.largerPatch, smallerPatch:record.smallerPatch,
+        largerSurfaceId:larger.id, smallerSurfaceId:smaller.id,
+        largerCapCurves:record.largerCapCurves || [],
+        smallerMouthCurve:record.smallerMouthCurve,
+        smallerBuriedCurve:record.smallerBuriedCurve,
+        removedSurfaceIds:removed,
+        sourceIds:record.sourceIds || [],
+        evidenceViews:record.views || [],
+        evidenceStrokeIds:record.strokeIds || []});
+    });
+    if (!applied.length) return null;
+    var displayDiagnostic = {code:'cylinder-junction-display-untrimmed',
+      severity:'warning',
+      message:'The shared analytic edge is available. The display mesh still contains the overlapping cylinder faces.'};
+    geometry.cylinderJunction = {contract:'analytic-solid-junction-v1',
+      status:'bounded', exactness:'analytic-quartic',
+      displayTrim:'deferred', displayDiagnostic:displayDiagnostic,
+      seams:applied,
+      sharedSurfaces:Array.from(new Set(applied.reduce(function (ids, seam) {
+        return ids.concat([seam.largerSurfaceId, seam.smallerSurfaceId]);
+      }, [])))};
+    solidJunctionTrimDisplay(model, geometry);
+    return geometry.cylinderJunction;
+  }
+  function applyAnalyticCavityJunction(model, geometry, trims) {
+    if (!model || !geometry || !trims) return null;
+    var boundary = null;
+    (trims.boundaries || []).some(function (candidate) {
+      if (candidate && candidate.supportKind === 'cylinder-intersection' &&
+          candidate.role === 'boundary' && candidate.status !== 'unsupported') {
+        boundary = candidate;
+        return true;
+      }
+      return false;
+    });
+    if (!boundary) return null;
+    var volumes = geometry.cavityVolumes || [];
+    var larger = volumes[boundary.largerVolume], smaller = volumes[boundary.smallerVolume];
+    if (!larger || !smaller) return null;
+    var tolerance = trimTolerance(volumes);
+    var largerSide = junctionFindSurface(model, larger.index, 'side');
+    var smallerSide = junctionFindSurface(model, smaller.index, 'side');
+    var largerBottom = junctionFindSurface(model, larger.index, 'bottom');
+    var smallerBottom = junctionFindSurface(model, smaller.index, 'bottom');
+    if (!largerSide || !smallerSide || !largerBottom) return null;
+    var largerMouth = junctionParentCircle(geometry, larger, 'mouth');
+    var largerRim = junctionParentCircle(geometry, larger, 'bottom');
+    var smallerMouth = junctionParentCircle(geometry, smaller, 'mouth');
+    var smallerRim = junctionParentCircle(geometry, smaller, 'bottom');
+    if (!largerMouth || !largerRim || !smallerMouth || !smallerRim) return null;
+    if (smallerBottom) {
+      var interiorSamples = 0;
+      for (var i = 0; i < 32; i++) {
+        var angle = TAU * i / 32;
+        var point = add(smallerRim.curve.center,
+          add(mul(smallerRim.curve.u, Math.cos(angle) * smaller.radius),
+            mul(smallerRim.curve.v, Math.sin(angle) * smaller.radius)));
+        if (!trimVolumeContains(larger, point, tolerance)) return null;
+        if (junctionStrictlyInside(larger, point, tolerance)) interiorSamples++;
+      }
+      if (interiorSamples < 24) return null;
+    }
+    var largerHost = junctionFindHost(geometry, model, larger, largerMouth);
+    var smallerHost = junctionFindHost(geometry, model, smaller, smallerMouth);
+    if (!largerHost || !smallerHost || largerHost.surface === smallerHost.surface) return null;
+    var seam = junctionEnsureCurve(geometry, boundary);
+    if (!seam || !validJunctionCurve(seam.curve)) return null;
+    var largerHostLoops = junctionHostLoops(geometry, largerHost, largerMouth);
+    var smallerHostLoops = junctionHostLoops(geometry, smallerHost, smallerMouth);
+    if (!largerHostLoops || !smallerHostLoops) return null;
+    var largerSideLoops = [
+      {kind:'outer', curves:[largerMouth.index]},
+      {kind:'outer', curves:[largerRim.index]},
+      {kind:'inner', curves:[seam.index], orientation:-1}
+    ];
+    var smallerSideLoops = [
+      {kind:'outer', curves:[smallerMouth.index]},
+      {kind:'outer', curves:[seam.index], orientation:1}
+    ];
+    junctionAttachHost(geometry, largerHost, largerMouth, largerHostLoops);
+    junctionAttachHost(geometry, smallerHost, smallerMouth, smallerHostLoops);
+    largerSide.loops = largerSideLoops;
+    smallerSide.loops = smallerSideLoops;
+    largerSide.boundaryCurves = [largerMouth.index, largerRim.index, seam.index];
+    smallerSide.boundaryCurves = [smallerMouth.index, seam.index];
+    function junctionSyncPatch(surface) {
+      var patches = geometry.surfacePatches || [];
+      var patch = surface.patchIndex !== undefined ? patches[surface.patchIndex] : null;
+      if (patch) patch.boundaryCurves = surface.boundaryCurves.slice();
+    }
+    junctionSyncPatch(largerSide);
+    junctionSyncPatch(smallerSide);
+    if (boundary.floorContact) {
+      var rim = largerRim.curve;
+      var relative = sub(seam.curve.start, rim.center);
+      rim.startAngle = Math.atan2(dot(relative, rim.v) / rim.radius,
+        dot(relative, rim.u) / rim.radius);
+    }
+    if (smallerBottom) model.surfaces = model.surfaces.filter(function (surface) {
+      return surface !== smallerBottom;
+    });
+    [largerSide, largerBottom, smallerSide].forEach(function (surface) {
+      delete surface.approximateBoundary;
+      delete surface.displayOnlyBoundary;
+    });
+    geometry.analyticCavityJunction = {contract:'analytic-cavity-junction-v1',
+      curveIndex:seam.index, largerVolume:larger.index, smallerVolume:smaller.index,
+      floorContact:boundary.floorContact === true,
+      smallerFloorAbsorbed:!!smallerBottom,
+      sharedSurfaces:[largerSide.id, smallerSide.id]};
+    (geometry.recesses || []).forEach(function (record) {
+      if (record.volumeIndex === smaller.index && smallerBottom) {
+        record.bottomClosure = 'absorbed';
+        record.analyticJunction = true;
+      }
+      if (record.volumeIndex === larger.index) record.analyticJunction = true;
+    });
+    return geometry.analyticCavityJunction;
   }
 
   function mergeContainedMouths(model, geometry) {
@@ -1925,6 +2945,17 @@
         if (finite(support[key])) out[key] = copyPoint(support[key]);
       });
       if (Number.isFinite(support.radius)) out.radius = support.radius;
+    } else if (support.kind === 'cylinder-intersection') {
+      ['origin', 'u', 'v', 'direction'].forEach(function (key) {
+        if (finite(support[key])) out[key] = copyPoint(support[key]);
+      });
+      ['radius', 'otherRadius', 'startAngle', 'sweepAngle'].forEach(function (key) {
+        if (Number.isFinite(support[key])) out[key] = support[key];
+      });
+      out.closed = true;
+      out.largerVolume = support.largerVolume;
+      out.smallerVolume = support.smallerVolume;
+      out.floorContact = !!support.floorContact;
     } else if (support.kind === 'unsupported') {
       out.reason = support.reason || null;
       out.guarantee = support.guarantee || 'numeric';
@@ -2104,6 +3135,61 @@
     }
     return [relation.a, relation.b];
   }
+  function trimJunctionCurve(junction) {
+    var c = junction && junction.curve;
+    if (!c || c.kind !== 'cylinder-intersection') return null;
+    var curve = {kind:'cylinder-intersection', origin:copyPoint(c.origin),
+      center:copyPoint(c.origin), u:copyPoint(c.u), v:copyPoint(c.v),
+      direction:copyPoint(c.direction), radius:c.radius, otherRadius:c.otherRadius,
+      startAngle:Number.isFinite(c.startAngle) ? c.startAngle : 0,
+      sweepAngle:Number.isFinite(c.sweepAngle) ? c.sweepAngle : TAU,
+      closed:true, largerVolume:junction.larger, smallerVolume:junction.smaller,
+      floorContact:junction.floorContact === true};
+    if (!validJunctionCurve(curve)) return null;
+    curve.start = copyPoint(curvePoint(curve, curve.startAngle));
+    curve.end = copyPoint(curvePoint(curve, curve.startAngle + curve.sweepAngle));
+    return curve;
+  }
+  function trimJunctionBounded(curve, a, b, group, tolerance) {
+    if (!curve || !a || !b || (group || []).length !== 2) return false;
+    for (var i = 0; i < 64; i++) {
+      var p = curvePoint(curve, curve.startAngle + curve.sweepAngle * i / 64);
+      if (!trimVolumeContains(a, p, tolerance) ||
+          !trimVolumeContains(b, p, tolerance)) return false;
+    }
+    return true;
+  }
+  function trimJunctionRecord(curve, sa, sb, volumes, group, tolerance) {
+    var component = {kind:'cylinder-intersection', origin:copyPoint(curve.origin),
+      center:copyPoint(curve.center), u:copyPoint(curve.u), v:copyPoint(curve.v),
+      direction:copyPoint(curve.direction), radius:curve.radius,
+      otherRadius:curve.otherRadius, startAngle:curve.startAngle,
+      sweepAngle:curve.sweepAngle, closed:true, start:copyPoint(curve.start),
+      end:copyPoint(curve.end), bounded:true, supportStatus:'exact',
+      boundsStatus:'exact', boundsMethod:'analytic-junction-domain'};
+    var classification = trimClassifyComponent(component, sa, sb, volumes, group,
+      tolerance, {supportRelation:'transverse'});
+    component.role = classification.role;
+    component.classification = classification.method;
+    component.reason = classification.reason || null;
+    component.exposureStatus = classification.exposureStatus || 'numeric';
+    component.status = trimWorst('exact', component.exposureStatus);
+    var record = {aVolume:sa.volume.index, bVolume:sb.volume.index,
+      aRole:sa.role, bRole:sb.role, aSurfaceId:sa.surfaceId, bSurfaceId:sb.surfaceId,
+      relation:'overlap', kind:'cylinder-intersection',
+      support:trimSerializeSupport(curve), supportStatus:'exact',
+      boundsStatus:'exact', exposureStatus:component.exposureStatus,
+      status:component.status, role:component.role, reason:component.reason || null,
+      supportRelation:'transverse', exactness:'analytic-quartic',
+      guarantee:'analytic-quartic', topologyCertified:true,
+      largerVolume:curve.largerVolume, smallerVolume:curve.smallerVolume,
+      floorContact:curve.floorContact === true,
+      domain:[trimDomainRecord(sa.volume, sa.role), trimDomainRecord(sb.volume, sb.role)],
+      sourceIds:Array.from(new Set((sa.sourceIds || []).concat(sb.sourceIds || []))),
+      branches:[component], excluded:0};
+    record.status = trimRecordStatus(record);
+    return record;
+  }
   function cavityTrims(model, geometry) {
     var volumes = geometry && geometry.cavityVolumes || [];
     var relations = geometry && geometry.cavityRelations || [];
@@ -2127,9 +3213,28 @@
         return;
       }
       var supportsA = trimSupportsFor(a, model), supportsB = trimSupportsFor(b, model);
+      var junctionRecord = null, junctionSideA = null, junctionSideB = null;
+      if (relation.relation === 'overlap' && group.length === 2 &&
+          a.kind === 'cylinder' && b.kind === 'cylinder' && !a.absorbed && !b.absorbed &&
+          CavityBoolean && CavityBoolean.perpendicularBoreJunction) {
+        var junction = CavityBoolean.perpendicularBoreJunction(a, b);
+        var junctionCurve = junction ? trimJunctionCurve(junction) : null;
+        if (junctionCurve && trimJunctionBounded(junctionCurve, a, b, group, tolerance)) {
+          supportsA.forEach(function (support) {
+            if (support.role === 'side') junctionSideA = support;
+          });
+          supportsB.forEach(function (support) {
+            if (support.role === 'side') junctionSideB = support;
+          });
+          if (junctionSideA && junctionSideB)
+            junctionRecord = trimJunctionRecord(junctionCurve, junctionSideA,
+              junctionSideB, volumes, group, tolerance);
+        }
+      }
       supportsA.forEach(function (sa) {
         supportsB.forEach(function (sb) {
-          var record = trimSupportPair(sa, sb, relation, volumes, group, tolerance);
+          var record = junctionRecord && sa.role === 'side' && sb.role === 'side' ?
+            junctionRecord : trimSupportPair(sa, sb, relation, volumes, group, tolerance);
           pair.supports.push(record);
           pair.boundaries += record.branches.length;
           record.branches.forEach(function (branch) {
@@ -2143,6 +3248,11 @@
             boundary.sourceIds = Array.from(new Set((sa.sourceIds || [])
               .concat(sb.sourceIds || [])));
             boundary.domain = record.domain;
+            if (record.kind === 'cylinder-intersection') {
+              boundary.largerVolume = record.largerVolume;
+              boundary.smallerVolume = record.smallerVolume;
+              boundary.floorContact = record.floorContact;
+            }
             result.boundaries.push(boundary);
           });
           if (record.status === 'unsupported' || record.status === 'unresolved' ||
@@ -2343,6 +3453,36 @@
               'A torus parameter domain needs finite increasing u and v intervals no longer than one turn.',
               sourceIds);
           }
+        } else if (patch.kind === 'parametric') {
+          var chart = patch.chart, sections = (patch.boundaryCurves || []).slice();
+          if (!Parametric || !Parametric.validSurface(chart) || sections.length !== 2 ||
+              sections.some(function (index, i) {
+                return !sameChartBoundary(curves[index], i === 0 ? chart.first : chart.second);
+              })) {
+            diag('surface-invalid-parametric-chart', 'A bounded spline chart needs matching analytic section curves.', sourceIds);
+            return;
+          }
+          if (chart.kind === 'revolved-spline')
+            chart = Object.assign({}, chart, {frame:Parametric.revolutionFrame(chart)});
+          var rails = Parametric.surfaceRails(chart);
+          var generators = chart.kind !== 'ruled-spline' ? [] : [0, 1].map(function (u) {
+            var start = Parametric.surfacePoint(chart, u, 0), end = Parametric.surfacePoint(chart, u, 1);
+            return {kind:'line', start:start, end:end, sourceIds:sourceIds.slice()};
+          });
+          if (!generators.every(validLine)) {
+            diag('surface-invalid-parametric-chart', 'A ruled spline chart has coincident end stations.', sourceIds);
+            return;
+          }
+          var boundary = {kind:'outer', curves:sections, lines:generators};
+          if (rails.length) boundary.elements = rails.map(function (rail, index) {
+            return {kind:'curve', curve:Object.assign({}, rail, {
+              id:'parametric:' + pi + ':rail:' + index, sourceIds:sourceIds.slice()
+            })};
+          });
+          surface = {kind:'parametric', analyticKind:chart.kind, chart:chart, closed:false,
+            origin:Parametric.surfacePoint(chart, 0, 0), loops:[boundary],
+            boundaryCurves:sections, sourceIds:sourceIds, patchIndex:pi,
+            displayFaceIndices:(patch.faceIndices || []).slice()};
         } else if (patch.kind === 'implicit') {
           var implicitPatch = patch.implicit ? Implicit.normalizeEquation(patch.implicit) : null;
           if (!implicitPatch) {
@@ -2423,6 +3563,7 @@
             var innerInvalid = false;
             (patch.innerCurves || []).forEach(function (i) {
               if (!validCurve(curves[i])) {
+                if (curves[i] && curves[i].kind === 'polyline') return;
                 diag('surface-invalid-boundary', 'A planar inner boundary references a missing analytic curve.', sourceIds);
                 innerInvalid = true; return;
               }
@@ -2544,10 +3685,20 @@
     mergeUnionMouths(model, geometry);
     model.summary = summarize(model);
     stampModelIdentity(model);
-    model.cavityTrims = cavityTrims(model, geometry);
-    if (geometry.cavityVolumes && geometry.cavityVolumes.length)
-      geometry.cavityTrims = model.cavityTrims;
-    else delete geometry.cavityTrims;
+    if (!(options && options.cavityTrims === false)) {
+      model.cavityTrims = cavityTrims(model, geometry);
+      if (geometry.cavityVolumes && geometry.cavityVolumes.length)
+        geometry.cavityTrims = model.cavityTrims;
+      else delete geometry.cavityTrims;
+      if (applyAnalyticCavityJunction(model, geometry, model.cavityTrims)) {
+        model.summary = summarize(model);
+        stampModelIdentity(model);
+      }
+      if (applyAnalyticSolidJunction(model, geometry)) {
+        model.summary = summarize(model);
+        stampModelIdentity(model);
+      }
+    }
     if (model.diagnostics.length) model.summary.status = 'issues';
     return model;
   }
@@ -2715,7 +3866,7 @@
         addVertex(data.end, surfaceId, id);
       return edge;
     }
-    function addCurveElement(element, surfaceId, loopIndex, role, explicitId) {
+    function addCurveElement(element, surfaceId, loopIndex, role, explicitId, orientation) {
       var curve = boundaryCurve(element, curves);
       if (!curve || !validCurve(curve)) return null;
       var id = explicitId || (element && typeof element === 'object' && element.id ?
@@ -2725,7 +3876,7 @@
       var end = closed ? start : curvePoint(curve, curveStart(curve) + curveSweep(curve));
       addEdge(id, 'curve', {curve:curve, curveId:explicitId || curve.id || null,
         start:start, end:end, closed:closed,
-        sourceIds:curve.sourceIds || []}, surfaceId, loopIndex, role);
+        sourceIds:curve.sourceIds || []}, surfaceId, loopIndex, role, orientation);
       return id;
     }
     function addLineElement(line, surfaceId, loopIndex, role) {
@@ -2773,7 +3924,8 @@
       (loop.curves || []).forEach(function (item) {
         var curve = typeof item === 'object' ? item : curves[item];
         var curveId = addCurveElement(curve, surfaceId, loopIndex, role,
-          typeof item === 'number' ? 'c:' + item : null);
+          typeof item === 'number' ? 'c:' + item : null,
+          loop.orientation === -1 ? -1 : 1);
         if (curveId && !edgeUses.some(function (u) { return u.edgeId === curveId; }))
           use(curveId);
       });
@@ -2997,12 +4149,75 @@
       return arc;
     });
   }
+  function patchLineRange(surface, origin, direction, geometry) {
+    if (!geometry) return null;
+    var dir = unit(direction);
+    if (!finite(dir) || length(dir) <= EPS) return null;
+    var from = Infinity, to = -Infinity;
+    var vertices = geometry.vertices || [], faces = geometry.faces || [],
+      curves = geometry.curves || [];
+    function station(p) {
+      if (!finite(p)) return;
+      var s = dot(sub(p, origin), dir);
+      if (s < from) from = s;
+      if (s > to) to = s;
+    }
+    function curveStation(curve) {
+      if (!curve) return;
+      station(curve.center);
+      var r = radii(curve);
+      var ru = r.u || 0, rv = r.v || 0;
+      if (!finite(curve.center) || !finite(curve.u) || !finite(curve.v) ||
+          (!(ru > 0) && !(rv > 0))) return;
+      var c = dot(sub(curve.center, origin), dir);
+      var spread = Math.hypot(dot(curve.u, dir) * ru, dot(curve.v, dir) * rv);
+      if (!Number.isFinite(spread) || spread <= 0) return;
+      if (c - spread < from) from = c - spread;
+      if (c + spread > to) to = c + spread;
+    }
+    (surface.displayFaceIndices || []).forEach(function (fi) {
+      (faces[fi] || []).forEach(function (vi) {station(vertices[vi]);});
+    });
+    (surface.loops || []).forEach(function (loop) {
+      if (!loop) return;
+      (loop.vertices || []).forEach(function (vi) {station(vertices[vi]);});
+      (loop.points || []).forEach(station);
+      (loop.lines || []).forEach(function (line) {
+        if (line) {station(line.start); station(line.end);}
+      });
+      (loop.curves || []).forEach(function (ci) {
+        curveStation(typeof ci === 'object' && ci ? ci : curves[ci]);
+      });
+      (loop.elements || []).forEach(function (element) {
+        if (!element) return;
+        if (element.kind === 'polyline') (element.points || []).forEach(station);
+        else if (element.kind === 'curve') curveStation(element.curve);
+      });
+      if (loop.section) curveStation(loop.section);
+    });
+    if (Number.isFinite(surface.radius)) {
+      var patchRadius = surface.radius;
+      if (finite(surface.center)) {
+        var centerStation = dot(sub(surface.center, origin), dir);
+        if (centerStation - patchRadius < from) from = centerStation - patchRadius;
+        if (centerStation + patchRadius > to) to = centerStation + patchRadius;
+      }
+    }
+    station(surface.apex);
+    if (!(Number.isFinite(from) && Number.isFinite(to) && to > from)) return null;
+    var pad = Math.max(1e-8, (to - from) / 64);
+    return {from:from - pad, to:to + pad};
+  }
   function clipLineToSurface(surface, origin, direction, geometry) {
-    var extent = geometryExtent(geometry, surface) * 4 + 10;
+    var range = patchLineRange(surface, origin, direction, geometry);
+    if (!range) {
+      var extent = geometryExtent(geometry, surface) * 4 + 10;
+      range = {from:-extent, to:extent};
+    }
     var count = 192, samples = [], parameters = [];
     function at(t) { return add(origin, mul(direction, t)); }
     for (var i=0;i<count;i++) {
-      var t = -extent + (i + 0.5) * (2 * extent) / count;
+      var t = range.from + (i + 0.5) * (range.to - range.from) / count;
       parameters.push(t);
       samples.push(boundedInside(classifyPoint(surface, at(t), geometry)));
     }
@@ -3435,7 +4650,7 @@
         loopCurves(loop, curves).forEach(function (c) {
           if (!validCurve(c)) { add('surface-boundary-missing', 'Surface ' + s.id + ' references a missing boundary curve.', s.sourceIds); return; }
           for (var k=0;k<8;k++) {
-            var p = curvePoint(c, (c.startAngle === undefined ? 0 : c.startAngle) + (c.sweepAngle === undefined ? TAU : c.sweepAngle)*k/8), ok = true;
+            var p = curvePoint(c, curveStart(c) + curveSweep(c)*k/8), ok = true;
             if (s.kind === 'cylinder') {
               var d = sub(p, s.origin), axial = dot(d, unit(s.axis));
               var radial = Math.sqrt(Math.max(0, dot(d,d) - axial*axial));
@@ -3454,7 +4669,7 @@
             if (!ok) { add('surface-boundary-off-surface', 'A boundary curve does not lie on ' + s.id + '.', s.sourceIds); break; }
           }
 
-          if (s.kind === 'cylinder') {
+          if (s.kind === 'cylinder' && isConicCurve(c)) {
             var sec = section(s, {origin:c.center, normal:curveNormal(c)});
             if (!sec || (sec.kind !== 'circle' && sec.kind !== 'ellipse')) {
               add('surface-section-mismatch', 'The boundary plane does not section ' + s.id + ' in its drawn boundary.', s.sourceIds);
@@ -3640,6 +4855,15 @@
     if (s.kind === 'sphere') {
       return finite(s.center) && s.radius > 0 ? Math.abs(length(sub(p, s.center)) - s.radius) : Infinity;
     }
+    if (s.kind === 'parametric' && Parametric && Parametric.validSurface(s.chart)) {
+      return Math.min.apply(null, [0, 1].map(function (u) {
+        var a = Parametric.surfacePoint(s.chart, u, 0), b = Parametric.surfacePoint(s.chart, u, 1);
+        var edge = sub(b, a), lengthSquared = dot(edge, edge);
+        if (!(lengthSquared > 0)) return Infinity;
+        var t = Math.max(0, Math.min(1, dot(sub(p, a), edge) / lengthSquared));
+        return length(sub(p, add(a, mul(edge, t))));
+      }));
+    }
     if (s.kind === 'implicit' || s.kind === 'polynomial') {
       var implicitSurface = implicitEquationFor(s);
       if (!implicitSurface || !Implicit) return Infinity;
@@ -3679,9 +4903,22 @@
     if (c.sweepAngle !== undefined && (!Number.isFinite(c.sweepAngle) || c.sweepAngle <= 0)) return false;
     return true;
   }
+  function sameParametricCurve(curve, definition) {
+    return validCurve(curve) && curve.kind === 'nurbs' && curve.degree === definition.degree &&
+      curve.closed === definition.closed &&
+      JSON.stringify(curve.knots) === JSON.stringify(definition.knots) &&
+      JSON.stringify(curve.weights) === JSON.stringify(definition.weights) &&
+      JSON.stringify(curve.controlPoints) === JSON.stringify(definition.controlPoints);
+  }
+  function sameChartBoundary(curve, definition) {
+    if (definition.kind === 'nurbs') return sameParametricCurve(curve, definition);
+    return validCurve(curve) && curve.kind === 'circle' && definition.kind === 'circle' &&
+      pointDistance(curve.center, definition.center) <= EPS &&
+      Math.abs(curve.radius - definition.radius) <= EPS &&
+      Math.abs(dot(curveNormal(curve), curveNormal(definition))) >= 1 - EPS;
+  }
   function sampleBoundaryCurve(c, count) {
-    var start = Number.isFinite(c.startAngle) ? c.startAngle : 0;
-    var sweep = Number.isFinite(c.sweepAngle) ? c.sweepAngle : TAU;
+    var start = curveStart(c), sweep = curveSweep(c);
     var points = [];
     for (var i=0;i<=count;i++) points.push(curvePoint(c, start + sweep*i/count));
     return points;
@@ -3803,7 +5040,7 @@
         displayFaceIndices:(surface.displayFaceIndices || []).slice(),
         parameters:surfaceParameters(surface), loops:[], checks:[], status:'ok',
         boundaryApproximate:surface.approximateBoundary === true};
-      var known = ['plane','cylinder','cone','sphere','torus','implicit','polynomial'].indexOf(rec.kind) !== -1;
+      var known = ['plane','cylinder','cone','sphere','torus','implicit','polynomial','parametric'].indexOf(rec.kind) !== -1;
 
       check(rec, rec, 'surface-id-present', {status:typeof surface.id === 'string' && surface.id !== '' ? 'ok':'failed',
         arithmetic:'exact-combinatorial', method:'combinatorial', issue:'certificate-surface-id-missing',
@@ -3892,6 +5129,12 @@
       } else if (rec.kind === 'sphere') {
         finiteVector(rec, rec, 'sphere-center-finite', surface.center, 'certificate-sphere-center-invalid');
         positiveExact(rec, rec, 'sphere-radius-positive', surface.radius, 'certificate-sphere-radius-invalid');
+      } else if (rec.kind === 'parametric') {
+        check(rec, rec, 'parametric-chart-valid', {
+          status:Parametric && Parametric.validSurface(surface.chart) ? 'ok' : 'failed',
+          arithmetic:'numeric', method:'bounded-chart',
+          issue:'certificate-parametric-chart-invalid',
+          message:rec.id + ' has an invalid bounded parametric chart.'});
       } else if (rec.kind === 'implicit' || rec.kind === 'polynomial') {
         var implicitEquation = implicitEquationFor(surface);
         finiteVector(rec, rec, 'implicit-origin-finite', surface.origin, 'certificate-implicit-origin-invalid');
@@ -3997,6 +5240,10 @@
         });
         loopCurves(loop, curves).forEach(function (c) {
           if (!boundaryCurveValid(c)) { invalidCurve = true; return; }
+          if (rec.kind === 'parametric' && Parametric && Parametric.validSurface(surface.chart) &&
+              [surface.chart.first, surface.chart.second].concat(Parametric.surfaceRails(surface.chart)).some(function (definition) {
+                return sameChartBoundary(c, definition);
+              })) return;
           sampleBoundaryCurve(c, 32).forEach(function (p) {
             var r = surfaceResidual(surface, p);
             if (!Number.isFinite(r)) undefinedResidual = true;
@@ -4059,6 +5306,15 @@
         if (rec.kind === 'cylinder') {
           loopCurves(loop, curves).forEach(function (c) {
             if (!boundaryCurveValid(c)) return;
+            if (c.kind === 'cylinder-intersection') {
+              check(loopRec, rec, 'cylinder-junction-curve', {
+                status:validJunctionCurve(c) ? 'ok' : 'failed',
+                arithmetic:'exact-combinatorial', method:'analytic-quartic',
+                issue:'certificate-cylinder-junction-invalid',
+                message:'A cylinder junction boundary is not a valid analytic quartic loop.',
+                sourceIds:boundarySourceIds(c, curves)});
+              return;
+            }
             var minor = c.kind === 'circle' ? c.radius : Math.min(radii(c).u, radii(c).v);
             if (Number.isFinite(minor)) {
               var exactRadius = exactNumbersEqual(minor, surface.radius);
@@ -5259,8 +6515,13 @@
 
 
 
-  function curveStart(c) { return Number.isFinite(c.startAngle) ? c.startAngle : 0; }
-  function curveSweep(c) { return Number.isFinite(c.sweepAngle) ? c.sweepAngle : TAU; }
+  function curveStart(c) {
+    return c.kind === 'nurbs' ? Parametric.domain(c)[0] : Number.isFinite(c.startAngle) ? c.startAngle : 0;
+  }
+  function curveSweep(c) {
+    return c.kind === 'nurbs' ? Parametric.domain(c)[1] - Parametric.domain(c)[0] :
+      Number.isFinite(c.sweepAngle) ? c.sweepAngle : TAU;
+  }
   function pointDistance(a, b) {
     var dx=a.x-b.x, dy=a.y-b.y, dz=a.z-b.z;
     return Math.sqrt(dx*dx + dy*dy + dz*dz);
@@ -5657,8 +6918,19 @@
     if (surface.kind !== 'cylinder' && surface.kind !== 'cone')
       return {ok:false, reason:'surface-kind'};
     var loops = surface.loops || [];
-    if (surface.kind === 'cylinder' && loops.length !== 2)
-      return {ok:false, reason:'topology'};
+    if (surface.kind === 'cylinder' && loops.length !== 2) {
+      var junctionTrimmed = loops.some(function (loop) {
+        return loopCurves(loop, curves).some(function (curve) {
+          return curve && curve.kind === 'cylinder-intersection';
+        });
+      });
+      var rims = junctionTrimmed ? loops.filter(function (loop) {
+        var curve = fullCircleCurve(loop, curves);
+        return curve && curveSweep(curve) >= TAU - 1e-9;
+      }) : [];
+      if (!junctionTrimmed || rims.length !== 2) return {ok:false, reason:'topology'};
+      loops = rims;
+    }
     if (surface.kind === 'cone' &&
         !(loops.length === 2 || (loops.length === 1 && finite(surface.apex || surface.origin))))
       return {ok:false, reason:'topology'};
@@ -5767,7 +7039,7 @@
     else if (loop.curves && loop.curves.length === 1 &&
         !(loop.lines && loop.lines.length) && !(loop.elements && loop.elements.length))
       curve = typeof loop.curves[0] === 'object' ? loop.curves[0] : curves[loop.curves[0]];
-    if (!curve || !validCurve(curve)) return null;
+    if (!curve || !validCurve(curve) || curve.kind === 'cylinder-intersection') return null;
     return curveSweep(curve) >= TAU - 1e-9 ? curve : null;
   }
 
@@ -5962,6 +7234,8 @@
   function classifyPoint(surface, p, geometry) {
     if (!surface || !finite(p))
       return {status:'unknown', reason:'invalid-input'};
+    if (surface.kind === 'parametric')
+      return {status:'unknown', reason:'parametric-inverse-unsupported'};
     var tol = surfaceTolerance(surface);
     var residual = surfaceResidual(surface, p);
     if (!Number.isFinite(residual) || residual > Math.max(tol*4, EPS))
@@ -7442,6 +8716,7 @@
     implicitEquation:implicitEquation,
     implicitLineIntervals:implicitLineIntervals,
     cavityTrims:cavityTrims,
+    crossingCylinderCandidates:crossingCylinderCandidates,
     circleInPlanarFace:circleInPlanarFace,
     trimCurveInsideVolume:trimCurveInsideVolume,
     trimLineInsideVolume:trimLineInsideVolume,

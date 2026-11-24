@@ -2,6 +2,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = factory({
       Surfaces:require('./educad-surfaces.js'),
+      DrawingSections:require('./educad-drawing-sections.js'),
       Implicit:require('./educad-implicit.js'),
       Predicates:require('./educad-predicates.js'),
       Planar:require('./educad-planar.js'),
@@ -12,6 +13,7 @@
   } else {
     root.EduCADKernel = factory({
       Surfaces:root.EduCADSurfaces,
+      DrawingSections:root.EduCADDrawingSections,
       Implicit:root.EduCADImplicit,
       Predicates:root.EduCADPredicates,
       Planar:root.EduCADPlanar,
@@ -42,18 +44,25 @@
       correspondence:'correspondence-audit-v1',
       constraint:'constraint-report-v1',
       viewState:'view-state-v1',
-      preview:'1.0.0-educad'
+      preview:'1.0.0-educad',
+      drawingSections:'drawing-sections-v1',
+      sectionBoundary:'section-boundary-v1',
+      sectionSplit:'section-split-v1',
+      cuttingPlane:'cutting-plane-evidence-v1',
+      sectionBoundaryEvidence:'section-boundary-evidence-v1'
     },
     capabilities:{
       surfaces:['plane','cylinder','cone','sphere','torus'],
       operations:['section','intersect','intersectBounded','split','trim',
         'attachBoundary','classifyPoint','topology','featureGraph',
-        'silhouettes','silhouetteHLR','planarBoolean','subtractContainedLoop'],
+        'silhouettes','silhouetteHLR','planarBoolean','subtractContainedLoop',
+        'sectionBoundary','retainSection','drawingSections'],
       predicates:['orient2d','orient3d','coplanar','pointOnPlane'],
       planarBooleans:['union','intersect','difference','xor'],
       exactness:['exact-decimal-rational','numeric']
     },
     Surfaces:modules.Surfaces,
+    DrawingSections:modules.DrawingSections,
     Implicit:modules.Implicit,
     Predicates:modules.Predicates,
     Planar:modules.Planar,

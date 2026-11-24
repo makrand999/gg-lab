@@ -3,14 +3,14 @@
     module.exports = factory(require('./educad-entities.js'), require('./educad-strict.js'),
       require('./educad-curve-reconstruct.js'), require('./educad-oblique-kernel.js'),function() {return require('./educad-project.js');},
       require('./educad-surfaces.js'), require('./educad-parametric.js'), require('./educad-parametric-reconstruct.js'),
-      require('./educad-surface-infer.js'), require('./educad-conic.js'));
+      require('./educad-surface-infer.js'), require('./educad-conic.js'), require('./educad-view-frame.js'), require('./educad-drawing-sections.js'));
   } else {
     root.EduCADReconstruct = factory(root.EduCADEntities, root.EduCADStrict,
       root.EduCADCurveReconstruct, root.EduCADObliqueKernel,function() {return root.EduCADProject;},
       root.EduCADSurfaces, root.EduCADParametric, root.EduCADParametricReconstruct, root.EduCADSurfaceInfer,
-      root.EduCADConic);
+      root.EduCADConic, root.EduCADViewFrame, root.EduCADDrawingSections);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function (Entities, Strict, Curves, Oblique, getProject, Surfaces, Parametric, ParametricReconstruct, SurfaceInfer, Conic) {
+})(typeof window !== 'undefined' ? window : globalThis, function (Entities, Strict, Curves, Oblique, getProject, Surfaces, Parametric, ParametricReconstruct, SurfaceInfer, Conic, ViewFrame, DrawingSections) {
   'use strict';
 
 
@@ -2625,6 +2625,7 @@
       if (p.viewRole === 'ELEVATION') return 'elev';
       if (p.viewRole === 'PLAN') return 'plan';
       if (p.viewRole === 'PROFILE') return 'profile';
+      if (p.viewRole === 'AUX') return '';
       if (p.y > 0) return 'elev';
       if (p.y < 0) return 'plan';
       return '';
@@ -2810,7 +2811,7 @@
     var needed=new Set(list.filter(function(e){return e.type!=='CURVE'&&e.type!=='POINT';}).flatMap(function(e){return (e.meta||{}).refs||[];}));
     var rest=list.filter(function(e){return e.type!=='CURVE'&&!(e.type==='POINT'&&refs.has(e.id)&&!needed.has(e.id));});
     var hasRest=rest.some(function(e){return ['POINT','SEGMENT','LINE','RAY','CIRCLE','CIRCULAR_ARC'].indexOf(e.type)!==-1;});
-    var base=hasRest?reconstruct(rest,opts):{geometry:null,issues:[]};
+    var base=hasRest?reconstructCore(rest,opts):{geometry:null,issues:[]};
     if(base.determination==='inconsistent')return base;
     var lifted=ParametricReconstruct.reconstruct(normalized,resolved.profile);
     var diagnostics=((base.pipeline||{}).diagnostics||base.issues||[]).concat(lifted.issues);
@@ -2827,6 +2828,13 @@
         for(var i=0;i<samples.length-(c.closed?0:1);i++) {c.displayEdges.push(g.edges.length);g.edges.push([offset+i,offset+(i+1)%samples.length]);}
         g.curves.push(c);
       });
+      g.surfacePatches = g.surfacePatches || [];
+      g.smoothSideFaces = g.smoothSideFaces || [];
+      var patches = ParametricReconstruct.inferPatches(g, normalized);
+      diagnostics = diagnostics.filter(function (issue) {
+        return !patches.sourceIds.has(issue.entityId) ||
+          ['curve-surface-unresolved','curve-surface-missing','unresolved-edge'].indexOf(issue.code) === -1;
+      }).concat(patches.diagnostics);
       g.profileMap=resolved.profile;g.topologyStatus=diagnostics.length?'partial':'inferred';
       var model=Surfaces.build(g);g.surfaces=model.surfaces;g.surfaceModel=model.summary;
       applyDisplaySync(g,model);
@@ -2835,10 +2843,11 @@
       else{g.analyticSurfaceValidation=Surfaces.validate(model,g);g.analyticCertificate=Surfaces.certify(model,g);
         g.surfaceModel.status=g.analyticSurfaceValidation.status;}
     }
-    return mergeDisplaySyncResult({status:g?'ok':'unavailable',reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
+    var parametricResult = mergeDisplaySyncResult({status:g?'ok':'unavailable',reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
       label:diagnostics.length?diagnostics[0].message:'Parametric curves reconstructed',geometry:g,
       determination:diagnostics.length?'partial':'inferred',issues:diagnostics,
       pipeline:{version:1,input:'vertices-edges-curves',identity:declared?'explicit':'inferred',stage:'surface-inference',diagnostics:diagnostics}});
+    return parametricResult;
   }
 
   function applyDisplaySync(geometry, model) {
@@ -2864,6 +2873,41 @@
       })) list.push(diagnostic);
     });
     return list;
+  }
+
+  function attachDrawingSections(result, rows, opts) {
+    if (!result || !result.geometry || !DrawingSections || !DrawingSections.analyze) return result;
+    if (result.geometry.sections) return result;
+    var model = null;
+    try {
+      model = DrawingSections.analyze(result.geometry, rows, {
+        profile: result.geometry.profileMap,
+        acceptAnalyticBoundary: !!(opts && opts.acceptAnalyticBoundary === true)
+      });
+    } catch (err) {
+      model = {contract:'drawing-sections-v1', status:'unresolved', evidence:[], queries:[],
+        retained:[], diagnostics:[{code:'section-analysis-failed', severity:'warning',
+          message:'Drawing sections could not be analysed: ' + (err && err.message || err)}],
+        summary:{planes:0, queries:0, retained:0, unresolved:0}};
+    }
+    if (!model || model.status === 'none') return result;
+    result.geometry.sections = model;
+    var issues = Array.isArray(result.issues) ? result.issues.slice() : [];
+    (model.diagnostics || []).forEach(function (diagnostic) {
+      if (!issues.some(function (existing) {
+        return existing && existing.code === diagnostic.code &&
+          existing.entityId === diagnostic.entityId &&
+          existing.surfaceId === diagnostic.surfaceId;
+      })) issues.push(diagnostic);
+    });
+    result.issues = issues;
+    if (result.pipeline) result.pipeline.diagnostics = issues.slice();
+    if (issues.length && result.determination !== 'inconsistent') {
+      result.determination = 'partial';
+      result.geometry.topologyStatus = 'partial';
+      if (!result.label) result.label = 'Partial 3D preview: ' + issues[0].message;
+    }
+    return result;
   }
 
   function mergeDisplaySyncResult(result) {
@@ -2918,7 +2962,7 @@
   function isConicSource(e) {
     return !!(e && e.meta && e.meta.ellipse);
   }
-  function reconstruct(entities, opts) {
+  function reconstructCore(entities, opts) {
     opts = opts || {};
     var list = Array.isArray(entities) ? entities.filter(Boolean).map(function(e) {
       return Object.assign({}, e, { visible: true });
@@ -2932,6 +2976,9 @@
       return Curves.isCurve(e) && meta.reconstructionRole !== 'construction' && !DROP_META[meta.kind];
     });
     var resolvedFrame = Curves.resolveProfileFrame(list,opts), frame=resolvedFrame.profile;
+    var frameRegistry = ViewFrame ? ViewFrame.resolve(list,opts) : null;
+    var hasAux = !!(frameRegistry && frameRegistry.hasAux);
+    var auxEntities = list.some(function (e) { return e && e.viewRole === 'AUX'; });
     var normalized = autoMembersForStrict(list, frame);
 
 
@@ -2958,8 +3005,9 @@
       });
     }
     var profileBridge = !declared && frame && !resolvedFrame.inferred && hasNamedProfileStations();
+    var auxBridge = !declared && auxEntities;
     function strictComponent(rows) {
-      var result=reconstructStrict(rows,opts);
+      var result=reconstructStrict(rows,opts,frameRegistry);
       if(result.geometry&&frame)result.geometry.profileMap=frame;
       return result;
     }
@@ -3025,9 +3073,12 @@
       }).filter(function(e) {return kept.has(e.id);});
     }
     function straightComponent(rows) {
-      if(declared) {
+      if(declared || auxBridge || rows.some(function (row) {
+        return row.type === 'DIMENSION' && row.meta && row.meta.dimensionAxis;
+      })) {
         var strict=strictComponent(rows);
         if(strict.geometry||strict.determination!=='underdetermined') return strict;
+        if(!declared) return strict;
         var subset=resolvedSubset(rows);
         if(subset.length) {
           var part=strictComponent(subset);
@@ -3098,11 +3149,15 @@
         return projector.pointHidden(occluder,point,view);
       };
     }
-    var conic = Conic && Conic.lift ? Conic.lift(normalized,
+    var toroidal = Curves.inferToroidalSurfaces(curveInk.length ? normalized : [], frame);
+    var curveRows = toroidal.consumedIds.size ? normalized.filter(function (e) {
+      return !toroidal.consumedIds.has(e.id);
+    }) : normalized;
+    var conic = Conic && Conic.lift ? Conic.lift(curveRows,
       {profile:frame,visibilityProvider:visibilityProvider}) :
       {curves:[],consumedIds:[],pointIds:[],issues:[],groups:[],usedGroups:[]};
     var conicIssues = (conic.issues || []).slice();
-    var lineLift = Conic && Conic.liftLine ? Conic.liftLine(normalized,
+    var lineLift = Conic && Conic.liftLine ? Conic.liftLine(curveRows,
       {profile:frame,usedGroups:conic.usedGroups || []}) :
       {curves:[],consumedIds:[],issues:[],usedGroups:[],consideredGroups:[]};
     var lineConsidered = new Set(lineLift.consideredGroups || []), lineSegIds = new Set();
@@ -3124,7 +3179,7 @@
     var blockedSegments = new Set(exactGroupSegments);
     (lineLift.consumedIds || []).forEach(function(id) {blockedSegments.add(id);});
     var oblique = Oblique && Oblique.reconstruct ?
-      Oblique.reconstruct(normalized.filter(function(e) {return !blockedSegments.has(e.id);}),
+      Oblique.reconstruct(curveRows.filter(function(e) {return !blockedSegments.has(e.id);}),
         {profile:frame,visibilityProvider:visibilityProvider}) :
       {curves:[],consumedIds:[],issues:[]};
     if(resolvedFrame.issue && (oblique.curves.length || oblique.issues.length || analyticCurves.length))
@@ -3277,6 +3332,31 @@
       return g;
     }
     function finish(result, stage, diagnostics) {
+      if (hasAux && ViewFrame) {
+        var auditGeometry = result.geometry || (result.frameEvidence && result.frameEvidence.length ?
+          { vertices: [], vertexIds: [], frameEvidence: result.frameEvidence } : null);
+        var frameAudit = ViewFrame.audit(list, auditGeometry, frameRegistry);
+        if (result.geometry) {
+          result.geometry.viewFrames = frameRegistry.serialize();
+          result.geometry.frameAudit = frameAudit;
+        }
+        (frameRegistry.issues || []).forEach(function (issue) {
+          if (!frameAudit.issues.some(function (d) { return d.code === issue.code && d.entityId === issue.entityId; }))
+            frameAudit.issues.push(issue);
+        });
+        if (frameAudit.issues.length) frameAudit.status = 'issues';
+        var frameIssues = (frameRegistry.issues || []).concat(frameAudit.issues || []);
+        result.issues = (result.issues || []).slice();
+        frameIssues.forEach(function (issue) {
+          if (!result.issues.some(function (d) { return d.code === issue.code && d.entityId === issue.entityId; }))
+            result.issues.push(issue);
+        });
+        if (frameAudit.status === 'issues' && ['inferred', 'determined'].indexOf(result.determination) !== -1)
+          result.determination = 'partial';
+        result.frameAudit = frameAudit;
+        result.viewFrames = frameRegistry.serialize();
+        diagnostics = (result.issues || []).slice();
+      }
       result.pipeline = { version: 1, input: 'vertices-edges-curves', identity: declared ? 'explicit' : 'inferred',
         stage: stage, diagnostics: (diagnostics || result.issues || []).slice() };
       mergeDisplaySyncResult(result);
@@ -3294,6 +3374,7 @@
       return list.filter(function(e) {
         var m=e.meta || {};
         if(e.type!=='POINT' || exempt && exempt.has(e.id) || m.reconstructionRole==='construction' || DROP_META[m.kind]) return false;
+        if(e.viewRole==='AUX') return false;
         if(e.viewRole!=='PLAN' && e.viewRole!=='ELEVATION' && e.viewRole!=='PROFILE') return false;
         if(e.viewRole==='PROFILE' && !profile) return false;
         return !g.vertices.some(function(v) {
@@ -3302,7 +3383,270 @@
         });
       }).map(function(e) {return {code:'point-correspondence-missing',entityId:e.id,message:'This point has no reconstructed correspondence; add or link its observation in another view.'};});
     }
-    if (topology) return finish(reconstructStrict(list,opts), 'declared-topology');
+    var SILHOUETTE_STROKE_TOL = 0.05;
+    function silhouetteStrokeEvidence(g, rows, usedSet) {
+      if (!g || !Surfaces || !Surfaces.build || !Surfaces.silhouettes) return [];
+      function eligiblePatch(patch) {
+        return !!(patch && (patch.kind === 'cylinder' || patch.kind === 'cone') &&
+          !patch.recess && !patch.recessMouth && !patch.throughOpening &&
+          !patch.recessBottom && !patch.approximateTrim && !patch.displayOnlyBoundary &&
+          patch.booleanDomain === undefined && patch.volumeIndex === undefined);
+      }
+      if (!(g.surfacePatches || []).some(eligiblePatch)) return [];
+      var byId = Object.create(null);
+      rows.forEach(function(e) { if (e && typeof e.id === 'string') byId[e.id] = e; });
+      function declaredStroke(e) {
+        var m = e.meta || {};
+        if (Array.isArray(m.endpointMemberIds) &&
+            m.endpointMemberIds.some(function(id) {
+              return id !== null && id !== undefined && id !== '';
+            })) return true;
+        if (Array.isArray(m.endpointMembers) &&
+            m.endpointMembers.some(function(id) {return id !== null && id !== undefined && id !== '';})) return true;
+        var refs = m.endpointRefs || m.refs || [];
+        return refs.some(function(id) {
+          var point = byId[id];
+          return !!(point && point.meta && point.meta.membersDeclared === true);
+        });
+      }
+      var byRole = {PLAN:[], ELEVATION:[], PROFILE:[]};
+      rows.forEach(function(e) {
+        if (e.type !== 'SEGMENT' || usedSet.has(e.id)) return;
+        var m = e.meta || {};
+        if (m.reconstructionRole === 'construction' || DROP_META[m.kind]) return;
+        if (['G','H','K'].indexOf(e.bisCode) !== -1) return;
+        if (!Object.prototype.hasOwnProperty.call(byRole,e.viewRole)) return;
+        if (e.viewRole === 'PROFILE' && !frame) return;
+        if (declaredStroke(e)) return;
+        var dx = e.x2-e.x, dy = e.y2-e.y;
+        if (![e.x,e.y,dx,dy].every(Number.isFinite) || Math.hypot(dx,dy) <= 1e-9) return;
+        byRole[e.viewRole].push(e);
+      });
+      var roles = Object.keys(byRole).filter(function(role) {return byRole[role].length;});
+      if (!roles.length) return [];
+      var model = Surfaces.build(g,{cavityTrims:false});
+      if (!model || !model.surfaces.length) return [];
+      var surfaceById = new Map();
+      model.surfaces.forEach(function(s) {
+        if (!s || (s.kind !== 'cylinder' && s.kind !== 'cone')) return;
+        if (s.closed === true || !Array.isArray(s.loops) || !s.loops.length) return;
+        if (s.recess || s.recessMouth || s.throughOpening || s.volumeIndex !== undefined ||
+            s.unionGroup !== undefined || s.memberRole || s.approximateBoundary ||
+            s.displayOnlyBoundary || s.booleanDomain !== undefined) return;
+        var patch = (g.surfacePatches || [])[s.patchIndex];
+        if (!eligiblePatch(patch)) return;
+        var finite = function(p) {
+          return !!p && [p.x,p.y,p.z].every(Number.isFinite);
+        };
+        if (s.kind === 'cylinder') {
+          if (!finite(s.origin) || !finite(s.axis) || !(s.radius > 0)) return;
+        } else if (!finite(s.axis) || !(s.halfAngle > 0) ||
+            !(s.halfAngle < Math.PI/2) || !finite(s.apex || s.origin)) return;
+        surfaceById.set(s.id, s);
+      });
+      var supported = Array.from(surfaceById.values());
+      if (!supported.length) return [];
+      function project(p,role) {
+        if (!p) return null;
+        if (role === 'PLAN') return {x:p.x, y:-p.z};
+        if (role === 'ELEVATION') return {x:p.x, y:p.y};
+        if (role === 'PROFILE' && frame)
+          return {x:frame.xRef + frame.s*(p.z-frame.dRef), y:p.y};
+        return null;
+      }
+      function viewName(role) {
+        if (role === 'PLAN') return 'top';
+        if (role === 'ELEVATION') return 'front';
+        return frame.s < 0 ? 'left' : 'right';
+      }
+      var accepted = [];
+      roles.forEach(function(role) {
+        var result = Surfaces.silhouettes({surfaces:supported},viewName(role),g);
+        var groups = new Map();
+        (result.curves || []).forEach(function(c) {
+          if (c.kind !== 'line' || !c.start || !c.end) return;
+          var surface = surfaceById.get(c.surfaceId);
+          if (!surface) return;
+          var a = project(c.start,role), b = project(c.end,role);
+          if (!a || !b) return;
+          var dx = b.x-a.x, dy = b.y-a.y, len = Math.hypot(dx,dy);
+          if (!(len > 1e-9)) return;
+          if (!groups.has(surface.id)) groups.set(surface.id,[]);
+          groups.get(surface.id).push({surface:surface, a:a, b:b, curve:c});
+        });
+        if (!groups.size) return;
+        byRole[role].forEach(function(e) {
+          var dx = e.x2-e.x, dy = e.y2-e.y, len = Math.hypot(dx,dy);
+          if (!(len > 1e-9)) return;
+          var tol = Math.min(SILHOUETTE_STROKE_TOL, Math.max(1e-6, len * 0.01));
+          var ux = dx/len, uy = dy/len, matches = [];
+          groups.forEach(function(lines) {
+            var spans = [];
+            lines.forEach(function(line) {
+              var d1 = Math.abs((line.a.x-e.x)*uy-(line.a.y-e.y)*ux);
+              var d2 = Math.abs((line.b.x-e.x)*uy-(line.b.y-e.y)*ux);
+              if (d1 > SILHOUETTE_STROKE_TOL || d2 > SILHOUETTE_STROKE_TOL) return;
+              var t1 = (line.a.x-e.x)*ux + (line.a.y-e.y)*uy;
+              var t2 = (line.b.x-e.x)*ux + (line.b.y-e.y)*uy;
+              var sa = Math.min(t1,t2), sb = Math.max(t1,t2);
+              if (sb < -tol || sa > len + tol) return;
+              spans.push({line:line, a:sa, b:sb});
+            });
+            if (!spans.length) return;
+            spans.sort(function(a,b) {return a.a-b.a;});
+            if (spans[0].a > tol) return;
+            var reach = spans[0].b, usedSpans = [spans[0]];
+            for (var i=1;i<spans.length;i++) {
+              if (spans[i].a > reach + tol) break;
+              reach = Math.max(reach,spans[i].b);
+              usedSpans.push(spans[i]);
+            }
+            if (reach < len - tol) return;
+            matches.push({surface:lines[0].surface, spans:usedSpans});
+          });
+          if (matches.length !== 1) return;
+          var match = matches[0];
+          var evidence = {
+            entityId:e.id,
+            evidence:'analytic-silhouette',
+            evidenceKind:'silhouette',
+            viewRole:role,
+            patchIndex:match.surface.patchIndex,
+            surfaceId:match.surface.id,
+            surfaceKind:match.surface.kind,
+            sourceIds:(match.surface.sourceIds || []).slice(),
+            bounded:true,
+            physicalEdge:false,
+            certified:false,
+            viewStart:{x:e.x,y:e.y},
+            viewEnd:{x:e.x2,y:e.y2},
+            surface:match.surface.kind === 'cylinder' ?
+              {kind:'cylinder',origin:match.surface.origin,axis:match.surface.axis,
+                radius:match.surface.radius} :
+              {kind:'cone',apex:match.surface.apex || match.surface.origin,
+                axis:match.surface.axis,halfAngle:match.surface.halfAngle},
+            silhouetteSegments:match.spans.map(function(span) {
+              return {start:span.line.curve.start, end:span.line.curve.end};
+            })
+          };
+          accepted.push(evidence);
+        });
+      });
+      return accepted;
+    }
+    var JUNCTION_STROKE_TOL = 0.05;
+    function crossingCylinderJunctionEvidence(g, rows, usedSet) {
+      if (!g || !Surfaces || !Surfaces.build ||
+          !Surfaces.crossingCylinderCandidates || !Surfaces.point) return [];
+      var model = Surfaces.build(g,{cavityTrims:false});
+      var candidates = Surfaces.crossingCylinderCandidates(model,g);
+      if (!candidates.length) return [];
+      var byRole = {PLAN:[], ELEVATION:[]};
+      rows.forEach(function(e) {
+        if (e.type !== 'SEGMENT' || usedSet.has(e.id)) return;
+        var m = e.meta || {};
+        if (m.reconstructionRole === 'construction' || DROP_META[m.kind]) return;
+        if (e.bisCode === 'E' || e.hidden === true) return;
+        if (['G','H','K'].indexOf(e.bisCode) !== -1) return;
+        if (!Object.prototype.hasOwnProperty.call(byRole,e.viewRole)) return;
+        var dx = e.x2-e.x, dy = e.y2-e.y;
+        if (![e.x,e.y,dx,dy].every(Number.isFinite) || Math.hypot(dx,dy) <= 1e-9) return;
+        byRole[e.viewRole].push(e);
+      });
+      if (!byRole.PLAN.length && !byRole.ELEVATION.length) return [];
+      function projected(p, role) {
+        if (!p) return null;
+        if (role === 'PLAN') return {x:p.x, y:-p.z};
+        if (role === 'ELEVATION') return {x:p.x, y:p.y};
+        return null;
+      }
+      function segmentDistance(p, e) {
+        var dx = e.x2-e.x, dy = e.y2-e.y, len2 = dx*dx+dy*dy;
+        if (!(len2 > 1e-18)) return Math.hypot(p.x-e.x,p.y-e.y);
+        var t = ((p.x-e.x)*dx + (p.y-e.y)*dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(p.x-(e.x+t*dx), p.y-(e.y+t*dy));
+      }
+      function polylineDistance(p, points) {
+        var best = Infinity;
+        for (var i = 0; i < points.length; i++) {
+          var a = points[i], b = points[(i + 1) % points.length];
+          var dx = b.x-a.x, dy = b.y-a.y, len2 = dx*dx+dy*dy;
+          var t = len2 > 1e-18 ?
+            ((p.x-a.x)*dx + (p.y-a.y)*dy) / len2 : 0;
+          t = Math.max(0, Math.min(1, t));
+          best = Math.min(best, Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy)));
+        }
+        return best;
+      }
+      var accepted = [];
+      candidates.forEach(function(candidate) {
+        var views = [], matched = new Set();
+        var tolerance = JUNCTION_STROKE_TOL;
+        function alignedView(role) {
+          var direction = role === 'PLAN' ? {x:0,y:1,z:0} :
+            role === 'ELEVATION' ? {x:0,y:0,z:1} : null;
+          if (!direction) return true;
+          var axes = [candidate.curve.v, candidate.curve.direction];
+          return axes.some(function (axis) {
+            if (!axis) return false;
+            var lengthAxis = Math.hypot(axis.x, axis.y, axis.z);
+            if (!(lengthAxis > 0)) return false;
+            return Math.abs((axis.x*direction.x + axis.y*direction.y +
+              axis.z*direction.z) / lengthAxis) > 1 - 1e-7;
+          });
+        }
+        ['PLAN','ELEVATION'].forEach(function(role) {
+          if (alignedView(role)) return;
+          var strokes = byRole[role];
+          if (!strokes.length) return;
+          var seamPoints = [];
+          for (var s = 0; s < 256; s++) {
+            var seamPoint = Surfaces.point(candidate.curve, 2 * Math.PI * s / 256);
+            var seamView = projected(seamPoint, role);
+            if (seamView) seamPoints.push(seamView);
+          }
+          if (seamPoints.length < 3) return;
+          var valid = strokes.filter(function(e) {
+            for (var k = 0; k <= 4; k++) {
+              var t = k / 4;
+              var p = {x:e.x+(e.x2-e.x)*t, y:e.y+(e.y2-e.y)*t};
+              if (polylineDistance(p, seamPoints) > tolerance) return false;
+            }
+            return true;
+          });
+          if (!valid.length) return;
+          var total = 128, covered = 0;
+          for (var i = 0; i < total; i++) {
+            var p = Surfaces.point(candidate.curve, 2 * Math.PI * i / total);
+            var q = projected(p, role);
+            if (!q) continue;
+            var bestDistance = Infinity;
+            valid.forEach(function(e) {
+              bestDistance = Math.min(bestDistance, segmentDistance(q, e));
+            });
+            if (bestDistance <= JUNCTION_STROKE_TOL) covered++;
+          }
+          if (covered / total < 0.95) return;
+          views.push(role);
+          valid.forEach(function(e) {matched.add(e.id);});
+        });
+        if (!views.length) return;
+        var strokeIds = Array.from(matched).sort();
+        accepted.push({contract:'analytic-solid-junction-evidence-v1',
+          largerPatch:candidate.largerPatch, smallerPatch:candidate.smallerPatch,
+          largerSurfaceId:candidate.largerSurfaceId,
+          smallerSurfaceId:candidate.smallerSurfaceId,
+          largerCapCurves:candidate.largerCapCurves.slice(),
+          smallerMouthCurve:candidate.smallerMouthCurve,
+          smallerBuriedCurve:candidate.smallerBuriedCurve,
+          curve:candidate.curve,
+          sourceIds:Array.from(new Set(candidate.sourceIds.concat(strokeIds))),
+          views:views, strokeIds:strokeIds});
+      });
+      return accepted;
+    }
+    if (topology) return finish(reconstructStrict(list,opts,frameRegistry), 'declared-topology');
     if (!curveInk.length && !oblique.curves.length && !analyticCurves.length) {
       var straight = straightComponent(list);
       var missing=unmatchedPoints(straight.geometry).concat(oblique.issues, analyticIssues);
@@ -3325,7 +3669,8 @@
       var check = Strict.reconstruct(normalized.filter(function(e) { return !Curves.isCurve(e) && !isConicSource(e); }),opts);
       if (check.determination === 'inconsistent') return finish(check,'correspondence',check.issues || []);
     }
-    var lifted = curveInk.length ? Curves.reconstruct(normalized,opts) : {geometry:null,issues:[],consumedIds:[]};
+    var lifted = curveInk.length ? Curves.reconstruct(normalized,
+      Object.assign({}, opts, {toroidal:toroidal})) : {geometry:null,issues:[],consumedIds:[]};
     var geometry = lifted.geometry;
     var diagnostics = lifted.issues.filter(function(d) {return !d.entityId || !obliqueIds.has(d.entityId);})
       .concat(oblique.issues, analyticIssues);
@@ -3379,6 +3724,34 @@
           ['unresolved-edge','curve-inclined-arc-unsupported'].indexOf(d.code) !== -1);
       });
       diagnostics = diagnostics.concat(inferredSurfaces.issues || []);
+    }
+    var silhouetteMatch = silhouetteStrokeEvidence(geometry,list,used);
+    if (silhouetteMatch.length) {
+      var silhouetteIds = new Set();
+      silhouetteMatch.forEach(function(evidence) {
+        used.add(evidence.entityId);
+        silhouetteIds.add(evidence.entityId);
+      });
+      diagnostics = diagnostics.filter(function(d) {
+        return !(d.code === 'unresolved-edge' && silhouetteIds.has(d.entityId));
+      });
+      geometry.silhouetteEvidence = (geometry.silhouetteEvidence || [])
+        .concat(silhouetteMatch);
+    }
+    var crossingEvidence = crossingCylinderJunctionEvidence(geometry,list,used);
+    if (crossingEvidence.length) {
+      var crossingIds = new Set();
+      crossingEvidence.forEach(function(evidence) {
+        (evidence.strokeIds || []).forEach(function(id) {
+          used.add(id);
+          crossingIds.add(id);
+        });
+      });
+      diagnostics = diagnostics.filter(function(d) {
+        return !(d.code === 'unresolved-edge' && crossingIds.has(d.entityId));
+      });
+      geometry.cylinderJunctionEvidence = (geometry.cylinderJunctionEvidence || [])
+        .concat(crossingEvidence);
     }
     var consumedPoints = new Set((oblique.pointIds || []).concat(conic.pointIds || [],
       lineLift.pointIds || [])), neededPoints = new Set();
@@ -3487,6 +3860,31 @@
     var exitDiagnostics=finalizeThroughCavities(geometry);
     if(exitDiagnostics&&exitDiagnostics.length) diagnostics=diagnostics.concat(exitDiagnostics);
     attachSurfaceModel(geometry);
+    if (Array.isArray(geometry.silhouetteEvidence) && geometry.silhouetteEvidence.length) {
+      var finalSurfaceByPatch = new Map();
+      (geometry.surfaces || []).forEach(function(surface) {
+        if (!surface || (surface.kind !== 'cylinder' && surface.kind !== 'cone')) return;
+        if (Number.isInteger(surface.patchIndex)) finalSurfaceByPatch.set(surface.patchIndex,surface);
+      });
+      geometry.silhouetteEvidence.forEach(function(evidence) {
+        var surface = Number.isInteger(evidence.patchIndex) ?
+          finalSurfaceByPatch.get(evidence.patchIndex) : null;
+        if (!surface) return;
+        evidence.surfaceId = surface.id;
+        evidence.sourceIds = (surface.sourceIds || []).slice();
+      });
+    }
+    if (geometry.cylinderJunction && geometry.cylinderJunction.displayTrim === 'deferred' &&
+        geometry.cylinderJunction.displayDiagnostic) {
+      var displayDiagnostic = geometry.cylinderJunction.displayDiagnostic;
+      if (!diagnostics.some(function (d) {return d.code === displayDiagnostic.code;})) {
+        diagnostics.push({code:displayDiagnostic.code,
+          severity:displayDiagnostic.severity, message:displayDiagnostic.message,
+          sourceIds:(geometry.cylinderJunction.seams || []).reduce(function (ids, seam) {
+            return ids.concat(seam.sourceIds || []);
+          }, [])});
+      }
+    }
     if (opts.deferValidation) {
       geometry.surfaceValidation = {status:'pending', deferred:true};
     } else {
@@ -3499,7 +3897,85 @@
       'surface-inference',diagnostics);
   }
 
-  function reconstructStrict(entities, opts) {
+  function dimensionConstraintsModule() {
+    try {
+      if (typeof require === 'function' && typeof module !== 'undefined')
+        return require('./educad-constraints.js');
+    } catch (error) {}
+    if (typeof window !== 'undefined' && window.EduCADConstraints) return window.EduCADConstraints;
+    if (typeof globalThis !== 'undefined' && globalThis.EduCADConstraints) return globalThis.EduCADConstraints;
+    return null;
+  }
+
+  function postProcessDimensions(result, entities, opts) {
+    if (!result || !Array.isArray(entities)) return result;
+    if (opts && opts.dimensionConstraints === false) return result;
+    if (!entities.some(function (entity) { return entity && entity.type === 'DIMENSION'; }))
+      return result;
+    var ConstraintModule = dimensionConstraintsModule();
+    if (!ConstraintModule || typeof ConstraintModule.analyzeDimensions !== 'function')
+      return result;
+    var profileFrame = result.geometry && result.geometry.profileMap ? result.geometry.profileMap : null;
+    var report = ConstraintModule.analyzeDimensions(entities, {
+      profileFrame:profileFrame,
+      axisEvidence:result.dimensionAxes,
+      toleranceMm:opts && opts.dimensionToleranceMm
+    });
+    result.dimensionConstraints = report;
+    var diagnostics = Array.isArray(report.diagnostics) ? report.diagnostics : [];
+    if (!diagnostics.length) return result;
+    function keyOf(diagnostic) {
+      return [diagnostic.code || '', diagnostic.entityId || '', diagnostic.message || ''].join('|');
+    }
+    var issues = Array.isArray(result.issues) ? result.issues.slice() : [];
+    var seen = Object.create(null);
+    issues.forEach(function (issue) { seen[keyOf(issue)] = true; });
+    diagnostics.forEach(function (diagnostic) {
+      var key = keyOf(diagnostic);
+      if (!seen[key]) { seen[key] = true; issues.push(diagnostic); }
+    });
+    result.issues = issues;
+    if (result.pipeline) {
+      var pipelineDiagnostics = Array.isArray(result.pipeline.diagnostics) ?
+        result.pipeline.diagnostics.slice() : [];
+      var pipelineSeen = Object.create(null);
+      pipelineDiagnostics.forEach(function (diagnostic) { pipelineSeen[keyOf(diagnostic)] = true; });
+      diagnostics.forEach(function (diagnostic) {
+        var key = keyOf(diagnostic);
+        if (!pipelineSeen[key]) { pipelineSeen[key] = true; pipelineDiagnostics.push(diagnostic); }
+      });
+      result.pipeline.diagnostics = pipelineDiagnostics;
+    }
+    if (report.status === 'inconsistent') {
+      var hardCodes = ['dimension-residual','dimension-target-conflict',
+        'dimension-axis-conflict','dimension-degenerate','dimension-target-invalid'];
+      var first = diagnostics.filter(function (diagnostic) {
+        return typeof ConstraintModule.isHardDiagnostic === 'function' ?
+          ConstraintModule.isHardDiagnostic(diagnostic) :
+          hardCodes.indexOf(diagnostic.code) !== -1;
+      })[0] || diagnostics[0];
+      result.determination = 'inconsistent';
+      result.status = 'unavailable';
+      result.reason = first.code;
+      result.label = first.message;
+    } else if (result.determination !== 'inconsistent') {
+      result.determination = 'partial';
+      if (result.status === 'ok' && !result.label)
+        result.label = 'Partial 3D preview: ' + diagnostics[0].message;
+    }
+    return result;
+  }
+
+  function reconstruct(entities, opts) {
+    var primitives = Array.isArray(entities) ? entities.filter(function (entity) {
+      var meta = entity && entity.meta;
+      return !meta || !meta.section && !meta.sectionBoundary && meta.kind !== 'section-boundary-point';
+    }) : entities;
+    var result = attachDrawingSections(reconstructCore(primitives, opts), entities, opts);
+    return postProcessDimensions(result, entities, opts);
+  }
+
+  function reconstructStrict(entities, opts, frames) {
     if (!Strict) throw new Error('Load educad-strict.js before educad-reconstruct.js for explicit reconstruction.');
 
 
@@ -3508,7 +3984,8 @@
       Curves.resolveProfileFrame(entities, opts || {}) : null;
     var profileFrame = resolvedFrame && resolvedFrame.profile && !resolvedFrame.inferred ? resolvedFrame.profile : null;
     var strictRows = Array.isArray(entities) ? entities.filter(function(e) {return !isConicSource(e);}) : entities;
-    var result = Strict.reconstruct(autoMembersForStrict(strictRows, profileFrame), opts);
+    var strictOptions = Object.assign({}, opts || {}, { frames: frames || null });
+    var result = Strict.reconstruct(autoMembersForStrict(strictRows, profileFrame), strictOptions);
     var declaredTopology = opts && opts.topology || Array.isArray(entities) && entities.some(function(e) {
       return e && e.meta && e.meta.reconstructionTopology;
     });
@@ -4319,6 +4796,7 @@
     reconstruct: reconstruct,
     reconstructStrict: reconstructStrict,
     reconstructLive: reconstructLive,
+    attachDrawingSections: attachDrawingSections,
     mergeDisplaySyncResult: mergeDisplaySyncResult,
     validateSurfaces: validateSurfaces
   };

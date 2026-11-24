@@ -24,7 +24,13 @@
   var BTN_CLASS = 'edugraphics-btn';
   var MENU_CLASS = 'edugraphics-menu';
   var MENU_ITEM_CLASS = 'edugraphics-menu-item';
-  var BUTTON_LABELS = { 'zoom-in': '+', 'zoom-out': '-', 'zoom-home': 'Home' };
+  var BUTTON_LABELS = { 'zoom-in': '+', 'zoom-out': '-', 'zoom-home': 'Reset view' };
+  var BUTTON_NAMES = { 'zoom-in': 'Zoom in', 'zoom-out': 'Zoom out', 'zoom-home': 'Reset view' };
+  var BUTTON_TITLES = {
+    'zoom-in': 'Zoom in',
+    'zoom-out': 'Zoom out',
+    'zoom-home': 'Reset view to default zoom and center'
+  };
   var MENU_LABELS = { plain: 'Plain (No Mesh)', mesh: 'Box Mesh' };
 
 
@@ -143,11 +149,16 @@
     container.appendChild(c1);
     container.appendChild(c2);
     var hud = mk('div', HUD_CLASS);
+    hud.setAttribute('role', 'group');
+    hud.setAttribute('aria-label', 'View controls');
     var btnMap = {};
     for (var i = 0; i < BUTTONS.length; i++) {
       var id = BUTTONS[i];
       var b = mk('button', BTN_CLASS);
+      b.setAttribute('type', 'button');
       b.setAttribute('data-btn', id);
+      b.setAttribute('aria-label', BUTTON_NAMES[id]);
+      b.title = BUTTON_TITLES[id];
       b.textContent = BUTTON_LABELS[id];
       hud.appendChild(b);
       btnMap[id] = b;

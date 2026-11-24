@@ -52,6 +52,64 @@
         mul(frame.v, Math.sin(angle) * volume.radius)));
   }
 
+  function perpendicularBoreJunction(a, b) {
+    if (![a, b].every(function (volume) {
+      return volume && volume.kind === 'cylinder' && !volume.through &&
+        finite(volume.origin) && finite(volume.axis) && len(volume.axis) > 1e-12 &&
+        Number.isFinite(volume.radius) && volume.radius > 0 &&
+        Number.isFinite(volume.depth) && volume.depth > 0;
+    })) return null;
+
+    var larger = a.radius > b.radius ? a : b;
+    var smaller = larger === a ? b : a;
+    var tolerance = 1e-9 * extentOf([larger, smaller]);
+    if (larger.radius - smaller.radius <= tolerance) return null;
+
+    var largerAxis = unit(larger.axis), smallerAxis = unit(smaller.axis);
+    if (Math.abs(dot(largerAxis, smallerAxis)) > 1e-12) return null;
+    var outward = neg(smallerAxis);
+    var across = unit(cross(largerAxis, outward));
+    var betweenMouths = sub(smaller.origin, larger.origin);
+    if (Math.abs(dot(betweenMouths, across)) > tolerance) return null;
+
+    var largerStation = dot(betweenMouths, largerAxis);
+    var smallerStation = dot(betweenMouths, outward);
+    var radius = smaller.radius, otherRadius = larger.radius;
+    var smallerFloorOffset = smaller.depth - smallerStation;
+    var maxLargerStation = largerStation + radius;
+    var innerReach = Math.sqrt((otherRadius - radius) * (otherRadius + radius));
+    if (largerStation - radius <= tolerance ||
+        maxLargerStation > larger.depth + tolerance ||
+        smallerStation - otherRadius <= tolerance ||
+        Math.abs(smallerFloorOffset) >= innerReach - tolerance) return null;
+
+    var floorContact = Math.abs(maxLargerStation - larger.depth) <= tolerance;
+    return {
+      larger: larger.index,
+      smaller: smaller.index,
+      floorContact: floorContact,
+      curve: {
+        kind: 'cylinder-intersection',
+        origin: add(larger.origin, mul(largerAxis, largerStation)),
+        u: across,
+        v: largerAxis,
+        direction: outward,
+        radius: radius,
+        otherRadius: otherRadius,
+        startAngle: floorContact ? Math.PI / 2 : 0,
+        sweepAngle: TAU
+      }
+    };
+  }
+
+  function junctionPoint(curve, angle) {
+    var across = curve.radius * Math.cos(angle);
+    var axial = curve.radius * Math.sin(angle);
+    var along = Math.sqrt((curve.otherRadius - across) * (curve.otherRadius + across));
+    return add(add(curve.origin, mul(curve.u, across)),
+      add(mul(curve.v, axial), mul(curve.direction, along)));
+  }
+
   function bottomRadiusOf(volume) {
     return Number.isFinite(volume.bottomRadius) ? volume.bottomRadius : volume.radius;
   }
@@ -1462,6 +1520,8 @@
     support:support,
     relation:relation,
     contact:contactInfo,
+    perpendicularBoreJunction:perpendicularBoreJunction,
+    junctionPoint:junctionPoint,
     union:union,
     tolerance:volumeTolerance
   };

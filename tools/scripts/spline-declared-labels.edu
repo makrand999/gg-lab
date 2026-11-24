@@ -1,4 +1,4 @@
-# expect: parametricCurves=1 curveFit=ok curveReprojection=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=1
+# expect: parametricCurves=1 curveFit=ok curveReprojection=ok curveStationReprojection=ok curveEvidence=2 curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=1
 /datum -60 180
 /point a 0 -10 plan
 /point b 20 -30 plan

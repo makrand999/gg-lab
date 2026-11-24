@@ -124,5 +124,72 @@
     if(!n||p.some(function(q){return Math.abs(dot(sub(q,origin),n))>1e-6;}))return null;
     return {origin:origin,normal:n};
   }
-  return {point:point,domain:domain,validate:validate,transform:transform,interpolate:interpolate,throughCircle:throughCircle,tessellate:tessellate,plane:plane};
+  function unitPoint(curve, t) {
+    var range = domain(curve);
+    return point(curve, range[0] + t * (range[1] - range[0]));
+  }
+  function revolutionFrame(chart) {
+    var first = chart.first, second = chart.second, meridian = chart.meridian;
+    if (!first || !second || ![first, second].every(function (ring) {
+      return ring.kind === 'circle' && finite(ring.center) && finite(ring.u) && finite(ring.v) &&
+        Number.isFinite(ring.radius) && ring.radius > 0;
+    }) || !validate(meridian) || meridian.closed) return null;
+    var origin = first.center, offset = sub(second.center, origin), height = norm(offset);
+    if (height <= EPS) return null;
+    var axis = mul(offset, 1 / height), tolerance = 1e-6;
+    if ([first, second].some(function (ring) {
+      return Math.abs(dot(axis, ring.u)) > tolerance || Math.abs(dot(axis, ring.v)) > tolerance;
+    })) return null;
+    var start = unitPoint(meridian, chart.reverse ? 1 : 0);
+    var end = unitPoint(meridian, chart.reverse ? 0 : 1);
+    var radial = mul(sub(start, origin), 1 / first.radius);
+    if (Math.abs(dot(radial, axis)) > tolerance || Math.abs(norm(radial) - 1) > tolerance ||
+        norm(sub(end, add(second.center, mul(radial, second.radius)))) > tolerance) return null;
+    var last = -tolerance;
+    var controls = chart.reverse ? meridian.controlPoints.slice().reverse() : meridian.controlPoints;
+    var valid = controls.every(function (p) {
+      var delta = sub(p, origin), station = dot(delta, axis), radius = dot(delta, radial);
+      var okay = station >= last - tolerance && station <= height + tolerance &&
+        radius > tolerance && Math.abs(dot(delta, cross(axis, radial))) <= tolerance;
+      last = station;
+      return okay;
+    });
+    return valid ? {origin:origin, axis:axis, radial:radial} : null;
+  }
+  function validSurface(chart) {
+    if (chart && chart.kind === 'revolved-spline')
+      return typeof chart.reverse === 'boolean' && !!revolutionFrame(chart);
+    return !!chart && ['ruled-spline','translated-spline'].indexOf(chart.kind) !== -1 &&
+      validate(chart.first) && validate(chart.second) && !chart.first.closed && !chart.second.closed &&
+      typeof chart.reverse === 'boolean' && (chart.kind === 'ruled-spline' ||
+        validate(chart.rail) && !chart.rail.closed && typeof chart.railReverse === 'boolean');
+  }
+  function surfacePoint(chart, u, v) {
+    if (!chart || !Number.isFinite(u) || !Number.isFinite(v) ||
+        u < 0 || u > 1 || v < 0 || v > 1) return null;
+    if (chart.kind === 'revolved-spline') {
+      var frame = chart.frame || revolutionFrame(chart);
+      if (!frame) return null;
+      var delta = sub(unitPoint(chart.meridian, chart.reverse ? 1 - v : v), frame.origin);
+      var axial = dot(delta, frame.axis), radial = dot(delta, frame.radial), angle = TAU * u;
+      var direction = add(mul(frame.radial, Math.cos(angle)), mul(cross(frame.axis, frame.radial), Math.sin(angle)));
+      return add(frame.origin, add(mul(frame.axis, axial), mul(direction, radial)));
+    }
+    var a = unitPoint(chart.first, u);
+    if (chart.kind === 'translated-spline') {
+      var start = chart.railReverse ? 1 : 0, at = chart.railReverse ? 1 - v : v;
+      return add(a, sub(unitPoint(chart.rail, at), unitPoint(chart.rail, start)));
+    }
+    var b = unitPoint(chart.second, chart.reverse ? 1 - u : u);
+    return add(mul(a, 1 - v), mul(b, v));
+  }
+  function surfaceRails(chart) {
+    if (chart.kind !== 'translated-spline') return [];
+    var from = unitPoint(chart.first, 0), to = unitPoint(chart.first, 1);
+    return [chart.rail, transform(chart.rail, function (p) { return add(p, sub(to, from)); })];
+  }
+  return {point:point,domain:domain,validate:validate,transform:transform,interpolate:interpolate,
+    throughCircle:throughCircle,tessellate:tessellate,plane:plane,
+    validSurface:validSurface,surfacePoint:surfacePoint,surfaceRails:surfaceRails,
+    revolutionFrame:revolutionFrame};
 });

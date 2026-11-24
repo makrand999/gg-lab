@@ -342,9 +342,9 @@
       do: { op: 'note' } },
     { say: 'Elevation: a 35 x 70 mm rectangle. The curved surface projects to two straight generators, and the base edge is hidden ink.',
       do: { op: 'note' } },
-    { say: 'Profile: the same rectangle; its width equals the diameter. The profile outline is display ink, not extra edges.',
+    { say: 'The profile is a 35 × 70 mm rectangle. Its vertical sides are silhouettes of the curved surface.',
       do: { op: 'note' } },
-    { say: '3D uses the plan rim and elevation height. The profile stays as a construction view, so the model is the reconstructed cylinder.',
+    { say: 'The plan rim and elevation define the cylinder. The profile outline provides a third view to check its shape.',
       do: { op: 'note' } },
     { say: 'Press Check hidden, then inspect the curved 3D model in the panel.',
       do: { op: 'check' } }
@@ -357,11 +357,41 @@
       do: { op: 'note' } },
     { say: 'Elevation: the base edge and two slants rise to the apex s\' at 70 mm; the base edge is hidden ink.',
       do: { op: 'note' } },
-    { say: 'Profile: the same triangle from the side. Its apex sits over the centre and its base width is the diameter.',
+    { say: 'The profile is a triangle with its apex above the centre and its base as wide as the diameter.',
       do: { op: 'note' } },
-    { say: '3D uses the plan base circle and the elevation apex. The profile outline is display/construction ink.',
+    { say: 'The plan base and elevation apex define the cone. The profile outline provides a third view to check its shape.',
       do: { op: 'note' } },
     { say: 'Press Check hidden, then inspect the reconstructed cone in the 3D panel.',
+      do: { op: 'check' } }
+  ];
+
+  var THREE_VIEW_INCLINED_SCRIPT = [
+    { say: 'A complete three-view sheet for a 70 x 50 x 40 mm inclined block. Plan below, elevation above, profile right.',
+      do: { op: 'setup', sheet: 'INCLINED' } },
+    { say: 'Plan shows the 70 x 50 mm footprint. The crease at 45 mm and the shoulder break at 30 mm depth divide the incline from the flat 25 mm tread.',
+      do: { op: 'note' } },
+    { say: 'Elevation keeps the full 70 x 40 mm outline as the rear shoulder. The full-height face hides the slope from 34 mm to 18 mm over 45 mm and the 18 mm tread, so they are drawn dashed.',
+      do: { op: 'note' } },
+    { say: 'Profile shows the near-depth 34 mm edge, while the 18 mm tread and the ramp edges are dashed. The profile also carries depth.',
+      do: { op: 'note' } },
+    { say: 'The width is 70 mm, the depth 50 mm and the shoulder height 40 mm. The plan locates the 45 mm tread break and the 30 mm shoulder.',
+      do: { op: 'note' } },
+    { say: 'Press Check hidden, then orbit the 3D panel to inspect the inclined face, its 45 mm crease, and the flat 18 mm tread.',
+      do: { op: 'check' } }
+  ];
+
+  var THREE_VIEW_STEPPED_NOTCH_SCRIPT = [
+    { say: 'A complete three-view sheet for a 70 x 50 x 30 mm stepped notch block. Plan below, elevation above, profile right.',
+      do: { op: 'setup', sheet: 'STEPPED_NOTCH' } },
+    { say: 'Plan shows the 70 x 50 mm footprint. The L-shaped top steps down at 40 mm width and 20 mm depth, leaving a 30 x 20 mm terrace at 15 mm height.',
+      do: { op: 'note' } },
+    { say: 'Elevation keeps the outline 30 mm high across the full 70 mm width. The full-height face hides the 15 mm tread and the inner wall at 40 mm, so they are drawn dashed.',
+      do: { op: 'note' } },
+    { say: 'Profile shows the full-height left face, which masks the tread and step wall. Dashed lines carry the 15 mm floor and 20 mm wall behind the outline.',
+      do: { op: 'note' } },
+    { say: 'The width is 70 mm, the depth 50 mm and the height 30 mm, with a 15 mm terrace. Each view shows a different edge of the same notch.',
+      do: { op: 'note' } },
+    { say: 'Press Check hidden, then orbit the 3D panel to inspect the L-shaped top, the 15 mm tread, and the hidden step wall.',
       do: { op: 'check' } }
   ];
 
@@ -369,7 +399,9 @@
     'three-view-prism': THREE_VIEW_PRISM_SCRIPT,
     'three-view-pyramid': THREE_VIEW_PYRAMID_SCRIPT,
     'three-view-cylinder': THREE_VIEW_CYLINDER_SCRIPT,
-    'three-view-cone': THREE_VIEW_CONE_SCRIPT
+    'three-view-cone': THREE_VIEW_CONE_SCRIPT,
+    'three-view-stepped-notch': THREE_VIEW_STEPPED_NOTCH_SCRIPT,
+    'three-view-inclined-block': THREE_VIEW_INCLINED_SCRIPT
   };
 
   function validateScript(script) {

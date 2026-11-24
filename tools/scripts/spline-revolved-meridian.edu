@@ -1,0 +1,19 @@
+/datum -50 120
+/circle 30 -40 12 A plan
+/circle 30 -40 18 A plan
+/point p 18 10 elevation
+/point q 42 10 elevation
+/point r 12 50 elevation
+/point s 48 50 elevation
+/line p q A elevation
+/line r s A elevation
+/point a 42 -40 plan
+/point b 38 -40 plan
+/point c 48 -40 plan
+/point "a'" 42 10 elevation
+/point "b'" 38 30 elevation
+/point "c'" 48 50 elevation
+/curve-through a b c plan
+/curve-through "a'" "b'" "c'" elevation
+# expect: parametricCurves=1 curveReprojection=ok rawFaces=578 boundary=0 surfaces=3 surfaceKinds=parametric,plane surfaceShells=1 surfaceOpen=0 surfaceCertificate=ok surfaceCertificateIssues=none status=inferred unresolved=0 previewParity=ok surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"parametric-surface-point","surface":2,"u":0.25,"v":0.5,"expect":{"kind":"revolved-spline","point":{"x":30,"y":30,"z":32}}}

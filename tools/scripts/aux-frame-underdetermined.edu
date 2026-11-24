@@ -1,0 +1,7 @@
+# expect: auxFrames=1 auxFrameStatus=issues auxPointRank=2 auxPointConflicts=0 auxReprojection=issues auxUnresolved=1 auxDiagnostics=aux-point-underdetermined previewAux=none determination=underdetermined
+/datum -50 150
+/auxframe A1 0 0 0 0 1 0 1 0 0 100 0
+/point a 10 -6 plan
+/point a2 110 6 aux:A1
+/rename a a members
+/rename a2 a members

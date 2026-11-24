@@ -469,6 +469,129 @@
     return off<=sweep+tol || off>=TAU-tol;
   }
 
+  function inferToroidalSurfaces(entities, profile) {
+    var ink = entities.filter(function (e) {
+      return !helper(e) && e.bisCode !== 'E' && !e.hidden;
+    });
+    var circles = ink.filter(function (e) { return e.type === 'CIRCLE'; });
+    var arcs = ink.filter(function (e) { return e.type === 'CIRCULAR_ARC'; });
+    var frames = ['PLAN','ELEVATION','PROFILE'].map(function (role) {
+      return principalFrame(role, profile);
+    }).filter(Boolean);
+    var candidates = [];
+    circles.forEach(function (outer) {
+      var axial = frames.find(function (frame) { return frame.role === outer.viewRole; });
+      if (!axial) return;
+      circles.forEach(function (inner) {
+        if (inner.viewRole !== outer.viewRole || !near(inner.x, outer.x) ||
+            !near(inner.y, outer.y) || outer.radius - inner.radius <= EPS) return;
+        var major = (outer.radius + inner.radius) / 2;
+        var minor = (outer.radius - inner.radius) / 2;
+        var base = axial.to3D(outer.x, outer.y, 0);
+        frames.forEach(function (side) {
+          if (side === axial) return;
+          var sheetAxis = {x:dot(axial.normal, side.u), y:dot(axial.normal, side.v)};
+          var sheetRadial = {x:sheetAxis.y, y:-sheetAxis.x};
+          var sheetBase = side.project(base);
+          function local(p) {
+            var x = p.x - sheetBase.x, y = p.y - sheetBase.y;
+            return {x:x * sheetRadial.x + y * sheetRadial.y,
+              y:x * sheetAxis.x + y * sheetAxis.y};
+          }
+          function endArc(row, sign) {
+            if (row.viewRole !== side.role || !near(row.radius, minor)) return false;
+            var span = sheetArcSpan(row);
+            if (!near(span.sweep, Math.PI)) return false;
+            var center = local(row);
+            if (!near(center.x, sign * major)) return false;
+            var middle = span.start + Math.PI / 2;
+            var midpoint = local({x:row.x + minor * Math.cos(middle),
+              y:row.y + minor * Math.sin(middle)});
+            return near(midpoint.x, sign * (major + minor)) && near(midpoint.y, center.y);
+          }
+          function tangentIds(y) {
+            var intervals = [];
+            ink.forEach(function (row) {
+              if (row.type !== 'SEGMENT' || row.viewRole !== side.role) return;
+              var a = local(row), b = local({x:row.x2,y:row.y2});
+              if (!near(a.y, y) || !near(b.y, y)) return;
+              var start = Math.min(a.x, b.x), end = Math.max(a.x, b.x);
+              if (start < -major - EPS || end > major + EPS || end - start <= EPS) return;
+              intervals.push({start:start, end:end, id:row.id});
+            });
+            intervals.sort(function (a, b) { return a.start - b.start; });
+            var reach = -major, ids = [];
+            intervals.forEach(function (interval) {
+              if (interval.start > reach + EPS) return;
+              reach = Math.max(reach, interval.end);
+              ids.push(interval.id);
+            });
+            return reach >= major - EPS ? ids : [];
+          }
+          var rightArcs = arcs.filter(function (row) { return endArc(row, 1); });
+          arcs.filter(function (row) { return endArc(row, -1); }).forEach(function (left) {
+            var station = local(left).y;
+            var right = rightArcs.filter(function (row) { return near(local(row).y, station); });
+            var low = tangentIds(station - minor), high = tangentIds(station + minor);
+            if (!right.length || !low.length || !high.length) return;
+            var sources = [outer.id, inner.id, left.id].concat(right.map(function (row) {
+              return row.id;
+            }), low, high);
+            var center = axial.to3D(outer.x, outer.y, station);
+            var match = candidates.find(function (candidate) {
+              return candidate.rings[0] === outer.id && candidate.rings[1] === inner.id &&
+                near(candidate.center.x, center.x) && near(candidate.center.y, center.y) &&
+                near(candidate.center.z, center.z);
+            });
+            if (match) match.sourceIds = Array.from(new Set(match.sourceIds.concat(sources)));
+            else candidates.push({kind:'torus', center:center, axis:axial.normal,
+              u:axial.u, v:axial.v, majorRadius:major, minorRadius:minor,
+              rings:[outer.id, inner.id], sourceIds:sources});
+          });
+        });
+      });
+    });
+    var issues = [], patches = candidates.filter(function (candidate) {
+      var conflicting = candidates.some(function (other) {
+        return candidate !== other && candidate.sourceIds.some(function (id) {
+          return other.sourceIds.indexOf(id) !== -1;
+        });
+      });
+      if (conflicting) issues.push({code:'toroidal-silhouette-conflict',
+        entityId:candidate.rings[0], sourceIds:candidate.sourceIds.slice(),
+        message:'The concentric contours and side silhouettes admit conflicting toroidal surfaces.'});
+      return !conflicting;
+    });
+    return {patches:patches, issues:issues, consumedIds:new Set(patches.flatMap(function (patch) {
+      return patch.sourceIds;
+    }))};
+  }
+
+  function addToroidalPatch(geometry, patch) {
+    var turns = 32, sections = 16, offset = geometry.vertices.length;
+    var faceIndices = [];
+    function vertex(i, j) { return offset + (i % turns) * sections + (j % sections); }
+    for (var i = 0; i < turns; i++) {
+      var u = TAU * i / turns;
+      var radial = add(mul(patch.u, Math.cos(u)), mul(patch.v, Math.sin(u)));
+      for (var j = 0; j < sections; j++) {
+        var v = TAU * j / sections;
+        var distance = patch.majorRadius + patch.minorRadius * Math.cos(v);
+        geometry.vertices.push(add(patch.center, add(mul(radial, distance),
+          mul(patch.axis, patch.minorRadius * Math.sin(v)))));
+        var a = vertex(i,j), b = vertex(i + 1,j), c = vertex(i + 1,j + 1), d = vertex(i,j + 1);
+        geometry.edges.push([a,b], [a,d]);
+        faceIndices.push(geometry.faces.length);
+        geometry.faces.push(dot(cross(patch.u, patch.v), patch.axis) > 0 ?
+          [a,b,c,d] : [a,d,c,b]);
+      }
+    }
+    geometry.smoothSideFaces.push.apply(geometry.smoothSideFaces, faceIndices);
+    geometry.surfacePatches.push({kind:'torus', center:patch.center, axis:patch.axis,
+      majorRadius:patch.majorRadius, minorRadius:patch.minorRadius,
+      closed:true, sourceIds:patch.sourceIds, faceIndices:faceIndices});
+  }
+
 
 
   function mouthLineEvidence(ink,W,p1,p2,used) {
@@ -2347,9 +2470,13 @@
       }
       return q;
     }
-    var used=new Set(), curvesIn=ink.filter(isCurve), sourceById=new Map(ink.map(function(e) {return [e.id,e];}));
+    var toroidal = options.toroidal || inferToroidalSurfaces(ink, profile);
+    var used = new Set(toroidal.consumedIds);
+    var sourceById = new Map(ink.map(function(e) {return [e.id,e];}));
+    ink = ink.filter(function (e) { return !used.has(e.id); });
     var geometry={name:'primitive surface',vertices:[],edges:[],faces:[],curves:[],spheres:[],surfacePatches:[],smoothSideFaces:[],recesses:[]};
-    var selectedIssues=[], explanations=new Map(), ambiguousSources=new Set();
+    var selectedIssues=toroidal.issues.slice(), explanations=new Map(), ambiguousSources=new Set();
+    toroidal.patches.forEach(function (patch) { addToroidalPatch(geometry, patch); });
     function sourceKey(e) {
       function r(v) {return Math.round(v*1e6)/1e6;}
       return [e.type,e.viewRole,r(e.x),r(e.y),r(e.radius),
@@ -2777,5 +2904,5 @@
     return {consumedIds:Array.from(consumed),issues:issues};
   }
   return { reconstruct:reconstruct, point:point, isCurve:isCurve, resolveProfileFrame:resolveProfileFrame,
-    inferBoundedCones:inferBoundedCones };
+    inferBoundedCones:inferBoundedCones, inferToroidalSurfaces:inferToroidalSurfaces };
 });

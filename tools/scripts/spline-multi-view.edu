@@ -1,4 +1,4 @@
-# expect: curves=2 parametricCurves=2 curveFit=ok curveReprojection=ok curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=2 status=partial
+# expect: curves=2 parametricCurves=2 curveFit=ok curveReprojection=ok curveStationReprojection=ok curveEvidence=5 curveEvidenceViews=ELEVATION,PLAN,PROFILE curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=2 status=partial
 /datum -60 180
 /profile 100 0 1
 /point a 0 -10 plan

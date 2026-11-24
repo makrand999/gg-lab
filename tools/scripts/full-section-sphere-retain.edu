@@ -1,0 +1,7 @@
+/datum -100 400
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/section A-A elevation 0 30 40 30 negative retain
+/section-boundary A-A plan circle 20 -30 20
+# expect: sectionPlanes=1 sectionQueries=1 sectionRetained=1 sectionStatus=ok sectionUnresolved=0 sectionDiagnostics=none sectionBoundaryStatus=ok sectionShellStatus=ok sectionShellClosed=1 previewSections=ok previewSectionPlanes=1 previewSectionShells=1 previewParity=ok surfaceChecks=1 surfaceQueries=ok
+# surface-query: {"operation":"retain-split","plane":{"origin":{"x":20,"y":30,"z":30},"normal":{"x":0,"y":1,"z":0}},"side":"negative","planeId":"A-A","expect":{"status":"ok","summary":{"retained":1,"unresolved":0},"certificate":{"status":"ok","counts":{"closedShells":1}}}}

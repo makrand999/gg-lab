@@ -378,6 +378,30 @@
     }
 
 
+    .model-row {
+      width: 100%;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: "Caveat", cursive;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--pencil-mid);
+    }
+
+    .model-row select {
+      font-family: "Architects Daughter", cursive;
+      font-size: 13px;
+      color: var(--pencil);
+      background: transparent;
+      border: 1.4px solid var(--pencil-mid);
+      border-radius: 3px;
+      padding: 3px 6px;
+      cursor: pointer;
+    }
+
+
     .slider-container {
       width: 100%;
       margin-top: 6px;
@@ -1204,7 +1228,7 @@
 
         <div class="zone-foot-bar">
           <span>Click "Line Rotation" on CAD top bar.</span>
-          <a href="index.html" class="canvas-launch-link">LOAD PRELOADED ROTATION DEMO</a>
+          <a href="index.html#line" class="canvas-launch-link">LOAD PRELOADED ROTATION DEMO</a>
         </div>
       </section>
 
@@ -1294,7 +1318,7 @@
 
         <div class="zone-foot-bar">
           <span>Click "Hexagonal Prism" to view complete 3-view geometry.</span>
-          <a href="index.html" class="canvas-launch-link">LOAD PRISM 3-VIEW</a>
+          <a href="index.html#3view" class="canvas-launch-link">LOAD PRISM 3-VIEW</a>
         </div>
       </section>
 
@@ -1317,9 +1341,17 @@
             <span class="viewport-scale-tag">AXONOMETRIC &bull; 30&deg;/30&deg;</span>
           </div>
           <div class="interactive-stage-box" style="height: 380px;">
-            <canvas id="sheet-turntable" width="800" height="460" tabindex="0" role="application" aria-label="3D wireframe cube. Drag to orbit, double-click or press R to reset."></canvas>
+            <canvas id="sheet-turntable" width="800" height="460" tabindex="0" role="application" aria-label="3D wireframe machine block. Drag to orbit, double-click or press R to reset."></canvas>
           </div>
           <p class="plate-red-caption">fig. E1 &mdash; interactive turntable axonometric wireframe model</p>
+          <div class="model-row">
+            <label for="turntable-model">Model</label>
+            <select id="turntable-model" aria-label="3D turntable model">
+              <option value="STEPPED_NOTCH" selected>Stepped Notch Block</option>
+              <option value="INCLINED">Inclined Block</option>
+            </select>
+          </div>
+          <p class="zone-desc" id="turntable-prompt">Sketch the plan, elevation and profile, then mark every hidden edge. Check the 30 mm outline, the 15 mm terrace and the 40 mm inner wall against the 3D model.</p>
           <div class="slider-labels" style="width:100%; text-align:center; margin-top:6px;">
             <span>[CLICK &amp; DRAG WIREFRAME ABOVE TO ORBIT 3D MODEL LIVE]</span>
           </div>
@@ -1335,8 +1367,8 @@
             <span class="spec-body-text">Smooth turntable rotation lets you inspect hidden dashed edges and vertex connectivity.</span>
           </div>
           <div class="spec-item">
-            <span class="spec-title"><kbd>Double-Click</kbd> &mdash; Reset Isometric Pose</span>
-            <span class="spec-body-text">Instantly restores standard isometric orientation (Yaw 45&deg;, Pitch 35.26&deg;).</span>
+            <span class="spec-title"><kbd>Double-Click or R</kbd> &mdash; Reset View</span>
+            <span class="spec-body-text">Restores the default front-right isometric pose (Yaw 225&deg;, Pitch 35.26&deg;).</span>
           </div>
         </div>
 
@@ -1532,6 +1564,27 @@
     </div>
   </div>
 
+
+  <script src="lib/educad-entities.js"></script>
+  <script src="lib/educad-view-frame.js"></script>
+  <script src="lib/educad-planar.js"></script>
+  <script src="lib/educad-implicit.js"></script>
+  <script src="lib/educad-cavity-boolean.js"></script>
+  <script src="lib/educad-parametric.js"></script>
+  <script src="lib/educad-surfaces.js"></script>
+  <script src="lib/educad-vec3.js"></script>
+  <script src="lib/educad-curve-reconstruct.js"></script>
+  <script src="lib/educad-oblique-kernel.js"></script>
+  <script src="lib/educad-project.js"></script>
+  <script src="lib/educad-parametric-reconstruct.js"></script>
+  <script src="lib/educad-surface-infer.js"></script>
+  <script src="lib/educad-conic.js"></script>
+  <script src="lib/educad-strict.js"></script>
+  <script src="lib/educad-curriculum.js"></script>
+  <script src="lib/educad-constraints.js"></script>
+  <script src="lib/educad-drawing-sections.js"></script>
+  <script src="lib/educad-reconstruct.js"></script>
+  <script src="lib/educad-solid.js"></script>
 
   <script>
 
@@ -1884,7 +1937,7 @@
       root.setAttribute('data-paper', next);
       var lbl = document.getElementById('paper-mode-name');
       if (lbl) lbl.textContent = next.toUpperCase();
-      if (window.drawSheetCube) window.drawSheetCube();
+      if (window.drawTurntable) window.drawTurntable();
     }
 
 
@@ -2037,46 +2090,42 @@
 
     (function() {
       var canvas = document.getElementById('sheet-turntable');
-      if (!canvas) return;
+      if (!canvas || typeof EduCADCurriculum === 'undefined' ||
+          typeof EduCADReconstruct === 'undefined' ||
+          typeof EduCADSolid === 'undefined') return;
       var ctx = canvas.getContext('2d');
-      var yaw = 45 * Math.PI / 180;
-      var pitch = 35.26 * Math.PI / 180;
+      var select = document.getElementById('turntable-model');
+      var prompt = document.getElementById('turntable-prompt');
+      var ISO_YAW = 225 * Math.PI / 180;
+      var ISO_PITCH = Math.atan(1 / Math.sqrt(2));
+      var yaw = ISO_YAW, pitch = ISO_PITCH;
       var dragging = false;
       var lastX = 0, lastY = 0;
+      var models = {};
+      var state = null;
 
-      var sz = 112;
-      var vertices = [
-        [-sz, -sz, -sz], [sz, -sz, -sz], [sz, sz, -sz], [-sz, sz, -sz],
-        [-sz, -sz,  sz], [sz, -sz,  sz], [sz, sz,  sz], [-sz, sz,  sz]
-      ];
-      var edges = [
-        [0,1],[1,2],[2,3],[3,0],
-        [4,5],[5,6],[6,7],[7,4],
-        [0,4],[1,5],[2,6],[3,7]
-      ];
-
-      function project(p) {
-        var x1 = p[0] * Math.cos(yaw) + p[2] * Math.sin(yaw);
-        var y1 = p[1];
-        var z1 = -p[0] * Math.sin(yaw) + p[2] * Math.cos(yaw);
-
-        var x2 = x1;
-        var y2 = y1 * Math.cos(pitch) - z1 * Math.sin(pitch);
-        var z2 = y1 * Math.sin(pitch) + z1 * Math.cos(pitch);
-
-        var cx = canvas.width / 2;
-        var cy = canvas.height / 2;
-        return { x: cx + x2, y: cy - y2, z: z2 };
+      function buildModel(key) {
+        if (models[key]) return models[key];
+        var model = { sheet: null, state: null };
+        try {
+          model.sheet = EduCADCurriculum.machineBlockSheet({ block: key });
+          var result = EduCADReconstruct.reconstruct(model.sheet.entities, { deferValidation: true });
+          if (result && result.status === 'ok' && result.geometry) {
+            var st = EduCADSolid.createSolidState({
+              size: 460, yaw: ISO_YAW, pitch: ISO_PITCH
+            });
+            EduCADSolid.setGeometry(st, result.geometry);
+            st.inspection = true;
+            model.state = st;
+          }
+        } catch (error) {
+          model.state = null;
+        }
+        models[key] = model;
+        return model;
       }
 
-      window.drawSheetCube = function() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        var cs = getComputedStyle(document.documentElement);
-        var mainStroke = cs.getPropertyValue('--pencil').trim() || '#33363b';
-        var hiddenStroke = cs.getPropertyValue('--pencil-light').trim() || '#969ba3';
-        var nodeFill = cs.getPropertyValue('--pencil').trim() || '#33363b';
-        var proj = vertices.map(project);
-
+      function drawAxes(cs) {
         ctx.save();
         ctx.strokeStyle = cs.getPropertyValue('--pencil-mid').trim() || '#5b6068';
         ctx.lineWidth = 2.4;
@@ -2094,48 +2143,47 @@
         ctx.fillText('Z', 54, 320);
         ctx.fillText('Y', 10, 440);
         ctx.restore();
+      }
 
-        edges.forEach(function(e) {
-          var p1 = proj[e[0]];
-          var p2 = proj[e[1]];
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var cs = getComputedStyle(document.documentElement);
+        if (state) {
+          state.yaw = yaw;
+          state.pitch = pitch;
+          EduCADSolid.renderFast(ctx, state, {
+            cxPx: canvas.width / 2, cyPx: canvas.height / 2
+          });
+        } else {
+          ctx.save();
+          ctx.font = '22px "Caveat", cursive';
+          ctx.fillStyle = cs.getPropertyValue('--red-pencil').trim() || '#b23a2e';
+          ctx.textAlign = 'center';
+          ctx.fillText('3D model unavailable', canvas.width / 2, canvas.height / 2);
+          ctx.restore();
+        }
+        drawAxes(cs);
+      }
 
-          var isHidden = (p1.z + p2.z) < -sz * 0.24;
+      function setModel(key) {
+        var model = buildModel(key);
+        state = model.state;
+        if (prompt && model.sheet) prompt.textContent = model.sheet.prompt;
+        if (model.sheet) {
+          canvas.setAttribute('aria-label', model.sheet.label +
+            ' 3D wireframe. Drag to orbit, double-click or press R to reset.');
+        }
+        yaw = ISO_YAW;
+        pitch = ISO_PITCH;
+        draw();
+      }
 
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
+      window.drawTurntable = draw;
 
-          if (isHidden) {
-            ctx.strokeStyle = hiddenStroke;
-            ctx.globalAlpha = 0.45;
-            ctx.setLineDash([8, 6]);
-            ctx.lineWidth = 2.2;
-          } else {
-            ctx.strokeStyle = mainStroke;
-            ctx.globalAlpha = 1.0;
-            ctx.setLineDash([]);
-            ctx.lineWidth = 4.2;
-          }
-          ctx.stroke();
-        });
-        ctx.globalAlpha = 1.0;
-
-        proj.forEach(function(pt) {
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, 7, 0, Math.PI * 2);
-          ctx.fillStyle = nodeFill;
-          ctx.fill();
-        });
-      };
-
-      drawSheetCube();
-
-
-      var ISO_YAW = 45 * Math.PI / 180, ISO_PITCH = 35.26 * Math.PI / 180;
       function resetPose() {
         yaw = ISO_YAW;
         pitch = ISO_PITCH;
-        drawSheetCube();
+        draw();
       }
       canvas.addEventListener('pointerdown', function(e) {
         dragging = true;
@@ -2149,13 +2197,12 @@
       });
       canvas.addEventListener('pointermove', function(e) {
         if (!dragging) return;
-
         var dx = e.clientX - lastX, dy = e.clientY - lastY;
         lastX = e.clientX;
         lastY = e.clientY;
-        yaw += dx * 0.012;
-        pitch = Math.max(-1.4, Math.min(1.4, pitch + dy * 0.012));
-        drawSheetCube();
+        yaw += dx * 0.008;
+        pitch = Math.max(-1.4, Math.min(1.4, pitch + dy * 0.008));
+        draw();
       });
       function endOrbit(e) {
         if (!dragging) return;
@@ -2179,11 +2226,15 @@
         else if (e.key === 'r' || e.key === 'R' || e.key === '0') resetPose();
         else used = false;
         if (used) {
-          drawSheetCube();
+          draw();
           e.preventDefault();
           e.stopPropagation();
         }
       });
+      if (select) {
+        select.addEventListener('change', function() { setModel(select.value); });
+      }
+      setModel(select ? select.value : 'STEPPED_NOTCH');
     })();
 
 

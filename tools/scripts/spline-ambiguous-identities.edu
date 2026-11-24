@@ -1,0 +1,17 @@
+# expect: curves=1 parametricCurves=1 curveFit=ok curveReprojection=ok curveStationReprojection=ok curveEvidence=2 curveEvidenceViews=ELEVATION,PLAN curvePreview=ok throughEdit=ok diagnostics=curve-surface-unresolved unresolved=1 status=partial
+# expect: previewStatus=ok previewDetermination=partial previewDiagnostics=curve-surface-unresolved previewParity=ok previewCurveParity=ok
+/datum -60 180
+/point a 0 -10 plan
+/point b 0 -30 plan
+/point c 0 -60 plan
+/point u 0 10 elevation
+/point v 0 40 elevation
+/point w 0 60 elevation
+/rename a s0 members
+/rename b s1 members
+/rename c s2 members
+/rename u s0 members
+/rename v s1 members
+/rename w s2 members
+/curve-through s0 s1 s2 plan
+/curve-through s0' s1' s2' elevation

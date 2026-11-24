@@ -6,6 +6,13 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
+  var THEME_ROOT = typeof window !== 'undefined' ? window :
+    (typeof globalThis !== 'undefined' ? globalThis : null);
+
+  function themeColor(name, fallback) {
+    var theme = THEME_ROOT && THEME_ROOT.EduCADTheme;
+    return (theme && typeof theme.color === 'function') ? theme.color(name) : fallback;
+  }
 
 
   var LAYER_STATIC = 'layer1';
@@ -179,9 +186,9 @@
     var haloW = (o.haloWidthPx === undefined || o.haloWidthPx === null) ?
       LABEL_HALO_WIDTH_PX : o.haloWidthPx;
     var halo = (o.haloStyle === undefined || o.haloStyle === null) ?
-      LABEL_HALO_STYLE : o.haloStyle;
+      themeColor('labelHalo', LABEL_HALO_STYLE) : o.haloStyle;
     var fill = (o.fillStyle === undefined || o.fillStyle === null) ?
-      LABEL_FILL_STYLE : o.fillStyle;
+      themeColor('labelFill', LABEL_FILL_STYLE) : o.fillStyle;
     assertFinite(x, y, haloW);
     ctx.save();
     ctx.font = font;
@@ -205,7 +212,7 @@
     var w = (o.widthPx === undefined || o.widthPx === null) ?
       LABEL_LEADER_WIDTH_PX : o.widthPx;
     var color = (o.color === undefined || o.color === null) ?
-      LABEL_LEADER_STYLE : o.color;
+      themeColor('labelLeader', LABEL_LEADER_STYLE) : o.color;
     var dotR = (o.dotRpx === undefined || o.dotRpx === null) ? 2 : o.dotRpx;
     assertFinite(x1, y1, x2, y2, w, dotR);
     ctx.save();
@@ -571,7 +578,8 @@
     o = o || {};
     var r = (o.radiusPx === undefined || o.radiusPx === null) ? SELECT_RING_R_PX : o.radiusPx;
     var w = (o.widthPx === undefined || o.widthPx === null) ? SELECT_RING_WIDTH_PX : o.widthPx;
-    var color = (o.color === undefined || o.color === null) ? SELECT_RING_STYLE : o.color;
+    var color = (o.color === undefined || o.color === null) ?
+      themeColor('select', SELECT_RING_STYLE) : o.color;
     assertFinite(x, y, r, w);
     ctx.save();
     ctx.strokeStyle = color;

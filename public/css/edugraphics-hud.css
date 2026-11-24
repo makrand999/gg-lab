@@ -26,6 +26,52 @@
   font: 14px/1 sans-serif;
   cursor: pointer;
 }
+#app-container .edugraphics-hud {
+  right: 12px;
+  bottom: 8px;
+  align-items: center;
+  gap: 2px;
+  padding: 1px;
+  color: #475569;
+  font: 12px/1 system-ui, sans-serif;
+}
+#app-container .edugraphics-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #475569;
+  font: 13px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+#app-container .edugraphics-btn:hover {
+  color: #0284c7;
+  background: #f1f5f9;
+}
+#app-container .edugraphics-btn:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 1px;
+}
+#app-container .edugraphics-btn[data-btn="zoom-in"],
+#app-container .edugraphics-btn[data-btn="zoom-out"] {
+  font-size: 15px;
+}
+#app-container .edugraphics-btn[data-btn="zoom-home"] {
+  min-width: 0;
+  padding: 0 10px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
 .edugraphics-menu {
   position: absolute;
   z-index: 4;
@@ -108,4 +154,32 @@ button.edugraphics-menu-item {
   display: block;
   background: transparent;
   pointer-events: none;
+}
+
+@media (min-width: 920px) and (min-height: 640px) {
+  body:not(.mobile-layout) #session-bar {
+    bottom: 8px;
+    gap: 2px;
+    padding: 1px 3px 1px 10px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  body:not(.mobile-layout) #session-bar > .demo-btn {
+    justify-content: center;
+    min-height: 30px;
+    padding: 0 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+  body:not(.mobile-layout) #session-bar > .demo-btn:hover {
+    color: #0284c7;
+    background: #f1f5f9;
+  }
+  body:not(.mobile-layout) #session-bar > .demo-btn:focus-visible {
+    outline: 2px solid #0284c7;
+    outline-offset: 1px;
+  }
 }

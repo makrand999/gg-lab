@@ -262,7 +262,11 @@
 
   function projectGeometry(geometry, view, profileMap) {
     var out = projectSolid(geometry.vertices, geometry.edges, geometry.faces || [], view, profileMap, geometry.faceHoles);
-    if (!geometry.smoothSideFaces && geometry.name !== 'cylinder' && geometry.name !== 'cone') return out;
+    var hasJunction = (geometry.curves || []).some(function (curve) {
+      return curve && curve.kind === 'cylinder-intersection';
+    });
+    if (!geometry.smoothSideFaces && geometry.name !== 'cylinder' && geometry.name !== 'cone' &&
+        !hasJunction) return out;
     var direction = view === 'front' ? [0, 0, 1] : view === 'top' ? [0, 1, 0] : view === 'left' ? [-1, 0, 0] : [1, 0, 0];
     var sideSize = geometry.name === 'cylinder' ? 4 : 3;
     var sides = (geometry.faces || []).filter(function (face, i) { return geometry.smoothSideFaces ? geometry.smoothSideFaces.indexOf(i) !== -1 : face.length === sideSize; });
@@ -272,8 +276,18 @@
       var vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
       return (uy * vz - uz * vy) * direction[0] + (uz * vx - ux * vz) * direction[1] + (ux * vy - uy * vx) * direction[2];
     }
-    return out.filter(function (segment, i) {
+    var kept = [];
+    var positionByOriginal = {};
+    var solidJunctionEdges = {};
+    (geometry.curves || []).forEach(function (curve) {
+      if (!curve || curve.solidJunction !== true) return;
+      (curve.displayEdges || []).forEach(function (index) {
+        if (Number.isInteger(index)) solidJunctionEdges[index] = true;
+      });
+    });
+    var filtered = out.filter(function (segment, i) {
       var edge = geometry.edges[i];
+      if (solidJunctionEdges[i]) { positionByOriginal[i] = kept.length; kept.push(i); return true; }
       var adjacent = sides.filter(function (face) {
         for (var k = 0; k < face.length; k++) {
           var a = face[k], b = face[(k + 1) % face.length];
@@ -281,15 +295,88 @@
         }
         return false;
       });
-      if (adjacent.length !== 2) return true;
+      if (adjacent.length !== 2) { positionByOriginal[i] = kept.length; kept.push(i); return true; }
       var f1 = facing(adjacent[0]), f2 = facing(adjacent[1]);
-      return f1 * f2 < 0 || (Math.abs(f1) < 1e-7 && Math.abs(f2) >= 1e-7) || (Math.abs(f2) < 1e-7 && Math.abs(f1) >= 1e-7);
+      if (f1 * f2 < 0 || (Math.abs(f1) < 1e-7 && Math.abs(f2) >= 1e-7) || (Math.abs(f2) < 1e-7 && Math.abs(f1) >= 1e-7)) {
+        positionByOriginal[i] = kept.length; kept.push(i); return true;
+      }
+      return false;
     });
+    var seams = (geometry.curves || []).filter(function (curve) {
+      return curve && curve.kind === 'cylinder-intersection';
+    });
+    if (!seams.length) return filtered;
+    var suppress = {};
+    seams.forEach(function (curve) {
+      var aligned = Math.abs(dotDirection(curve.v, direction)) > 1 - 1e-7 ||
+        Math.abs(dotDirection(curve.direction, direction)) > 1 - 1e-7;
+      var cumulative = 0;
+      var groups = Object.create(null), order = [];
+      (curve.displayEdges || []).forEach(function (originalIndex) {
+        var position = positionByOriginal[originalIndex];
+        if (position === undefined) return;
+        var segment = filtered[position];
+        if (!segment) return;
+        if (aligned) { suppress[position] = true; return; }
+        var first = Math.round(segment.ax * 1e6) + ',' + Math.round(segment.ay * 1e6);
+        var second = Math.round(segment.bx * 1e6) + ',' + Math.round(segment.by * 1e6);
+        var key = first < second ? first + '|' + second : second + '|' + first;
+        if (!groups[key]) { groups[key] = []; order.push(key); }
+        groups[key].push({position:position, segment:segment});
+      });
+      var solid = curve.solidJunction === true;
+      order.forEach(function (key) {
+        var entries = groups[key];
+        var chosen = entries[0];
+        if (solid) {
+          entries.some(function (entry) {
+            if (!entry.segment.hidden) { chosen = entry; return true; }
+            return false;
+          });
+        }
+        entries.forEach(function (entry) {
+          if (entry !== chosen) suppress[entry.position] = true;
+        });
+        if (suppress[chosen.position]) return;
+        chosen.segment.dashDistanceMm = cumulative;
+        cumulative += Math.hypot(chosen.segment.bx - chosen.segment.ax,
+          chosen.segment.by - chosen.segment.ay);
+      });
+    });
+    if (Object.keys(suppress).length)
+      return filtered.filter(function (segment, position) { return !suppress[position]; });
+    return filtered;
+  }
+  function dotDirection(vector, direction) {
+    if (!vector || !Number.isFinite(vector.x) || !Number.isFinite(vector.y) ||
+        !Number.isFinite(vector.z)) return 0;
+    var length = Math.hypot(vector.x, vector.y, vector.z);
+    if (!(length > 0)) return 0;
+    return (vector.x * direction[0] + vector.y * direction[1] +
+      vector.z * direction[2]) / length;
+  }
+  function pointOnJunctionOverlay(geometry, point) {
+    if (!geometry || !point || !Number.isFinite(point.x) ||
+        !Number.isFinite(point.y) || !Number.isFinite(point.z)) return null;
+    var found = null;
+    (geometry.curves || []).some(function (curve) {
+      if (!curve || curve.kind !== 'cylinder-intersection') return false;
+      var match = (curve.displayVertices || []).some(function (index) {
+        var p = geometry.vertices && geometry.vertices[index];
+        return p && Math.hypot(p.x - point.x, p.y - point.y, p.z - point.z) <= 1e-7;
+      });
+      if (match) found = curve;
+      return match;
+    });
+    return found;
   }
 
 
   function pointHidden(geometry, point, view) {
     var direction=view==='top'?[0,1,0]:view==='front'?[0,0,1]:view==='left'?[-1,0,0]:[1,0,0];
+    var seam = pointOnJunctionOverlay(geometry, point);
+    if (seam && (Math.abs(dotDirection(seam.v, direction)) > 1 - 1e-7 ||
+        Math.abs(dotDirection(seam.direction, direction)) > 1 - 1e-7)) return true;
     var verts=geometry.vertices.concat([point]), index=verts.length-1;
     return edgeHiddenAt(verts,geometry.faces || [],geometry.faceHoles || [],{},index,index,
       direction[0],direction[1],direction[2],0);

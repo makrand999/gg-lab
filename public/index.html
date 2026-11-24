@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>EduCAD - 2D Engineering Graphics CAD</title>
+  <script src="lib/educad-theme.js"></script>
   <link rel="stylesheet" href="css/edugraphics-hud.css">
   <link rel="stylesheet" href="css/educad-spatial.css?v=ortho-20261007-1">
-  <link rel="stylesheet" href="css/educad-mobile.css?v=mobile-20261007-5">
+  <link rel="stylesheet" href="css/educad-mobile.css?v=mobile-20261122-1">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -151,7 +152,40 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     }
     #session-bar .demo-btn { box-shadow: none; }
+    #session-bar [hidden] { display: none !important; }
     body.mobile-inspect #btn-attach-reviewed-model { display: none !important; }
+    #onboarding-prompt {
+      position: absolute;
+      z-index: 8;
+      top: 58%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 4px 14px;
+      color: #64748b;
+      font: 12px/1.7 system-ui, sans-serif;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    #onboarding-prompt[hidden] { display: none !important; }
+    #onboarding-prompt .onboarding-note { color: #8190a0; }
+    #onboarding-prompt button {
+      pointer-events: auto;
+      background: none;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      color: #415c74;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    #onboarding-prompt button:hover { color: #0284c7; }
+    body.mobile-inspect #onboarding-prompt,
+    body.mobile-layout #onboarding-prompt { display: none !important; }
 
 
 
@@ -383,6 +417,17 @@
       margin-top: 8px;
     }
     #settings-panel #settings-reset:hover { background: #e2e2e2; }
+    #settings-panel .cmd-settings-link {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 0;
+      color: #0284c7;
+      text-decoration: none;
+      border-bottom: 1px solid #eee;
+    }
+    #settings-panel .cmd-settings-link:hover { text-decoration: underline; }
+    #settings-panel .cmd-settings-link small { color: #64748b; font-size: 12px; text-align: right; }
 
 
 
@@ -452,15 +497,24 @@
     }
     #pose-panel .pose-actions button:hover { text-decoration: underline; }
 </style>
-  <link rel="stylesheet" href="css/educad-drafting.css?v=drawing-method-20261007-1">
+  <link rel="stylesheet" href="css/educad-drafting.css?v=shortcuts-only-20261124-1">
+  <link rel="stylesheet" href="css/educad-theme.css">
 </head>
 <body>
+  <script>
+    (function classifyMode() {
+      var q = String(window.location.search || '');
+      window.educadClassroom =
+        /(?:^|[?&])(classroom|submission|solve|drawing|draw|model)(?:[=&]|$)/.test(q);
+    })();
+  </script>
   <script>
 
 
 
 
     (function gateLogin() {
+      if (!window.educadClassroom) return;
       try {
         if (!window.localStorage) return;
         var raw = window.localStorage.getItem('educad_session');
@@ -472,7 +526,7 @@
         try { role = JSON.parse(raw).role; } catch (err) {}
         if (role === 'teacher' || role === 'academics') {
           var q = String(window.location.search || '');
-          if (!/(?:^|[?&])(submission|solve|drawing|draw|model)=/.test(q)) {
+          if (!/(?:^|[?&])(classroom|submission|solve|drawing|draw|model)(?:[=&]|$)/.test(q)) {
             window.location.replace('teacher.html');
           }
         }
@@ -508,6 +562,12 @@
   <div class="coords-hud" id="coords-display">X: 0.00 mm &bull; Y: 0.00 mm (Ground Line XY)</div>
   <span id="plane-indicator" class="plane-tag" style="display:none;"></span>
 
+  <div id="onboarding-prompt" hidden role="region" aria-label="Start a drawing">
+    <span class="onboarding-note">Start drawing:</span>
+    <button type="button" id="onboarding-draw-line">Draw a line</button>
+    <button type="button" id="onboarding-example">Try a 3D example</button>
+  </div>
+
   <div class="demo-bar">
     <label class="clean-select-wrap">Demo:
       <select class="clean-select" id="sel-demo" aria-label="Demo Selection">
@@ -527,6 +587,8 @@
         <option value="three-view-pyramid">3-View Square Pyramid</option>
         <option value="three-view-cylinder">3-View Cylinder</option>
         <option value="three-view-cone">3-View Cone</option>
+        <option value="three-view-stepped-notch">3-View Stepped Notch Block</option>
+        <option value="three-view-inclined-block">3-View Inclined Block</option>
       </select>
     </label>
     <span class="demo-bridge" style="display:none;">
@@ -541,6 +603,8 @@
       <button class="demo-btn" id="btn-tut-3v-pyramid">Tutorial: 3-View Pyramid</button>
       <button class="demo-btn" id="btn-tut-3v-cylinder">Tutorial: 3-View Cylinder</button>
       <button class="demo-btn" id="btn-tut-3v-cone">Tutorial: 3-View Cone</button>
+      <button class="demo-btn" id="btn-tut-3v-step">Tutorial: 3-View Stepped Notch</button>
+      <button class="demo-btn" id="btn-tut-3v-inclined">Tutorial: 3-View Inclined Block</button>
     </span>
     <span class="bar-divider"></span>
     <button class="demo-btn" id="btn-clear">Clear Sheet</button>
@@ -557,10 +621,13 @@
     <span id="session-who"></span>
     <button class="demo-btn" id="btn-save" type="button" title="Save the sheet to your account">Save</button>
     <button class="demo-btn" id="btn-drawings" type="button" title="Open a saved drawing">Drawings</button>
+    <button class="demo-btn" id="btn-import" type="button" title="Open a drawing file">Import</button>
+    <button class="demo-btn" id="btn-export" type="button" title="Export the sheet as a drawing file">Export</button>
     <button class="demo-btn" id="btn-sets" type="button" title="Question sets">Sets</button>
     <a class="demo-btn" id="btn-home" href="teacher.html" title="Back to your home page">Studio</a>
     <button class="demo-btn" id="btn-logout" type="button">Logout</button>
     <span id="save-status" role="status"></span>
+    <input id="drawing-file" type="file" accept=".json,application/json" hidden>
     <div id="drawings-panel" class="cf-panel" hidden></div>
     <div id="sets-panel" class="cf-panel" hidden></div>
   </div>
@@ -576,16 +643,18 @@
   <div id="settings-panel" hidden>
     <div class="cmd-settings-head"><span>Settings</span><button id="settings-close" type="button" aria-label="Close settings">×</button></div>
     <div class="cmd-settings-section">Drawing</div>
-    <div id="settings-drafting">
-      <div class="drafting-method">
-        <label>Drawing method <select id="settings-drawing-mode" aria-label="Drawing method"><option value="menu">Draw menu</option><option value="shortcuts">Shortcuts</option></select></label>
-        <p id="drawing-method-help"></p>
-      </div>
-    </div>
+    <div id="settings-drafting"></div>
     <div class="cmd-settings-section">Sheet</div>
     <div id="settings-sheet"></div>
     <div class="cmd-settings-section">Preferences</div>
     <div id="settings-rows"></div>
+    <div class="cmd-settings-section">Appearance</div>
+    <div id="settings-appearance" class="cmd-appearance" role="group" aria-label="Appearance">
+      <button type="button" data-appearance="light" aria-pressed="true">Light</button>
+      <button type="button" data-appearance="dark" aria-pressed="false">Dark</button>
+    </div>
+    <div class="cmd-settings-section">Reference</div>
+    <a class="cmd-settings-link" id="settings-geometry-coverage" href="geometry-coverage.html" target="_blank" rel="noopener">Geometry coverage<small>Opens in a new tab</small></a>
     <button id="settings-reset" type="button">Reset to defaults</button>
   </div>
 
@@ -613,6 +682,23 @@
         ['pointerdown', 'pointerup', 'click', 'dblclick', 'wheel'].forEach(function (t) {
           bar.addEventListener(t, function (e) { e.stopPropagation(); });
         });
+      }
+      if (!window.educadClassroom) {
+        ['session-who', 'btn-sets', 'btn-home', 'btn-logout'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) {
+            el.hidden = true;
+            el.style.display = 'none';
+          }
+        });
+        var saveLocal = document.getElementById('btn-save');
+        if (saveLocal) saveLocal.title = 'Save this drawing in this browser';
+        var drawLocal = document.getElementById('btn-drawings');
+        if (drawLocal) {
+          drawLocal.textContent = 'Open';
+          drawLocal.title = 'Open a drawing saved in this browser';
+        }
+        return;
       }
       var s = current();
       var who = document.getElementById('session-who');
@@ -642,6 +728,7 @@
   <script src="lib/educad-viewport.js"></script>
   <script src="lib/educad-canvas.js"></script>
   <script src="lib/educad-entities.js"></script>
+  <script src="lib/educad-view-frame.js"></script>
   <script src="lib/educad-conic.js"></script>
   <script src="lib/educad-shim.js"></script>
   <script src="lib/educad-solver.js"></script>
@@ -649,8 +736,8 @@
   <script src="lib/edugraphics-instruments.js"></script>
   <script src="lib/educad-curriculum.js?v=quiet-20261006-2"></script>
   <script src="lib/educad-labels.js"></script>
-  <script src="lib/educad-solid.js?v=hp-vp-2"></script>
-  <script src="lib/educad-settings.js?v=drawing-method-20261007-1"></script>
+  <script src="lib/educad-solid.js?v=zbuf-20261122-1"></script>
+  <script src="lib/educad-settings.js?v=shortcuts-only-20261124-1"></script>
   <script src="lib/educad-spatial.js?v=inspect-20261007-1"></script>
   <script src="lib/educad-strict.js"></script>
   <script src="lib/educad-vec3.js"></script>
@@ -663,7 +750,8 @@
   <script src="lib/educad-surfaces.js"></script>
   <script src="lib/educad-parametric-reconstruct.js"></script>
   <script src="lib/educad-surface-infer.js"></script>
-  <script src="lib/educad-reconstruct.js?v=quiet-20261006-2"></script>
+  <script src="lib/educad-drawing-sections.js"></script>
+  <script src="lib/educad-reconstruct.js?v=silhouette-20261122-1"></script>
   <script src="lib/educad-correspondence.js"></script>
   <script src="lib/educad-constraints.js"></script>
   <script src="lib/educad-ref3d.js"></script>
@@ -675,16 +763,22 @@
   <script src="lib/edugraphics-common.js"></script>
   <script src="lib/educad-boot.js"></script>
   <script src="lib/educad-saves.js"></script>
+  <script src="lib/educad-local-drawings.js"></script>
   <script src="lib/educad-command.js?v=mobile-20261007-5"></script>
   <script src="lib/educad-auto.js"></script>
   <script src="lib/educad-pose.js"></script>
   <script src="lib/educad-project.js?v=quiet-20261006-2"></script>
-  <script src="lib/educad-drafting.js?v=drawing-method-20261007-1"></script>
-  <script src="lib/educad-mobile.js?v=mobile-20261007-5"></script>
+  <script src="lib/educad-drafting.js?v=shortcuts-only-20261124-1"></script>
+  <script src="lib/educad-mobile.js?v=mobile-20261122-1"></script>
 
   <script>
     (function () {
       'use strict';
+      function themeColor(name, fallback) {
+        var theme = window.EduCADTheme;
+        return (theme && typeof theme.color === 'function') ?
+          theme.color(name, fallback) : fallback;
+      }
       var container = document.getElementById('app-container');
       var coordsDisp = document.getElementById('coords-display');
       var planeInd = document.getElementById('plane-indicator');
@@ -719,7 +813,26 @@
           EduCADMobile.clickSuppressed();
       }
 
-
+      var onboardingPrompt = document.getElementById('onboarding-prompt');
+      var onboardingDismissed = false;
+      function sheetHasGeometry() {
+        var list = handle.table.list();
+        for (var i = 0; i < list.length; i++) {
+          var e = list[i];
+          if (e.type === 'DATUM_AXIS' || (e.meta && e.meta.kind === 'axis')) continue;
+          return true;
+        }
+        return false;
+      }
+      function updateOnboarding() {
+        if (!onboardingPrompt) return;
+        if (sheetHasGeometry()) onboardingDismissed = true;
+        var tool = drafting && typeof drafting.currentTool === 'function' ? drafting.currentTool() : 'select';
+        if (tool !== 'select') onboardingDismissed = true;
+        onboardingPrompt.hidden = onboardingDismissed || !!window.educadClassroom || mobileInspection ||
+          mobileSplitActive() || handle.measure.mode !== 'edit' || !drafting ||
+          drafting.drawingMode() !== 'menu' || sheetHasGeometry();
+      }
 
       function withMobilePrivileged(fn) {
         mobilePrivileged = true;
@@ -852,7 +965,7 @@
             if (g && typeof g.setTransform === 'function') {
               var st = EduCADEntities.BIS_STYLES[item.code];
               g.setTransform(dpr, 0, 0, dpr, 0, 0);
-              g.strokeStyle = '#0f172a';
+              g.strokeStyle = themeColor('ink', '#0f172a');
               g.lineWidth = EduCADEntities.cosmeticWidthPx(st.widthMm);
               g.setLineDash(EduCADEntities.cosmeticDashPx(st.dashMm));
               g.beginPath();
@@ -1291,14 +1404,23 @@
         loadDemo('clear');
         tutStepper = keepTut;
         tutLesson = keepLesson;
+        if (solid === 'STEPPED_NOTCH' || solid === 'INCLINED') {
+          var blockSheet = EduCADCurriculum.machineBlockSheet({ block: solid });
+          handle.table.importEntities(blockSheet.entities);
+          demoTruth = blockSheet.corners || null;
+          if (handle.rebuildSolid) handle.rebuildSolid();
+          renderLayer1();
+          return;
+        }
         var sheet = EduCADCurriculum.threeViewSheet({
           solid: solid, sizeMm: 35, heightMm: 70, xMm: 0
         });
         handle.table.importEntities(sheet.entities);
         var patches = {};
+        var curvedTutorial = solid === 'CYLINDER' || solid === 'CONE';
         handle.table.list().forEach(function (e) {
           var meta = Object.assign({}, e.meta);
-          if (e.viewRole === 'PROFILE' || e.bisCode === 'G' ||
+          if ((e.viewRole === 'PROFILE' && !curvedTutorial) || e.bisCode === 'G' ||
               (e.type === 'POINT' && e.caption === 'o') ||
               (solid === 'CONE' && e.type === 'POINT' && e.viewRole === 'PLAN' && e.caption === 's')) {
             meta.reconstructionRole = 'construction';
@@ -1484,7 +1606,8 @@
           }),
           faceHoles: (handle.solidMm.faceHoles || []).map(function (holes) {
             return holes.map(function (hole) { return hole.slice(); });
-          })
+          }),
+          curves: (handle.solidMm.curves || []).map(copyPoseCurve)
         };
         poseState = {
           mm: restMm,
@@ -1638,7 +1761,16 @@
       function poseProjectedEdges(posed) {
         var shape = {name:poseState.mm.name,vertices:posed,edges:poseState.mm.edges,
           faces:poseState.mm.faces || [],faceHoles:poseState.mm.faceHoles || [],
-          smoothSideFaces:poseState.mm.smoothSideFaces};
+          smoothSideFaces:poseState.mm.smoothSideFaces, curves:[]};
+        (poseState.mm.curves || []).forEach(function (curve) {
+          if (!curve || curve.kind !== 'cylinder-intersection') return;
+          var axes = EduCADPose.applyPose([curve.v, curve.direction],
+            { t: [0, 0, 0], rm: poseState.pose.rm, s: 1 }, { x: 0, y: 0, z: 0 });
+          shape.curves.push({
+            kind: curve.kind, v: axes[0], direction: axes[1],
+            displayEdges: curve.displayEdges
+          });
+        });
         var result = {
           front: EduCADProject.projectGeometry(shape, 'front'),
           top: EduCADProject.projectGeometry(shape, 'top')
@@ -1650,13 +1782,89 @@
         return result;
       }
 
+      function copyPoseCurve(curve) {
+        var out = {};
+        if (!curve || typeof curve !== 'object') return out;
+        for (var key in curve) {
+          if (Object.prototype.hasOwnProperty.call(curve, key)) out[key] = curve[key];
+        }
+        ['center', 'u', 'v'].forEach(function (field) {
+          var p = out[field];
+          if (p && typeof p.x === 'number' && typeof p.y === 'number' &&
+              typeof p.z === 'number') {
+            out[field] = { x: p.x, y: p.y, z: p.z };
+          }
+        });
+        ['displayVertices', 'displayEdges', 'displayParams'].forEach(function (field) {
+          if (Array.isArray(out[field])) out[field] = out[field].slice();
+        });
+        if (Array.isArray(out.points)) {
+          out.points = out.points.map(function (p) {
+            return (p && typeof p.x === 'number' && typeof p.y === 'number' &&
+              typeof p.z === 'number') ? { x: p.x, y: p.y, z: p.z } : p;
+          });
+        }
+        return out;
+      }
+
+      function poseConicValid(curve) {
+        if (!curve || curve.kind === 'cylinder-intersection') return false;
+        var fields = [curve.center, curve.u, curve.v];
+        for (var i = 0; i < fields.length; i++) {
+          var p = fields[i];
+          if (!p || typeof p.x !== 'number' || !isFinite(p.x) ||
+              typeof p.y !== 'number' || !isFinite(p.y) ||
+              typeof p.z !== 'number' || !isFinite(p.z)) return false;
+        }
+        var ru = (typeof curve.radiusU === 'number' && curve.radiusU > 0) ?
+          curve.radiusU : curve.radius;
+        var rv = (typeof curve.radiusV === 'number' && curve.radiusV > 0) ?
+          curve.radiusV : curve.radius;
+        return typeof ru === 'number' && isFinite(ru) && ru > 0 &&
+          typeof rv === 'number' && isFinite(rv) && rv > 0;
+      }
+
       function updatePoseView() {
         if (!poseState || !handle.solid) return;
         var posed = EduCADPose.applyPose(poseState.mm.vertices, poseState.pose,
           poseState.center);
         var stage = EduCADPose.stageWithRest(posed, poseState.rest);
+        var curves = (poseState.mm.curves || []).map(copyPoseCurve);
+        var conicIndexes = [], centers = [], dirs = [];
+        for (var c = 0; c < curves.length; c++) {
+          if (!poseConicValid(curves[c])) continue;
+          conicIndexes.push(c);
+          centers.push({ x: curves[c].center.x, y: curves[c].center.y,
+            z: curves[c].center.z });
+          dirs.push({ x: curves[c].u.x, y: curves[c].u.y, z: curves[c].u.z });
+          dirs.push({ x: curves[c].v.x, y: curves[c].v.y, z: curves[c].v.z });
+        }
+        var centersStaged = [], dirsRotated = [];
+        if (centers.length) {
+          centersStaged = EduCADPose.stageWithRest(
+            EduCADPose.applyPose(centers, poseState.pose, poseState.center),
+            poseState.rest);
+          dirsRotated = EduCADPose.applyPose(dirs,
+            { t: [0, 0, 0], rm: poseState.pose.rm, s: 1 },
+            { x: 0, y: 0, z: 0 });
+        }
+        var curveScale = poseState.pose.s * poseState.rest.scale;
+        for (var q = 0; q < conicIndexes.length; q++) {
+          var curve = curves[conicIndexes[q]];
+          curve.center = centersStaged[q];
+          curve.u = dirsRotated[q * 2];
+          curve.v = dirsRotated[q * 2 + 1];
+          ['radius', 'radiusU', 'radiusV'].forEach(function (field) {
+            if (typeof curve[field] === 'number' && isFinite(curve[field])) {
+              curve[field] = curve[field] * curveScale;
+            }
+          });
+        }
         var geom = EduCADSolid.createGeometry({ name: 'posed', vertices: stage,
-          edges: poseState.mm.edges, faces: poseState.mm.faces, faceHoles: poseState.mm.faceHoles });
+          edges: poseState.mm.edges, faces: poseState.mm.faces,
+          faceHoles: poseState.mm.faceHoles,
+          smoothSideFaces: poseState.mm.smoothSideFaces || [],
+          curves: curves });
         EduCADSolid.setGeometry(handle.solid, geom, { normalize: false });
         poseState.sims = poseSimsFor(poseState.pose);
         poseState.overlay = (typeof EduCADProject !== 'undefined') ?
@@ -2189,7 +2397,9 @@
           var lines = [rep.title].concat(rep.rows);
           for (var i = 0; i < lines.length; i++) {
             EduCADCanvas.drawKnockoutLabel(ctx2, lines[i], bx, by + i * 16,
-              { font: '12px sans-serif', fillStyle: i === 0 ? '#0f172a' : '#0284c7' });
+              { font: '12px sans-serif',
+                fillStyle: i === 0 ? themeColor('ink', '#0f172a') :
+                  themeColor('accent', '#0284c7') });
           }
         }
         ctx2.restore();
@@ -2198,7 +2408,7 @@
 
       function strokeDimSegs(segs) {
         ctx2.save();
-        ctx2.strokeStyle = '#0284c7';
+        ctx2.strokeStyle = themeColor('accent', '#0284c7');
         ctx2.lineWidth = 1;
         ctx2.beginPath();
         for (var i = 0; i < segs.length; i++) {
@@ -2218,7 +2428,7 @@
           strokeDimSegs([[lay.leader.from, lay.leader.to]]);
         }
         ctx2.save();
-        ctx2.fillStyle = '#0284c7';
+        ctx2.fillStyle = themeColor('accent', '#0284c7');
         drawArrowhead(ctx2,
           { x: lay.d1.x + lay.dir.x * 10, y: lay.d1.y + lay.dir.y * 10 },
           lay.d1);
@@ -2228,12 +2438,12 @@
         ctx2.restore();
         EduCADCanvas.drawKnockoutLabel(ctx2, lay.text,
           lay.textPos.x, lay.textPos.y,
-          { font: '12px sans-serif', fillStyle: '#0f172a' });
+          { font: '12px sans-serif', fillStyle: themeColor('ink', '#0f172a') });
         for (var i = 0; i < secondary.length; i++) {
           EduCADCanvas.drawKnockoutLabel(ctx2, secondary[i],
             lay.secondaryPos.x + lay.normal.x * lay.lineHpx * i,
             lay.secondaryPos.y + lay.normal.y * lay.lineHpx * i,
-            { font: '12px sans-serif', fillStyle: '#0284c7' });
+            { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
         }
       }
 
@@ -2243,14 +2453,14 @@
         strokeDimSegs(rl.centerMark);
         strokeDimSegs([[rl.rim, rl.elbow], [rl.elbow, rl.shelfEnd]]);
         ctx2.save();
-        ctx2.fillStyle = '#0284c7';
+        ctx2.fillStyle = themeColor('accent', '#0284c7');
         drawArrowhead(ctx2,
           { x: rl.rim.x + rl.dir.x * 10, y: rl.rim.y + rl.dir.y * 10 },
           rl.rim);
         ctx2.restore();
         EduCADCanvas.drawKnockoutLabel(ctx2, rl.text,
           rl.textPos.x, rl.textPos.y,
-          { font: '12px sans-serif', fillStyle: '#0f172a' });
+          { font: '12px sans-serif', fillStyle: themeColor('ink', '#0f172a') });
         var secs = ['Ø ' + EduCADMeasure.fmtMm(2 * ent.radius) + ' mm'];
         if (ent.type === 'CIRCULAR_ARC' && rep.rows.length > 2) {
           secs.push(rep.rows[2]);
@@ -2258,7 +2468,7 @@
         for (var i = 0; i < secs.length; i++) {
           EduCADCanvas.drawKnockoutLabel(ctx2, secs[i],
             rl.textPos.x, rl.elbow.y + 13 + i * 15,
-            { font: '12px sans-serif', fillStyle: '#0284c7' });
+            { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
         }
       }
 
@@ -2268,7 +2478,7 @@
         strokeDimSegs([[wit.pt, wit.foot]]);
         EduCADCanvas.drawKnockoutLabel(ctx2, wit.text,
           wit.textPos.x, wit.textPos.y,
-          { font: '12px sans-serif', fillStyle: '#0f172a' });
+          { font: '12px sans-serif', fillStyle: themeColor('ink', '#0f172a') });
       }
 
 
@@ -2328,7 +2538,7 @@
         var t = EduCADCanvas.lineToolProgress(anim.t0, ts);
         renderLayer2(lastCursor, { snap: handle.snapCurrent });
         ctx2.save();
-        ctx2.strokeStyle = '#0f172a';
+        ctx2.strokeStyle = themeColor('ink', '#0f172a');
         ctx2.lineWidth = anim.widthPx;
         if (anim.dash.length > 0) ctx2.setLineDash(anim.dash);
         ctx2.beginPath();
@@ -2473,7 +2683,7 @@
           var maxW = EduCADViewport.inverse(v, { x: v.w, y: 0 });
 
           ctx1.lineWidth = 0.5;
-          ctx1.strokeStyle = '#e2e8f0';
+          ctx1.strokeStyle = themeColor('grid', '#e2e8f0');
           ctx1.beginPath();
           var startX = Math.floor(minW.x / stepMm) * stepMm;
           for (var gx = startX; gx <= maxW.x; gx += stepMm) {
@@ -2497,7 +2707,7 @@
         if (xyY >= 0 && xyY <= v.h) {
           ctx1.save();
           ctx1.lineWidth = 1.5;
-          ctx1.strokeStyle = '#334155';
+          ctx1.strokeStyle = themeColor('strong', '#334155');
           ctx1.beginPath();
 
 
@@ -2539,10 +2749,20 @@
           }
 
 
-          ctx1.font = '11px sans-serif';
-          ctx1.fillStyle = '#64748b';
-          ctx1.fillText('V.P. (Front View / Elevation)', 40, xyY - 8);
-          ctx1.fillText('H.P. (Top View / Plan)', 40, xyY + 16);
+          ctx1.font = '600 12px sans-serif';
+          ctx1.fillStyle = themeColor('construction', '#475569');
+          ctx1.fillText('Front view', 40, xyY - 8);
+          var frontLabelWidth = ctx1.measureText('Front view').width;
+          ctx1.font = '10px sans-serif';
+          ctx1.fillStyle = themeColor('faint', '#94a3b8');
+          ctx1.fillText(' · VP', 40 + frontLabelWidth, xyY - 8);
+          ctx1.font = '600 12px sans-serif';
+          ctx1.fillStyle = themeColor('construction', '#475569');
+          ctx1.fillText('Top view', 40, xyY + 16);
+          var topLabelWidth = ctx1.measureText('Top view').width;
+          ctx1.font = '10px sans-serif';
+          ctx1.fillStyle = themeColor('faint', '#94a3b8');
+          ctx1.fillText(' · HP', 40 + topLabelWidth, xyY + 16);
           ctx1.restore();
         }
 
@@ -2585,7 +2805,8 @@
                 if ((seg.hidden ? 0 : 1) !== pass) continue;
                 renderEntity(ctx1, v, { id: 'pose-ov', type: 'SEGMENT',
                   x: seg.ax, y: seg.ay, x2: seg.bx, y2: seg.by,
-                  bisCode: seg.hidden ? 'E' : 'A', viewRole: 'BOTH' });
+                  bisCode: seg.hidden ? 'E' : 'A', viewRole: 'BOTH',
+                  dashDistanceMm: seg.dashDistanceMm });
               }
             }
           }
@@ -2631,10 +2852,10 @@
       function renderEntity(ctx, v, ent) {
         if (drafting && ent.type === 'DIMENSION') { drafting.drawDimension(ctx, v, ent); return; }
         var style = EduCADEntities.resolveStyle(ent);
-        var strokeColor = ent.color || '#0f172a';
-        if (ent.bisCode === 'B') strokeColor = '#475569';
-        if (ent.bisCode === 'G') strokeColor = '#64748b';
-        if (ent.bisCode === 'K') strokeColor = '#0284c7';
+        var strokeColor = ent.color || themeColor('ink', '#0f172a');
+        if (ent.bisCode === 'B') strokeColor = themeColor('construction', '#475569');
+        if (ent.bisCode === 'G') strokeColor = themeColor('muted', '#64748b');
+        if (ent.bisCode === 'K') strokeColor = themeColor('accent', '#0284c7');
 
         ctx.save();
         ctx.strokeStyle = strokeColor;
@@ -2643,7 +2864,10 @@
 
         ctx.lineWidth = EduCADEntities.cosmeticWidthPx(style.widthMm);
         var dash = EduCADEntities.cosmeticDashPx(style.dashMm);
-        if (dash.length > 0) ctx.setLineDash(dash);
+        if (dash.length > 0) {
+          ctx.setLineDash(dash);
+          if (Number.isFinite(ent.dashDistanceMm)) ctx.lineDashOffset = ent.dashDistanceMm * v.s;
+        }
 
         if (ent.type === 'SEGMENT' || ent.type === 'LINE' ||
             ent.type === 'RAY' || ent.type === 'DIMENSION') {
@@ -2741,7 +2965,7 @@
           var sp = snapResult.snap;
 
           ctx2.save();
-          ctx2.strokeStyle = '#06b6d4';
+          ctx2.strokeStyle = themeColor('accentAlt', '#06b6d4');
           ctx2.lineWidth = 2;
           ctx2.beginPath();
           ctx2.arc(sp.xPx, sp.yPx, 7, 0, 2 * Math.PI);
@@ -2780,7 +3004,7 @@
             var cpPx = EduCADViewport.forward(handle.view, { x: cpEnt.x, y: cpEnt.y });
             EduCADCanvas.drawSelectionRing(ctx2, cpPx.x, cpPx.y);
             EduCADCanvas.drawKnockoutLabel(ctx2, String(cpi + 1), cpPx.x + 8, cpPx.y - 8,
-              { font: '12px sans-serif', fillStyle: '#b45309' });
+              { font: '12px sans-serif', fillStyle: themeColor('warm', '#b45309') });
           }
         }
 
@@ -2800,7 +3024,7 @@
               (lock && lock.lock === 'x') ? 'ΔY: ' : 'Δ: ';
             EduCADCanvas.drawKnockoutLabel(ctx2, taxis + tbuf + ' mm (Enter)',
               cursorPx.x + 14, cursorPx.y - 10,
-              { font: '12px sans-serif', fillStyle: '#0284c7' });
+              { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
             var tparsed = EduCADCanvas.parseTypedDist(tbuf);
             var tlock = lock && (lock.lock === 'x' || lock.lock === 'y') ?
               lock.lock : null;
@@ -2813,12 +3037,12 @@
                 var tpx = EduCADViewport.forward(handle.view,
                   { x: ttgt.xMm, y: ttgt.yMm });
                 EduCADCanvas.drawSelectionRing(ctx2, tpx.x, tpx.y,
-                  { color: '#0284c7' });
+                  { color: themeColor('accent', '#0284c7') });
               }
             }
           } else if (lock.readout) {
             EduCADCanvas.drawKnockoutLabel(ctx2, lock.readout, cursorPx.x + 14, cursorPx.y - 10,
-              { font: '12px sans-serif', fillStyle: '#0284c7' });
+              { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
           }
         }
 
@@ -2831,14 +3055,14 @@
           if (lt.p1Member !== null && lt.p1Member !== undefined) {
             EduCADCanvas.drawKnockoutLabel(ctx2, 'for ' + lt.p1Member,
               ap1.x + 12, ap1.y - 12,
-              { font: '12px sans-serif', fillStyle: '#0284c7' });
+              { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
           }
           if (lt.phase === 'menu' && lt.p2Mm) {
             var ap2 = EduCADViewport.forward(handle.view, lt.p2Mm);
             if (lt.p2Member) EduCADCanvas.drawKnockoutLabel(ctx2, 'to ' + lt.p2Member,
-              ap2.x + 12, ap2.y - 12, { font: '12px sans-serif', fillStyle: '#0284c7' });
+              ap2.x + 12, ap2.y - 12, { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
             ctx2.save();
-            ctx2.strokeStyle = '#64748b';
+            ctx2.strokeStyle = themeColor('muted', '#64748b');
             ctx2.lineWidth = 1;
             ctx2.beginPath();
             ctx2.moveTo(ap1.x, ap1.y);
@@ -2855,7 +3079,7 @@
         if (pl.phase === 'angle' || pl.phase === 'distance' || pl.phase === 'invalid') {
           var pp0 = EduCADViewport.forward(handle.view, pl.p0Mm);
           EduCADCanvas.drawSelectionRing(ctx2, pp0.x, pp0.y,
-            { color: EduCADCanvas.POLAR_RING_STYLE });
+            { color: themeColor('accentAlt', EduCADCanvas.POLAR_RING_STYLE) });
           if (cursorPx && pl.phase === 'angle' && pl.baseDir) {
             var wc = EduCADViewport.inverse(handle.view, cursorPx);
             var rawTh = EduCADCanvas.polarAngleDeg(pl.baseDir, pl.p0Mm, wc, pl.thetaDeg);
@@ -2868,7 +3092,7 @@
             if (pdx * pdx + pdy * pdy > 4) {
               var delta = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
               ctx2.save();
-              ctx2.strokeStyle = '#64748b';
+              ctx2.strokeStyle = themeColor('muted', '#64748b');
               ctx2.lineWidth = 1;
               ctx2.beginPath();
               ctx2.arc(pp0.x, pp0.y, POLAR_ARC_R_PX, a0, a0 + delta, delta < 0);
@@ -2877,14 +3101,14 @@
             }
             EduCADCanvas.drawKnockoutLabel(ctx2, '∠ ' + showTh.toFixed(1) + '°',
               cursorPx.x + 14, cursorPx.y - 10,
-              { font: '12px sans-serif', fillStyle: '#0284c7' });
+              { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
           } else if (cursorPx && pl.phase === 'distance' && pl.rayDir) {
             var wd = EduCADViewport.inverse(handle.view, cursorPx);
             var tgt = EduCADCanvas.polarTargetFor(pl.p0Mm, pl.rayDir, wd);
             var tp = EduCADViewport.forward(handle.view, { x: tgt.xMm, y: tgt.yMm });
             ctx2.save();
-            ctx2.strokeStyle = '#64748b';
-            ctx2.fillStyle = '#64748b';
+            ctx2.strokeStyle = themeColor('muted', '#64748b');
+            ctx2.fillStyle = themeColor('muted', '#64748b');
             ctx2.lineWidth = 1;
             ctx2.beginPath();
             ctx2.moveTo(pp0.x, pp0.y);
@@ -2897,7 +3121,7 @@
             EduCADCanvas.drawKnockoutLabel(ctx2,
               tgt.rMm.toFixed(2) + ' mm (∠ ' + pl.thetaDeg.toFixed(1) + '° locked)',
               cursorPx.x + 14, cursorPx.y - 10,
-              { font: '12px sans-serif', fillStyle: '#0284c7' });
+              { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
           }
         }
 
@@ -2925,7 +3149,7 @@
           var pend = (pp !== null) ?
             EduCADViewport.forward(handle.view, { x: pp.xMm, y: pp.yMm }) : cp;
           ctx2.save();
-          ctx2.strokeStyle = '#64748b';
+          ctx2.strokeStyle = themeColor('muted', '#64748b');
           ctx2.lineWidth = 1;
           ctx2.beginPath();
           ctx2.moveTo(fp.x, fp.y);
@@ -2934,13 +3158,13 @@
           ctx2.restore();
           if (pp !== null) {
             EduCADCanvas.drawSelectionRing(ctx2, pend.x, pend.y,
-              { color: '#0284c7' });
+              { color: themeColor('accent', '#0284c7') });
           }
           EduCADCanvas.drawKnockoutLabel(ctx2, pbuf !== '' ?
             '⊥ ' + pbuf + ' mm (Enter)' :
             '⊥ Dist: ' + cand.distMm.toFixed(2) + ' mm',
             cursorPx.x + 14, cursorPx.y - 10,
-            { font: '12px sans-serif', fillStyle: '#0284c7' });
+            { font: '12px sans-serif', fillStyle: themeColor('accent', '#0284c7') });
         }
 
 
@@ -3824,6 +4048,8 @@
         } finally {
           if (mobileInspection) mobilePrivileged = false;
         }
+        if (type === 'clear') onboardingDismissed = false;
+        updateOnboarding();
         lastDemoTitle = DEMO_TITLES[type] || lastDemoTitle;
         if (mobileShell) {
           mobileShell.setTitle(lastDemoTitle);
@@ -3844,6 +4070,8 @@
       document.getElementById('btn-tut-3v-pyramid').addEventListener('click', function () { startTutorial('three-view-pyramid'); });
       document.getElementById('btn-tut-3v-cylinder').addEventListener('click', function () { startTutorial('three-view-cylinder'); });
       document.getElementById('btn-tut-3v-cone').addEventListener('click', function () { startTutorial('three-view-cone'); });
+      document.getElementById('btn-tut-3v-step').addEventListener('click', function () { startTutorial('three-view-stepped-notch'); });
+      document.getElementById('btn-tut-3v-inclined').addEventListener('click', function () { startTutorial('three-view-inclined-block'); });
       document.getElementById('btn-clear').addEventListener('click', function () { loadDemo('clear'); });
       document.getElementById('btn-check').addEventListener('click', function () { runVerify(); });
       document.getElementById('btn-mode-edit').addEventListener('click', function () { setSheetMode('edit'); });
@@ -4136,7 +4364,8 @@
             tutBusy = false;
             tutError = ok ? '' : err;
             if (ok) EduCADTutorial.advance(tutStepper);
-            if (ok && window.EduCADSaves && EduCADTutorial.done(tutStepper)) {
+            if (ok && window.educadClassroom && window.EduCADSaves &&
+                EduCADTutorial.done(tutStepper)) {
 
               window.EduCADSaves.recordProgress(tutLesson, {
                 done: true, at: Date.now()
@@ -4168,6 +4397,8 @@
         if (tutLesson === 'three-view-pyramid') return 'Tutorial: 3-View Square Pyramid';
         if (tutLesson === 'three-view-cylinder') return 'Tutorial: 3-View Cylinder';
         if (tutLesson === 'three-view-cone') return 'Tutorial: 3-View Cone';
+        if (tutLesson === 'three-view-stepped-notch') return 'Tutorial: 3-View Stepped Notch';
+        if (tutLesson === 'three-view-inclined-block') return 'Tutorial: 3-View Inclined Block';
         return 'Tutorial: Profile Square';
       }
       function startTutorial(which) {
@@ -4192,11 +4423,15 @@
         tutStepper = EduCADTutorial.createStepper(script);
         hideVerifyPanel();
         renderTutorialPanel();
+        onboardingDismissed = true;
+        updateOnboarding();
       }
 
 
       var hash = window.location.hash;
-      if (hash === '#points') {
+      if (hash === '#line') {
+        loadDemo('line');
+      } else if (hash === '#points') {
         loadDemo('points');
       } else if (hash === '#prism') {
         loadDemo('prism');
@@ -4214,8 +4449,15 @@
           mount.menu.classList.add('open');
         }
         renderLayer1();
-      } else {
+      } else if (window.educadClassroom) {
         loadDemo('line');
+      } else {
+        document.querySelectorAll('.demo-btn').forEach(function (b) {
+          b.classList.remove('active');
+        });
+        var blankDemo = document.getElementById('sel-demo');
+        if (blankDemo) blankDemo.value = '';
+        lastDemoTitle = DEMO_TITLES.clear;
       }
       renderLayer1();
 
@@ -4288,6 +4530,7 @@
             builtRevision = revision;
             builtResult = res;
             handle.reconstruction = res;
+            handle.sectionModel = res.geometry && res.geometry.sections || null;
             if (res.geometry && res.geometry.analyticSurfaceValidation &&
                 res.geometry.analyticSurfaceValidation.deferred) {
               var pendingGeometry = res.geometry;
@@ -4303,6 +4546,10 @@
             if (res.status === 'ok') {
               handle.solidMm = res.geometry;
               EduCADSolid.setGeometry(solid3d, res.geometry);
+            } else if (!window.educadClassroom && !sheetHasGeometry()) {
+              handle.solidMm = null;
+              EduCADSolid.setUnavailable(solid3d, 'empty-sheet',
+                'Add matching geometry in the front and top views to build a 3D preview.');
             } else {
               handle.solidMm = null;
               EduCADSolid.setUnavailable(solid3d, res.reason, res.label);
@@ -4332,7 +4579,10 @@
         legacyActive: function () { return pendingMember !== null || handle.sel.editing !== null ||
           handle.circlePicks.picks.length > 0 || EduCADCanvas.isLineToolActive(handle.line) ||
           EduCADCanvas.isPolarToolActive(handle.polar) || EduCADCanvas.isPlotToolActive(handle.plot); },
-        getPose: function () { return poseState; }
+        getPose: function () { return poseState; },
+        learn: !window.educadClassroom && !mobileInspection,
+        hasGeometry: sheetHasGeometry,
+        onSync: updateOnboarding
       });
       handle.drafting = drafting;
       handle.history = history;
@@ -4356,10 +4606,32 @@
       }
       drafting.refresh();
       renderLayer1();
+      updateOnboarding();
 
-
-
-
+      (function onboardingActions() {
+        if (!onboardingPrompt) return;
+        function hide() {
+          onboardingDismissed = true;
+          onboardingPrompt.hidden = true;
+          if (document.activeElement && onboardingPrompt.contains(document.activeElement)) document.activeElement.blur();
+        }
+        var drawLine = document.getElementById('onboarding-draw-line');
+        var example = document.getElementById('onboarding-example');
+        if (drawLine) drawLine.addEventListener('click', function () {
+          if (window.educadClassroom || mobileInspection) return;
+          hide();
+          setSheetMode('edit');
+          if (drafting) drafting.startTool('line');
+          updateOnboarding();
+        });
+        if (example) example.addEventListener('click', function () {
+          if (window.educadClassroom || mobileInspection) return;
+          hide();
+          setSheetMode('edit');
+          loadDemo('3view');
+          updateOnboarding();
+        });
+      })();
 
       (function commandLine() {
         if (typeof EduCADSettings === 'undefined' ||
@@ -4375,7 +4647,6 @@
         var cmdBar = document.getElementById('cmd-bar');
         var settingsPanel = document.getElementById('settings-panel');
         var settingsRows = document.getElementById('settings-rows');
-        var drawingModeSelect = document.getElementById('settings-drawing-mode');
         var sugActive = 0;
         var sugOpen = [];
         var cmdHistory = [];
@@ -4394,22 +4665,21 @@
           if (selDemo && selDemo.parentNode) {
             selDemo.parentNode.style.display = demos ? '' : 'none';
           }
+          var onboardingExample = document.getElementById('onboarding-example');
+          if (onboardingExample) onboardingExample.hidden = !demos;
           var selTut = document.getElementById('sel-tut');
           if (selTut && selTut.parentNode) {
             selTut.parentNode.style.display = tuts ? '' : 'none';
           }
+          if (drafting && typeof drafting.setLearnVisible === 'function') {
+            drafting.setLearnVisible(!mobileInspection && (demos || tuts));
+          }
           var coordsEl = document.getElementById('coords-display');
           if (coordsEl) coordsEl.style.display = coords ? '' : 'none';
           if (drafting) drafting.preferences({
-            drawingMode: EduCADSettings.getDrawingMode(settingsStore),
             guides: EduCADSettings.get(settingsStore, 'projectionGuides'),
             solid: EduCADSettings.get(settingsStore, 'solidPreview')
           });
-          if (drawingModeSelect) drawingModeSelect.value = EduCADSettings.getDrawingMode(settingsStore);
-          var drawingHelp = document.getElementById('drawing-method-help');
-          if (drawingHelp) drawingHelp.textContent = EduCADSettings.getDrawingMode(settingsStore) === 'shortcuts' ?
-            'Click to place · Ctrl/Cmd-click to bank points · double-click to rename. Aim, type a distance and press Enter.' :
-            'Choose a tool in Draw, then place it on the sheet. Select a point for projection actions.';
           if (spatialView) spatialView.setPreferences(EduCADSettings.getInspection(settingsStore));
           if (orthographicView) orthographicView.setPreferences(EduCADSettings.getSheetInspection(settingsStore));
           syncInspectionSettings();
@@ -4422,10 +4692,6 @@
           renderLayer1();
           renderLayer2(null, null);
         }
-        if (drawingModeSelect) drawingModeSelect.addEventListener('change', function () {
-          EduCADSettings.setDrawingMode(settingsStore, drawingModeSelect.value);
-          applySettings();
-        });
         handle.setInspectionPreferences = function (preferences) {
           Object.keys(EduCADSettings.INSPECTION_FIELDS).forEach(function (key) {
             EduCADSettings.setInspection(settingsStore, key, preferences[key]);
@@ -4631,7 +4897,7 @@
             var st = EduCADEntities.BIS_STYLES[code];
             if (g && st && typeof g.setTransform === 'function') {
               g.setTransform(dpr, 0, 0, dpr, 0, 0);
-              g.strokeStyle = '#e2e8f0';
+              g.strokeStyle = themeColor('sampleLine', '#e2e8f0');
               g.lineWidth = EduCADEntities.cosmeticWidthPx(st.widthMm);
               g.setLineDash(EduCADEntities.cosmeticDashPx(st.dashMm));
               g.beginPath();
@@ -4703,7 +4969,8 @@
 
 
             var one = /^\/(\S*)$/.exec(line);
-            if (one && one[1].length >= 1 && sugOpen.length === 0 &&
+            if (window.educadClassroom && one && one[1].length >= 1 &&
+                sugOpen.length === 0 &&
                 '/auto'.indexOf('/' + one[1]) === 0) {
               sugOpen = [{ text: '/auto ', display: '/auto',
                 hint: 'Draw from words (teachers)', kind: 'command' }];
@@ -4716,10 +4983,12 @@
           if (cmdPreview) {
             if (EduCADSettings.get(settingsStore, 'commandPreview')) {
               var text = '';
-              if (isAutoLine(line)) {
-                text = 'Describe the model — Enter draws it (teachers).';
-              } else if (EduCADCommand.isNaturalRequest(line)) {
-                text = 'Describe the drawing in words — Enter interprets it.';
+              if (isAutoLine(line) || EduCADCommand.isNaturalRequest(line)) {
+                text = window.educadClassroom
+                  ? (isAutoLine(line)
+                    ? 'Describe the model — Enter draws it (teachers).'
+                    : 'Describe the drawing in words — Enter interprets it.')
+                  : publicCmdHint();
               } else {
                 try {
                   text = EduCADCommand.preview(line,
@@ -4796,6 +5065,7 @@
           return res;
         }
         function currentRole() {
+          if (!window.educadClassroom) return 'public';
           try {
             if (typeof window.EduCADSaves !== 'undefined') {
               var s = window.EduCADSaves.currentSession();
@@ -4807,6 +5077,9 @@
         function isAutoLine(line) {
           var t = String(line).replace(/^\s+|\s+$/g, '');
           return /^\/auto(?:\s|$)/.test(t);
+        }
+        function publicCmdHint() {
+          return 'Public workspace: use exact drawing commands such as /point P 20 30 — type /help.';
         }
         function pushHistory(line) {
           if (EduCADSettings.get(settingsStore, 'commandHistory')) {
@@ -4856,6 +5129,11 @@
           friendly: interpretFriendly
         });
         function runInterpret(text, mode, replace) {
+          if (!window.educadClassroom) {
+            var localMessage = publicCmdHint();
+            showCmdStatus(false, localMessage);
+            return Promise.resolve({ ok: false, message: localMessage });
+          }
           showCmdStatus(true, mode === 'auto' ? 'Drawing your model…' : 'Interpreting…');
           return interpretRunner(text, mode, replace).then(function (res) {
             showCmdStatus(res.ok, res.message);
@@ -4917,6 +5195,11 @@
               e.preventDefault();
               var line = cmdInput.value;
               if (line.replace(/^\s+|\s+$/g, '') === '') return;
+              if (!window.educadClassroom &&
+                  (isAutoLine(line) || EduCADCommand.isNaturalRequest(line))) {
+                showCmdStatus(false, publicCmdHint());
+                return;
+              }
               if (isAutoLine(line)) {
                 var desc = line.replace(/^\s*\/auto\s*/, '').replace(/\s+$/g, '');
                 if (currentRole() !== 'teacher' && currentRole() !== 'academics') {
@@ -5027,6 +5310,7 @@
           typeof EduCADMobile.mount === 'function') {
         try {
           mobileShell = EduCADMobile.mount({
+            classroom: !!window.educadClassroom,
             getMode: function () { return handle.measure.mode; },
             isInspection: function () { return mobileInspection; },
             canEdit: function () { return !mobileInspection; },
@@ -5119,6 +5403,16 @@
         }
       }
 
+      if (window.EduCADTheme && typeof window.EduCADTheme.onChange === 'function') {
+        window.EduCADTheme.onChange(function () {
+          try { renderLayer1(); } catch (err) {}
+          try { renderLayer2(null, null); } catch (err) {}
+          if (handle.solid && typeof handle.solid.scheduleDraw === 'function') {
+            handle.solid.scheduleDraw();
+          }
+        });
+      }
+
       console.log('EduCAD Web App initialized successfully!');
     })();
 </script>
@@ -5132,18 +5426,29 @@
     (function savesUI() {
       if (typeof window.EduCADSaves === 'undefined') return;
       var Saves = window.EduCADSaves;
+      var Local = window.EduCADLocalDrawings || null;
+      var classroom = !!window.educadClassroom;
       function $(id) { return document.getElementById(id); }
       function table() {
         var h = window.educadHandle;
         return (h && h.table) || null;
+      }
+      function storeMessage(err) {
+        return (err && err.message) || 'Browser drawing storage is unavailable.';
       }
       function fail(msg) {
         return function (err) {
           status(msg + (err && err.message ? ': ' + err.message : ''));
         };
       }
+      function localFail(msg) {
+        return function (err) { status(msg + ': ' + storeMessage(err)); };
+      }
 
       var current = { id: null, title: '' };
+      var sheetGeneration = 0;
+      var localWriteInFlight = false;
+      function noteSheetChange() { sheetGeneration++; }
 
 
       function mobileWriteBlocked(msg) {
@@ -5155,14 +5460,25 @@
         }
         return blocked;
       }
+      function deselectSheet() {
+        var h = window.educadHandle;
+        if (h && h.sel && window.EduCADCanvas &&
+            typeof window.EduCADCanvas.deselect === 'function') {
+          try { window.EduCADCanvas.deselect(h.sel); } catch (err) {}
+        }
+      }
+      function mobileTitle(title) {
+        if (typeof window.educadMobileTitle === 'function') {
+          window.educadMobileTitle(title || 'Drawing');
+        }
+      }
 
 
       window.educadNoteDrawing = function (id, title) {
+        noteSheetChange();
         current.id = id;
         current.title = title || '';
-        if (typeof window.educadMobileTitle === 'function') {
-          window.educadMobileTitle(current.title || 'Drawing');
-        }
+        mobileTitle(current.title || 'Drawing');
       };
       var statusEl = $('save-status');
       function status(msg) { if (statusEl) statusEl.textContent = msg || ''; }
@@ -5181,27 +5497,82 @@
       var t0 = table();
       if (t0 && typeof t0.subscribe === 'function') {
         t0.subscribe(function (op) {
-          if (op === 'clear') { current.id = null; current.title = ''; }
+          if (op === 'clear') {
+            current.id = null;
+            current.title = '';
+            noteSheetChange();
+          }
         });
       }
 
-      var saveBtn = $('btn-save');
-      if (saveBtn) saveBtn.addEventListener('click', function () {
+      function sheetSnapshot() {
+        var t = table();
+        if (!t) { status('Sheet not ready.'); return null; }
+        try {
+          return Saves.snapshotTable(t);
+        } catch (err) {
+          status('Could not read the sheet: ' + (err && err.message ? err.message : 'snapshot failed') + '.');
+          return null;
+        }
+      }
+
+      function saveLocal(asNew) {
+        if (mobileWriteBlocked('Saving is unavailable in mobile inspection.')) return;
+        if (!Local) { status('Browser drawing storage is unavailable in this browser.'); return; }
+        if (localWriteInFlight) { status('A save is already in progress.'); return; }
+        var snap = sheetSnapshot();
+        if (!snap) return;
+        var gen = sheetGeneration;
+        function associate(rec) {
+          if (gen !== sheetGeneration) return;
+          current.id = rec.id;
+          current.title = rec.title;
+          mobileTitle(rec.title);
+        }
+        function createNew(defaultTitle) {
+          localWriteInFlight = true;
+          var title = window.prompt('Drawing name:', defaultTitle || 'Untitled');
+          if (title === null) { localWriteInFlight = false; return; }
+          Local.create(title, snap).then(function (rec) {
+            localWriteInFlight = false;
+            associate(rec);
+            noteSheetChange();
+            status('Saved "' + rec.title + '" in this browser ' + stamp());
+            if (panel && !panel.hidden) refreshPanel();
+          }, function (err) {
+            localWriteInFlight = false;
+            localFail('Save failed')(err);
+          });
+        }
+        if (asNew || current.id === null) {
+          createNew(current.title || 'Untitled');
+          return;
+        }
+        var id = current.id;
+        localWriteInFlight = true;
+        Local.update(id, { data: snap }).then(function (rec) {
+          localWriteInFlight = false;
+          if (gen === sheetGeneration) {
+            current.title = rec.title;
+            mobileTitle(rec.title);
+          }
+          status('Saved "' + rec.title + '" in this browser ' + stamp());
+          if (panel && !panel.hidden) refreshPanel();
+        }, function (err) {
+          localWriteInFlight = false;
+          localFail('Save failed')(err);
+        });
+      }
+
+      function saveClassroom() {
         if (mobileWriteBlocked('Saving is unavailable in mobile inspection.')) return;
         var s = Saves.currentSession();
         if (Saves.isGuest(s)) {
           status('Log in to save drawings (guest is local-only).');
           return;
         }
-        var t = table();
-        if (!t) { status('Sheet not ready.'); return; }
-        var snap;
-        try {
-          snap = Saves.snapshotTable(t);
-        } catch (err) {
-          status('Snapshot failed.');
-          return;
-        }
+        var snap = sheetSnapshot();
+        if (!snap) return;
         var fi = window.fetch.bind(window);
         if (current.id) {
           Saves.updateDrawing(fi, s, current.id, { data: snap }).then(function () {
@@ -5209,25 +5580,34 @@
           }, fail('Save failed'));
           return;
         }
-        var title = window.prompt('Drawing title:', 'Untitled');
+        var title = window.prompt('Drawing title:', current.title || 'Untitled');
         if (title === null) return;
         Saves.createDrawing(fi, s, title || 'Untitled', snap).then(function (data) {
           current.id = data.id;
           current.title = title || 'Untitled';
           status('Saved ' + stamp());
         }, fail('Save failed'));
+      }
+
+      var saveBtn = $('btn-save');
+      if (saveBtn) saveBtn.addEventListener('click', function () {
+        if (classroom) saveClassroom();
+        else saveLocal(false);
       });
 
       var panel = $('drawings-panel');
       function hidePanel() { if (panel) panel.hidden = true; }
       function fmtDate(ts) {
+        var value = Number(ts);
+        if (!isFinite(value) || value <= 0) return '';
+        if (value < 1e12) value *= 1000;
         try {
-          return new Date(ts * 1000).toLocaleString();
+          return new Date(value).toLocaleString();
         } catch (err) {
           return '';
         }
       }
-      function renderList(items) {
+      function panelHeader() {
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         var head = document.createElement('div');
         head.className = 'cf-title';
@@ -5239,9 +5619,28 @@
         x.addEventListener('click', hidePanel);
         head.appendChild(x);
         panel.appendChild(head);
+      }
+      function renderList(items) {
+        panelHeader();
+        if (!classroom) {
+          var hint = document.createElement('div');
+          hint.className = 'cf-muted';
+          hint.textContent = 'Saved in this browser only.';
+          panel.appendChild(hint);
+          var actions = document.createElement('div');
+          actions.className = 'cf-row';
+          var saveAs = document.createElement('button');
+          saveAs.className = 'demo-btn';
+          saveAs.type = 'button';
+          saveAs.textContent = 'Save as new...';
+          saveAs.addEventListener('click', function () { saveLocal(true); });
+          actions.appendChild(saveAs);
+          panel.appendChild(actions);
+        }
         if (!items.length) {
           var empty = document.createElement('div');
-          empty.textContent = 'No saved drawings yet.';
+          empty.textContent = classroom ? 'No saved drawings yet.' :
+            'No saved drawings in this browser yet.';
           empty.style.marginTop = '6px';
           panel.appendChild(empty);
           return;
@@ -5254,13 +5653,14 @@
           name.className = 'cf-name';
           row.appendChild(name);
           var when = document.createElement('div');
-          when.textContent = fmtDate(it.updated_at);
+          when.textContent = (it.when || fmtDate(it.updatedAt || it.updated_at)) +
+            (it.entities ? ' · ' + it.entities + ' entities' : '');
           when.className = 'cf-muted';
           row.appendChild(when);
           var load = document.createElement('button');
           load.className = 'demo-btn';
           load.type = 'button';
-          load.textContent = 'Load';
+          load.textContent = classroom ? 'Load' : 'Open';
           load.style.marginRight = '6px';
           load.addEventListener('click', function () { onLoad(it); });
           row.appendChild(load);
@@ -5273,50 +5673,91 @@
           panel.appendChild(row);
         });
       }
-      function onLoad(it) {
+      function onLocalLoad(it) {
+        Local.get(it.id).then(function (rec) {
+          var count;
+          try {
+            count = window.educadReplaceSheet(rec.data);
+          } catch (err) {
+            status('That drawing could not be opened: ' +
+              (err && err.message ? err.message : 'unreadable data') +
+              '. The sheet was not changed.');
+            return;
+          }
+          noteSheetChange();
+          current.id = rec.id;
+          current.title = rec.title;
+          mobileTitle(rec.title);
+          deselectSheet();
+          hidePanel();
+          status('Opened "' + rec.title + '" (' + count + ' entities) ' + stamp());
+        }, localFail('Open failed'));
+      }
+      function onServerLoad(it) {
         var s = Saves.currentSession();
         if (Saves.isGuest(s)) { hidePanel(); return; }
         var t = table();
         if (!t || !window.EduCADEntities) { status('Sheet not ready.'); return; }
         Saves.getDrawing(window.fetch.bind(window), s, it.id).then(function (data) {
           var count = window.educadReplaceSheet(data.data);
+          noteSheetChange();
           current.id = it.id;
           current.title = data.title || '';
-          if (typeof window.educadMobileTitle === 'function') {
-            window.educadMobileTitle(current.title || 'Drawing');
-          }
-          var h = window.educadHandle;
-          if (h && h.sel && window.EduCADCanvas &&
-              typeof window.EduCADCanvas.deselect === 'function') {
-            try { window.EduCADCanvas.deselect(h.sel); } catch (err) {}
-          }
+          mobileTitle(current.title || 'Drawing');
+          deselectSheet();
           hidePanel();
           status('Loaded ' + count + ' entities ' + stamp());
         }, fail('Load failed'));
       }
+      function onLoad(it) {
+        if (classroom) onServerLoad(it);
+        else onLocalLoad(it);
+      }
       function onDelete(it) {
         if (mobileWriteBlocked('Deleting is unavailable in mobile inspection.')) return;
         if (!window.confirm('Delete "' + (it.title || 'Untitled') + '"?')) return;
-        var s = Saves.currentSession();
-        if (Saves.isGuest(s)) return;
-        Saves.deleteDrawing(window.fetch.bind(window), s, it.id).then(function () {
+        if (classroom) {
+          var s = Saves.currentSession();
+          if (Saves.isGuest(s)) return;
+          Saves.deleteDrawing(window.fetch.bind(window), s, it.id).then(function () {
+            if (current.id === it.id) { current.id = null; current.title = ''; }
+            refreshPanel();
+          }, fail('Delete failed'));
+          return;
+        }
+        if (!Local) { status('Browser drawing storage is unavailable in this browser.'); return; }
+        Local.remove(it.id).then(function () {
           if (current.id === it.id) { current.id = null; current.title = ''; }
           refreshPanel();
-        }, fail('Delete failed'));
+        }, localFail('Delete failed'));
       }
       function refreshPanel() {
-        var s = Saves.currentSession();
-        if (Saves.isGuest(s)) {
-          status('Log in to open drawings (guest is local-only).');
+        if (classroom) {
+          var s = Saves.currentSession();
+          if (Saves.isGuest(s)) {
+            status('Log in to open drawings (guest is local-only).');
+            return;
+          }
+          panel.hidden = false;
+          panel.textContent = 'Loading…';
+          Saves.listDrawings(window.fetch.bind(window), s).then(function (data) {
+            renderList(data.drawings || []);
+          }, function (err) {
+            panel.textContent = 'Load failed' +
+              (err && err.message ? ': ' + err.message : '');
+          });
           return;
         }
         panel.hidden = false;
+        if (!Local) {
+          panel.textContent = 'Browser drawing storage is unavailable in this browser.';
+          return;
+        }
         panel.textContent = 'Loading…';
-        Saves.listDrawings(window.fetch.bind(window), s).then(function (data) {
-          renderList(data.drawings || []);
+        Local.list().then(function (items) {
+          renderList(items);
         }, function (err) {
-          panel.textContent = 'Load failed' +
-            (err && err.message ? ': ' + err.message : '');
+          panel.textContent = 'Saved drawings are unavailable: ' + storeMessage(err);
         });
       }
       var drawingsBtn = $('btn-drawings');
@@ -5326,22 +5767,99 @@
         else hidePanel();
       });
 
-
-      Saves.fetchProgress().then(function (r) {
-        if (r.skipped) return;
-        var buttons = {
-          square: 'btn-tut-square', prism: 'btn-tut-prism',
-          'three-view-prism': 'btn-tut-3v-prism',
-          'three-view-pyramid': 'btn-tut-3v-pyramid',
-          'three-view-cylinder': 'btn-tut-3v-cylinder',
-          'three-view-cone': 'btn-tut-3v-cone'
-        };
-        (r.progress || []).forEach(function (p) {
-          if (!p || !p.state || p.state.done !== true) return;
-          var b = buttons[p.lesson] ? $(buttons[p.lesson]) : null;
-          if (b && b.textContent.indexOf('✓') === -1) b.textContent += ' ✓';
+      var fileInput = $('drawing-file');
+      function importDrawing() {
+        if (mobileWriteBlocked('Importing is unavailable in mobile inspection.')) return;
+        if (!fileInput) return;
+        fileInput.value = '';
+        fileInput.click();
+      }
+      function exportDrawing() {
+        var snap = sheetSnapshot();
+        if (!snap) return;
+        var base = String(current.title || 'EduCAD drawing')
+          .replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() ||
+          'EduCAD drawing';
+        var url;
+        try {
+          url = URL.createObjectURL(new Blob([JSON.stringify(snap, null, 2)],
+            { type: 'application/json' }));
+        } catch (err) {
+          status('Export failed: this browser cannot create the file.');
+          return;
+        }
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = base + '.educad.json';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        window.setTimeout(function () {
+          try {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          } catch (err) {}
+        }, 0);
+        status('Exported "' + base + '" as a drawing file ' + stamp());
+      }
+      if (fileInput) fileInput.addEventListener('change', function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        var name = String(file.name || '')
+          .replace(/\.educad\.json$/i, '').replace(/\.json$/i, '') ||
+          'Imported drawing';
+        file.text().then(function (text) {
+          var data;
+          try {
+            data = JSON.parse(text);
+          } catch (err) {
+            throw new Error('that file is not valid JSON');
+          }
+          var snapshot = Saves.migrateSnapshot(data);
+          var count;
+          try {
+            count = window.educadReplaceSheet(snapshot);
+          } catch (err) {
+            throw new Error((err && err.message) || 'the drawing data is unreadable');
+          }
+          noteSheetChange();
+          current.id = null;
+          current.title = name;
+          mobileTitle(name);
+          deselectSheet();
+          status('Imported "' + name + '" (' + count + ' entities) ' + stamp());
+        }).catch(function (err) {
+          status('Import failed: ' +
+            (err && err.message ? err.message : 'the file could not be read') +
+            '. The sheet was not changed.');
+        }).then(function () {
+          fileInput.value = '';
         });
-      }, function () {});
+      });
+      var importBtn = $('btn-import');
+      if (importBtn) importBtn.addEventListener('click', importDrawing);
+      var exportBtn = $('btn-export');
+      if (exportBtn) exportBtn.addEventListener('click', exportDrawing);
+
+      if (classroom) {
+        Saves.fetchProgress().then(function (r) {
+          if (r.skipped) return;
+          var buttons = {
+            square: 'btn-tut-square', prism: 'btn-tut-prism',
+            'three-view-prism': 'btn-tut-3v-prism',
+            'three-view-pyramid': 'btn-tut-3v-pyramid',
+            'three-view-cylinder': 'btn-tut-3v-cylinder',
+            'three-view-cone': 'btn-tut-3v-cone',
+            'three-view-stepped-notch': 'btn-tut-3v-step',
+            'three-view-inclined-block': 'btn-tut-3v-inclined'
+          };
+          (r.progress || []).forEach(function (p) {
+            if (!p || !p.state || p.state.done !== true) return;
+            var b = buttons[p.lesson] ? $(buttons[p.lesson]) : null;
+            if (b && b.textContent.indexOf('✓') === -1) b.textContent += ' ✓';
+          });
+        }, function () {});
+      }
     })();
 </script>
 
@@ -5353,6 +5871,7 @@
 
 
     (function setsUI() {
+      if (!window.educadClassroom) return;
       if (typeof window.EduCADSaves === 'undefined') return;
       var Saves = window.EduCADSaves;
       function $(id) { return document.getElementById(id); }
@@ -6262,6 +6781,7 @@
 
 
     (function deepLink() {
+      if (!window.educadClassroom) return;
       if (typeof window.EduCADSaves === 'undefined') return;
       var Saves = window.EduCADSaves;
       function $(id) { return document.getElementById(id); }

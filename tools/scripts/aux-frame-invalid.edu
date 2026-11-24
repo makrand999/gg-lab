@@ -1,0 +1,3 @@
+# expect: auxFrames=0 auxFrameStatus=none auxReprojection=none status=empty-sketch
+/datum -50 150
+# reject: {"command":"/auxframe A1 0 0 0 0 1 0 0 1 0 0 0","contains":"perpendicular"}

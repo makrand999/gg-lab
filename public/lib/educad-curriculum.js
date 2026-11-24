@@ -711,6 +711,106 @@
   }
 
 
+  var MACHINE_BLOCKS = {
+    STEPPED_NOTCH: {
+      label: 'Stepped Notch Block',
+      widthMm: 70, depthMm: 50, heightMm: 30, xRefMm: 100,
+      points: {
+        PLAN: [[0,0],[70,0],[70,-50],[0,-50],[0,0],[40,0],[40,-20],[70,-20],[70,-50],[0,-50],[40,0],[70,0],[70,-20],[40,-20]],
+        ELEVATION: [[0,0],[70,0],[70,0],[0,0],[0,30],[40,30],[40,30],[70,30],[70,30],[0,30],[40,15],[70,15],[70,15],[40,15]],
+        PROFILE: [[100,0],[100,0],[150,0],[150,0],[100,30],[100,30],[120,30],[120,30],[150,30],[150,30],[100,15],[100,15],[120,15],[120,15]]
+      },
+      edges: {
+        PLAN: [[0,1,'E'],[2,1,'E'],[8,9,'A'],[9,4,'A'],[4,5,'A'],[5,6,'A'],[6,7,'A'],[7,8,'A'],[10,11,'A'],[11,12,'A']],
+        ELEVATION: [[2,3,'A'],[4,5,'E'],[6,7,'E'],[8,9,'A'],[10,11,'E'],[13,12,'E'],[3,9,'A'],[2,8,'A'],[1,11,'E'],[10,5,'E'],[13,6,'E'],[12,7,'E']],
+        PROFILE: [[3,0,'A'],[5,6,'E'],[7,8,'E'],[9,4,'A'],[11,12,'E'],[10,13,'E'],[0,4,'A'],[3,9,'A'],[1,11,'E'],[10,5,'E'],[13,6,'E'],[12,7,'E']]
+      },
+      prompt: 'Sketch the plan, elevation and profile, then mark every hidden edge. Check the 30 mm outline, the 15 mm terrace and the 40 mm inner wall against the 3D model.'
+    },
+    INCLINED: {
+      label: 'Inclined Block',
+      widthMm: 70, depthMm: 50, heightMm: 40, xRefMm: 100,
+      points: {
+        PLAN: [[0,0],[70,0],[70,-50],[0,-50],[0,0],[45,0],[70,0],[0,-30],[45,-30],[70,-30],[0,-30],[70,-30],[0,-50],[70,-50]],
+        ELEVATION: [[0,0],[70,0],[70,0],[0,0],[0,34],[45,18],[70,18],[0,34],[45,18],[70,18],[0,40],[70,40],[0,40],[70,40]],
+        PROFILE: [[100,0],[100,0],[150,0],[150,0],[100,34],[100,18],[100,18],[130,34],[130,18],[130,18],[130,40],[130,40],[150,40],[150,40]]
+      },
+      edges: {
+        PLAN: [[0,1,'E'],[2,1,'E'],[12,13,'A'],[3,0,'E'],[4,5,'A'],[5,6,'A'],[10,11,'A'],[8,9,'E'],[7,8,'E'],[4,7,'A'],[5,8,'A'],[6,9,'A'],[10,12,'A'],[11,13,'A']],
+        ELEVATION: [[2,3,'A'],[0,4,'E'],[1,6,'E'],[2,13,'A'],[3,12,'A'],[4,5,'E'],[7,8,'E'],[5,6,'E'],[8,9,'E'],[12,13,'A'],[7,10,'E'],[9,11,'E']],
+        PROFILE: [[3,0,'A'],[0,4,'A'],[1,6,'E'],[3,12,'A'],[5,4,'E'],[7,10,'A'],[9,11,'E'],[8,7,'E'],[4,7,'A'],[5,8,'E'],[6,9,'E'],[10,12,'A'],[11,13,'A']]
+      },
+      prompt: 'Sketch the three views and mark the hidden slope and 18 mm tread. Check the 34 mm near edge and the 45 mm tread break against the 3D model.'
+    }
+  };
+
+  function normalizeMachineBlock(name) {
+    var key = String(name === undefined ? 'STEPPED_NOTCH' : name)
+      .trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (key === 'STEPPED' || key === 'NOTCH' || key === 'STEPPED_NOTCH_BLOCK') key = 'STEPPED_NOTCH';
+    if (key === 'INCLINED_BLOCK' || key === 'RAMP' || key === 'RAMP_BLOCK') key = 'INCLINED';
+    if (!MACHINE_BLOCKS[key]) throw new Error('unknown machine block: ' + String(name));
+    return key;
+  }
+
+  function machineBlockSheet(opts) {
+    opts = opts || {};
+    var key = normalizeMachineBlock(opts.block);
+    var block = MACHINE_BLOCKS[key];
+    var roles = ['PLAN', 'ELEVATION', 'PROFILE'];
+    var map = { xRef: block.xRefMm, dRef: 0, s: 1, three: true, side: 'left' };
+    var prefix = 'mb-' + key.toLowerCase();
+    var ent = [], points = {}, corners = {};
+    function pointName(i, role) {
+      return 'p' + i + (role === 'ELEVATION' ? "'" : role === 'PROFILE' ? "''" : '');
+    }
+    roles.forEach(function (role) {
+      block.points[role].forEach(function (xy, i) {
+        var point = spec('POINT', {
+          x: xy[0], y: xy[1], bisCode: 'B', viewRole: role,
+          caption: pointName(i, role), showLabel: false,
+          meta: { kind: 'machine-block', block: key }
+        });
+        point.id = prefix + '-p-' + role.toLowerCase() + '-' + i;
+        points[role + ':' + i] = point;
+        ent.push(point);
+      });
+    });
+    block.points.PLAN.forEach(function (xy, i) {
+      corners['p' + i] = {
+        plan: { x: xy[0], y: xy[1] },
+        elev: { x: block.points.ELEVATION[i][0], y: block.points.ELEVATION[i][1] }
+      };
+    });
+    var datum = spec('DATUM_AXIS', {
+      x: -40, y: 0, x2: block.xRefMm + block.depthMm + 20, y2: 0,
+      bisCode: 'G', viewRole: 'BOTH', caption: 'XY', showLabel: true,
+      meta: { kind: 'XY', draftingLayout: map }
+    });
+    datum.id = prefix + '-datum';
+    ent.push(datum);
+    var segmentIndex = 0;
+    roles.forEach(function (role) {
+      block.edges[role].forEach(function (edge) {
+        var a = points[role + ':' + edge[0]], b = points[role + ':' + edge[1]];
+        var segment = spec('SEGMENT', {
+          x: a.x, y: a.y, x2: b.x, y2: b.y,
+          bisCode: edge[2], viewRole: role,
+          caption: '', showLabel: false,
+          meta: {
+            kind: 'machine-block-edge', block: key,
+            refs: [a.id, b.id]
+          }
+        });
+        segment.id = prefix + '-line-' + (segmentIndex++);
+        ent.push(segment);
+      });
+    });
+    return {
+      label: block.label, entities: ent, corners: corners, prompt: block.prompt
+    };
+  }
+
   function generateLesson(kind, opts) {
     var k = String(kind === undefined ? '' : kind).trim().toUpperCase().replace(/[-\s]+/g, '_');
     if (k === 'POINT' || k === 'QUADRANT' || k === 'QUADRANT_POINT') return quadrantPoint(opts);
@@ -802,6 +902,8 @@
     regularSolid: regularSolid, solidLesson: regularSolid, solid: regularSolid, solid35mm: regularSolid,
     profileSquare: profileSquare, squareLesson: profileSquare,
     threeViewSheet: threeViewSheet,
+    machineBlockSheet: machineBlockSheet,
+    MACHINE_BLOCKS: MACHINE_BLOCKS,
     generateLesson: generateLesson, generate: generateLesson, buildLesson: generateLesson,
     generateCurriculum: generateCurriculum, buildCurriculum: generateCurriculum,
     curriculum: generateCurriculum, fullCurriculum: generateCurriculum,

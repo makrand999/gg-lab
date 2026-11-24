@@ -1,0 +1,45 @@
+# expect: 96V 144E 52F curves=4 surfaces=6 surfaceKinds=cylinder,plane surfaceLoops=8 surfaceShells=2 surfaceOpen=0 surfaceBoundary=0 surfaceModel=ok surfaceCertificate=ok surfaceValidation=issues status=partial unresolved=3 diagnostics=curve-projection-ambiguous,recess-depth-missing previewParity=ok previewJunction=0 previewJunctionEvidence=0
+/datum -160 120
+/profile 100 0 1
+/point a0 -20 0 elevation
+/point a1 20 0 elevation
+/point a2 20 70 elevation
+/point a3 -20 70 elevation
+/line a0 a1 A elevation
+/line a1 a2 A elevation
+/line a2 a3 A elevation
+/line a3 a0 A elevation
+/point ac 0 -35 plan
+/circle ac 20 A plan
+/point ap0 115 0 profile
+/point ap1 155 0 profile
+/point ap2 155 70 profile
+/point ap3 115 70 profile
+/line ap0 ap1 A profile
+/line ap1 ap2 A profile
+/line ap2 ap3 A profile
+/line ap3 ap0 A profile
+/point b0 -45 27 elevation
+/point b1 5 27 elevation
+/point b2 5 43 elevation
+/point b3 -45 43 elevation
+/line b0 b1 A elevation
+/line b1 b2 A elevation
+/line b2 b3 A elevation
+/line b3 b0 A elevation
+/point bc 135 35 profile
+/circle bc 8 A profile
+/point bp0 -45 -27 plan
+/point bp1 -45 -43 plan
+/point bp2 5 -43 plan
+/point bp3 5 -27 plan
+/line bp0 bp1 A plan
+/line bp1 bp2 A plan
+/line bp2 bp3 A plan
+/line bp3 bp0 A plan
+# surface-query: {"operation":"topology","expect":{"contract":"analytic-topology-v1","summary":{"faces":6,"edges":4,"vertices":4,"loops":8,"openEdges":0,"sharedEdges":4,"nonmanifoldEdges":0,"status":"closed"}}}
+# surface-query: {"operation":"topology","curveKind":"cylinder-intersection","expect":{"summary":{"edges":0},"edges":[]}}
+# surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":6,"edges":4,"convex":2,"concave":2,"smooth":0,"open":0,"unknown":0,"recesses":0,"fillets":0}}}
+# surface-query: {"operation":"projection-segments","view":"front","expect":{"seamCurves":0,"seamDashed":0}}
+# surface-query: {"operation":"solid-junction","expect":{"contract":null,"seams":0,"curveCount":0,"payloadParity":true,"loopsParity":true}}
+# surface-query: {"operation":"solid-edges","yaw":0,"pitch":0,"expect":{"seamEdges":0,"seamVisible":0,"seamHidden":0}}

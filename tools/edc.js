@@ -14,6 +14,7 @@ var E = require('../public/lib/educad-entities.js');
 var R = require('../public/lib/educad-reconstruct.js');
 var P = require('../public/lib/educad-project.js');
 var Surfaces = require('../public/lib/educad-surfaces.js');
+var DrawingSections = require('../public/lib/educad-drawing-sections.js');
 var Implicit = require('../public/lib/educad-implicit.js');
 var Parametric = require('../public/lib/educad-parametric.js');
 var Ref3d = require('../public/lib/educad-ref3d.js');
@@ -23,12 +24,24 @@ function baseName(caption) {
   return String(caption).replace(/['’′]+$/, '').toLowerCase();
 }
 
+function curveViewPoint(p, role, frame) {
+  if (role === 'PLAN') return {x:p.x, y:-p.z};
+  if (role === 'ELEVATION') return {x:p.x, y:p.y};
+  if (role === 'PROFILE' && frame) return {x:frame.xRef + frame.s*(p.z - frame.dRef), y:p.y};
+  return null;
+}
+
+function curveSignature(curves) {
+  return JSON.stringify(curves || []);
+}
+
 
 
 function checkProjectors(table) {
   var groups = Object.create(null);
   table.list().forEach(function (e) {
-    if (e.type !== 'POINT' || e.viewRole === 'PROFILE') return;
+    if (e.type !== 'POINT' || e.viewRole === 'PROFILE' || e.viewRole === 'AUX' ||
+        e.meta && e.meta.kind === 'section-boundary-point') return;
     var b = baseName(e.caption || e.name);
     if (!groups[b]) groups[b] = [];
     groups[b].push(e);
@@ -132,6 +145,20 @@ function runScript(text, options) {
   var solid = R.reconstruct(table.list(), {identity: options.strict ? 'explicit' : 'auto'});
   var properties = topologyProperties(solid);
   properties.determination=solid.determination||'none';
+  var dimensionReport=solid&&solid.dimensionConstraints||null;
+  properties.dimensionStatus=dimensionReport?dimensionReport.status:'none';
+  properties.dimensionDriving=dimensionReport&&dimensionReport.summary?dimensionReport.summary.driving:0;
+  properties.dimensionMeasurements=dimensionReport&&dimensionReport.summary?dimensionReport.summary.measurements:0;
+  properties.dimensionSatisfied=dimensionReport&&dimensionReport.summary?dimensionReport.summary.satisfied:0;
+  properties.dimensionConflicts=dimensionReport&&dimensionReport.summary?dimensionReport.summary.conflicts:0;
+  properties.dimensionUnresolved=dimensionReport&&dimensionReport.summary?dimensionReport.summary.unresolved:0;
+  properties.dimensionAmbiguous=dimensionReport&&dimensionReport.summary?dimensionReport.summary.ambiguous:0;
+  properties.dimensionRefs=dimensionReport&&dimensionReport.dimensions.length?
+    (dimensionReport.dimensions.every(function(dimension){
+      return Array.isArray(dimension.refs)&&dimension.refs.length===2&&
+        dimension.refs.every(function(ref){return ref.resolved;});
+    })?'ok':'issues'):'none';
+  properties.dimensionDiagnostics=Array.from(new Set((dimensionReport&&dimensionReport.diagnostics||[]).map(function(d){return d.code;}))).sort().join(',')||'none';
   if(lines.some(function(line){return /^\s*#\s*expect:.*\bpreview[A-Z]/.test(line);})) {
     var saved=JSON.parse(JSON.stringify(Ref3d.buildPreview(table.list(),R)));
     function faceHoleSignature(holes) {
@@ -141,6 +168,7 @@ function runScript(text, options) {
     }
     properties.previewStatus=saved&&saved.status||'none';
     properties.previewDetermination=saved&&saved.determination||'none';
+    properties.previewDimensionStatus=saved&&saved.dimensionConstraints?saved.dimensionConstraints.status:'none';
     properties.previewDiagnostics=Array.from(new Set((saved&&saved.issues||[]).map(function(d){return d.code;}))).sort().join(',')||'none';
     properties.previewCertificateScope=saved&&saved.geometry&&saved.geometry.analyticCertificate&&saved.geometry.analyticCertificate.scope||'none';
     properties.previewValidationScope=saved&&saved.geometry&&saved.geometry.analyticSurfaceValidation&&saved.geometry.analyticSurfaceValidation.scope||'none';
@@ -150,22 +178,39 @@ function runScript(text, options) {
     properties.previewTrimExactness=savedTrims&&savedTrims.exactness||'none';
     properties.previewTrimVisible=savedTrims&&Number.isFinite(savedTrims.visible)?savedTrims.visible:0;
     properties.previewTrimUnsupported=savedTrims&&Number.isFinite(savedTrims.unsupported)?savedTrims.unsupported:0;
+    var savedJunction=saved&&saved.geometry&&saved.geometry.cylinderJunction||null;
+    properties.previewJunction=savedJunction&&Array.isArray(savedJunction.seams)?savedJunction.seams.length:0;
+    properties.previewJunctionEvidence=saved&&saved.geometry&&Array.isArray(saved.geometry.cylinderJunctionEvidence)?
+      saved.geometry.cylinderJunctionEvidence.length:0;
     if(lines.some(function(line){return /^\s*#\s*expect:.*\bsurfaceRevalidationScope\b/.test(line);})) {
       var probe=solid&&solid.geometry?JSON.parse(JSON.stringify(solid.geometry)):null;
       var revalidated=probe&&R.validateSurfaces?R.validateSurfaces(probe):null;
       properties.surfaceRevalidationScope=revalidated&&revalidated.certificate&&revalidated.certificate.scope||'none';
       properties.surfaceRevalidationValidationScope=revalidated&&revalidated.validation&&revalidated.validation.scope||'none';
     }
+    properties.previewCurveParity=saved&&saved.geometry&&solid.geometry?(curveSignature(saved.geometry.curves)===curveSignature(solid.geometry.curves)?'ok':'issues'):'none';
     properties.previewParity=Ref3d.validPreview(saved)&&saved.status===solid.status&&
       saved.determination===solid.determination&&JSON.stringify(saved.issues)===JSON.stringify(solid.issues||[])&&
-      (!solid.geometry||JSON.stringify(saved.geometry.vertices)===JSON.stringify(solid.geometry.vertices)&&
+      JSON.stringify(saved.dimensionConstraints||null)===JSON.stringify(solid.dimensionConstraints||null)&&
+      (!solid.geometry||!saved.geometry||curveSignature(saved.geometry.curves)===curveSignature(solid.geometry.curves)&&
+        JSON.stringify(saved.geometry.vertices)===JSON.stringify(solid.geometry.vertices)&&
         JSON.stringify(saved.geometry.edges)===JSON.stringify(solid.geometry.edges)&&JSON.stringify(saved.geometry.faces)===JSON.stringify(solid.geometry.faces)&&
         faceHoleSignature(saved.geometry.faceHoles)===faceHoleSignature(solid.geometry.faceHoles)&&
+        JSON.stringify(saved.geometry.sections||null)===JSON.stringify(solid.geometry.sections||null)&&
+        JSON.stringify(saved.geometry.surfacePatches||[])===JSON.stringify(solid.geometry.surfacePatches||[])&&
         JSON.stringify(saved.geometry.cavityVolumes||[])===JSON.stringify(solid.geometry.cavityVolumes||[])&&
         JSON.stringify(saved.geometry.cavityRelations||[])===JSON.stringify(solid.geometry.cavityRelations||[])&&
         JSON.stringify(saved.geometry.cavityUnions||[])===JSON.stringify(solid.geometry.cavityUnions||[])&&
         JSON.stringify(saved.geometry.cavityTrims||null)===JSON.stringify(solid.geometry.cavityTrims||null)&&
+        JSON.stringify(saved.geometry.cylinderJunction||null)===JSON.stringify(solid.geometry.cylinderJunction||null)&&
         JSON.stringify(saved.geometry.displaySync||null)===JSON.stringify(solid.geometry.displaySync||null))?'ok':'issues';
+        properties.previewSections=saved&&saved.geometry&&saved.geometry.sections?
+          saved.geometry.sections.status:'none';
+        properties.previewSectionPlanes=saved&&saved.geometry&&saved.geometry.sections&&
+          saved.geometry.sections.summary?saved.geometry.sections.summary.planes:0;
+        properties.previewSectionShells=saved&&saved.geometry&&saved.geometry.sections&&
+          saved.geometry.sections.retained?saved.geometry.sections.retained.filter(function(r){
+            return r&&r.status==='ok';}).length:0;
   }
   properties.rejected = rejected;
   var recessDepths=((solid.geometry||{}).recesses||[]).map(function(r){return r.depth;}).filter(Number.isFinite);
@@ -202,26 +247,72 @@ function runScript(text, options) {
     } catch(error) {return false;}
   })?'ok':'issues':'none';
   properties.curveFit=parametric.length?parametric.every(function(c){return Parametric.validate(c)&&c.interpolationPoints.every(function(p,i){var q=Parametric.point(c,c.parameters[i]);return Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z)<1e-6;});})?'ok':'issues':'none';
-  properties.curveReprojection=parametric.length?parametric.every(function(c){return c.sourceEvidence.every(function(evidence){
-    var source=table.get(evidence.entityId),definition=source.meta.curve,n=evidence.order.length,frame=solid.geometry.profileMap;
-    var count=c.closed?n:n-1;
-    for(var i=0;i<=40;i++) {
-      var t=i/40,station=t*count,index=Math.min(Math.floor(station),count-1),fraction=station-index;
-      var start=evidence.order[index],next=evidence.order[(index+1)%n],delta=next-start;
-      if(c.closed&&delta>1)delta-=n;if(c.closed&&delta< -1)delta+=n;
-      var sourceT=(start+fraction*delta)/count;
-      if(c.closed)sourceT=(sourceT%1+1)%1;
-      var p=Parametric.point(c,t),q=Parametric.point(definition,sourceT),x=p.x,y=source.viewRole==='PLAN'?-p.z:p.y;
-      if(source.viewRole==='PROFILE')x=frame.xRef+frame.s*(p.z-frame.dRef);
-      if(Math.hypot(x-q.x,y-q.y)>1e-6)return false;
-    }
-    return true;
-  });})?'ok':'issues':'none';
+  var curveReprojectionResidual=0,curveStationResidual=0,curveEvidence=0,curveEvidenceViews=new Set();
+  var curveReprojectionOk=parametric.length>0,curveStationOk=parametric.length>0;
+  parametric.forEach(function(c){
+    if(!Array.isArray(c.sourceEvidence)||!c.sourceEvidence.length){curveReprojectionOk=false;curveStationOk=false;return;}
+    c.sourceEvidence.forEach(function(evidence){
+      curveEvidence++;
+      var source=table.get(evidence.entityId),definition=source&&source.meta&&source.meta.curve,frame=(solid.geometry||{}).profileMap;
+      if(!source||!definition||!Array.isArray(evidence.order)){curveReprojectionOk=false;curveStationOk=false;return;}
+      curveEvidenceViews.add(source.viewRole);
+      var n=evidence.order.length,count=c.closed?n:n-1;
+      if(n<2||count<1||evidence.order.some(function(k){return !Number.isInteger(k)||k<0||k>=n;})){curveReprojectionOk=false;curveStationOk=false;return;}
+      for(var i=0;i<=40;i++) {
+        var t=i/40,station=t*count,index=Math.min(Math.floor(station),count-1),fraction=station-index;
+        var start=evidence.order[index],next=evidence.order[(index+1)%n],delta=next-start;
+        if(c.closed&&delta>1)delta-=n;if(c.closed&&delta< -1)delta+=n;
+        var sourceT=(start+fraction*delta)/count;
+        if(c.closed)sourceT=(sourceT%1+1)%1;
+        var p=Parametric.point(c,t),q=Parametric.point(definition,sourceT),projected=curveViewPoint(p,source.viewRole,frame);
+        if(!projected){curveReprojectionOk=false;return;}
+        curveReprojectionResidual=Math.max(curveReprojectionResidual,Math.hypot(projected.x-q.x,projected.y-q.y));
+      }
+      for(var k=0;k<n;k++) {
+        var stationPoint=table.get((source.meta.throughRefs||[])[evidence.order[k]]);
+        if(!stationPoint||stationPoint.type!=='POINT'){curveStationOk=false;continue;}
+        var at=Parametric.point(c,k/count),drawn=curveViewPoint(at,source.viewRole,frame);
+        if(!drawn){curveStationOk=false;continue;}
+        curveStationResidual=Math.max(curveStationResidual,Math.hypot(drawn.x-stationPoint.x,drawn.y-stationPoint.y));
+      }
+    });
+  });
+  properties.curveReprojection=parametric.length?(curveReprojectionOk&&curveReprojectionResidual<=1e-6?'ok':'issues'):'none';
+  properties.curveStationReprojection=parametric.length?(curveStationOk&&curveStationResidual<=1e-6?'ok':'issues'):'none';
+  properties.curveReprojectionResidual=curveReprojectionResidual;
+  properties.curveStationResidual=curveStationResidual;
+  properties.curveEvidence=curveEvidence;
+  properties.curveEvidenceViews=curveEvidenceViews.size?Array.from(curveEvidenceViews).sort().join(','):'none';
   if(parametric.length) {
     var preview=JSON.parse(JSON.stringify(Ref3d.buildPreview(table.list(),R)));
     properties.curvePreview=Ref3d.validPreview(preview)?'ok':'issues';
   } else properties.curvePreview='none';
   properties.obliqueReprojection = checkObliqueReprojection(solid, table.list());
+  var auxAudit = solid.geometry && solid.geometry.frameAudit || solid.frameAudit || null;
+  var auxFrames = solid.geometry && Array.isArray(solid.geometry.viewFrames) ?
+    solid.geometry.viewFrames : Array.isArray(solid.viewFrames) ? solid.viewFrames : [];
+  properties.auxFrames = auxFrames.length;
+  properties.auxFrameStatus = auxAudit ? auxAudit.status : properties.auxFrames ? 'ok' : 'none';
+  properties.auxPointRank = auxAudit && Number.isFinite(auxAudit.pointRank) ? auxAudit.pointRank : 0;
+  properties.auxPointConflicts = auxAudit && Number.isFinite(auxAudit.pointConflicts) ? auxAudit.pointConflicts : 0;
+  properties.auxReprojection = auxAudit ? auxAudit.status : 'none';
+  properties.auxUnresolved = auxAudit && Array.isArray(auxAudit.unresolvedIds) ? auxAudit.unresolvedIds.length : 0;
+  properties.auxDiagnostics = auxAudit && Array.isArray(auxAudit.issues) ?
+    (Array.from(new Set(auxAudit.issues.map(function (issue) { return issue.code; }))).sort().join(',') || 'none') : 'none';
+  if (properties.auxFrames) {
+    var auxPreview = JSON.parse(JSON.stringify(Ref3d.buildPreview(table.list(), R)));
+    properties.previewAux = auxPreview.status === 'ok' ?
+      (Ref3d.validPreview(auxPreview) ? 'ok' : 'issues') : 'none';
+    properties.previewAuxParity = auxPreview.status !== 'ok' ? 'none' :
+      (auxPreview.status === solid.status &&
+      JSON.stringify((auxPreview.geometry || {}).viewFrames || []) ===
+      JSON.stringify((solid.geometry || {}).viewFrames || []) &&
+      JSON.stringify((auxPreview.geometry || {}).frameAudit || null) ===
+      JSON.stringify((solid.geometry || {}).frameAudit || null) ? 'ok' : 'issues');
+  } else {
+    properties.previewAux = 'none';
+    properties.previewAuxParity = 'none';
+  }
   var projectionCurves=((solid.geometry || {}).curves || []).filter(function(c) {return c.oblique||c.analytic;});
   var obliqueCurves=projectionCurves.filter(function(c) {return c.oblique;});
   properties.oblique=projectionCurves.length;
@@ -349,6 +440,43 @@ function runScript(text, options) {
             validation:Surfaces.validate(splitModel,g),
             certificate:Surfaces.certify(splitModel,g)};
         } else result = {refused:true, diagnostic:splitDiagnostics[0] || null};
+      } else if (request.operation === 'section-boundary' || request.operation === 'retain-split') {
+        var sectionSpec = request.plane || (request.from !== undefined ? pick(request.from) : null);
+        var sectionPlane = sectionSpec && sectionSpec.kind === 'plane' ?
+          {origin:sectionSpec.origin, normal:sectionSpec.normal} : sectionSpec;
+        var normalizedSection = Surfaces.planeSpec(sectionPlane);
+        if (!normalizedSection && request.evidence && request.evidence.plane)
+          normalizedSection = Surfaces.planeSpec(request.evidence.plane);
+        if (!normalizedSection) throw new Error('Missing cutting plane');
+        var sectionEvidence = Object.assign({}, request.evidence || {}, {
+          plane:normalizedSection, status:'resolved', normal:normalizedSection.normal,
+          origin:normalizedSection.origin, side:request.side || request.keepSide ||
+            request.evidence && request.evidence.side || null,
+          retain:request.operation === 'retain-split',
+          sectionView:request.sectionView || null});
+        var sectionQuery = DrawingSections.sectionBoundary(g, sectionEvidence, request.options);
+        if (request.fromDrawing !== false) {
+          var drawingBoundaries = DrawingSections.collectBoundaries(table.list(), g && g.profileMap);
+          var planeKey = request.planeId || request.evidence && request.evidence.id || null;
+          var matchedBoundaries = drawingBoundaries.loops.filter(function (loop) {
+            return !loop.planeId || !planeKey || loop.planeId === planeKey;
+          });
+          sectionQuery.boundary = DrawingSections.compareBoundaries(sectionQuery,
+            matchedBoundaries, normalizedSection, sectionQuery.tolerance);
+        }
+        if (request.operation === 'retain-split') {
+          result = DrawingSections.retain(g, sectionEvidence, sectionQuery,
+            Object.assign({}, request.options || {}, {acceptAnalyticBoundary:request.acceptAnalyticBoundary === true}));
+          if (request.save && result && result.surfaces) {
+            if (typeof request.save === 'string') querySurfaces[request.save] = result.surfaces[0];
+            else {
+              if (request.save.retained) querySurfaces[request.save.retained] = result.surfaces[0];
+              if (request.save.removed) querySurfaces[request.save.removed] = result.removed[0];
+            }
+          }
+        } else result = sectionQuery;
+      } else if (request.operation === 'drawing-sections') {
+        result = DrawingSections.analyze(g, table.list(), request.options || {});
       } else if (request.operation === 'intersectionCurves') {
         var curveRefs = request.surfaces || [
           request.from !== undefined ? request.from : request.surface,
@@ -652,6 +780,10 @@ function runScript(text, options) {
         result = {value:evaluated.value, gradient:evaluated.gradient,
           gradientNorm:evaluatedGradient,
           residual:evaluatedGradient > 0 ? Math.abs(evaluated.value)/evaluatedGradient : null};
+      } else if (request.operation === 'parametric-surface-point') {
+        var patch = g.surfaces && g.surfaces[request.surface];
+        result = patch && patch.kind === 'parametric' ?
+          {kind:patch.analyticKind, point:Parametric.surfacePoint(patch.chart, request.u, request.v)} : {};
       } else if (request.operation === 'param-partial') {
         var chartEquation;
         if (request.chart) {
@@ -1000,6 +1132,166 @@ function runScript(text, options) {
         var topoSurfaces = request.surfaces ?
           topoRefs.map(pick).filter(Boolean) : topoRefs;
         result = Surfaces.topology(modelOf(topoSurfaces), g);
+        if (typeof request.curveKind === 'string') {
+          result.edges = result.edges.filter(function (edge) {
+            return edge.curveKind === request.curveKind;
+          });
+          result.summary.edges = result.edges.length;
+        }
+      } else if (request.operation === 'projection-segments') {
+        var projectionView = request.view || 'front';
+        var projectionMap = request.profileMap || (g && g.profileMap) || null;
+        var projected = P.projectGeometry(g, projectionView, projectionMap);
+        var seamCurves = (g && g.curves || []).filter(function (curve) {
+          return curve && curve.kind === 'cylinder-intersection';
+        });
+        var dashed = projected.filter(function (segment) {
+          return Number.isFinite(segment.dashDistanceMm);
+        });
+        var outputKeys = {}, seamDuplicate = 0;
+        dashed.forEach(function (segment) {
+          var keyA = Math.round(segment.ax * 1e6) + ',' + Math.round(segment.ay * 1e6);
+          var keyB = Math.round(segment.bx * 1e6) + ',' + Math.round(segment.by * 1e6);
+          var key = keyA < keyB ? keyA + '|' + keyB : keyB + '|' + keyA;
+          if (outputKeys[key]) seamDuplicate++;
+          else outputKeys[key] = true;
+        });
+        result = {view:projectionView, segments:projected.length,
+          seamCurves:seamCurves.length, seamDashed:dashed.length,
+          seamVisible:dashed.filter(function (segment) { return !segment.hidden; }).length,
+          seamHidden:dashed.filter(function (segment) { return segment.hidden; }).length,
+          seamSplit:dashed.filter(function (segment) {
+            return segment.intervals && segment.intervals.length > 1;
+          }).length,
+          seamUnique:Object.keys(outputKeys).length, seamDuplicate:seamDuplicate,
+          seamOwnedByBoth:seamCurves.every(function (curve) {
+            return Array.isArray(curve.surfaceIds) && curve.surfaceIds.length === 2;
+          }),
+          seamOwnership:seamCurves.map(function (curve, index) {
+            return {curveIndex:(g.curves || []).indexOf(curve), curveId:curve.id || null,
+              surfaceIds:(curve.surfaceIds || []).slice(),
+              largerSurfaceId:curve.largerSurfaceId || null,
+              smallerSurfaceId:curve.smallerSurfaceId || null,
+              largerPatch:curve.largerPatch, smallerPatch:curve.smallerPatch,
+              sourceIds:(curve.sourceIds || []).slice()};
+          })};
+      } else if (request.operation === 'solid-edges') {
+        var Solid = require('../public/lib/educad-solid.js');
+        var edgeGeometry = Solid.createGeometry({name:g && g.name,
+          vertices:g.vertices, edges:g.edges, faces:g.faces || [],
+          faceHoles:g.faceHoles || [], smoothSideFaces:g.smoothSideFaces || [],
+          curves:g.curves || [], surfaces:g.surfaces || []});
+        var solidState = Solid.createSolidState({geometry:edgeGeometry,
+          yaw:Number.isFinite(request.yaw) ? request.yaw : 0,
+          pitch:Number.isFinite(request.pitch) ? request.pitch : 0});
+        var solidEdges = Solid.classifyEdges(solidState);
+        var seamEdgeIndices = new Set();
+        (g.curves || []).forEach(function (curve) {
+          if (!curve || curve.solidJunction !== true) return;
+          (curve.displayEdges || []).forEach(function (index) {
+            seamEdgeIndices.add(index);
+          });
+        });
+        var seamEdges = solidEdges.filter(function (edge) {
+          return seamEdgeIndices.has(edge.index);
+        });
+        result = {total:solidEdges.length,
+          hidden:solidEdges.filter(function (edge) { return edge.hidden; }).length,
+          seamEdges:seamEdges.length,
+          seamVisible:seamEdges.filter(function (edge) { return !edge.hidden; }).length,
+          seamHidden:seamEdges.filter(function (edge) { return edge.hidden; }).length};
+      } else if (request.operation === 'solid-junction') {
+        function analyticPayload(curve) {
+          if (!curve) return null;
+          return {kind:curve.kind, origin:curve.origin, u:curve.u, v:curve.v,
+            direction:curve.direction, radius:curve.radius, otherRadius:curve.otherRadius,
+            startAngle:curve.startAngle, sweepAngle:curve.sweepAngle, closed:curve.closed,
+            sourceIds:curve.sourceIds || [], surfaceIds:curve.surfaceIds || [],
+            largerSurfaceId:curve.largerSurfaceId, smallerSurfaceId:curve.smallerSurfaceId};
+        }
+        function junctionPayload(row) {
+          if (!row) return null;
+          return {contract:row.contract, status:row.status, exactness:row.exactness,
+            displayTrim:row.displayTrim, displayDiagnostic:row.displayDiagnostic,
+            seams:row.seams};
+        }
+        function junctionLoopPayload(source) {
+          return ((source && source.surfaces) || []).filter(function (surface) {
+            return surface.analyticJunction;
+          }).map(function (surface) {
+            return {id:surface.id, patchIndex:surface.patchIndex, loops:surface.loops};
+          });
+        }
+        var beforeJunction = g && g.cylinderJunction || null;
+        var beforePayload = ((g && g.curves) || []).filter(function (curve) {
+          return curve && curve.kind === 'cylinder-intersection';
+        }).map(analyticPayload);
+        var beforeLoops = junctionLoopPayload(g);
+        var seamDisplayEdges = ((g && g.curves) || []).filter(function (curve) {
+          return curve && curve.kind === 'cylinder-intersection';
+        }).reduce(function (indices, curve) {
+          return indices.concat(curve.displayEdges || []);
+        }, []);
+        var faceUse = new Map();
+        ((g && g.faces) || []).forEach(function (face, faceIndex) {
+          for (var i = 0; i < face.length; i++) {
+            var a = face[i], b = face[(i + 1) % face.length];
+            var key = Math.min(a, b) + '_' + Math.max(a, b);
+            if (!faceUse.has(key)) faceUse.set(key, []);
+            faceUse.get(key).push(faceIndex);
+          }
+        });
+        var faceSurface = new Map();
+        ((g && g.surfaces) || []).forEach(function (surface) {
+          (surface.displayFaceIndices || []).forEach(function (faceIndex) {
+            if (!faceSurface.has(faceIndex)) faceSurface.set(faceIndex, surface);
+          });
+        });
+        var seamIncidentEdges = 0, seamTwoSidedEdges = 0;
+        var seamCurveOwners = ((g && g.curves) || []).filter(function (curve) {
+          return curve && curve.kind === 'cylinder-intersection';
+        }).reduce(function (ids, curve) {
+          return ids.concat(curve.surfaceIds || []);
+        }, []);
+        seamDisplayEdges.forEach(function (edgeIndex) {
+          var edge = g && g.edges && g.edges[edgeIndex];
+          if (!edge) return;
+          var key = Math.min(edge[0], edge[1]) + '_' + Math.max(edge[0], edge[1]);
+          var use = faceUse.get(key) || [];
+          if (use.length === 2) seamIncidentEdges++;
+          var owners = use.map(function (faceIndex) { return faceSurface.get(faceIndex); })
+            .filter(Boolean).map(function (surface) { return surface.id; });
+          var unique = Array.from(new Set(owners));
+          if (use.length === 2 && seamCurveOwners.every(function (id) {
+            return unique.indexOf(id) !== -1;
+          })) seamTwoSidedEdges++;
+        });
+        var probe = g ? JSON.parse(JSON.stringify(g)) : null;
+        var revalidated = probe && R.validateSurfaces ? R.validateSurfaces(probe) : null;
+        var afterPayload = ((probe && probe.curves) || []).filter(function (curve) {
+          return curve && curve.kind === 'cylinder-intersection';
+        }).map(analyticPayload);
+        result = {contract:beforeJunction && beforeJunction.contract || null,
+          status:beforeJunction && beforeJunction.status || null,
+          exactness:beforeJunction && beforeJunction.exactness || null,
+          displayTrim:beforeJunction && beforeJunction.displayTrim || null,
+          displayDiagnostic:beforeJunction && beforeJunction.displayDiagnostic || null,
+          seams:beforeJunction && Array.isArray(beforeJunction.seams) ? beforeJunction.seams.length : 0,
+          curveCount:beforePayload.length,
+          payloadParity:JSON.stringify(beforePayload) === JSON.stringify(afterPayload),
+          junctionParity:JSON.stringify(junctionPayload(beforeJunction)) ===
+            JSON.stringify(junctionPayload(probe && probe.cylinderJunction || null)),
+          loopsParity:JSON.stringify(beforeLoops) === JSON.stringify(junctionLoopPayload(probe)),
+          revalidationStatus:revalidated && revalidated.validation &&
+            revalidated.validation.status || null,
+          certificateStatus:revalidated && revalidated.certificate &&
+            revalidated.certificate.status || null,
+          seamDisplayEdges:seamDisplayEdges.length,
+          seamIncidentEdges:seamIncidentEdges,
+          seamTwoSidedEdges:seamTwoSidedEdges,
+          seamIncidentTwoSided:seamDisplayEdges.length > 0 &&
+            seamTwoSidedEdges === seamDisplayEdges.length,
+          curves:beforePayload};
       } else if (request.operation === 'visibility') {
         result = {hidden:!!P.pointHidden(g,request.point,request.view||'front')};
       } else if (request.operation === 'edge-visibility') {
@@ -1270,6 +1562,10 @@ function runScript(text, options) {
             center:trimPoint(b.center), radius:b.radius, radiusU:b.radiusU,
             radiusV:b.radiusV, start:trimPoint(b.start),
             end:trimPoint(b.end), startAngle:b.startAngle, sweepAngle:b.sweepAngle,
+            origin:trimPoint(b.origin), u:trimPoint(b.u), v:trimPoint(b.v),
+            direction:trimPoint(b.direction), otherRadius:b.otherRadius,
+            largerVolume:b.largerVolume, smallerVolume:b.smallerVolume,
+            floorContact:b.floorContact, closed:b.closed,
             events:(b.events || []).map(function (event) {
               return {kind:event.kind, source:event.source, member:event.member,
                 t:event.t, residual:event.residual};
@@ -1442,6 +1738,8 @@ function runScript(text, options) {
         });
         var inputBefore=JSON.stringify(imported);
         var rebuilt=R.reconstruct(imported,request.options||{}),persisted=Ref3d.buildPreview(imported,R);
+        var rebuiltSections=(rebuilt.geometry||{}).sections||null;
+        var previewSections=persisted&&persisted.geometry&&persisted.geometry.sections||null;
         result={status:rebuilt.status,determination:rebuilt.determination,
           vertices:((rebuilt.geometry||{}).vertices||[]).length,
           identity:rebuilt.pipeline&&rebuilt.pipeline.identity,
@@ -1450,9 +1748,24 @@ function runScript(text, options) {
           surfaceCertificateStatus:((rebuilt.geometry||{}).analyticCertificate||{}).status,
           curves:((rebuilt.geometry||{}).curves||[]).length,
           diagnostics:Array.from(new Set((rebuilt.issues||[]).map(function(d){return d.code;}))).sort(),
+          sectionStatus:rebuiltSections&&rebuiltSections.status||'none',
+          sectionPlanes:rebuiltSections&&rebuiltSections.summary?
+            rebuiltSections.summary.planes:0,
+          sectionQueries:rebuiltSections&&rebuiltSections.summary?
+            rebuiltSections.summary.queries:0,
+          sectionRetained:rebuiltSections&&rebuiltSections.summary?
+            rebuiltSections.summary.retained:0,
+          sectionUnresolved:rebuiltSections&&rebuiltSections.summary?
+            rebuiltSections.summary.unresolved:0,
+          sectionDiagnostics:Array.from(new Set((rebuiltSections&&rebuiltSections.diagnostics||[])
+            .map(function(d){return d.code;}))).sort().join(',')||'none',
+          sectionBoundaryStatus:rebuiltSections&&rebuiltSections.queries&&
+            rebuiltSections.queries[0]&&rebuiltSections.queries[0].boundary?
+            rebuiltSections.queries[0].boundary.status:'none',
           previewStatus:persisted.status,previewDetermination:persisted.determination,
           previewIdentity:persisted.pipeline&&persisted.pipeline.identity,
           previewVertices:((persisted.geometry||{}).vertices||[]).length,
+          previewSections:previewSections?previewSections.status:'none',
           sourceUnchanged:JSON.stringify(imported)===inputBefore,
           previewValid:Ref3d.validPreview(persisted)};
       } else if (request.operation === 'constraints') {
@@ -1462,6 +1775,22 @@ function runScript(text, options) {
         var ConstraintsSpec = require('../public/lib/educad-constraints.js');
         result = ConstraintsSpec.analyze(request.entities || [],
           {profileFrame:request.profileFrame || null});
+      } else if (request.operation === 'dimension-constraints') {
+        var DimensionConstraints = require('../public/lib/educad-constraints.js');
+        result = DimensionConstraints.analyzeDimensions(table.list(),
+          {profileFrame:g && g.profileMap, toleranceMm:request.toleranceMm,
+            axisEvidence:solid.dimensionAxes});
+      } else if (request.operation === 'dimension-constraints-spec') {
+        var DimensionConstraintsSpec = require('../public/lib/educad-constraints.js');
+        result = DimensionConstraintsSpec.analyzeDimensions(request.entities || [],
+          {profileFrame:request.profileFrame || null,
+            toleranceMm:request.toleranceMm});
+      } else if (request.operation === 'dimension-constraints-persisted') {
+        var Saves = require('../public/lib/educad-saves.js');
+        var restoredTable = E.createTable();
+        Saves.restoreTable(E, restoredTable, Saves.snapshotTable(table));
+        var restoredSolid = R.reconstruct(restoredTable.list(), {});
+        result = restoredSolid.dimensionConstraints || null;
       } else if (request.operation === 'view-state') {
         var ViewState = require('../public/lib/educad-constraints.js');
         result = ViewState.viewState(request.entities || table.list(),
@@ -2079,6 +2408,7 @@ function topologyProperties(solid) {
     frontHidden: front.filter(function(e) { return e.hidden; }).length,
     splitHidden: top.filter(function(e) { return e.intervals && e.intervals.length > 1; }).length,
     curves: (g.curves || []).length,
+    silhouettes: (g.silhouetteEvidence || []).length,
     oblique: (g.curves || []).filter(function(c) { return c.oblique; }).length,
     spheres: (g.spheres || []).length,
     surfaces: analytic.length,
@@ -2100,6 +2430,20 @@ function topologyProperties(solid) {
     displaySync: g.displaySync ? g.displaySync.status : 'none',
     displaySyncIssues: g.displaySync && (g.displaySync.diagnostics || []).length ?
       Array.from(new Set(g.displaySync.diagnostics.map(function(d) { return d.code; }))).sort().join(',') : 'none',
+    sectionStatus: g.sections ? g.sections.status : 'none',
+    sectionPlanes: g.sections && g.sections.summary ? g.sections.summary.planes : 0,
+    sectionQueries: g.sections && g.sections.summary ? g.sections.summary.queries : 0,
+    sectionRetained: g.sections && g.sections.summary ? g.sections.summary.retained : 0,
+    sectionUnresolved: g.sections && g.sections.summary ? g.sections.summary.unresolved : 0,
+    sectionDiagnostics: g.sections && (g.sections.diagnostics || []).length ?
+      Array.from(new Set(g.sections.diagnostics.map(function(d) { return d.code; }))).sort().join(',') : 'none',
+    sectionBoundaryStatus: g.sections && g.sections.queries && g.sections.queries[0] &&
+      g.sections.queries[0].boundary ? g.sections.queries[0].boundary.status : 'none',
+    sectionShellStatus: g.sections && g.sections.retained && g.sections.retained[0] ?
+      g.sections.retained[0].status : 'none',
+    sectionShellClosed: g.sections && g.sections.retained && g.sections.retained[0] &&
+      g.sections.retained[0].certificate && g.sections.retained[0].certificate.counts ?
+      g.sections.retained[0].certificate.counts.closedShells : 0,
     recesses: (g.recesses || []).length,
     fillets: (g.fillets || []).length,
     minRadius: (g.curves || []).length ? Math.min.apply(null,g.curves.map(function(c) {return c.radius||0;})) : 0,
@@ -2280,7 +2624,7 @@ function junitReport(corpus) {
   return out.join('\n');
 }
 
-if (require.main === module) process.exit(main(process.argv));
+if (require.main === module) process.exitCode = main(process.argv);
 
 module.exports = {
   runScript: runScript,

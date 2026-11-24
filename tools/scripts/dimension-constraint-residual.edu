@@ -1,0 +1,7 @@
+# expect: dimensionStatus=inconsistent dimensionDriving=1 dimensionConflicts=1 dimensionDiagnostics=dimension-residual dimensionRefs=ok determination=inconsistent previewParity=ok previewDimensionStatus=inconsistent previewDiagnostics=dimension-residual surfaceChecks=2 surfaceQueries=ok
+/datum -50 100
+/point a 0 -10 plan
+/point b 30 -10 plan
+/dimension a b 40 plan
+# surface-query: {"operation":"dimension-constraints","expect":{"contract":"dimension-constraints-v1","status":"inconsistent","summary":{"dimensions":1,"driving":1,"satisfied":0,"conflicts":1,"unresolved":0},"dimensions":[{"view":"plan","axis":"x","targetMm":40,"measuredMm":30,"residualMm":-10,"status":"conflict"}],"diagnostics":[{"code":"dimension-residual"}]}}
+# surface-query: {"operation":"dimension-constraints-persisted","expect":{"contract":"dimension-constraints-v1","status":"inconsistent","summary":{"dimensions":1,"driving":1,"conflicts":1},"dimensions":[{"mode":"driving","targetMm":40,"refs":[{"resolved":true},{"resolved":true}]}],"diagnostics":[{"code":"dimension-residual"}]}}

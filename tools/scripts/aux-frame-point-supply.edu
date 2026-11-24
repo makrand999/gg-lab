@@ -1,0 +1,13 @@
+# expect: 2V 1E auxFrames=1 auxFrameStatus=ok auxPointRank=3 auxPointConflicts=0 auxReprojection=ok auxUnresolved=0 previewAux=ok previewAuxParity=ok determination=determined status=ok
+/datum -50 150
+/auxframe A1 0 0 0 0 0.7071067811865476 0.7071067811865476 1 0 0 100 0
+/point a 10 -6 plan
+/point b 30 -6 plan
+/point a2 110 9.899494936611665 aux:A1
+/point b2 130 9.899494936611665 aux:A1
+/line a b A plan
+/line a2 b2 A aux:A1
+/rename a a members
+/rename a2 a members
+/rename b b members
+/rename b2 b members

@@ -1,0 +1,9 @@
+# expect: dimensionStatus=ok dimensionDriving=2 dimensionSatisfied=2 dimensionConflicts=0 dimensionUnresolved=0 dimensionRefs=ok previewParity=ok previewDimensionStatus=ok previewDiagnostics=none
+/datum -50 100
+/point a 0 -10 plan
+/point b 30 -10 plan
+/point "a'" 0 20 elevation
+/point "b'" 30 20 elevation
+/dimension a b 30 plan
+/dimension "a'" "b'" 30 elevation
+# surface-query: {"operation":"dimension-constraints","expect":{"contract":"dimension-constraints-v1","status":"ok","summary":{"dimensions":2,"driving":2,"measurements":0,"satisfied":2,"conflicts":0,"unresolved":0,"ambiguous":0},"dimensions":[{"view":"plan","axis":"x","targetMm":30,"measuredMm":30,"residualMm":0,"status":"satisfied"}]}}

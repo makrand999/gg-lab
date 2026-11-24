@@ -1,0 +1,8 @@
+# expect: 24V 24E 1F auxFrames=1 auxFrameStatus=ok auxReprojection=ok unresolved=0 status=inferred
+/datum -30 70
+/auxframe A1 0 0 0 0 0.7071067811865476 0.7071067811865476 1 0 0 100 0
+/circle 20 30 20 A elevation
+/point a 0 -15 plan
+/point b 40 -15 plan
+/line a b A plan
+# surface-query: {"operation":"reconstruct","entityPatches":[{"entityId":"E2","patch":{"viewRole":"AUX","meta":{"frameId":"A1"}}}],"expect":{"diagnostics":["aux-curve-unsupported"]}}

@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-surfaces.js'), require('./educad-view-frame.js'));
-  else root.EduCADDrawingSections = factory(root.EduCADSurfaces, root.EduCADViewFrame);
-})(typeof window !== 'undefined' ? window : globalThis, function (Surfaces, ViewFrame) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-surfaces.js'), require('./educad-view-frame.js'), require('./educad-planar.js'));
+  else root.EduCADDrawingSections = factory(root.EduCADSurfaces, root.EduCADViewFrame, root.EduCADPlanar);
+})(typeof window !== 'undefined' ? window : globalThis, function (Surfaces, ViewFrame, Planar) {
   'use strict';
 
   var VERSION = '1.0.0-educad';
@@ -145,7 +145,7 @@
       sourceIds:(c.sourceIds || []).slice(), surfaceIds:(c.surfaceIds || []).slice()};
   }
   function reverseComponent(c) {
-    var out = cloneComponent(c);
+    var out = Object.assign({},c);
     if (out.kind === 'line') {
       var t = out.start; out.start = out.end; out.end = t;
       return out;
@@ -239,7 +239,16 @@
       status:fatal ? 'unresolved' : 'resolved', diagnostics:diagnostics};
   }
 
+  function sectionProfile(entities, profile) {
+    if (profile) return profile;
+    var datum = (entities || []).find(function (entity) {
+      return entity && entity.type === 'DATUM_AXIS' && entity.meta && entity.meta.draftingLayout;
+    });
+    return datum ? datum.meta.draftingLayout : null;
+  }
+
   function collectEvidence(entities, profile) {
+    profile = sectionProfile(entities, profile);
     var evidence = [], diagnostics = [];
     (entities || []).forEach(function (entity) {
       var spec = entity && entity.meta && entity.meta.section;
@@ -254,6 +263,7 @@
   }
 
   function collectBoundaries(entities, profile, registry) {
+    profile = sectionProfile(entities, profile);
     var groups = Object.create(null), diagnostics = [];
     var byId = Object.create(null);
     (entities || []).forEach(function (entity) { if (entity && entity.id) byId[entity.id] = entity; });
@@ -262,7 +272,8 @@
       if (!spec || typeof spec !== 'object') return;
       if (spec.contract && spec.contract !== BOUNDARY) return;
       if (spec.role && spec.role !== 'section-boundary') return;
-      var loopId = spec.loopId || ('loop:' + (spec.planeId || '') + ':' + (spec.points || []).join(','));
+      var loopId = spec.loopId || ('loop:' + (spec.planeId || '') + ':' +
+        (spec.shape === 'circle' ? entity.id : (spec.points || []).join(',')));
       var key = String(spec.planeId || '') + '|' + loopId;
       if (!groups[key]) groups[key] = {spec:spec, records:[]};
       groups[key].records.push(entity);
@@ -434,7 +445,8 @@
       nodes.push({point:copyPoint(p), edges:[]});
       return nodes.length - 1;
     }
-    edges.forEach(function (edge) {
+    edges.forEach(function (edge, index) {
+      edge.graphIndex = index;
       edge.a = nodeFor(edge.start);
       edge.b = nodeFor(edge.end);
       nodes[edge.a].edges.push(edge);
@@ -443,26 +455,24 @@
     var used = edges.map(function () { return false; });
     for (var i=0;i<edges.length;i++) {
       if (used[i]) continue;
-      var stack = [edges[i]], group = [], guard = 0;
+      var stack = [edges[i]], group = [];
       used[i] = true;
-      while (stack.length && guard++ <= edges.length + 1) {
+      while (stack.length) {
         var edge = stack.pop();
         group.push(edge);
         [edge.a, edge.b].forEach(function (nodeIndex) {
           nodes[nodeIndex].edges.forEach(function (other) {
-            var oi = edges.indexOf(other);
+            var oi = other.graphIndex;
             if (!used[oi]) { used[oi] = true; stack.push(other); }
           });
         });
       }
-      var bad = null;
-      group.forEach(function (edge) {
-        if (!bad && nodes[edge.a].edges.length !== 2) bad = {kind:'open', point:nodes[edge.a].point};
-        if (!bad && nodes[edge.b].edges.length !== 2) bad = {kind:'open', point:nodes[edge.b].point};
-        if (!bad && (nodes[edge.a].edges.length > 2 || nodes[edge.b].edges.length > 2))
-          bad = {kind:'ambiguous', point:nodes[edge.a].point};
-      });
-      if (bad) {
+      var connectedNodes = Array.from(new Set(group.flatMap(function (edge) { return [edge.a,edge.b]; })));
+      var junction = connectedNodes.find(function (node) { return nodes[node].edges.length > 2; });
+      var end = connectedNodes.find(function (node) { return nodes[node].edges.length < 2; });
+      if (junction !== undefined || end !== undefined) {
+        var bad = junction !== undefined ?
+          {kind:'ambiguous',point:nodes[junction].point} : {kind:'open',point:nodes[end].point};
         if (bad.kind === 'ambiguous') ambiguous.push(bad);
         else open.push(bad);
         diagnostics.push({code:bad.kind === 'ambiguous' ? 'section-boundary-ambiguous' : 'section-boundary-open',
@@ -472,8 +482,16 @@
           point:copyPoint(bad.point)});
         continue;
       }
-      loops.push({components:group.map(function (e) { return e.component; }),
-        componentIndices:group.map(function (e) { return e.index; }),
+      var ordered = [], componentIndices = [], next = group[0], cursor = next.a;
+      for (var step=0;step<group.length;step++) {
+        var forward = next.a === cursor;
+        ordered.push(forward ? next.component : reverseComponent(next.component));
+        componentIndices.push(next.index);
+        cursor = forward ? next.b : next.a;
+        var previous = next;
+        next = nodes[cursor].edges.find(function (candidate) { return candidate !== previous; });
+      }
+      loops.push({components:ordered, componentIndices:componentIndices,
         closed:true,
         sourceIds:Array.from(new Set(group.reduce(function (ids, e) {
           return ids.concat(e.component.sourceIds || []);
@@ -814,104 +832,168 @@
     return {loops:loops, open:open, ambiguous:ambiguous};
   }
 
-  function retainConvexPolyhedron(geometry, evidence, query) {
+  function signedPlanarArea(points) {
+    return points.reduce(function (sum, a, i) {
+      var b = points[(i + 1) % points.length];
+      return sum + a.x*b.y - b.x*a.y;
+    }, 0) / 2;
+  }
+
+  function planarPoint(point, origin, basis) {
+    var d = sub(point,origin);
+    return {x:dot(d,basis.u), y:dot(d,basis.v)};
+  }
+
+  function planarPatches(loops, origin, normal, basis, sourceIds) {
+    var patches = [];
+    function worldLoop(loop) {
+      var points = loop.points;
+      if ((signedPlanarArea(points) < 0) !== (loop.role === 'inner')) points = points.slice().reverse();
+      return {kind:loop.role, points:points.map(function (p) {
+        return add(origin, add(mul(basis.u,p.x), mul(basis.v,p.y)));
+      })};
+    }
+    loops.filter(function (loop) { return loop.role === 'outer'; }).forEach(function (loop) {
+      patches.push({boundary:loop.points, area:Math.abs(signedPlanarArea(loop.points)),
+        patch:{kind:'plane', origin:origin, normal:normal, sourceIds:sourceIds,
+          loops:[worldLoop(loop)]}});
+    });
+    for (var loop of loops) {
+      if (loop.role !== 'inner') continue;
+      var owners = patches.filter(function (entry) {
+        return Planar.pointInRegion(entry.boundary,loop.points[0]);
+      }).sort(function (a,b) { return a.area-b.area; });
+      if (!owners.length) return null;
+      owners[0].patch.loops.push(worldLoop(loop));
+    }
+    return patches.map(function (entry) { return entry.patch; });
+  }
+
+  function cutPlanarFace(surface, vertices, plane, inward, tolerance) {
+    var loops = surface.loops.map(function (loop) {
+      return {role:loop.kind, points:loop.vertices.map(function (index) { return vertices[index]; })};
+    });
+    var points = loops.flatMap(function (loop) { return loop.points; });
+    var distances = points.map(function (point) { return dot(inward,sub(point,plane.origin)); });
+    if (distances.every(function (d) { return d <= tolerance; })) return [];
+    var origin = points[0], normal = surface.normal, basis = planeBasis(surface);
+    var within = distances.every(function (d) { return d >= -tolerance; });
+    var tangent = sub(inward,mul(normal,dot(inward,normal)));
+    if (!within) {
+      var u = unit(tangent);
+      if (!u) return null;
+      basis = {u:u,v:cross(normal,u)};
+    }
+    var region = {loops:loops.map(function (loop) {
+      return {role:loop.role,points:loop.points.map(function (point) { return planarPoint(point,origin,basis); })};
+    })};
+    if (!within) {
+      var local = region.loops.flatMap(function (loop) { return loop.points; });
+      var xMax = Math.max.apply(null, local.map(function (p) { return p.x; }));
+      var ys = local.map(function (p) { return p.y; });
+      var lo = Math.min.apply(null,ys), hi = Math.max.apply(null,ys);
+      var margin = Math.max(1,hi-lo);
+      var threshold = -dot(inward,sub(origin,plane.origin))/length(tangent);
+      var half = [{x:threshold,y:lo-margin},{x:xMax+margin,y:lo-margin},
+        {x:xMax+margin,y:hi+margin},{x:threshold,y:hi+margin}];
+      var clipped = Planar.booleanRegion(region,half,'intersect');
+      if (!clipped.ok || !clipped.loops.length) return null;
+      region.loops = clipped.loops;
+    }
+    return planarPatches(region.loops,origin,normal,basis,surface.sourceIds);
+  }
+
+  function weldPlanarPatches(patches, tolerance) {
+    var points = [], incidence = new Map();
+    function pointIndex(point) {
+      var index = points.findIndex(function (p) { return distance(p,point) <= tolerance; });
+      return index >= 0 ? index : points.push(point)-1;
+    }
+    var boundaries = patches.map(function (patch) {
+      return patch.loops.map(function (loop) {
+        return loop.points.map(pointIndex).filter(function (index,i,all) {
+          return index !== all[(i+all.length-1) % all.length];
+        });
+      });
+    });
+    if (boundaries.some(function (loops) { return loops.some(function (loop) { return loop.length < 3; }); }))
+      return false;
+    patches.forEach(function (patch, pi) {
+      patch.loops.forEach(function (loop, li) {
+        var indices = boundaries[pi][li];
+        loop.lines = indices.flatMap(function (start, i) {
+          var end = indices[(i+1) % indices.length];
+          var vector = sub(points[end],points[start]), lengthSquared = dot(vector,vector);
+          var stations = [{index:start,t:0},{index:end,t:1}];
+          points.forEach(function (p, index) {
+            if (index === start || index === end) return;
+            var offset = sub(p,points[start]), t = dot(offset,vector)/lengthSquared;
+            if (t > 0 && t < 1 && length(sub(offset,mul(vector,t))) <= tolerance)
+              stations.push({index:index,t:t});
+          });
+          stations.sort(function (a,b) { return a.t-b.t; });
+          return stations.slice(1).map(function (b, j) {
+            var a = stations[j], low = Math.min(a.index,b.index), high = Math.max(a.index,b.index);
+            var id = 'section-edge:' + low + ':' + high;
+            if (!incidence.has(id)) incidence.set(id,[]);
+            incidence.get(id).push(a.index === low ? 1 : -1);
+            return {id:id,kind:'line',start:points[a.index],end:points[b.index]};
+          });
+        });
+        delete loop.points;
+      });
+    });
+    return Array.from(incidence.values()).every(function (uses) {
+      return uses.length === 2 && uses[0] === -uses[1];
+    });
+  }
+
+  function retainPlanarShell(geometry, evidence, query) {
     var surfaces = geometry.surfaces || [], vertices = geometry.vertices || [];
-    if (!surfaces.length || surfaces.some(function (surface) {
-      return surface.kind !== 'plane' || surface.loops.length !== 1 ||
-        !Array.isArray(surface.loops[0].vertices);
+    if (!Planar || query.status !== 'ok' || !surfaces.length || surfaces.some(function (surface) {
+      return surface.kind !== 'plane' || !surface.loops.length || surface.loops.some(function (loop) {
+        return !Array.isArray(loop.vertices) || loop.vertices.length < 3 ||
+          (loop.curves || []).length || (loop.lines || []).length || loop.elements || loop.section;
+      });
     })) return null;
     var original = geometry.analyticCertificate;
     if (!original || original.deferred)
       original = Surfaces.certify({surfaces:surfaces, diagnostics:[]}, geometry);
-    if (!original || original.status !== 'ok' || original.counts.closedShells !== 1 ||
+    if (!original || original.status !== 'ok' || !original.counts.closedShells ||
         original.counts.openComponents !== 0) return null;
-    var indices = Array.from(new Set(surfaces.flatMap(function (surface) {
-      return surface.loops[0].vertices;
-    })));
-    var plane = evidence.plane, tolerance = query.tolerance || EPS;
-    var center = mul(indices.reduce(function (sum, index) {
-      return add(sum, vertices[index]);
-    }, {x:0,y:0,z:0}), 1 / indices.length);
-    if (surfaces.some(function (surface) {
-      var direction = dot(surface.normal, sub(center, surface.origin));
-      return Math.abs(direction) <= tolerance || indices.some(function (index) {
-        return Math.sign(direction) * dot(surface.normal, sub(vertices[index], surface.origin)) < -tolerance;
-      });
-    })) return null;
-    var sign = evidence.side === 'positive' ? 1 : -1;
-    var distances = vertices.map(function (vertex) {
-      return sign * dot(plane.normal, sub(vertex, plane.origin));
-    });
-    if (!indices.some(function (index) { return distances[index] > tolerance; }) ||
-        !indices.some(function (index) { return distances[index] < -tolerance; })) return null;
-    var crossings = new Map(), cut = new Set();
-    function intersection(a, b) {
-      if (Math.abs(distances[a]) <= tolerance) return vertices[a];
-      if (Math.abs(distances[b]) <= tolerance) return vertices[b];
-      var low = Math.min(a, b), high = Math.max(a, b), key = low + ':' + high;
-      if (!crossings.has(key)) {
-        var delta = sub(vertices[high], vertices[low]);
-        crossings.set(key, add(vertices[low], mul(delta, distances[low] /
-          (distances[low] - distances[high]))));
-      }
-      return crossings.get(key);
-    }
-    var lineIds = new Map();
-    function patch(points, normal, sourceIds) {
-      var lines = points.map(function (start, index) {
-        var end = points[(index + 1) % points.length];
-        var key = [start, end].map(function (p) {
-          return [p.x, p.y, p.z].join(',');
-        }).sort().join('|');
-        if (!lineIds.has(key)) lineIds.set(key, 'section-edge:' + lineIds.size);
-        return {id:lineIds.get(key), kind:'line', start:start, end:end};
-      });
-      return {kind:'plane', origin:points[0], normal:normal, sourceIds:sourceIds,
-        loops:[{kind:'outer', lines:lines}]};
-    }
+
+    var plane = evidence.plane, normal = mul(plane.normal,evidence.side === 'positive' ? -1 : 1);
+    var tolerance = Math.max(EPS,(query.tolerance || EPS)*1e-3);
     var retained = [], removed = [];
-    surfaces.forEach(function (surface) {
-      var loop = surface.loops[0].vertices;
-      var clipped = [];
-      loop.forEach(function (a, i) {
-        var b = loop[(i + 1) % loop.length];
-        var keepA = distances[a] >= -tolerance, keepB = distances[b] >= -tolerance;
-        if (keepA) clipped.push(vertices[a]);
-        if (keepA !== keepB) clipped.push(intersection(a, b));
-      });
-      clipped = Array.from(new Set(clipped));
-      if (clipped.length < 3) {
-        removed.push(surface);
-        return;
-      }
-      clipped.forEach(function (point) {
-        if (pointOnPlane(point, plane) <= tolerance) cut.add(point);
-      });
-      var normal = dot(surface.normal, sub(center, surface.origin)) < 0 ?
-        surface.normal : mul(surface.normal, -1);
-      retained.push(patch(clipped, normal, surface.sourceIds));
-    });
-    var points = Array.from(cut);
-    if (points.length < 3) return null;
-    var origin = mul(points.reduce(add), 1 / points.length);
-    var normal = mul(plane.normal, -sign);
-    var right = unit(sub(points[0], origin));
-    if (!right) return null;
-    var up = cross(normal, right);
-    function angle(point) {
-      var offset = sub(point, origin);
-      return Math.atan2(dot(up, offset), dot(right, offset));
+    for (var surface of surfaces) {
+      var patches = cutPlanarFace(surface,vertices,plane,mul(normal,-1),tolerance);
+      if (!patches) return null;
+      if (patches.length) retained.push.apply(retained,patches);
+      else removed.push(surface);
     }
-    points.sort(function (a, b) { return angle(a) - angle(b); });
-    var cap = patch(points, normal, evidence.sourceIds);
-    var retainedGeometry = {vertices:[], curves:[], faces:[], surfacePatches:retained.concat(cap)};
+    var basis = planeBasis({normal:normal});
+    var rings = query.loops.map(function (loop) {
+      if (!loop.closed || loop.components.length < 3 || loop.components.some(function (c) { return c.kind !== 'line'; }))
+        return null;
+      return {points:loop.components.map(function (c) { return planarPoint(c.start,plane.origin,basis); })};
+    });
+    if (!rings.length || rings.includes(null)) return null;
+    rings.forEach(function (ring) {
+      var depth = rings.filter(function (other) {
+        return other !== ring && Planar.pointInRegion(other.points,ring.points[0]);
+      }).length;
+      ring.role = depth % 2 ? 'inner' : 'outer';
+    });
+    var caps = planarPatches(rings,plane.origin,normal,basis,evidence.sourceIds);
+    if (!caps || !caps.length || !weldPlanarPatches(retained.concat(caps),tolerance)) return null;
+    var retainedGeometry = {vertices:[], curves:[], faces:[], surfacePatches:retained.concat(caps)};
     var model = Surfaces.build(retainedGeometry);
-    var certificate = Surfaces.certify(model, retainedGeometry);
-    var validation = Surfaces.validate(model, retainedGeometry);
-    if (certificate.status !== 'ok' || certificate.counts.closedShells !== 1) return null;
+    var certificate = Surfaces.certify(model,retainedGeometry);
+    var validation = Surfaces.validate(model,retainedGeometry);
+    if (certificate.status !== 'ok' || !certificate.counts.closedShells || validation.status !== 'ok') return null;
     return {contract:RETAIN, kind:'section-split', status:'ok', plane:plane,
       side:evidence.side, section:query, surfaces:retained, removed:removed,
-      unresolved:[], cap:[cap], model:model.summary, certificate:certificate,
+      unresolved:[], cap:caps, model:model.summary, certificate:certificate,
       validation:validation, diagnostics:[],
       summary:{surfaces:surfaces.length, retained:retained.length, removed:removed.length, unresolved:0}};
   }
@@ -967,7 +1049,7 @@
         'section-boundary-conflict' : 'section-boundary-missing',
         'A retained full section needs a resolved drawn section boundary.');
 
-    var planarShell = retainConvexPolyhedron(geometry, evidence, query);
+    var planarShell = retainPlanarShell(geometry, evidence, query);
     if (planarShell) return planarShell;
     var plane = evidence.plane;
     var tolerance = query.tolerance || Math.max(EPS, (geometryExtent(geometry) || {size:1}).size * 1e-6);
@@ -978,7 +1060,7 @@
       if (record && record.components && record.components.length) {
         if (surface.kind === 'plane') {
           unresolved.push({surfaceId:surface.id, code:'section-planar-split-unsupported',
-            message:'The planar faces need a supported convex shell with a closed cut loop.'});
+            message:'The cut could not be certified with closed, consistently oriented planar boundaries.'});
           return;
         }
         var splitDiagnostics = [];

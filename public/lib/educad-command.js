@@ -2025,7 +2025,7 @@
             meta: Object.assign({}, sbMeta, { kind: 'section-boundary', reconstructionRole: 'construction',
               sectionBoundary: { contract: 'section-boundary-evidence-v1',
                 planeId: sbId, role: 'section-boundary', view: sbView,
-                loopId: 'boundary:' + sbId, shape: 'circle',
+                shape: 'circle',
                 center: {x:sbcX, y:sbcY}, radius: sbcR } })
           });
           if (sbCircle.fail) return sbCircle.fail;
@@ -2056,7 +2056,7 @@
               refs: [sbA.id, sbB.id],
               sectionBoundary: { contract: 'section-boundary-evidence-v1',
                 planeId: sbId, role: 'section-boundary', view: sbView,
-                loopId: 'boundary:' + sbId, points: sbIds,
+                loopId: 'boundary:' + sbId + ':' + sbIds[0], points: sbIds,
                 order: sbj, count: sbPoints.length } })
           });
           if (sbSeg.fail) return sbSeg.fail;

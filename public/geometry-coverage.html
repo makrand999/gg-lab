@@ -469,9 +469,9 @@
         },
         {
           group: 'operations', status: 'verified', title: 'Multi-face trimming and topology',
-          text: 'A section trace trims multiple faces of a convex polyhedron, welds the cut, and certifies the capped retained shell.',
-          limit: 'Concave shells, crossing holes, and general curved trims need additional topology support.',
-          fixtures: ['full-section-planar-prism']
+          text: 'A section trace trims multiple faces of a planar shell, welds the cut, and certifies the capped retained components.',
+          limit: 'General curved trims and topology repair for mixed-face shells remain open.',
+          fixtures: ['full-section-planar-prism', 'full-section-concave-prism', 'through-hole']
         },
         {
           group: 'evidence', status: 'verified', title: 'Three-view correspondence',
@@ -624,10 +624,10 @@
           fixtures: []
         },
         {
-          group: 'operations', status: 'planned', title: 'Concave multi-face cuts and sections through holes',
-          text: 'Slice concave or perforated shells and assemble multiple outer and inner cut loops.',
-          limit: 'Verify a cut with disconnected caps, a cut through a hole and a cut that separates a solid into multiple retained components.',
-          fixtures: []
+          group: 'operations', status: 'verified', title: 'Concave multi-face cuts and sections through holes',
+          text: 'A plane cut through a concave or perforated planar shell can produce disconnected caps, caps with inner loops, and multiple retained bodies.',
+          limit: 'The fixtures cover closed shells with straight boundary loops. Sections through curved holes remain a separate capability.',
+          fixtures: ['full-section-concave-prism', 'through-hole']
         },
         {
           group: 'operations', status: 'partial', title: 'Oblique and compound sections of mixed solids',

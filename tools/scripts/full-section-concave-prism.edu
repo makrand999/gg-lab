@@ -1,0 +1,71 @@
+/datum -100 400
+/point v0 0 -10 plan
+/point "v0'" 0 20 elevation
+/point v1 80 -10 plan
+/point "v1'" 80 20 elevation
+/point v2 80 -90 plan
+/point "v2'" 80 20 elevation
+/point v3 60 -90 plan
+/point "v3'" 60 20 elevation
+/point v4 60 -30 plan
+/point "v4'" 60 20 elevation
+/point v5 20 -30 plan
+/point "v5'" 20 20 elevation
+/point v6 20 -90 plan
+/point "v6'" 20 20 elevation
+/point v7 0 -90 plan
+/point "v7'" 0 20 elevation
+/line v0 v1 A plan
+/line "v0'" "v1'" A elevation
+/line v1 v2 A plan
+/line v2 v3 A plan
+/line "v2'" "v3'" A elevation
+/line v3 v4 A plan
+/line v4 v5 A plan
+/line "v4'" "v5'" A elevation
+/line v5 v6 A plan
+/line v6 v7 A plan
+/line "v6'" "v7'" A elevation
+/line v7 v0 A plan
+/point v8 0 -10 plan
+/point "v8'" 0 60 elevation
+/point v9 80 -10 plan
+/point "v9'" 80 60 elevation
+/point v10 80 -90 plan
+/point "v10'" 80 60 elevation
+/point v11 60 -90 plan
+/point "v11'" 60 60 elevation
+/point v12 60 -30 plan
+/point "v12'" 60 60 elevation
+/point v13 20 -30 plan
+/point "v13'" 20 60 elevation
+/point v14 20 -90 plan
+/point "v14'" 20 60 elevation
+/point v15 0 -90 plan
+/point "v15'" 0 60 elevation
+/line v8 v9 A plan
+/line "v8'" "v9'" A elevation
+/line v9 v10 A plan
+/line v10 v11 A plan
+/line "v10'" "v11'" A elevation
+/line v11 v12 A plan
+/line v12 v13 A plan
+/line "v12'" "v13'" A elevation
+/line v13 v14 A plan
+/line v14 v15 A plan
+/line "v14'" "v15'" A elevation
+/line v15 v8 A plan
+/line "v0'" "v8'" A elevation
+/line "v1'" "v9'" A elevation
+/line "v2'" "v10'" A elevation
+/line "v3'" "v11'" A elevation
+/line "v4'" "v12'" A elevation
+/line "v5'" "v13'" A elevation
+/line "v6'" "v14'" A elevation
+/line "v7'" "v15'" A elevation
+/section A-A plan 0 -50 80 -50 positive retain
+/section-boundary A-A elevation 0 20 20 20 20 60 0 60
+/section-boundary A-A elevation 60 20 80 20 80 60 60 60
+# expect: 16V 24E 10F closed=1 boundary=0 sectionPlanes=1 sectionQueries=1 sectionRetained=1 sectionStatus=ok sectionBoundaryStatus=ok sectionShellStatus=ok sectionShellClosed=2 previewSections=ok previewParity=ok
+# surface-query: {"operation":"retain-split","plane":{"origin":{"x":0,"y":0,"z":50},"normal":{"x":0,"y":0,"z":1}},"side":"negative","planeId":"A-A","expect":{"status":"ok","section":{"summary":{"loops":2}},"certificate":{"status":"ok","counts":{"closedShells":1}}}}
+# expect: surfaceChecks=1 surfaceQueries=ok

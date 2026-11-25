@@ -66,3 +66,14 @@
 /line "v7'" "v15'" A elevation
 # surface-query: {"operation":"topology","expect":{"contract":"analytic-topology-v1","summary":{"faces":10,"edges":24,"vertices":16,"loops":12,"openEdges":0,"sharedEdges":24,"nonmanifoldEdges":0,"status":"closed"}}}
 # surface-query: {"operation":"feature-graph","expect":{"contract":"feature-graph-v1","summary":{"faces":10,"edges":24,"convex":20,"concave":4,"smooth":0,"open":0,"unknown":0,"recesses":0,"fillets":0}}}
+/section A-A elevation 0 40 80 40 positive retain
+/section-boundary A-A plan 0 -10 80 -10 80 -90 0 -90
+/section-boundary A-A plan 20 -30 60 -30 60 -70 20 -70
+/profile 110 10 1
+/section B-B plan 40 -90 40 -10 positive retain
+/section-boundary B-B profile 110 20 130 20 130 60 110 60
+/section-boundary B-B profile 170 20 190 20 190 60 170 60
+# expect: sectionPlanes=2 sectionQueries=2 sectionRetained=2 sectionStatus=ok sectionBoundaryStatus=ok sectionShellStatus=ok sectionShellClosed=1 previewSections=ok previewSectionShells=2 previewParity=ok
+# surface-query: {"operation":"retain-split","plane":{"origin":{"x":0,"y":40,"z":0},"normal":{"x":0,"y":-1,"z":0}},"side":"positive","planeId":"A-A","expect":{"status":"ok","section":{"summary":{"loops":2}},"cap":[{"loops":[{"kind":"outer"},{"kind":"inner"}]}],"certificate":{"status":"ok","counts":{"closedShells":1,"openComponents":0}}}}
+# surface-query: {"operation":"retain-split","plane":{"origin":{"x":40,"y":0,"z":0},"normal":{"x":1,"y":0,"z":0}},"side":"positive","planeId":"B-B","expect":{"status":"ok","section":{"summary":{"loops":2}},"cap":[{"loops":[{"kind":"outer"}]},{"loops":[{"kind":"outer"}]}],"certificate":{"status":"ok","counts":{"closedShells":1,"openComponents":0}}}}
+# expect: surfaceChecks=4 surfaceQueries=ok

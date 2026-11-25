@@ -37,4 +37,7 @@
 /line pd pa A profile
 /section A-A elevation -20 35 20 35 negative retain
 /section-boundary A-A plan 17.5 -25.5 8.75 -10.344555 -8.75 -10.344555 -17.5 -25.5 -8.75 -40.655445 8.75 -40.655445
-# expect: sectionPlanes=1 sectionQueries=1 sectionRetained=1 sectionStatus=ok sectionUnresolved=0 sectionBoundaryStatus=ok sectionShellStatus=ok sectionShellClosed=1 previewSections=ok previewSectionShells=1 previewParity=ok
+/auxframe CUT 0 35 25.5 0.7071067811865476 -0.7071067811865476 0 0.7071067811865476 0.7071067811865476 0 145 90
+/section B-B elevation -20 15 20 55 positive retain
+/section-boundary B-B aux:CUT 169.74873734152916 90 157.37436867076458 74.844555 132.62563132923542 74.844555 120.25126265847084 90 132.62563132923542 105.155445 157.37436867076458 105.155445
+# expect: sectionPlanes=2 sectionQueries=2 sectionRetained=2 sectionStatus=ok sectionUnresolved=0 sectionBoundaryStatus=ok sectionShellStatus=ok sectionShellClosed=1 previewSections=ok previewSectionShells=2 previewParity=ok

@@ -1,0 +1,7 @@
+/datum -100 400
+/auxframe CUT 10 30 20 0.7071067811865476 0 0.7071067811865476 0 1 0 150 35
+/circle 20 -30 20 A plan
+/circle 20 30 20 A elevation
+/section A-A plan 0 -30 40 10 negative retain
+/section-boundary A-A aux:CUT circle 150 35 14.142135623730951
+# expect: sectionPlanes=1 sectionQueries=1 sectionRetained=1 sectionStatus=ok sectionUnresolved=0 sectionDiagnostics=none sectionBoundaryStatus=ok sectionShellStatus=ok sectionShellClosed=1 previewSections=ok previewSectionShells=1 previewParity=ok

@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-surfaces.js'));
-  else root.EduCADDrawingSections = factory(root.EduCADSurfaces);
-})(typeof window !== 'undefined' ? window : globalThis, function (Surfaces) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-surfaces.js'), require('./educad-view-frame.js'));
+  else root.EduCADDrawingSections = factory(root.EduCADSurfaces, root.EduCADViewFrame);
+})(typeof window !== 'undefined' ? window : globalThis, function (Surfaces, ViewFrame) {
   'use strict';
 
   var VERSION = '1.0.0-educad';
@@ -219,10 +219,6 @@
         'The declared section view is not normal to the resolved cutting plane.',
         {declared:spec.sectionView, resolved:sectionView});
     }
-    if (retain && oblique) {
-      push('section-plane-oblique-unsupported',
-        'A retained full section needs a cutting plane parallel to a principal view plane.');
-    }
     if (retain && !side) {
       push('section-plane-side-unresolved',
         'A retained full section needs an explicit positive or negative side.');
@@ -232,8 +228,7 @@
         d.code === 'section-plane-view-ambiguous' ||
         d.code === 'section-plane-trace-conflict' ||
         d.code === 'section-view-conflict' ||
-        (retain && (d.code === 'section-plane-oblique-unsupported' ||
-          d.code === 'section-plane-side-unresolved'));
+        (retain && d.code === 'section-plane-side-unresolved');
     });
     return {contract:CUTTING, id:spec.id || null, entityId:entity.id,
       sourceIds:[entity.id], view:view, trace:{start:p1, end:p2},
@@ -258,7 +253,7 @@
     return {evidence:evidence, diagnostics:diagnostics};
   }
 
-  function collectBoundaries(entities, profile) {
+  function collectBoundaries(entities, profile, registry) {
     var groups = Object.create(null), diagnostics = [];
     var byId = Object.create(null);
     (entities || []).forEach(function (entity) { if (entity && entity.id) byId[entity.id] = entity; });
@@ -275,22 +270,31 @@
     var loops = [];
     Object.keys(groups).forEach(function (key) {
       var group = groups[key], spec = group.spec;
+      var record = group.records[0];
       var ids = Array.isArray(spec.points) ? spec.points.slice() : [];
+      var firstPoint = byId[ids[0]];
+      var view = spec.view || (firstPoint && firstPoint.viewRole !== 'BOTH' ?
+        firstPoint.viewRole : record.viewRole);
+      if (view === 'AUX' && !registry) registry = ViewFrame.resolve(entities);
+      var frame = view === 'AUX' ? ViewFrame.forEntity(record, profile, registry) : null;
+      var normal = frame ? frame.n : viewDirection(view);
+      function worldPoint(x, y) {
+        return frame ? ViewFrame.unproject(frame, {x:x, y:y}) : worldPointForView(x, y, view, profile);
+      }
       if (spec.shape === 'circle' && spec.center &&
           Number.isFinite(spec.center.x) && Number.isFinite(spec.center.y) &&
           Number.isFinite(spec.radius) && spec.radius > 0) {
-        var circleView = spec.view || group.records[0].viewRole;
-        if (!circleView || circleView === 'BOTH') {
+        if (!normal) {
           diagnostics.push({code:'section-boundary-unresolved', severity:'warning',
-            message:'A drawn circular section boundary needs one view role.',
+            message:'A drawn circular section boundary needs a resolved view frame.',
             sourceIds:group.records.map(function (e) { return e.id; })});
           return;
         }
         var circlePoints = [];
         for (var ci=0;ci<64;ci++) {
           var angle = TAU * ci / 64;
-          var world = worldPointForView(spec.center.x + spec.radius*Math.cos(angle),
-            spec.center.y + spec.radius*Math.sin(angle), circleView, profile);
+          var world = worldPoint(spec.center.x + spec.radius*Math.cos(angle),
+            spec.center.y + spec.radius*Math.sin(angle));
           if (!finite(world)) { circlePoints = []; break; }
           circlePoints.push(world);
         }
@@ -301,7 +305,7 @@
           return;
         }
         loops.push({contract:BOUNDARY, planeId:spec.planeId || null, loopId:spec.loopId || key,
-          view:circleView, points:circlePoints, closed:true, shape:'circle',
+          view:view, normal:normal, points:circlePoints, closed:true, shape:'circle',
           sourceIds:group.records.map(function (e) { return e.id; })});
         return;
       }
@@ -311,15 +315,15 @@
           sourceIds:group.records.map(function (e) { return e.id; })});
         return;
       }
-      var points = [], view = spec.view || null;
+      var points = [];
       var missing = false;
       ids.forEach(function (id) {
         var point = byId[id];
         if (!point) { missing = true; return; }
         var pview = point.viewRole === 'BOTH' ? view : point.viewRole;
-        if (!view) view = pview;
         if (pview !== view) { missing = true; return; }
-        var world = worldPointForView(point.x, point.y, pview, profile);
+        if (view === 'AUX' && (!frame || registry.frameFor(point) !== frame)) { missing = true; return; }
+        var world = worldPoint(point.x, point.y);
         if (!finite(world)) { missing = true; return; }
         points.push(world);
       });
@@ -330,7 +334,7 @@
         return;
       }
       loops.push({contract:BOUNDARY, planeId:spec.planeId || null, loopId:spec.loopId || key,
-        view:view, points:points, closed:true,
+        view:view, normal:normal, points:points, closed:true,
         sourceIds:group.records.map(function (e) { return e.id; })});
     });
     return {loops:loops, diagnostics:diagnostics};
@@ -643,6 +647,13 @@
         message:'No drawn section boundary is available for this plane.',
         matches:[], diagnostics:[]};
     }
+    if (boundaries.some(function (loop) {
+      return loop.normal && length(cross(loop.normal, plane.normal)) > EPS;
+    })) {
+      var message = 'The drawn section boundary needs a view normal to the cutting plane.';
+      return {status:'conflict', code:'section-boundary-view-conflict', message:message,
+        matches:[], diagnostics:[{code:'section-boundary-view-conflict', severity:'warning', message:message}]};
+    }
     var loops = query && query.loops || [];
     if (!loops.length) {
       return {status:'unresolved', code:'section-boundary-unresolved',
@@ -940,9 +951,6 @@
     }
     if (!evidence || !evidence.plane || evidence.status !== 'resolved')
       return fail('section-plane-invalid', 'A retained section needs a resolved cutting plane.');
-    if (evidence.oblique)
-      return fail('section-plane-oblique-unsupported',
-        'A retained full section needs a principal cutting plane.');
     if (!evidence.side)
       return fail('section-plane-side-unresolved',
         'A retained full section needs an explicit positive or negative side.');
@@ -951,8 +959,8 @@
         'A retained section needs a resolved analytic section boundary.');
     var boundary = query.boundary || evidence.boundary || null;
     if (boundary && boundary.status === 'conflict')
-      return fail('section-boundary-conflict',
-        'The drawn section boundary does not match the analytic section.',
+      return fail(boundary.code || 'section-boundary-conflict',
+        boundary.message || 'The drawn section boundary does not match the analytic section.',
         {residual:boundary.matches && boundary.matches[0] && boundary.matches[0].residual});
     if ((!boundary || boundary.status !== 'ok') && options.acceptAnalyticBoundary !== true)
       return fail(boundary && boundary.code === 'section-boundary-conflict' ?
@@ -1086,7 +1094,8 @@
     if (!collected.evidence.length)
       return {contract:MODEL, status:'none', evidence:[], queries:[], retained:[],
         diagnostics:[], summary:{planes:0, queries:0, retained:0, unresolved:0}};
-    var boundaries = collectBoundaries(entities, options.profile || geometry.profileMap);
+    var registry = ViewFrame.resolve(entities, {viewFrames:geometry.viewFrames});
+    var boundaries = collectBoundaries(entities, options.profile || geometry.profileMap, registry);
     var diagnostics = collected.diagnostics.concat(boundaries.diagnostics);
     var queries = [], retained = [];
     var extent = geometryExtent(geometry);

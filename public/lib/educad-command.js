@@ -2010,9 +2010,11 @@
       case 'section-boundary': {
         var sbArity = arity(6, -1);
         if (sbArity) return sbArity;
-        var sbId = args[0], sbView = normRole(args[1]);
-        if (sbView === null || sbView === 'BOTH')
-          return fail('Section boundary needs a plan, elevation or profile view.');
+        var sbId = args[0], sbRole = parseRoleSpec(args[1]);
+        if (!sbRole || sbRole.viewRole === 'BOTH')
+          return fail('Section boundary needs a plan, elevation, profile or auxiliary view.');
+        var sbView = sbRole.viewRole;
+        var sbMeta = sbRole.frameId ? { frameId: sbRole.frameId } : {};
         if (String(args[2]).toLowerCase() === 'circle') {
           var sbcX = parseNum(args[3]), sbcY = parseNum(args[4]), sbcR = parseNum(args[5]);
           if (sbcX === null || sbcY === null || sbcR === null || sbcR <= 0 || args.length !== 6)
@@ -2020,11 +2022,11 @@
           var sbCircle = create('CIRCLE', {
             x: sbcX, y: sbcY, radius: sbcR, bisCode: 'A', viewRole: sbView,
             caption: '', showLabel: false,
-            meta: { kind: 'section-boundary', reconstructionRole: 'construction',
+            meta: Object.assign({}, sbMeta, { kind: 'section-boundary', reconstructionRole: 'construction',
               sectionBoundary: { contract: 'section-boundary-evidence-v1',
                 planeId: sbId, role: 'section-boundary', view: sbView,
                 loopId: 'boundary:' + sbId, shape: 'circle',
-                center: {x:sbcX, y:sbcY}, radius: sbcR } }
+                center: {x:sbcX, y:sbcY}, radius: sbcR } })
           });
           if (sbCircle.fail) return sbCircle.fail;
           return { ok: true,
@@ -2039,7 +2041,7 @@
           var sbPoint = create('POINT', {
             x: sbNums[sbi], y: sbNums[sbi + 1], name: '', caption: '',
             showLabel: false, bisCode: 'B', viewRole: sbView,
-            meta: { kind: 'section-boundary-point', reconstructionRole: 'construction' }
+            meta: Object.assign({}, sbMeta, { kind: 'section-boundary-point', reconstructionRole: 'construction' })
           });
           if (sbPoint.fail) return sbPoint.fail;
           sbPoints.push(sbPoint.ent);
@@ -2050,12 +2052,12 @@
           var sbSeg = create('SEGMENT', {
             x: sbA.x, y: sbA.y, x2: sbB.x, y2: sbB.y,
             bisCode: 'A', viewRole: sbView, caption: '', showLabel: false,
-            meta: { kind: 'section-boundary', reconstructionRole: 'construction',
+            meta: Object.assign({}, sbMeta, { kind: 'section-boundary', reconstructionRole: 'construction',
               refs: [sbA.id, sbB.id],
               sectionBoundary: { contract: 'section-boundary-evidence-v1',
                 planeId: sbId, role: 'section-boundary', view: sbView,
                 loopId: 'boundary:' + sbId, points: sbIds,
-                order: sbj, count: sbPoints.length } }
+                order: sbj, count: sbPoints.length } })
           });
           if (sbSeg.fail) return sbSeg.fail;
           sbMade.push(sbSeg.ent.id);

@@ -56,6 +56,11 @@
       sheet: { x: profile.xRef, y: 0 }
     };
   }
+  function forEntity(entity, profile, registry) {
+    if (entity.viewRole === 'PROFILE') return fromProfile(profile);
+    if (entity.viewRole === 'AUX') return registry ? registry.frameFor(entity) : null;
+    return standard(entity.viewRole);
+  }
   function declaration(raw) {
     if (!raw || typeof raw !== 'object') throw new Error('A view frame needs an object declaration.');
     var id = String(raw.id || '').trim();
@@ -246,11 +251,53 @@
     }
     return out;
   }
-  function audit(entities, geometry, registry) {
+  function audit(entities, geometry, registry, curveIssues) {
     if (!registry || !registry.hasAux) return { status: 'none', frames: [], issues: [],
       consumedIds: [], unresolvedIds: [], residual: 0, pointRank: 0, pointConflicts: 0 };
     var issues = [], consumed = new Set(), unresolved = new Set();
     var byId = new Map((entities || []).map(function (e) { return [e.id, e]; }));
+    var curveSources = new Set(), traceSources = new Set(), stations = new Set(), fittedStations = new Set();
+    var issueByCurve = new Map((curveIssues || []).filter(function (issue) {
+      return /^(conic-|aux-conic-|curve-|aux-curve-)/.test(issue.code);
+    }).map(function (issue) { return [issue.entityId, issue]; }));
+    (geometry && geometry.curves || []).forEach(function (curve) {
+      if (curve.kind === 'nurbs') {
+        (curve.sourceEvidence || []).forEach(function (source) { curveSources.add(source.entityId); });
+      } else if (curve.analytic) {
+        (curve.sourceIds || []).forEach(function (id) { curveSources.add(id); });
+        (curve.viewDefinitions || []).forEach(function (view) {
+          if (view.kind === 'line' && view.role === 'AUX')
+            (view.ids || []).forEach(function (id) { traceSources.add(id); });
+        });
+        (curve.centerSourceIds || []).forEach(function (id) { fittedStations.add(id); });
+        (curve.pointEvidence || []).forEach(function (evidence) {
+          (evidence.sourceIds || []).forEach(function (id) { fittedStations.add(id); });
+        });
+      }
+    });
+    (entities || []).forEach(function (entity) {
+      if (entity.viewRole !== 'AUX') return;
+      var meta = entity.meta || {};
+      var center = meta.centerRef || meta.ellipse && meta.ellipse.centerRef;
+      var refs = entity.type === 'CURVE' ? meta.throughRefs : center ? [center] : null;
+      if (traceSources.has(entity.id)) {
+        var endpoints = meta.endpointRefs || meta.refs;
+        if (Array.isArray(endpoints) && endpoints.length === 2)
+          refs = endpoints.filter(function (id, index) {
+            var point = byId.get(id), x = index ? entity.x2 : entity.x, y = index ? entity.y2 : entity.y;
+            return point && Math.hypot(point.x-x,point.y-y) <= RESIDUAL_MM;
+          });
+      }
+      if (!Array.isArray(refs)) return;
+      var frame = registry.frameFor(entity);
+      refs.forEach(function (id) {
+        var station = byId.get(id);
+        if (!station || station.type !== 'POINT' || station.viewRole !== 'AUX' ||
+            (station.meta || {}).frameId !== (entity.meta || {}).frameId) return;
+        stations.add(id);
+        if (frame && curveSources.has(entity.id)) fittedStations.add(id);
+      });
+    });
     var vertexByMember = new Map();
     (geometry && geometry.vertexIds || []).forEach(function (id, i) {
       if (geometry.vertices && geometry.vertices[i]) vertexByMember.set(id, geometry.vertices[i]);
@@ -273,13 +320,22 @@
           message: 'Auxiliary entity ' + e.id + ' has no usable frame declaration.' });
         return;
       }
+      if (curveSources.has(e.id)) {
+        consumed.add(e.id);
+        return;
+      }
+      if (e.meta && e.meta.ellipse) {
+        unresolved.add(e.id);
+        if (issueByCurve.has(e.id)) issues.push(issueByCurve.get(e.id));
+        return;
+      }
       if (e.type === 'POINT') {
         var ids = memberIds(e);
-        var fitted = false;
+        var fitted = fittedStations.has(e.id);
         ids.forEach(function (id) {
           var vertex = vertexByMember.get(id);
           if (!vertex) {
-            unresolved.add(e.id);
+            if (!fittedStations.has(e.id)) unresolved.add(e.id);
             return;
           }
           var q = project(frame, vertex);
@@ -294,7 +350,7 @@
         if (fitted && !unresolved.has(e.id)) consumed.add(e.id);
         else if (!ids.length) {
           unresolved.add(e.id);
-          issues.push({ code: 'aux-point-unresolved', entityId: e.id,
+          if (!stations.has(e.id)) issues.push({ code: 'aux-point-unresolved', entityId: e.id,
             message: 'Auxiliary point ' + e.id + ' has no spatial member identity.' });
         }
         return;
@@ -319,7 +375,7 @@
         return;
       }
       unresolved.add(e.id);
-      issues.push({ code: 'aux-curve-unsupported', entityId: e.id,
+      issues.push(issueByCurve.get(e.id) || { code: 'aux-curve-unsupported', entityId: e.id,
         message: 'Auxiliary ' + e.type + ' ' + e.id + ' is retained but not reconstructed in this frame.' });
     });
     var residual = 0;
@@ -336,7 +392,7 @@
 
   return {
     EPS: EPS, RESIDUAL_MM: RESIDUAL_MM,
-    standard: standard, fromProfile: fromProfile, declaration: declaration,
+    standard: standard, fromProfile: fromProfile, forEntity: forEntity, declaration: declaration,
     resolve: resolve, frameFor: function (registry, entity) {
       return registry && registry.frameFor ? registry.frameFor(entity) : null;
     },

@@ -72,7 +72,7 @@
       out.bis = String(first).toUpperCase();
     } else if (firstSpec !== null) {
       if (firstSpec.viewRole === 'AUX' && !allowAux) {
-        out.error = 'Auxiliary frames currently support points and straight edges.';
+        out.error = 'This command needs a principal view.';
         return out;
       }
       out.role = firstSpec.viewRole; out.frameId = firstSpec.frameId; out.roleKey = firstSpec.key;
@@ -91,7 +91,7 @@
         return out;
       }
       if (secondSpec.viewRole === 'AUX' && !allowAux) {
-        out.error = 'Auxiliary frames currently support points and straight edges.';
+        out.error = 'This command needs a principal view.';
         return out;
       }
       out.role = secondSpec.viewRole; out.frameId = secondSpec.frameId; out.roleKey = secondSpec.key;
@@ -152,7 +152,7 @@
       args: [{ name: 'p1', kind: 'point-name' },
         { name: 'p2', kind: 'point-name' },
         { name: 'p3', kind: 'point-name', variadic: true }] },
-    { name: 'curve-through', usage: '/curve-through <p1> <p2> [p3 ...] [closed] [plan|elevation|profile]',
+    { name: 'curve-through', usage: '/curve-through <p1> <p2> [p3 ...] [closed] [plan|elevation|profile|aux:<id>]',
       hint: 'Interpolate a natural or periodic cubic curve through ordered points',
       args: [{name:'points',kind:'point-name',variadic:true}] },
     { name: 'circle-through', usage: '/circle-through <p1> <p2> <p3> [plan|elevation|profile]',
@@ -927,12 +927,12 @@
     if (args.length < 2 + extra) return 'Usage: ' + usage;
     var named = !isNumTok(args[0]);
     var need = named ? 2 + extra : 3 + extra;
-    var br = parseBisRole(args.slice(need));
+    var br = parseBisRole(args.slice(need), name === 'circle');
     if (br.error !== '') return br.error + ' — usage: ' + usage;
     var style = (br.bis !== null ? ', type ' + br.bis : '') +
       (br.role !== null ? ', ' + br.role + ' view' : '');
     if (named) {
-      var centre = previewNeedPoint(ctx, args[0], br.role);
+      var centre = previewNeedPoint(ctx, args[0], br.roleKey);
       if (centre.fail) return centre.fail;
       var r = parseNum(args[1]);
       if (r === null || r <= 0) return 'Radius must be a number above 0 (mm).';
@@ -978,13 +978,13 @@
       return 'Segments must be a whole number from ' + ELLIPSE_SEGS_MIN +
         ' to ' + ELLIPSE_SEGS_MAX + ' — usage: ' + usage;
     }
-    var br = parseBisRole(split.rest);
+    var br = parseBisRole(split.rest, true);
     if (br.error !== '') return br.error + ' — usage: ' + usage;
     var style = (br.bis !== null ? ', type ' + br.bis : '') +
       (br.role !== null ? ', ' + br.role + ' view' : '');
     var at, rx, ry;
     if (named) {
-      var centre = previewNeedPoint(ctx, args[0], br.role);
+      var centre = previewNeedPoint(ctx, args[0], br.roleKey);
       if (centre.fail) return centre.fail;
       rx = parseNum(args[1]);
       ry = parseNum(args[2]);
@@ -1014,13 +1014,13 @@
       return 'Segments must be a whole number from ' + ELLIPSE_SEGS_MIN +
         ' to ' + ELLIPSE_SEGS_MAX + ' — usage: ' + usage;
     }
-    var br = parseBisRole(split.rest);
+    var br = parseBisRole(split.rest, true);
     if (br.error !== '') return br.error + ' — usage: ' + usage;
     var style = (br.bis !== null ? ', type ' + br.bis : '') +
       (br.role !== null ? ', ' + br.role + ' view' : '');
     var at;
     if (named) {
-      var centre = previewNeedPoint(ctx, args[0], br.role);
+      var centre = previewNeedPoint(ctx, args[0], br.roleKey);
       if (centre.fail) return centre.fail;
       at = 'at "' + args[0] + '"';
     } else {
@@ -1039,9 +1039,10 @@
 
   function previewThrough(name, args, ctx, spec) {
     var tokens = args.slice(), role = null, closed = false;
-    if (tokens.length && ['plan', 'elevation', 'profile']
-        .indexOf(tokens[tokens.length - 1].toLowerCase()) !== -1) {
-      role = tokens.pop().toUpperCase();
+    var roleSpec = throughRole(name, tokens[tokens.length - 1]);
+    if (roleSpec) {
+      tokens.pop();
+      role = roleSpec.key;
     }
     if (tokens[tokens.length - 1] === 'closed') { closed = true; tokens.pop(); }
     if (name !== 'curve-through' && (closed || tokens.length !== 3)) {
@@ -1118,6 +1119,13 @@
       return p.viewRole;
     }
     return roleForY(p.y);
+  }
+
+  function throughRole(name, token) {
+    var role = parseRoleSpec(token);
+    if (!role || role.viewRole === 'BOTH' ||
+        (role.viewRole === 'AUX' && name !== 'curve-through')) return null;
+    return role;
   }
 
   function pointInRole(p, role) {
@@ -1526,19 +1534,23 @@
       case 'curve-through':
       case 'circle-through':
       case 'arc-through': {
-        var tokens=args.slice(), curveRole=null, closed=false;
-        if(tokens.length && ['plan','elevation','profile'].indexOf(tokens[tokens.length-1].toLowerCase())!==-1) curveRole=tokens.pop().toUpperCase();
+        var tokens=args.slice(), closed=false;
+        var curveView=throughRole(p.name,tokens[tokens.length-1]);
+        if(curveView)tokens.pop();
         if(tokens[tokens.length-1]==='closed') {closed=true;tokens.pop();}
         if(p.name!=='curve-through' && (closed||tokens.length!==3)) return fail('Usage: '+spec.usage);
         var through=[];
-        for(var ti=0;ti<tokens.length;ti++) {var found=needPoint(tokens[ti],curveRole,{sameView:true});if(found.fail)return found.fail;through.push(found.ent);}
+        for(var ti=0;ti<tokens.length;ti++) {var found=needPoint(tokens[ti],curveView&&curveView.key,{sameView:true});if(found.fail)return found.fail;through.push(found.ent);}
         if(!through.length)return fail('Usage: '+spec.usage);
-        curveRole=curveRole||through[0].viewRole;
-        if(['PLAN','ELEVATION','PROFILE'].indexOf(curveRole)===-1 || through.some(function(e){return e.viewRole!==curveRole;}))
+        curveView=curveView||throughRole(p.name,viewOfPoint(through[0]));
+        if(!curveView || through.some(function(e){
+          return e.viewRole!==curveView.viewRole||viewOfPoint(e)!==curveView.key;
+        }))
           return fail('All defining points must belong to the same declared view.');
         try {
           var cm={refs:through.map(function(e){return e.id;}),throughRefs:through.map(function(e){return e.id;}),construction:p.name};
-          var options={bisCode:'A',viewRole:curveRole,meta:cm};
+          if(curveView.frameId)cm.frameId=curveView.frameId;
+          var options={bisCode:'A',viewRole:curveView.viewRole,meta:cm};
           if(p.name==='curve-through') {
             cm.curve=Parametric.interpolate(through,closed);
             options.x=through[0].x;options.y=through[0].y;
@@ -1556,13 +1568,12 @@
         var xnoun = p.name === 'circle' ? 'CIRCLE' : 'CIRCULAR_ARC';
         var xnamed = !isNumTok(args[0]);
         var xneed = xnamed ? 2 + xextra : 3 + xextra;
-        var xbr2 = parseBisRole(args.slice(xneed));
+        var xbr2 = parseBisRole(args.slice(xneed), p.name === 'circle');
         if (xbr2.error !== '') return fail(xbr2.error + ' — usage: ' + spec.usage);
         var xbis = xbr2.bis !== null ? xbr2.bis : 'A';
-        var xrole2 = xbr2.role !== null ? xbr2.role : null;
         var cx, cy, crr, crole, cref;
         if (xnamed) {
-          var cc = needPoint(args[0], xrole2);
+          var cc = needPoint(args[0], xbr2.roleKey);
           if (cc.fail) return cc.fail;
           crr = parseNum(args[1]);
           if (crr === null || crr <= 0) {
@@ -1592,12 +1603,17 @@
             return fail('Angles differ by a full turn — a 0° arc draws nothing (use /circle for a full ring).');
           }
         }
-        crole = xrole2 !== null ? xrole2 :
-          (xnamed ? viewOfPoint(cc.ent) : roleForY(cy));
+        var roundView = parseRoleSpec(xbr2.roleKey || (xnamed ? viewOfPoint(cc.ent) : roleForY(cy)));
+        if (!roundView) return fail('Select a declared view for the curve.');
+        if (roundView.viewRole === 'AUX' && p.name === 'arc')
+          return fail('Use a principal view for circular arcs.');
+        crole = roundView.viewRole;
+        var roundMeta = cref !== null ? { refs: [cref], centerRef: cref } : {};
+        if (roundView.frameId) roundMeta.frameId = roundView.frameId;
         var nc = create(xnoun, { x: cx, y: cy, radius: crr,
           startAngle: aa1, endAngle: aa2, bisCode: xbis, viewRole: crole,
           caption: '', showLabel: false,
-          meta: cref !== null ? { refs: [cref], centerRef: cref } : {} });
+          meta: roundMeta });
         if (nc.fail) return nc.fail;
         if (p.name === 'arc') {
           return { ok: true,
@@ -1696,12 +1712,11 @@
           return fail('Segments must be a whole number from ' + ELLIPSE_SEGS_MIN +
             ' to ' + ELLIPSE_SEGS_MAX + ' — usage: ' + spec.usage);
         }
-        var ebr = parseBisRole(esplit.rest);
+        var ebr = parseBisRole(esplit.rest, true);
         if (ebr.error !== '') return fail(ebr.error + ' — usage: ' + spec.usage);
         var ex, ey, erx, ery;
-        var erolePick = ebr.role !== null ? ebr.role : null;
         if (enamed) {
-          var ecc = needPoint(args[0], erolePick);
+          var ecc = needPoint(args[0], ebr.roleKey);
           if (ecc.fail) return ecc.fail;
           ex = ecc.ent.x;
           ey = ecc.ent.y;
@@ -1718,8 +1733,9 @@
           return fail('rx and ry must be numbers above 0 (mm).');
         }
         var ebis = ebr.bis !== null ? ebr.bis : 'A';
-        var erole = erolePick !== null ? erolePick :
-          (enamed ? viewOfPoint(ecc.ent) : roleForY(ey));
+        var ellipseView = parseRoleSpec(ebr.roleKey || (enamed ? viewOfPoint(ecc.ent) : roleForY(ey)));
+        if (!ellipseView) return fail('Select a declared view for the ellipse.');
+        var erole = ellipseView.viewRole;
         var ring = ellipseRing(ex, ey, erx, ery, esegs);
         var eids = [];
         for (var ei = 0; ei < ring.length; ei++) {
@@ -1738,6 +1754,7 @@
             count: esegs, index: ej, role: erole,
             centerRef: enamed ? ecc.ent.id : null };
           var emeta = { ellipse: edef };
+          if (ellipseView.frameId) emeta.frameId = ellipseView.frameId;
           if (enamed) emeta.centerRef = ecc.ent.id;
           ebatch[eids[ej]] = { meta: emeta };
         }
@@ -1761,11 +1778,11 @@
           return fail('Segments must be a whole number from ' + ELLIPSE_SEGS_MIN +
             ' to ' + ELLIPSE_SEGS_MAX + ' — usage: ' + spec.usage);
         }
-        var cbr = parseBisRole(csplit.rest);
+        var cbr = parseBisRole(csplit.rest, true);
         if (cbr.error !== '') return fail(cbr.error + ' — usage: ' + spec.usage);
         var cbx, cby, ccref = null, ccEnt = null;
         if (cn) {
-          var cc = needPoint(args[0], cbr.role);
+          var cc = needPoint(args[0], cbr.roleKey);
           if (cc.fail) return cc.fail;
           cbx = cc.ent.x; cby = cc.ent.y; ccref = cc.ent.id; ccEnt = cc.ent;
         } else {
@@ -1781,8 +1798,9 @@
           return fail('The two conic basis vectors must be independent.');
         }
         var cbis = cbr.bis !== null ? cbr.bis : 'A';
-        var crole = cbr.role !== null ? cbr.role :
-          (cn ? viewOfPoint(ccEnt) : roleForY(cby));
+        var conicView = parseRoleSpec(cbr.roleKey || (cn ? viewOfPoint(ccEnt) : roleForY(cby)));
+        if (!conicView) return fail('Select a declared view for the conic.');
+        var crole = conicView.viewRole;
         var cring = basisRing(cbx, cby, {x:cax,y:cay}, {x:cbvx,y:cbvy}, csegs);
         var cids = [];
         for (var ci2 = 0; ci2 < cring.length; ci2++) {
@@ -1800,6 +1818,7 @@
             a: { x: cax, y: cay }, b: { x: cbvx, y: cbvy },
             count: csegs, index: cj, role: crole, centerRef: ccref };
           var cmeta = { ellipse: cdef };
+          if (conicView.frameId) cmeta.frameId = conicView.frameId;
           if (ccref) cmeta.centerRef = ccref;
           cbatch[cids[cj]] = { meta: cmeta };
         }

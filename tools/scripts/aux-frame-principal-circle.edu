@@ -1,0 +1,9 @@
+/datum -100 400
+/auxframe EDGE 10 20 30 0.7071067811865476 0 0.7071067811865476 0 1 0 200 40
+/circle 10 -30 10 A plan
+/point lo 200 30 aux:EDGE
+/point hi 200 50 aux:EDGE
+/line lo hi A aux:EDGE
+# expect: curves=1 analyticConics=1 conicProjection=ok conicDefinitions=ok conicQueries=ok
+# expect: auxFrames=1 auxFrameStatus=ok auxUnresolved=0 previewAuxParity=ok previewCurveParity=ok previewParity=ok diagnostics=none
+# conic-query: {"expect":{"count":1,"kind":"circle","center":{"x":10,"y":20,"z":30},"axes":[10,10],"normal":{"x":0,"y":1,"z":0},"projectionOk":true,"viewDefinitions":[{"role":"PLAN","count":1},{"kind":"line","role":"AUX","frameId":"EDGE"}]}}

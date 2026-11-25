@@ -1,0 +1,12 @@
+/datum -100 300
+/auxframe A1 0 0 0 0 0.7071067811865476 0.7071067811865476 1 0 0 100 0
+/point p0 0 -10 plan
+/point p1 20 -30 plan
+/point p2 40 -20 plan
+/point a0 100 0 aux:A1
+/point a1 121 10.606601717798213 aux:A1
+/point a2 140 4.949747468305833 aux:A1
+/curve-through p0 p1 p2 plan
+/curve-through a0 a1 a2 aux:A1
+# expect: parametricCurves=0 auxFrames=1 auxFrameStatus=issues auxUnresolved=4 auxDiagnostics=curve-projection-conflict
+# expect: diagnostics=curve-projection-conflict unresolved=2 previewStatus=unavailable previewParity=ok

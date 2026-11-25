@@ -2794,15 +2794,43 @@
 
 
 
-  function reconstructParametric(list, opts) {
+  function attachFrameAudit(result, list, registry, curveIssues) {
+    if (!registry || !registry.hasAux) return result;
+    var auditGeometry = result.geometry || { frameEvidence: result.frameEvidence };
+    var frameAudit = ViewFrame.audit(list, auditGeometry, registry, (result.issues || []).concat(curveIssues || []));
+    registry.issues.forEach(function (issue) {
+      if (!frameAudit.issues.some(function (d) { return d.code === issue.code && d.entityId === issue.entityId; }))
+        frameAudit.issues.push(issue);
+    });
+    if (frameAudit.issues.length) frameAudit.status = 'issues';
+    result.issues = (result.issues || []).slice();
+    registry.issues.concat(frameAudit.issues).forEach(function (issue) {
+      if (!result.issues.some(function (d) { return d.code === issue.code && d.entityId === issue.entityId; }))
+        result.issues.push(issue);
+    });
+    if (frameAudit.status === 'issues' && ['inferred', 'determined'].indexOf(result.determination) !== -1)
+      result.determination = 'partial';
+    result.frameAudit = frameAudit;
+    result.viewFrames = registry.serialize();
+    if (result.geometry) {
+      result.geometry.viewFrames = result.viewFrames;
+      result.geometry.frameAudit = frameAudit;
+    }
+    return result;
+  }
+
+  function reconstructParametric(list, opts, frameRegistry) {
     var declared=opts.identity==='explicit'||list.some(function(e){return e.meta&&e.meta.membersDeclared;});
     var resolved=Curves.resolveProfileFrame(list,opts),normalized=autoMembersForStrict(list,resolved.profile);
 
 
 
     if(declared) {
-      var check=Strict.reconstruct(normalized.filter(function(e){return e.type!=='CURVE'&&!Curves.isCurve(e);}),opts);
+      var check=Strict.reconstruct(normalized.filter(function(e){return e.type!=='CURVE'&&!Curves.isCurve(e);}),
+        Object.assign({},opts,{frames:frameRegistry}));
       if(check.determination==='inconsistent') {
+        var straightRows=list.filter(function(e){return e.type!=='CURVE';});
+        attachFrameAudit(check,straightRows,frameRegistry);
         check.pipeline={version:1,input:'vertices-edges-curves',identity:'explicit',stage:'correspondence',diagnostics:check.issues||[]};
         return check;
       }
@@ -2811,9 +2839,13 @@
     var needed=new Set(list.filter(function(e){return e.type!=='CURVE'&&e.type!=='POINT';}).flatMap(function(e){return (e.meta||{}).refs||[];}));
     var rest=list.filter(function(e){return e.type!=='CURVE'&&!(e.type==='POINT'&&refs.has(e.id)&&!needed.has(e.id));});
     var hasRest=rest.some(function(e){return ['POINT','SEGMENT','LINE','RAY','CIRCLE','CIRCULAR_ARC'].indexOf(e.type)!==-1;});
-    var base=hasRest?reconstructCore(rest,opts):{geometry:null,issues:[]};
-    if(base.determination==='inconsistent')return base;
-    var lifted=ParametricReconstruct.reconstruct(normalized,resolved.profile);
+    var base=hasRest?reconstructCore(rest,opts,frameRegistry):{geometry:null,issues:[]};
+    if(base.determination==='inconsistent') {
+      attachFrameAudit(base,rest,frameRegistry);
+      base.pipeline.diagnostics=base.issues;
+      return base;
+    }
+    var lifted=ParametricReconstruct.reconstruct(normalized,resolved.profile,frameRegistry);
     var diagnostics=((base.pipeline||{}).diagnostics||base.issues||[]).concat(lifted.issues);
     if(resolved.issue)diagnostics.push(resolved.issue);
     var g=base.geometry;
@@ -2843,11 +2875,14 @@
       else{g.analyticSurfaceValidation=Surfaces.validate(model,g);g.analyticCertificate=Surfaces.certify(model,g);
         g.surfaceModel.status=g.analyticSurfaceValidation.status;}
     }
-    var parametricResult = mergeDisplaySyncResult({status:g?'ok':'unavailable',reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
-      label:diagnostics.length?diagnostics[0].message:'Parametric curves reconstructed',geometry:g,
-      determination:diagnostics.length?'partial':'inferred',issues:diagnostics,
-      pipeline:{version:1,input:'vertices-edges-curves',identity:declared?'explicit':'inferred',stage:'surface-inference',diagnostics:diagnostics}});
-    return parametricResult;
+    var parametricResult = attachFrameAudit({status:g?'ok':'unavailable',geometry:g,
+      frameEvidence:base.frameEvidence,determination:diagnostics.length?'partial':'inferred',
+      issues:diagnostics},list,frameRegistry,lifted.issues);
+    diagnostics=parametricResult.issues;
+    return mergeDisplaySyncResult(Object.assign(parametricResult,{
+      reason:g?null:diagnostics.length?diagnostics[0].code:'curve-correspondence-missing',
+      label:diagnostics.length?diagnostics[0].message:'Parametric curves reconstructed',
+      pipeline:{version:1,input:'vertices-edges-curves',identity:declared?'explicit':'inferred',stage:'surface-inference',diagnostics:diagnostics}}));
   }
 
   function applyDisplaySync(geometry, model) {
@@ -2962,22 +2997,21 @@
   function isConicSource(e) {
     return !!(e && e.meta && e.meta.ellipse);
   }
-  function reconstructCore(entities, opts) {
+  function reconstructCore(entities, opts, deferredFrameRegistry) {
     opts = opts || {};
     var list = Array.isArray(entities) ? entities.filter(Boolean).map(function(e) {
       return Object.assign({}, e, { visible: true });
     }) : [];
     list = Entities.withDeclaredMembers(list);
-    if(list.some(function(e){return e.type==='CURVE';})) return reconstructParametric(list,opts);
+    var frameRegistry = deferredFrameRegistry || ViewFrame.resolve(list,opts);
+    if(list.some(function(e){return e.type==='CURVE';})) return reconstructParametric(list,opts,frameRegistry);
     var declared = opts.identity === 'explicit' || list.some(function(e) { return e.meta && e.meta.membersDeclared; });
     var topology = opts.topology || list.some(function(e) { return e.meta && e.meta.reconstructionTopology; });
     var curveInk = list.filter(function(e) {
       var meta = e.meta || {};
-      return Curves.isCurve(e) && meta.reconstructionRole !== 'construction' && !DROP_META[meta.kind];
+      return Curves.isCurve(e) && e.viewRole !== 'AUX' && meta.reconstructionRole !== 'construction' && !DROP_META[meta.kind];
     });
     var resolvedFrame = Curves.resolveProfileFrame(list,opts), frame=resolvedFrame.profile;
-    var frameRegistry = ViewFrame ? ViewFrame.resolve(list,opts) : null;
-    var hasAux = !!(frameRegistry && frameRegistry.hasAux);
     var auxEntities = list.some(function (e) { return e && e.viewRole === 'AUX'; });
     var normalized = autoMembersForStrict(list, frame);
 
@@ -3154,18 +3188,19 @@
       return !toroidal.consumedIds.has(e.id);
     }) : normalized;
     var conic = Conic && Conic.lift ? Conic.lift(curveRows,
-      {profile:frame,visibilityProvider:visibilityProvider}) :
+      {profile:frame,frameRegistry:frameRegistry,visibilityProvider:visibilityProvider}) :
       {curves:[],consumedIds:[],pointIds:[],issues:[],groups:[],usedGroups:[]};
     var conicIssues = (conic.issues || []).slice();
     var lineLift = Conic && Conic.liftLine ? Conic.liftLine(curveRows,
-      {profile:frame,usedGroups:conic.usedGroups || []}) :
+      {profile:frame,frameRegistry:frameRegistry,groups:conic.groups,usedGroups:conic.usedGroups || []}) :
       {curves:[],consumedIds:[],issues:[],usedGroups:[],consideredGroups:[]};
     var lineConsidered = new Set(lineLift.consideredGroups || []), lineSegIds = new Set();
+    var lineConsumed = new Set(lineLift.consumedIds || []);
     (conic.groups || []).forEach(function(g) {
       if(lineConsidered.has(g.id)) g.segmentIds.forEach(function(id) {lineSegIds.add(id);});
     });
     conicIssues = conicIssues.filter(function(issue) {
-      return !(lineSegIds.has(issue.entityId) &&
+      return !lineConsumed.has(issue.entityId) && !(lineSegIds.has(issue.entityId) &&
         ['conic-projection-missing','conic-lift-ambiguous','conic-third-view-conflict',
           'conic-point-conflict'].indexOf(issue.code) !== -1);
     });
@@ -3173,7 +3208,9 @@
     var analyticIds = new Set((conic.consumedIds || []).concat(lineLift.consumedIds || []));
     var exactGroupSegments = new Set();
     (conic.groups || []).forEach(function(g) {
-      g.segmentIds.forEach(function(id) {exactGroupSegments.add(id);});
+      g.segmentIds.forEach(function(id) {
+        if (!g.nativePrincipal || analyticIds.has(id)) exactGroupSegments.add(id);
+      });
     });
     var analyticIssues = conicIssues.concat(lineLift.issues || []);
     var blockedSegments = new Set(exactGroupSegments);
@@ -3332,29 +3369,8 @@
       return g;
     }
     function finish(result, stage, diagnostics) {
-      if (hasAux && ViewFrame) {
-        var auditGeometry = result.geometry || (result.frameEvidence && result.frameEvidence.length ?
-          { vertices: [], vertexIds: [], frameEvidence: result.frameEvidence } : null);
-        var frameAudit = ViewFrame.audit(list, auditGeometry, frameRegistry);
-        if (result.geometry) {
-          result.geometry.viewFrames = frameRegistry.serialize();
-          result.geometry.frameAudit = frameAudit;
-        }
-        (frameRegistry.issues || []).forEach(function (issue) {
-          if (!frameAudit.issues.some(function (d) { return d.code === issue.code && d.entityId === issue.entityId; }))
-            frameAudit.issues.push(issue);
-        });
-        if (frameAudit.issues.length) frameAudit.status = 'issues';
-        var frameIssues = (frameRegistry.issues || []).concat(frameAudit.issues || []);
-        result.issues = (result.issues || []).slice();
-        frameIssues.forEach(function (issue) {
-          if (!result.issues.some(function (d) { return d.code === issue.code && d.entityId === issue.entityId; }))
-            result.issues.push(issue);
-        });
-        if (frameAudit.status === 'issues' && ['inferred', 'determined'].indexOf(result.determination) !== -1)
-          result.determination = 'partial';
-        result.frameAudit = frameAudit;
-        result.viewFrames = frameRegistry.serialize();
+      if (frameRegistry.hasAux && !deferredFrameRegistry) {
+        attachFrameAudit(result,list,frameRegistry);
         diagnostics = (result.issues || []).slice();
       }
       result.pipeline = { version: 1, input: 'vertices-edges-curves', identity: declared ? 'explicit' : 'inferred',
@@ -3648,13 +3664,17 @@
     }
     if (topology) return finish(reconstructStrict(list,opts,frameRegistry), 'declared-topology');
     if (!curveInk.length && !oblique.curves.length && !analyticCurves.length) {
-      var straight = straightComponent(list);
+      var straight = straightComponent(list.filter(function(e) {
+        return e.type !== 'CIRCLE' || e.viewRole !== 'AUX' || !exactGroupSegments.has(e.id);
+      }));
       var missing=unmatchedPoints(straight.geometry).concat(oblique.issues, analyticIssues);
       if(missing.length && straight.geometry) {straight.determination='partial';straight.geometry.topologyStatus='partial';}
       if((oblique.issues.length || analyticIssues.length) && !straight.geometry && straight.determination!=='inconsistent') {
         var firstIssue=oblique.issues[0] || analyticIssues[0];
         straight.reason=firstIssue.code;
         straight.label=firstIssue.message;
+        if (frameRegistry.hasAux && analyticIssues.length)
+          straight.issues=(straight.issues || []).filter(function(issue) {return issue.code!=='empty-model';});
       }
       var straightValidation=validateInferredSurfaces(straight.geometry);
       if(straightValidation) straight.geometry.surfaceValidation=straightValidation;
@@ -3669,7 +3689,9 @@
       var check = Strict.reconstruct(normalized.filter(function(e) { return !Curves.isCurve(e) && !isConicSource(e); }),opts);
       if (check.determination === 'inconsistent') return finish(check,'correspondence',check.issues || []);
     }
-    var lifted = curveInk.length ? Curves.reconstruct(normalized,
+    var lifted = curveInk.length ? Curves.reconstruct(normalized.filter(function(e) {
+      return e.viewRole !== 'AUX' && !(e.type === 'CIRCLE' && analyticIds.has(e.id));
+    }),
       Object.assign({}, opts, {toroidal:toroidal})) : {geometry:null,issues:[],consumedIds:[]};
     var geometry = lifted.geometry;
     var diagnostics = lifted.issues.filter(function(d) {return !d.entityId || !obliqueIds.has(d.entityId);})

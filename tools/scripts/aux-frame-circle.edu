@@ -1,0 +1,9 @@
+/datum -100 400
+/auxframe FACE 20 30 40 0 0.7071067811865476 0.7071067811865476 1 0 0 240 45
+/ellipse 20 -40 10 7.0710678118654755 12 A plan
+/ellipse 20 30 10 7.0710678118654755 12 A elevation
+/point centre 240 45 aux:FACE
+/circle centre 10 A aux:FACE
+# expect: curves=1 analyticConics=1 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok centreRefs=ok centreEdit=ok
+# expect: auxFrames=1 auxFrameStatus=ok auxUnresolved=0 previewAuxParity=ok previewCurveParity=ok previewParity=ok diagnostics=none
+# conic-query: {"expect":{"count":1,"kind":"circle","center":{"x":20,"y":30,"z":40},"axes":[10,10],"normal":{"x":0,"y":0.7071067811865476,"z":0.7071067811865476},"projectionOk":true,"viewDefinitions":{"2":{"role":"AUX","frameId":"FACE","count":1}}}}

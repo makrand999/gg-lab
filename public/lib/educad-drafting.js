@@ -30,6 +30,9 @@
   function role(e) {
     return e.viewRole && e.viewRole !== 'BOTH' ? e.viewRole : (e.y < 0 ? 'PLAN' : 'ELEVATION');
   }
+  function sameView(a, b) {
+    return role(a) === role(b) && (role(a) !== 'AUX' || (a.meta||{}).frameId === (b.meta||{}).frameId);
+  }
   function toView(v, r, map) {
     if (r === 'PLAN') return { x: v.x, y: -v.z };
     if (r === 'PROFILE') return { x: map.xRef + map.s * (v.z - map.dRef), y: v.y };
@@ -65,8 +68,14 @@
     var values = Object.create(null);
     list.forEach(function (p) {
       if (p.type !== 'POINT') return;
-      var r = role(p), axes = r === 'PLAN' ? {x: p.x, depth: -p.y} : r === 'ELEVATION' ? {x: p.x, height: p.y} : {height: p.y, sideX: p.x};
+      var r = role(p), axes = r === 'PLAN' ? {x: p.x, depth: -p.y} :
+        r === 'ELEVATION' ? {x: p.x, height: p.y} : r === 'PROFILE' ? {height: p.y, sideX: p.x} : {};
       if (r === 'PROFILE' && map) axes.depth = map.dRef + map.s * (p.x - map.xRef);
+      if (r === 'AUX') {
+        var frameId = p.meta.frameId;
+        axes['horizontal coordinate in ' + frameId] = p.x;
+        axes['vertical coordinate in ' + frameId] = p.y;
+      }
       (p.meta.members || []).forEach(function (m) {
         var known = values[m.id] || (values[m.id] = {});
         Object.keys(axes).forEach(function (axis) {
@@ -80,7 +89,7 @@
     var rules = editRules(options), list = Entities.identitySnapshot(table.list());
     var point = editablePoint(list, id);
     caption = String(caption).trim();
-    if (rules.labelPolicy === 'unique-view' && list.some(function (e) { return e.id !== id && e.type === 'POINT' && role(e) === role(point) && e.caption === caption; })) throw new Error('That display label is already used in this view.');
+    if (rules.labelPolicy === 'unique-view' && list.some(function (e) { return e.id !== id && e.type === 'POINT' && sameView(e,point) && e.caption === caption; })) throw new Error('That display label is already used in this view.');
     if (rules.renameScope === 'local') {
       point.caption = caption; point.name = caption; point.meta.labelOverride = true;
     } else {
@@ -100,7 +109,7 @@
     }
     if (rules.labelPolicy === 'unique-view') list.forEach(function (e) {
       if (e.type !== 'POINT' || !e.caption || e.id !== id && e.caption === table.get(e.id).caption) return;
-      if (list.some(function (other) { return other.type === 'POINT' && other.id !== e.id && role(other) === role(e) && other.caption === e.caption; })) throw new Error('That display label is already used in this view.');
+      if (list.some(function (other) { return other.type === 'POINT' && other.id !== e.id && sameView(other,e) && other.caption === e.caption; })) throw new Error('That display label is already used in this view.');
     });
     commitIdentitySnapshot(table, list);
   }
@@ -159,7 +168,7 @@
   function linkPoints(table, sourceId, targetId, map) {
     var list = Entities.identitySnapshot(table.list());
     var source = editablePoint(list, sourceId), target = editablePoint(list, targetId);
-    if (role(source) === role(target)) throw new Error('Choose stations in different views.');
+    if (sameView(source,target)) throw new Error('Choose stations in different views.');
     var front = role(source) === 'ELEVATION' ? source : role(target) === 'ELEVATION' ? target : null;
     var plan = role(source) === 'PLAN' ? source : role(target) === 'PLAN' ? target : null;
     var side = role(source) === 'PROFILE' ? source : role(target) === 'PROFILE' ? target : null;
@@ -286,7 +295,7 @@
       points.forEach(function (q) {
         if (q.id === p.id || !common(p, q)) return;
         var qr = role(q);
-        if (r === qr) put(q, k, value);
+        if (sameView(p,q)) put(q, k, value);
         if (k === 'x' && ((r === 'PLAN' && qr === 'ELEVATION') || (r === 'ELEVATION' && qr === 'PLAN'))) put(q, 'x', value);
         if (r === 'PLAN' && qr === 'PROFILE' && k === 'y') put(q, 'x', map.xRef + map.s * (-value - map.dRef));
         if (r === 'ELEVATION' && qr === 'PROFILE' && k === 'y') put(q, 'y', value);

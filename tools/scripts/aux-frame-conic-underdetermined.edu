@@ -1,0 +1,6 @@
+/datum -100 400
+/auxframe PARALLEL 5 4 3 0 1 0 1 0 0 100 15
+/ellipse 10 -30 9 6 8 A plan
+/ellipse 105 -12 9 6 8 A aux:PARALLEL
+# expect: analyticConics=0 auxFrames=1 auxFrameStatus=issues auxUnresolved=8 auxDiagnostics=aux-conic-underdetermined
+# expect: diagnostics=aux-conic-underdetermined previewStatus=unavailable previewParity=ok

@@ -1,0 +1,11 @@
+/datum -100 400
+/auxframe EDGE 10 20 30 0.5 -0.5 0.7071067811865476 0.7071067811865476 0.7071067811865476 0 200 40
+/ellipse 10 -30 4.242640687119286 4 12 A plan
+/point lo 200 34.900980486407214 aux:EDGE
+/point hi 200 45.099019513592786 aux:EDGE
+/line lo hi A aux:EDGE
+# expect: curves=1 analyticConics=1 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok
+# expect: auxFrames=1 auxFrameStatus=ok auxUnresolved=0 previewAuxParity=ok previewCurveParity=ok previewParity=ok diagnostics=none
+# conic-query: {"expect":{"count":1,"kind":"ellipse","center":{"x":10,"y":20,"z":30},"axes":[6,4],"normal":{"x":0.7071067811865476,"y":0.7071067811865476,"z":0},"projectionOk":true,"viewDefinitions":{"1":{"kind":"line","role":"AUX","frameId":"EDGE"}}}}
+# surface-query: {"operation":"reconstruct","entityPatches":[{"entityId":"E14","patch":{"y":39}},{"entityId":"E15","patch":{"y":41}},{"entityId":"E16","patch":{"y":39,"y2":41}}],"expect":{"curves":0,"previewValid":true,"sourceUnchanged":true}}
+# expect: surfaceChecks=1 surfaceQueries=ok

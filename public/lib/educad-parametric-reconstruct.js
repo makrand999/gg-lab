@@ -1,15 +1,17 @@
 (function(root,factory) {
-  if(typeof module!=='undefined'&&module.exports) module.exports=factory(require('./educad-parametric.js'));
-  else root.EduCADParametricReconstruct=factory(root.EduCADParametric);
-})(typeof window!=='undefined'?window:globalThis,function(P) {
+  if(typeof module!=='undefined'&&module.exports) module.exports=factory(require('./educad-parametric.js'),require('./educad-view-frame.js'));
+  else root.EduCADParametricReconstruct=factory(root.EduCADParametric,root.EduCADViewFrame);
+})(typeof window!=='undefined'?window:globalThis,function(P,ViewFrame) {
   'use strict';
   var EPS=1e-6;
-  function reconstruct(entities,profile) {
+  function reconstruct(entities,profile,registry) {
     var byId=new Map(entities.map(function(e){return [e.id,e];}));
     var rows=entities.filter(function(e){return e.type==='CURVE'&&!(e.meta&&e.meta.reconstructionRole==='construction');});
     var curves=[],issues=[];
     function diag(code,e,message){issues.push({code:code,entityId:e.id,sourceIds:[e.id],message:message});}
     function stations(e){return (Array.isArray((e.meta||{}).throughRefs)?e.meta.throughRefs:[]).map(function(id){return byId.get(id);});}
+    function view(e){return e.viewRole==='AUX'?'AUX:'+((e.meta||{}).frameId||''):e.viewRole;}
+    function frameFor(e){return ViewFrame.forEntity(e,profile,registry);}
     function ids(p){return ((p.meta||{}).members||[]).map(function(m){return m.id;});}
 
 
@@ -29,9 +31,8 @@
       return {};
     }
     function pair(a,b) {
-      if(a.viewRole===b.viewRole||a.meta.curve.closed!==b.meta.curve.closed)return [];
       var A=stations(a),B=stations(b),n=A.length,closed=a.meta.curve.closed;
-      if(n<2||n!==B.length||A.concat(B).some(function(p){return !p;}))return [];
+      var auxiliary=a.viewRole==='AUX'||b.viewRole==='AUX',frameA=frameFor(a),frameB=frameFor(b);
       var aid=new Set(A.flatMap(ids)),bid=new Set(B.flatMap(ids));
       var sharedId=Array.from(aid).some(function(id){return bid.has(id);});
       var explicit=A.concat(B).some(declared);
@@ -43,6 +44,14 @@
         A.forEach(function(p,i) {
           var q=B[order[i]];
           if(constrainStations&&!shared(p,q)) {valid=false;return;}
+          if(auxiliary) {
+            var solved=ViewFrame.solveObservations([
+              {frame:frameA,x:p.x,y:p.y},{frame:frameB,x:q.x,y:q.y}
+            ]);
+            if(!solved.point||solved.residual>EPS)valid=false;
+            points.push(solved.point);
+            return;
+          }
           var x=coords(p,a.viewRole),y=coords(q,b.viewRole),v={};
           ['x','y','z'].forEach(function(k){
             if(x[k]!==undefined&&y[k]!==undefined&&Math.abs(x[k]-y[k])>EPS)valid=false;
@@ -54,30 +63,35 @@
       return solutions;
     }
 
-    function drawing(p,role) {
-      if(role==='PLAN') return {x:p.x,y:-p.z};
-      if(role==='ELEVATION') return {x:p.x,y:p.y};
-      if(role==='PROFILE'&&profile&&profile.s)return {x:profile.xRef+(p.z-profile.dRef)/profile.s,y:p.y};
-      return null;
-    }
     function samePoints(p,q) {
       return p.every(function(point,i){var other=q[i];return Math.hypot(point.x-other.x,point.y-other.y,point.z-other.z)<EPS;});
     }
     function plausible(a,b) {
-      return a.viewRole!==b.viewRole && a.meta.curve.closed===b.meta.curve.closed &&
+      return view(a)!==view(b) && a.meta.curve.closed===b.meta.curve.closed &&
         stations(a).length>=2 && stations(a).length===stations(b).length;
+    }
+    function independent(a,b) {
+      var first=frameFor(a),second=frameFor(b);
+      if(!first||!second)return false;
+      return ViewFrame.solveObservations([
+        {frame:first,x:first.sheet.x,y:first.sheet.y},
+        {frame:second,x:second.sheet.x,y:second.sheet.y}
+      ]).rank===3;
     }
 
 
     function orderFor(points,refs,c) {
       var C=stations(c),n=C.length,closed=c.meta.curve.closed;
       if(n!==points.length)return null;
+      var frame=frameFor(c);
+      if(!frame)return null;
+      var projected=points.map(function(p){return ViewFrame.project(frame,p);});
       var constrain=refs.concat(C).some(declared)||refs.some(function(p){return C.some(function(q){return shared(p,q);});});
       for(var reverse=0;reverse<2;reverse++)for(var offset=0;offset<(closed?n:1);offset++) {
         var order=C.map(function(_,i){return closed?(offset+(reverse?-i:i)+n)%n:reverse?n-1-i:i;});
         var valid=true;
         for(var i=0;i<n;i++) {
-          var q=C[order[i]],p=drawing(points[i],c.viewRole);
+          var q=C[order[i]],p=projected[i];
           if(constrain&&!shared(refs[i],q)) {valid=false;break;}
           if(!p||Math.abs(p.x-q.x)>EPS||Math.abs(p.y-q.y)>EPS) {valid=false;break;}
         }
@@ -86,7 +100,8 @@
       return null;
     }
     rows=rows.filter(function(a) {
-      if(!a.meta || !P.validate(a.meta.curve)||a.meta.curve.parameterization!=='uniform-stations'||!Array.isArray(a.meta.throughRefs)||stations(a).some(function(p){return !p||p.type!=='POINT'||p.viewRole!==a.viewRole;})) {
+      if(a.viewRole==='AUX'&&!frameFor(a))return false;
+      if(!a.meta || !P.validate(a.meta.curve)||a.meta.curve.parameterization!=='uniform-stations'||!Array.isArray(a.meta.throughRefs)||stations(a).some(function(p){return !p||p.type!=='POINT'||view(p)!==view(a);})){
         diag('curve-definition-unsupported',a,'This curve needs a valid definition and an array of defining point stations in the same declared view for cross-view reconstruction.');return false;
       }
       var definition;
@@ -175,8 +190,11 @@
       return a.rows.length-b.rows.length;
     }
     components.forEach(function(component) {
+      var hasAux=component.some(function(e){return e.viewRole==='AUX';});
+      var rankMessage='Curve stations need a second view with an independent normal to determine their depth.';
       if(component.length===1) {
-        diag('curve-correspondence-missing',component[0],'No compatible second view supplies all three coordinates at the defining stations.');
+        diag(hasAux?'aux-curve-underdetermined':'curve-correspondence-missing',component[0],
+          hasAux?rankMessage:'No compatible second view supplies all three coordinates at the defining stations.');
         return;
       }
       function diagnose(code,message) {
@@ -184,13 +202,20 @@
       }
 
 
-      var candidates=[];
+      var candidates=[],independentPairs=new Map();
       for(var ci=0;ci<component.length;ci++)for(var cj=ci+1;cj<component.length;cj++) {
-        if(!plausible(component[ci],component[cj]))continue;
-        pair(component[ci],component[cj]).forEach(function(solution){
+        var first=component[ci],second=component[cj];
+        if(!plausible(first,second)||hasAux&&!independent(first,second))continue;
+        if(!independentPairs.has(first))independentPairs.set(first,new Set());
+        independentPairs.get(first).add(second);
+        pair(first,second).forEach(function(solution){
           if(!candidates.some(function(c){return samePoints(c.points,solution.points);}))
-            candidates.push({points:solution.points,refs:stations(component[ci])});
+            candidates.push({points:solution.points,refs:stations(first)});
         });
+      }
+      if(hasAux&&!independentPairs.size) {
+        diagnose('aux-curve-underdetermined',rankMessage);
+        return;
       }
 
 
@@ -198,14 +223,14 @@
 
       var groups=[];
       candidates.forEach(function(candidate) {
-        var support=[],byRole=Object.create(null),roleOrder=[];
+        var byRole=Object.create(null),roleOrder=[];
         component.forEach(function(row) {
           var order=orderFor(candidate.points,candidate.refs,row);
           if(!order)return;
           var entry={row:row,order:order};
-          support.push(entry);
-          if(!byRole[row.viewRole]){byRole[row.viewRole]=[];roleOrder.push(row.viewRole);}
-          byRole[row.viewRole].push(entry);
+          var role=view(row);
+          if(!byRole[role]){byRole[role]=[];roleOrder.push(role);}
+          byRole[role].push(entry);
         });
         if(roleOrder.length<2)return;
         var choices=[[]];
@@ -217,6 +242,10 @@
           choices=next;
         });
         choices.forEach(function(evidence) {
+          if(hasAux&&!evidence.some(function(entry) {
+            var independent=independentPairs.get(entry.row);
+            return independent&&evidence.some(function(other){return independent.has(other.row);});
+          }))return;
           if(identityConflict(evidence))return;
           evidence=evidence.slice().sort(function(a,b){return rowIndex.get(a.row)-rowIndex.get(b.row);});
           groups.push({rows:evidence.map(function(e){return e.row;}),evidence:evidence,

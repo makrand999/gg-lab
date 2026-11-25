@@ -1,0 +1,14 @@
+/datum -100 400
+/auxframe LEFT 5 4 3 0 0.7071067811865476 0.7071067811865476 1 0 0 100 15
+/auxframe RIGHT 0 0 0 0.7071067811865476 0 0.7071067811865476 0 1 0 200 10
+/conic 105 7.221825406947977 9 0.7071067811865476 -1 -1.4142135623730951 8 A aux:LEFT
+/conic 220 24.14213562373095 2 -5.656854249492381 4 4.949747468305833 8 A aux:RIGHT
+/point pLeft 114 7.9289321881345245 aux:LEFT
+/point pRight 222 18.485281374238568 aux:RIGHT
+/rename pLeft boundary members
+/rename pRight boundary members
+# expect: analyticConics=1 conicProjection=ok conicQueries=ok obliquePoints=1 obliquePointFit=ok
+# expect: auxFrames=2 auxFrameStatus=ok auxUnresolved=0 previewAuxParity=ok previewParity=ok diagnostics=none
+# conic-query: {"expect":{"count":1,"center":{"x":10,"y":20,"z":30},"axes":[9.313481607302753,7.229042837778272],"projectionOk":true}}
+# surface-query: {"operation":"reconstruct","entityPatches":[{"entityId":"E18","patch":{"type":"TEXT","viewRole":"BOTH"}},{"entityId":"E19","patch":{"type":"TEXT","viewRole":"BOTH"}}],"expect":{"status":"unavailable","curves":0,"diagnostics":["conic-lift-ambiguous"],"previewValid":true,"sourceUnchanged":true}}
+# expect: surfaceChecks=1 surfaceQueries=ok

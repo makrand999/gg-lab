@@ -17,18 +17,12 @@ var Surfaces = require('../public/lib/educad-surfaces.js');
 var DrawingSections = require('../public/lib/educad-drawing-sections.js');
 var Implicit = require('../public/lib/educad-implicit.js');
 var Parametric = require('../public/lib/educad-parametric.js');
+var ViewFrame = require('../public/lib/educad-view-frame.js');
 var Ref3d = require('../public/lib/educad-ref3d.js');
 var PoseVerify = require('./pose-verify.js');
 
 function baseName(caption) {
   return String(caption).replace(/['’′]+$/, '').toLowerCase();
-}
-
-function curveViewPoint(p, role, frame) {
-  if (role === 'PLAN') return {x:p.x, y:-p.z};
-  if (role === 'ELEVATION') return {x:p.x, y:p.y};
-  if (role === 'PROFILE' && frame) return {x:frame.xRef + frame.s*(p.z - frame.dRef), y:p.y};
-  return null;
 }
 
 function curveSignature(curves) {
@@ -232,6 +226,8 @@ function runScript(text, options) {
   var centred=table.list().filter(function(e){return (e.type==='CIRCLE'||e.type==='CIRCULAR_ARC')&&e.meta&&e.meta.centerRef;});
   properties.centreRefs=centred.length?centred.every(function(e){
     var c=table.get(e.meta.centerRef);
+    if(e.viewRole==='AUX')return !!c&&c.type==='POINT'&&c.viewRole==='AUX'&&
+      (c.meta||{}).frameId===e.meta.frameId&&Math.hypot(c.x-e.x,c.y-e.y)<1e-9;
     var view=c&&(c.viewRole==='PLAN'||c.viewRole==='ELEVATION'||c.viewRole==='PROFILE')?c.viewRole:(c&&c.y<0?'PLAN':'ELEVATION');
     return !!c&&c.type==='POINT'&&view===e.viewRole&&Math.abs(c.x-e.x)<1e-9&&Math.abs(c.y-e.y)<1e-9;
   })?'ok':'issues':'none';
@@ -249,13 +245,15 @@ function runScript(text, options) {
   properties.curveFit=parametric.length?parametric.every(function(c){return Parametric.validate(c)&&c.interpolationPoints.every(function(p,i){var q=Parametric.point(c,c.parameters[i]);return Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z)<1e-6;});})?'ok':'issues':'none';
   var curveReprojectionResidual=0,curveStationResidual=0,curveEvidence=0,curveEvidenceViews=new Set();
   var curveReprojectionOk=parametric.length>0,curveStationOk=parametric.length>0;
+  var frameRegistry=parametric.length?ViewFrame.resolve(table.list()):null;
   parametric.forEach(function(c){
     if(!Array.isArray(c.sourceEvidence)||!c.sourceEvidence.length){curveReprojectionOk=false;curveStationOk=false;return;}
     c.sourceEvidence.forEach(function(evidence){
       curveEvidence++;
-      var source=table.get(evidence.entityId),definition=source&&source.meta&&source.meta.curve,frame=(solid.geometry||{}).profileMap;
+      var source=table.get(evidence.entityId),definition=source&&source.meta&&source.meta.curve;
       if(!source||!definition||!Array.isArray(evidence.order)){curveReprojectionOk=false;curveStationOk=false;return;}
-      curveEvidenceViews.add(source.viewRole);
+      var frame=ViewFrame.forEntity(source,solid.geometry.profileMap,frameRegistry);
+      curveEvidenceViews.add(source.viewRole==='AUX'?'AUX:'+source.meta.frameId:source.viewRole);
       var n=evidence.order.length,count=c.closed?n:n-1;
       if(n<2||count<1||evidence.order.some(function(k){return !Number.isInteger(k)||k<0||k>=n;})){curveReprojectionOk=false;curveStationOk=false;return;}
       for(var i=0;i<=40;i++) {
@@ -264,14 +262,14 @@ function runScript(text, options) {
         if(c.closed&&delta>1)delta-=n;if(c.closed&&delta< -1)delta+=n;
         var sourceT=(start+fraction*delta)/count;
         if(c.closed)sourceT=(sourceT%1+1)%1;
-        var p=Parametric.point(c,t),q=Parametric.point(definition,sourceT),projected=curveViewPoint(p,source.viewRole,frame);
+        var p=Parametric.point(c,t),q=Parametric.point(definition,sourceT),projected=ViewFrame.project(frame,p);
         if(!projected){curveReprojectionOk=false;return;}
         curveReprojectionResidual=Math.max(curveReprojectionResidual,Math.hypot(projected.x-q.x,projected.y-q.y));
       }
       for(var k=0;k<n;k++) {
         var stationPoint=table.get((source.meta.throughRefs||[])[evidence.order[k]]);
         if(!stationPoint||stationPoint.type!=='POINT'){curveStationOk=false;continue;}
-        var at=Parametric.point(c,k/count),drawn=curveViewPoint(at,source.viewRole,frame);
+        var at=Parametric.point(c,k/count),drawn=ViewFrame.project(frame,at);
         if(!drawn){curveStationOk=false;continue;}
         curveStationResidual=Math.max(curveStationResidual,Math.hypot(drawn.x-stationPoint.x,drawn.y-stationPoint.y));
       }
@@ -1834,7 +1832,7 @@ function runScript(text, options) {
       if (!curve && Number.isInteger(request.index)) curve = curves[request.index];
       if (!curve) curve = curves[0];
       if (!curve) throw new Error('Missing analytic conic');
-      var residual = conicProjectionResidual(curve, g && g.profileMap);
+      var residual = conicProjectionResidual(curve, g.profileMap, g.viewFrames);
       var axes = conicAxes(curve);
       var normal = curve.definition && curve.definition.normal;
       if (!normal) normal = {x:curve.u.y*curve.v.z-curve.u.z*curve.v.y,
@@ -1992,24 +1990,21 @@ function projectWorld(p, role, frame, vector) {
     {x:frame.s*p.z, y:p.y} : {x:frame.xRef + frame.s*(p.z-frame.dRef), y:p.y};
   return null;
 }
-function conicViewQ(curve, role, frame) {
-  var d = curve.definition || {};
-  var A = d.a || {x:curve.u.x*curve.radiusU, y:curve.u.y*curve.radiusU, z:curve.u.z*curve.radiusU};
-  var B = d.b || {x:curve.v.x*curve.radiusV, y:curve.v.y*curve.radiusV, z:curve.v.z*curve.radiusV};
-  var pa = projectWorld(A, role, frame, true), pb = projectWorld(B, role, frame, true);
-  return {q00:pa.x*pa.x+pb.x*pb.x, q01:pa.x*pa.y+pb.x*pb.y, q11:pa.y*pa.y+pb.y*pb.y};
-}
-function conicProjectionResidual(curve, frame) {
+function conicProjectionResidual(curve, frame, auxFrames) {
   var max = 0, sourceQ = curve.definition && curve.definition.exact;
   var d = curve.definition || {};
   var A3 = d.a || {x:curve.u.x*curve.radiusU, y:curve.u.y*curve.radiusU, z:curve.u.z*curve.radiusU};
   var B3 = d.b || {x:curve.v.x*curve.radiusV, y:curve.v.y*curve.radiusV, z:curve.v.z*curve.radiusV};
   (curve.viewDefinitions || []).forEach(function (view) {
     if (!view) return;
+    var auxiliary = view.role === 'AUX' && (auxFrames || []).find(function (f) { return f.id === view.frameId; });
+    function project(p, vector) {
+      return auxiliary ? (vector ? ViewFrame.direction(auxiliary,p) : ViewFrame.project(auxiliary,p)) :
+        projectWorld(p,view.role,frame,vector);
+    }
+    var A2 = project(A3,true), B2 = project(B3,true), C2 = project(curve.center);
+    if (!A2 || !B2 || !C2) { max = Infinity; return; }
     if (view.kind === 'line') {
-      var A2 = projectWorld(A3, view.role, frame, true), B2 = projectWorld(B3, view.role, frame, true);
-      var C2 = projectWorld(curve.center, view.role, frame);
-      if (!A2 || !B2 || !C2) { max = Math.max(max, Infinity); return; }
       var la = Math.hypot(A2.x,A2.y), lb = Math.hypot(B2.x,B2.y);
       if (!(la > 0) && !(lb > 0)) { max = Math.max(max, Infinity); return; }
       max = Math.max(max, la*lb > 0 ? Math.abs(A2.x*B2.y-A2.y*B2.x)/(la*lb) : 0);
@@ -2045,7 +2040,6 @@ function conicProjectionResidual(curve, frame) {
       return;
     }
     if (!view.center || !view.a || !view.b) return;
-    var projected = conicViewQ(curve, view.role, frame);
     var v00 = view.a.x*view.a.x+view.b.x*view.b.x;
     var v01 = view.a.x*view.a.y+view.b.x*view.b.y;
     var v11 = view.a.y*view.a.y+view.b.y*view.b.y;
@@ -2054,32 +2048,24 @@ function conicProjectionResidual(curve, frame) {
       var scale = Math.max(Math.abs(x), Math.abs(y));
       return Math.abs(x-y)/scale;
     }
-    max = Math.max(max, rel(projected.q00, v00), rel(projected.q01, v01),
-      rel(projected.q11, v11));
+    max = Math.max(max, rel(A2.x*A2.x+B2.x*B2.x, v00), rel(A2.x*A2.y+B2.x*B2.y, v01),
+      rel(A2.y*A2.y+B2.y*B2.y, v11));
     var centerShape = Math.sqrt(Math.max(1e-12, v00, v11));
-    var center = projectWorld(curve.center, view.role, frame);
-    if (center) max = Math.max(max,
-      Math.hypot(center.x-view.center.x, center.y-view.center.y) / centerShape);
+    max = Math.max(max, Math.hypot(C2.x-view.center.x, C2.y-view.center.y) / centerShape);
     var count = Math.min(Number.isInteger(view.count) ? view.count : 24, 48);
-    var sampleA = projectWorld(A3, view.role, frame, true);
-    var sampleB = projectWorld(B3, view.role, frame, true);
-    var sampleDet = sampleA ? sampleA.x*sampleB.y-sampleA.y*sampleB.x : 0;
+    var sampleDet = A2.x*B2.y-A2.y*B2.x;
     for (var i = 0; i < count; i++) {
       var t = 2*Math.PI*i/count;
       var source = {x:view.center.x + view.a.x*Math.cos(t) + view.b.x*Math.sin(t),
         y:view.center.y + view.a.y*Math.cos(t) + view.b.y*Math.sin(t)};
       var local = {x:source.x-view.center.x, y:source.y-view.center.y};
       if (!(Math.abs(sampleDet) > 1e-18)) continue;
-      var alpha = (local.x*sampleB.y-local.y*sampleB.x)/sampleDet;
-      var beta = (sampleA.x*local.y-sampleA.y*local.x)/sampleDet;
+      var alpha = (local.x*B2.y-local.y*B2.x)/sampleDet;
+      var beta = (A2.x*local.y-A2.y*local.x)/sampleDet;
       max = Math.max(max, Math.abs(Math.hypot(alpha,beta)-1));
     }
   });
   return {max:max, exactInput:!!sourceQ};
-  function paDot(q, point, row) {
-    if (row === 0) return q.q00*point.x + q.q01*point.y;
-    return q.q01*point.x + q.q11*point.y;
-  }
 }
 function checkConicProjection(solid) {
   var g = solid && solid.geometry;
@@ -2088,7 +2074,7 @@ function checkConicProjection(solid) {
   if (!curves.length) return {status:'none', curves:0, residual:0};
   var frame = g.profileMap || null, max = 0;
   curves.forEach(function (c) {
-    var result = conicProjectionResidual(c, frame);
+    var result = conicProjectionResidual(c, frame, g.viewFrames);
     max = Math.max(max, result.max);
   });
   return {status:max <= 1e-7 ? 'ok' : 'issues', curves:curves.length, residual:max};
@@ -2298,7 +2284,7 @@ function checkObliqueReprojection(solid, entities) {
   if (!curves.length) return 'none';
   var frame = g.profileMap || (entities.find(function(e) {return e.meta && e.meta.draftingLayout;}) || {meta:{}}).meta.draftingLayout;
   return curves.every(function(c) {
-    if (c.analytic) return conicProjectionResidual(c,frame).max <= 1e-7;
+    if (c.analytic) return conicProjectionResidual(c,frame,g.viewFrames).max <= 1e-7;
     return c.sourceIds.every(function(id) {
       var e = byId.get(id);
       if (!e || e.type !== 'SEGMENT') return false;

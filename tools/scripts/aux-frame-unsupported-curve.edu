@@ -5,4 +5,4 @@
 /point a 0 -15 plan
 /point b 40 -15 plan
 /line a b A plan
-# surface-query: {"operation":"reconstruct","entityPatches":[{"entityId":"E2","patch":{"viewRole":"AUX","meta":{"frameId":"A1"}}}],"expect":{"diagnostics":["aux-curve-unsupported"]}}
+# surface-query: {"operation":"reconstruct","entityPatches":[{"entityId":"E2","patch":{"type":"CIRCULAR_ARC","startAngle":0,"endAngle":90,"viewRole":"AUX","meta":{"frameId":"A1"}}}],"expect":{"diagnostics":["aux-curve-unsupported"]}}

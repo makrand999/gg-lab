@@ -1,0 +1,6 @@
+/datum -100 400
+/auxframe FACE 20 30 40 0 0.7071067811865476 0.7071067811865476 1 0 0 240 45
+/ellipse 20 -40 12 7.0710678118654755 12 A plan
+/circle 240 45 10 A aux:FACE
+# expect: analyticConics=0 auxFrames=1 auxFrameStatus=issues auxUnresolved=1 auxDiagnostics=conic-projection-conflict
+# expect: diagnostics=conic-projection-conflict previewStatus=unavailable previewParity=ok

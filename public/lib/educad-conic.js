@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-entities.js'));
-  else root.EduCADConic = factory(root.EduCADEntities);
-})(typeof window !== 'undefined' ? window : globalThis, function (Entities) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-entities.js'), require('./educad-view-frame.js'));
+  else root.EduCADConic = factory(root.EduCADEntities, root.EduCADViewFrame);
+})(typeof window !== 'undefined' ? window : globalThis, function (Entities, ViewFrame) {
   'use strict';
 
   var TAU = 2 * Math.PI, EPS = 1e-9;
@@ -28,11 +28,15 @@
   }
   function roleOfPoint(p) {
     if (!p) return null;
-    if (p.viewRole === 'PLAN' || p.viewRole === 'ELEVATION' || p.viewRole === 'PROFILE')
+    if (['PLAN','ELEVATION','PROFILE','AUX'].indexOf(p.viewRole) !== -1)
       return p.viewRole;
     if (!p.viewRole || p.viewRole === 'BOTH') return p.y > 0 ? 'ELEVATION' : p.y < 0 ? 'PLAN' : null;
     return null;
   }
+  function viewKey(role, frameId) { return role === 'AUX' ? 'AUX:' + frameId : role; }
+  function groupView(g) { return viewKey(g.role,g.frameId); }
+  function frameIdOf(e) { return (e.meta || {}).frameId; }
+  function entityView(e) { return viewKey(e.viewRole, frameIdOf(e)); }
   function add(a, b) { return {x:a.x+b.x, y:a.y+b.y}; }
   function sub(a, b) { return {x:a.x-b.x, y:a.y-b.y}; }
   function mul(a, s) { return {x:a.x*s, y:a.y*s}; }
@@ -57,7 +61,7 @@
     return Math.hypot(p.x-q.x, p.y-q.y) <= tol;
   }
   function sameDef(a, b) {
-    return a.role === b.role && a.count === b.count &&
+    return a.role === b.role && a.frameId === b.frameId && a.count === b.count &&
       a.center.x === b.center.x && a.center.y === b.center.y &&
       a.a.x === b.a.x && a.a.y === b.a.y &&
       a.b.x === b.b.x && a.b.y === b.b.y &&
@@ -91,15 +95,18 @@
     if (!Number.isInteger(index) || index < 0 || index >= count)
       return {error:'invalid conic segment index'};
     var role = raw.role || (entity && entity.viewRole);
-    if (['PLAN','ELEVATION','PROFILE'].indexOf(role) === -1)
+    if (['PLAN','ELEVATION','PROFILE','AUX'].indexOf(role) === -1)
       return {error:'invalid conic view role'};
-    if (entity && ['PLAN','ELEVATION','PROFILE'].indexOf(entity.viewRole) !== -1 &&
+    if (entity && ['PLAN','ELEVATION','PROFILE','AUX'].indexOf(entity.viewRole) !== -1 &&
         entity.viewRole !== role)
       return {error:'segment role disagrees with conic definition'};
+    var frameId = role === 'AUX' && entity ? frameIdOf(entity) : null;
+    if (role === 'AUX' && (typeof frameId !== 'string' || !frameId || entity.viewRole !== 'AUX'))
+      return {error:'auxiliary conic needs one view frame'};
     var centerRef = typeof raw.centerRef === 'string' && raw.centerRef ? raw.centerRef :
       entity && entity.meta && typeof entity.meta.centerRef === 'string' ? entity.meta.centerRef : null;
     return {def:{group:group, kind:'ellipse', exact:true, center:center, a:a, b:b,
-      count:count, index:index, role:role, centerRef:centerRef, scale:shapeScale}};
+      count:count, index:index, role:role, frameId:frameId, centerRef:centerRef, scale:shapeScale}};
   }
   function definition(entity) {
     if (!entity || entity.type !== 'SEGMENT' || !entity.meta || !entity.meta.ellipse) return null;
@@ -145,7 +152,7 @@
       var centerPoint = rawPoint || outerPoint;
       if (centerPoint) {
         var pointRole = roleOfPoint(centerPoint);
-        if (pointRole !== def.role) {
+        if (pointRole !== def.role || def.role === 'AUX' && frameIdOf(centerPoint) !== def.frameId) {
           invalid.push({entityId:entity.id, group:def.group,
             code:'conic-center-reference-invalid',
             message:'The ellipse centre point is not in the same declared view.'});
@@ -198,11 +205,37 @@
           code:'conic-definition-invalid', message:problem});
         return;
       }
-      out.push({id:entry.id, role:base.role, definition:base, count:base.count,
+      out.push({id:entry.id, role:base.role, frameId:base.frameId, definition:base, count:base.count,
         segments:ordered, segmentIds:ordered.map(function (e) { return e.id; }),
         center:base.center, a:base.a, b:base.b});
     });
     return {groups:out, invalid:invalid};
+  }
+  function collectCircles(entities, principal) {
+    var groups = [], invalid = [];
+    (entities || []).forEach(function (e) {
+      if (!e || e.type !== 'CIRCLE' || !(e.radius > 0) || !finite(e.radius) || !vec(e)) return;
+      var auxiliary = e.viewRole === 'AUX', meta = e.meta || {};
+      if (auxiliary ? !meta.frameId : !principal || ['PLAN','ELEVATION','PROFILE'].indexOf(e.viewRole) === -1) return;
+      if (['G','H','K'].indexOf(e.bisCode) !== -1 || meta.reconstructionRole === 'construction') return;
+      var ref = meta.centerRef;
+      var center = {x:e.x,y:e.y};
+      if (ref) {
+        var point = resolveEntity(entities, ref, 'POINT');
+        if (!point || entityView(point) !== entityView(e) ||
+            !nearPoint(center, point, 1e-9 * e.radius + 1e-12 * Math.max(1, Math.abs(e.x), Math.abs(e.y)))) {
+          if (auxiliary) invalid.push({entityId:e.id, code:'conic-center-reference-invalid',
+            message:'The auxiliary circle centre must match a point in its declared view.'});
+          return;
+        }
+        ref = point.id;
+      }
+      groups.push({id:e.id, role:e.viewRole, frameId:auxiliary ? meta.frameId : null, count:1,
+        nativePrincipal:!auxiliary,
+        definition:{centerRef:ref || null}, segments:[e], segmentIds:[e.id],
+        center:center, a:{x:e.radius,y:0}, b:{x:0,y:e.radius}});
+    });
+    return {groups:groups, invalid:invalid};
   }
   function viewQ(group) {
     var a = group.a, b = group.b;
@@ -332,7 +365,61 @@
     var v2 = add3(mul3(e1,d2.x), mul3(e2,d2.y));
     return {values:[large,small], vectors:[v1,v2], normal:normal, det:det};
   }
-  function solvePair(first, second, profile) {
+  function observationFrame(group, profile, registry) {
+    if (group.role === 'AUX') return registry && registry.byId[group.frameId];
+    return ViewFrame.forEntity({viewRole:group.role}, profile);
+  }
+  function fitPosition(first, second, frameA, frameB) {
+    var solved = ViewFrame.solveObservations([
+      {frame:frameA, x:first.x, y:first.y}, {frame:frameB, x:second.x, y:second.y}
+    ]);
+    return solved.point && ViewFrame.residualAt(solved.observations, solved.point) <= 1e-6 ? solved.point : null;
+  }
+  function solveFramedPair(first, second, profile, registry) {
+    var frameA = observationFrame(first, profile, registry), frameB = observationFrame(second, profile, registry);
+    function fail(code, message) {
+      return {issue:{code:code, entityId:first.segmentIds[0], message:message}};
+    }
+    if (!frameA || !frameB) return fail('conic-view-frame-missing',
+      'The conic projection needs a resolved view frame.');
+    var cross = cross3(frameA.n, frameB.n), sin = len3(cross);
+    if (sin <= 1e-6) return fail('aux-conic-underdetermined',
+      'Parallel projections leave the conic depth unresolved. Add an independent view.');
+    var center = fitPosition(first.center, second.center, frameA, frameB);
+    if (!center) return fail('conic-center-conflict',
+      'The projected ellipse centers disagree along their shared direction.');
+    var shared = mul3(cross, 1/sin);
+    var acrossA = cross3(frameA.n, shared), acrossB = cross3(frameB.n, shared);
+    function localGroup(group, frame, across, role, sign) {
+      var x = ViewFrame.direction(frame, shared), y = ViewFrame.direction(frame, across);
+      function projectBasis(v) { return {x:dot(v,x), y:sign*dot(v,y)}; }
+      return {role:role, segmentIds:group.segmentIds, center:{x:0,y:0},
+        a:projectBasis(group.a), b:projectBasis(group.b)};
+    }
+    var solved = solvePair(localGroup(first, frameA, acrossA, 'PLAN', -1),
+      localGroup(second, frameB, acrossB, 'ELEVATION', 1));
+    if (solved.issue) return solved;
+    var cosine = dot3(acrossA, acrossB);
+    var remaining = mul3(add3(acrossB, mul3(acrossA, -cosine)), 1/sin);
+    function world(p) {
+      return add3(add3(mul3(shared,p.x), mul3(acrossA,p.z)),
+        mul3(remaining, (p.y - cosine*p.z)/sin));
+    }
+    var candidates = solved.candidates.map(function (candidate) {
+      var a = world(mul3(candidate.vectors[0], Math.sqrt(candidate.values[0])));
+      var b = world(mul3(candidate.vectors[1], Math.sqrt(candidate.values[1])));
+      var theta = 0.5 * Math.atan2(2*dot3(a,b), dot3(a,a)-dot3(b,b));
+      var major = add3(mul3(a,Math.cos(theta)), mul3(b,Math.sin(theta)));
+      var majorRadius = len3(major), normal = cross3(a,b), area = len3(normal);
+      var u = mul3(major,1/majorRadius), n = mul3(normal,1/area);
+      return {center:center, q:axesQ(a,b), values:[majorRadius*majorRadius, Math.pow(area/majorRadius,2)],
+        vectors:[u,cross3(n,u)], normal:n, scale:majorRadius};
+    }).filter(function (candidate) { return candidate.values[1] > EPS*EPS; });
+    return candidates.length ? {candidates:candidates} : fail('conic-lift-degenerate-shared-axis',
+      'The projected definitions leave a degenerate spatial conic.');
+  }
+  function solvePair(first, second, profile, registry) {
+    if (first.role === 'AUX' || second.role === 'AUX') return solveFramedPair(first, second, profile, registry);
     var d1 = viewData(first, profile), d2 = viewData(second, profile);
     if (!d1 || !d2) return {issue:{code:'conic-profile-frame-missing',
       entityId:first.segmentIds[0], message:'The profile projection needs a declared side-view frame.'}};
@@ -424,8 +511,15 @@
     var s = Math.max(1e-12, scale || 1);
     return Math.abs(a.x-b.x) <= tol*s && Math.abs(a.y-b.y) <= tol*s;
   }
-  function thirdMatches(candidate, group, profile) {
-    var view = profileViewQ(candidate, group.role, profile);
+  function thirdMatches(candidate, group, profile, registry) {
+    var view;
+    if (group.role === 'AUX') {
+      var frame = observationFrame(group, profile, registry);
+      if (!frame) return false;
+      var a = ViewFrame.direction(frame, mul3(candidate.vectors[0], Math.sqrt(candidate.values[0])));
+      var b = ViewFrame.direction(frame, mul3(candidate.vectors[1], Math.sqrt(candidate.values[1])));
+      view = {center:ViewFrame.project(frame,candidate.center), q:viewQ({a:a,b:b})};
+    } else view = profileViewQ(candidate, group.role, profile);
     if (!view) return false;
     var q = viewQ(group);
     var shape = Math.sqrt(Math.max(0, candidate.values[0]));
@@ -447,13 +541,17 @@
       return {z:profile.dRef + (p.x - profile.xRef) / profile.s, y:p.y};
     return null;
   }
-  function linkedPoints(entities, first, second, profile) {
+  function linkedPoints(entities, first, second, profile, registry) {
     var byMember = new Map();
+    var leftKey = groupView(first), rightKey = groupView(second);
+    var auxiliary = first.role === 'AUX' || second.role === 'AUX';
+    var frameA = auxiliary && observationFrame(first, profile, registry);
+    var frameB = auxiliary && observationFrame(second, profile, registry);
     (entities || []).forEach(function (e) {
       if (!e || e.type !== 'POINT' || !e.meta || !Array.isArray(e.meta.members)) return;
-      var role = e.viewRole;
-      if (role !== first.role && role !== second.role) return;
-      var group = role === first.role ? first : second;
+      var role = entityView(e);
+      if (role !== leftKey && role !== rightKey) return;
+      var group = role === leftKey ? first : second;
       if (!onGroup(group, {x:e.x, y:e.y})) return;
       e.meta.members.forEach(function (m) {
         if (!m || typeof m.id !== 'string') return;
@@ -463,14 +561,14 @@
     });
     var out = [], seen = new Set();
     byMember.forEach(function (points, id) {
-      var left = points.filter(function (p) { return p.viewRole === first.role; });
-      var right = points.filter(function (p) { return p.viewRole === second.role; });
+      var left = points.filter(function (p) { return entityView(p) === leftKey; });
+      var right = points.filter(function (p) { return entityView(p) === rightKey; });
       left.forEach(function (p) { right.forEach(function (q) {
         var key = id + '|' + p.id + '|' + q.id;
         if (seen.has(key)) return;
-        var position = mergeCenter(pointCoordinates(p, first.role, profile),
-          pointCoordinates(q, second.role, profile));
-        if (!position) return;
+        var position = auxiliary ? fitPosition(p,q,frameA,frameB) :
+          mergeCenter(pointCoordinates(p, first.role, profile), pointCoordinates(q, second.role, profile));
+        if (!position && !(auxiliary && p.meta.membersDeclared && q.meta.membersDeclared)) return;
         seen.add(key);
         out.push({memberId:id, pointIds:[p.id,q.id], position:position});
       }); });
@@ -588,6 +686,7 @@
     return {evidence:evidence, issues:issues};
   }
   function candidatePointResidual(candidate, position) {
+    if (!position) return Infinity;
     var d = {x:position.x-candidate.center.x, y:position.y-candidate.center.y,
       z:position.z-candidate.center.z};
     var u = candidate.vectors[0], v = candidate.vectors[1];
@@ -666,12 +765,39 @@
         a:aVec, b:bVec, u:frames.u, v:frames.v, radiusU:ru, radiusV:rv,
         normal:frames.n, exact:true},
       viewDefinitions:groups.map(function (g) {
-        return {group:g.id, role:g.role, center:{x:g.center.x,y:g.center.y},
+        var def = {group:g.id, role:g.role, center:{x:g.center.x,y:g.center.y},
           a:{x:g.a.x,y:g.a.y}, b:{x:g.b.x,y:g.b.y}, count:g.count};
+        if (g.frameId) def.frameId = g.frameId;
+        return def;
       })
     };
+    var centerRefs = groups.filter(function (g) { return g.role === 'AUX' && g.definition.centerRef; })
+      .map(function (g) { return g.definition.centerRef; });
+    if (centerRefs.length) curve.centerSourceIds = Array.from(new Set(centerRefs));
     if (circular) curve.radius = ru;
     return curve;
+  }
+  function mergeCurveSources(curve, other) {
+    curve.sourceIds = Array.from(new Set(curve.sourceIds.concat(other.sourceIds)));
+    curve.sourceGroups = Array.from(new Set(curve.sourceGroups.concat(other.sourceGroups)));
+    other.viewDefinitions.forEach(function (def) {
+      var present = curve.viewDefinitions.some(function (existing) {
+        if (def.kind === 'line')
+          return existing.kind === 'line' && def.ids.join('|') === existing.ids.join('|');
+        return def.group === existing.group;
+      });
+      if (!present) curve.viewDefinitions.push(def);
+    });
+    if (other.centerSourceIds)
+      curve.centerSourceIds = Array.from(new Set((curve.centerSourceIds || []).concat(other.centerSourceIds)));
+    if (other.pointEvidence) {
+      if (!curve.pointEvidence) curve.pointEvidence = [];
+      other.pointEvidence.forEach(function (point) {
+        var existing = curve.pointEvidence.find(function (entry) { return entry.memberId === point.memberId; });
+        if (existing) existing.sourceIds = Array.from(new Set(existing.sourceIds.concat(point.sourceIds)));
+        else curve.pointEvidence.push(point);
+      });
+    }
   }
   function sameCenter(a, b, tol, scale) {
     var s = Math.max(1e-12, scale || 1);
@@ -689,9 +815,8 @@
     var scale = Math.sqrt(Math.max(1e-12, Math.abs(a.q[0][0]), Math.abs(a.q[1][1]), Math.abs(a.q[2][2])));
     return sameCenter(a.center, b.center, 1e-7, scale) && sameQMatrix(a.q, b.q);
   }
-  function curveQ(curve) {
-    var d = curve.definition;
-    var a = d.a, b = d.b, Q = [[0,0,0],[0,0,0],[0,0,0]];
+  function axesQ(a, b) {
+    var Q = [[0,0,0],[0,0,0],[0,0,0]];
     [a,b].forEach(function (v) {
       var c = [v.x,v.y,v.z];
       for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) Q[i][j] += c[i]*c[j];
@@ -701,7 +826,7 @@
   function sameCurveGeometry(a, b) {
     var scale = Math.max(1e-12, a.radiusU || 0, a.radiusV || 0, b.radiusU || 0, b.radiusV || 0);
     return a.kind === b.kind && sameCenter(a.center, b.center, 1e-7, scale) &&
-      sameQMatrix(curveQ(a), curveQ(b));
+      sameQMatrix(axesQ(a.definition.a,a.definition.b), axesQ(b.definition.a,b.definition.b));
   }
   function candidateVisibility(candidate, entities, profile, visibilityAt) {
     if (!visibilityAt) return null;
@@ -745,9 +870,14 @@
   function lift(entities, options) {
     options = options || {};
     var profile = options.profile || null;
-    var collected = collect(entities), groups = collected.groups;
+    var registry = options.frameRegistry || ViewFrame.resolve(entities);
+    var collected = collect(entities);
+    var hasAuxiliaryEvidence = (entities || []).some(function (e) {
+      return e && e.viewRole === 'AUX' && ['CIRCLE','SEGMENT'].indexOf(e.type) !== -1 && registry.frameFor(e);
+    });
+    var circles = collectCircles(entities,hasAuxiliaryEvidence), groups = collected.groups.concat(circles.groups);
     var invalidSeen = new Set();
-    var issues = collected.invalid.filter(function (bad) {
+    var issues = collected.invalid.concat(circles.invalid).filter(function (bad) {
       var key = bad.group || bad.entityId;
       if (invalidSeen.has(key)) return false;
       invalidSeen.add(key);
@@ -757,25 +887,54 @@
     });
     if (!groups.length) return {curves:[], consumedIds:[], pointIds:[], issues:issues, groups:[]};
     var byRole = {PLAN:[], ELEVATION:[], PROFILE:[]};
-    groups.forEach(function (g) { byRole[g.role].push(g); });
+    groups.forEach(function (g) {
+      var role = groupView(g);
+      if (!byRole[role]) byRole[role] = [];
+      byRole[role].push(g);
+    });
+    var roles = Object.keys(byRole), pairs = ROLE_PAIR.slice(), failedPairs = new Map();
+    roles.forEach(function (role, i) {
+      if (i < 3) return;
+      roles.slice(0,i).forEach(function (other) { pairs.push({a:other,b:role,auxiliary:true}); });
+    });
+    var entitiesById = new Map((entities || []).map(function (entity) { return [entity.id,entity]; }));
+    function centerMembers(group) {
+      var id = group.definition && group.definition.centerRef, point = entitiesById.get(id);
+      if (!point || !point.meta || !point.meta.membersDeclared) return [];
+      return (point.meta.members || []).map(function (m) { return m.id; });
+    }
     var visibilityAt = options.visibilityProvider ? options.visibilityProvider([]) : null;
     var candidates = [];
-    ROLE_PAIR.forEach(function (pair) {
+    pairs.forEach(function (pair) {
       byRole[pair.a].forEach(function (first) {
         byRole[pair.b].forEach(function (second) {
-          var solved = solvePair(first, second, profile);
-          if (solved.issue) return;
+          if (!pair.auxiliary && (first.nativePrincipal || second.nativePrincipal)) return;
+          if (pair.auxiliary) {
+            var firstMembers = centerMembers(first), secondMembers = centerMembers(second);
+            if (firstMembers.length && secondMembers.length && !firstMembers.some(function (id) {
+              return secondMembers.indexOf(id) !== -1;
+            })) return;
+          }
+          var solved = solvePair(first, second, profile, registry);
+          if (solved.issue) {
+            if (pair.auxiliary) [first,second].forEach(function (g) {
+              if (!failedPairs.has(g.id)) failedPairs.set(g.id, []);
+              failedPairs.get(g.id).push(solved.issue);
+            });
+            return;
+          }
           solved.candidates.forEach(function (candidate) {
             var entry = Object.assign({}, candidate, {first:first, second:second,
-              roles:[first.role, second.role], pair:pair});
-            var linked = linkedPoints(entities, first, second, profile);
-            var endpoint = segmentEndpointObservations(entities, first, second, profile);
+              roles:[pair.a, pair.b], pair:pair});
+            var linked = linkedPoints(entities, first, second, profile, registry);
+            var endpoint = pair.auxiliary ? {issues:[],evidence:[]} :
+              segmentEndpointObservations(entities, first, second, profile);
             issues = issues.concat(endpoint.issues);
             var mergedEvidence = linked.slice();
             var mergeTol = 1e-6 * Math.max(1, candidate.scale || 0);
             endpoint.evidence.forEach(function (observation) {
               var duplicate = mergedEvidence.some(function (existing) {
-                return Math.hypot(existing.position.x - observation.position.x,
+                return existing.position && Math.hypot(existing.position.x - observation.position.x,
                   existing.position.y - observation.position.y,
                   existing.position.z - observation.position.z) <= mergeTol;
               });
@@ -784,10 +943,10 @@
             entry.evidence = mergedEvidence;
             entry.fit = pointFit(entry, entry.evidence);
             entry.third = [];
-            ['PLAN','ELEVATION','PROFILE'].forEach(function (role) {
-              if (role === first.role || role === second.role) return;
+            roles.forEach(function (role) {
+              if (role === pair.a || role === pair.b) return;
               byRole[role].forEach(function (third) {
-                if (thirdMatches(entry, third, profile)) entry.third.push(third);
+                if (thirdMatches(entry, third, profile, registry)) entry.third.push(third);
               });
             });
             entry.visibility = candidateVisibility(entry, entities, profile, visibilityAt);
@@ -820,6 +979,9 @@
       entry.candidates = unique;
     });
     var selected = [], selectionIssues = new Map();
+    function uniqueThirds(candidate) {
+      return candidate.third.length > 0 && new Set(candidate.third.map(groupView)).size === candidate.third.length;
+    }
     function noteGroup(group, code, message) {
       if (!selectionIssues.has(group.id))
         selectionIssues.set(group.id, {code:code, entityId:group.segmentIds[0], message:message});
@@ -845,29 +1007,34 @@
       components.get(r).push(g);
     });
     components.forEach(function (componentGroups, compId) {
-      var roleCount = {PLAN:0, ELEVATION:0, PROFILE:0};
-      componentGroups.forEach(function (g) { roleCount[g.role]++; });
+      var roleCount = Object.create(null);
+      componentGroups.forEach(function (g) {
+        var role = groupView(g);
+        roleCount[role] = (roleCount[role] || 0) + 1;
+      });
       var entries = Array.from(pairGroups.values()).filter(function (entry) {
         return root(entry.first.id) === compId;
       });
       entries.forEach(function (entry) {
         var evidence = entry.candidates[0].evidence;
-        var fit = (evidence.length ? entry.candidates.filter(function (c) { return c.fit.ok; }) :
-          entry.candidates.slice()).filter(function (c) {
-            return !c.visibility || !c.visibility.tested || c.visibility.conflicts === 0;
-          });
-        var otherRoles = ['PLAN','ELEVATION','PROFILE'].filter(function (role) {
-          return entry.first.role !== role && entry.second.role !== role;
+        var expected = roles.filter(function (role) {
+          return groupView(entry.first) !== role && groupView(entry.second) !== role && roleCount[role] === 1;
         });
-        var expectsThird = otherRoles.some(function (role) { return roleCount[role] === 1; });
-        var anyThird = entry.candidates.some(function (c) { return c.third.length === 1; });
-        if (expectsThird && !anyThird) {
+        var matches = entry.candidates.filter(function (c) {
+          var views = c.third.map(groupView);
+          return expected.every(function (role) { return views.indexOf(role) !== -1; });
+        });
+        if (!matches.length) {
           noteGroup(entry.first, 'conic-third-view-conflict',
             'The third view contains an exact ellipse for this projection set, but no spatial completion agrees with it; the correspondence is unresolved.');
           noteGroup(entry.second, 'conic-third-view-conflict',
             'The third view contains an exact ellipse for this projection set, but no spatial completion agrees with it; the correspondence is unresolved.');
           return;
         }
+        var fit = matches.filter(function (c) {
+          return (!evidence.length || c.fit.ok) &&
+            (!c.visibility || !c.visibility.tested || c.visibility.conflicts === 0);
+        });
         if (evidence.length && !fit.length) {
           noteGroup(entry.first, 'conic-point-conflict',
             'Linked boundary points contradict every spatial completion supported by these two projections.');
@@ -886,14 +1053,14 @@
         if (fit.length === 1) {
           choice = fit[0];
           if (evidence.length > 0) choice = fit[0];
-          else if (choice.third.length === 1) choice = fit[0];
+          else if (uniqueThirds(choice)) choice = fit[0];
           else if (choice.third.length > 1) {
             noteGroup(entry.first, 'conic-lift-ambiguous',
               'Several third-view ellipses agree with this spatial conic; the correspondence is unresolved.');
             return;
           } else {
             var pairOnly = entries.length === 1 &&
-              roleCount[entry.first.role] === 1 && roleCount[entry.second.role] === 1;
+              roleCount[groupView(entry.first)] === 1 && roleCount[groupView(entry.second)] === 1;
             if (!pairOnly) {
               noteGroup(entry.first, 'conic-lift-ambiguous',
                 'More than one ellipse in these views can take part in this correspondence; add a linked boundary identity or a third view.');
@@ -903,7 +1070,7 @@
             }
           }
         } else if (fit.length > 1) {
-          var thirdSelect = fit.filter(function (c) { return c.third.length === 1; });
+          var thirdSelect = fit.filter(uniqueThirds);
           if (thirdSelect.length === 1) choice = thirdSelect[0];
           else {
             noteGroup(entry.first, 'conic-lift-ambiguous',
@@ -959,20 +1126,14 @@
       if (c.visibility && c.visibility.tested)
         curve.visibilityEvidence = {samples:c.visibility.tested, sourceIds:curve.sourceIds.slice(),
           occluderSourceIds:[]};
-      if (c.third.length === 1) curve.thirdView = c.third[0].role;
+      if (c.third.length === 1) curve.thirdView = groupView(c.third[0]);
       var same = curves.find(function (existing) { return sameCurveGeometry(existing, curve); });
-      if (same) {
-        same.sourceIds = Array.from(new Set(same.sourceIds.concat(curve.sourceIds)));
-        same.sourceGroups = Array.from(new Set(same.sourceGroups.concat(curve.sourceGroups)));
-        (curve.viewDefinitions || []).forEach(function (def) {
-          if (!same.viewDefinitions.some(function (q) { return q.group === def.group; }))
-            same.viewDefinitions.push(def);
-        });
-      } else curves.push(curve);
+      if (same) mergeCurveSources(same,curve);
+      else curves.push(curve);
       involved.forEach(function (g) { used.add(g.id); });
     });
     groups.forEach(function (g) {
-      if (used.has(g.id)) return;
+      if (used.has(g.id) || g.nativePrincipal) return;
       if (selectionIssues.has(g.id)) {
         var issue = selectionIssues.get(g.id);
         issues.push({code:issue.code, entityId:g.segmentIds[0], message:issue.message});
@@ -986,6 +1147,15 @@
         issues.push({code:'conic-lift-ambiguous', entityId:g.segmentIds[0],
           message:'The exact ellipse projections leave more than one spatial completion; add a third view or linked boundary identity.'});
       } else {
+        var failed = failedPairs.get(g.id) || [];
+        var auxiliaryIssue = null;
+        if (failed.length === 1 && (g.role === 'AUX' || groups.length === 2)) auxiliaryIssue = failed[0];
+        else if (g.role === 'AUX' && failed.length && failed.every(function (f) { return f.code === 'aux-conic-underdetermined'; }))
+          auxiliaryIssue = failed[0];
+        if (auxiliaryIssue) {
+          issues.push({code:auxiliaryIssue.code, entityId:g.segmentIds[0], message:auxiliaryIssue.message});
+          return;
+        }
         issues.push({code:'conic-projection-missing', entityId:g.segmentIds[0],
           message:'This exact ellipse needs a corresponding projection in another declared view.'});
       }
@@ -1031,20 +1201,23 @@
       if (!e || e.type !== 'SEGMENT' || e.meta && e.meta.ellipse) return;
       if (e.meta && (e.meta.reconstructionRole === 'construction' ||
           ['axis','projector','locus'].indexOf(e.meta.kind) !== -1)) return;
-      if (['PLAN','ELEVATION','PROFILE'].indexOf(e.viewRole) === -1) return;
+      if (['PLAN','ELEVATION','PROFILE','AUX'].indexOf(e.viewRole) === -1 ||
+          e.viewRole === 'AUX' && !frameIdOf(e)) return;
+      var key = entityView(e), frameId = e.viewRole === 'AUX' ? frameIdOf(e) : null;
       var dx = e.x2-e.x, dy = e.y2-e.y, l = Math.hypot(dx,dy);
       if (!(l > 1e-12)) return;
       dx /= l; dy /= l;
       if (dx < -1e-9 || (Math.abs(dx) <= 1e-9 && dy < 0)) { dx = -dx; dy = -dy; }
       var nx = -dy, ny = dx, c = nx*e.x + ny*e.y;
       var run = runs.find(function (r) {
-        return r.role === e.viewRole &&
+        return r.viewKey === key &&
           Math.abs(r.dx*dy-r.dy*dx) <= 1e-9 &&
           Math.abs(r.nx-nx) <= 1e-9 && Math.abs(r.ny-ny) <= 1e-9 &&
-          Math.abs(c-r.c) <= 1e-7 * Math.max(1e-12, Math.abs(c), Math.abs(r.c));
+          Math.abs(c-r.c) <= (frameId ? 1e-6 + 32*Number.EPSILON*Math.max(Math.abs(c),Math.abs(r.c)) :
+            1e-7 * Math.max(1e-12, Math.abs(c), Math.abs(r.c)));
       });
       if (!run) {
-        run = {role:e.viewRole, viewRole:e.viewRole, dx:dx, dy:dy, nx:nx, ny:ny, c:c,
+        run = {viewRole:e.viewRole, frameId:frameId, viewKey:key, dx:dx, dy:dy, nx:nx, ny:ny, c:c,
           intervals:[], ids:[], segments:[]};
         runs.push(run);
       }
@@ -1069,70 +1242,30 @@
     if (role === 'PROFILE' && profile) return {x:profile.s*v.z, y:v.y};
     return null;
   }
-  function lineCandidate(group, line, profile) {
-    var eq = lineEquation(line), nx = eq.nx, ny = eq.ny;
-    var cs = group.center, as = group.a, bs = group.b;
-    var C = null, A = null, B = null;
-    if (group.role === 'PLAN' && line.viewRole === 'ELEVATION') {
-      if (Math.abs(ny) <= 1e-12) return {issue:'The edge-on elevation trace is vertical; a full plan ellipse cannot lie on it.'};
-      var m = -nx/ny, b0 = eq.c/ny;
-      C = {x:cs.x, y:m*cs.x+b0, z:-cs.y};
-      A = {x:as.x, y:m*as.x, z:-as.y};
-      B = {x:bs.x, y:m*bs.x, z:-bs.y};
-    } else if (group.role === 'PLAN' && line.viewRole === 'PROFILE') {
-      if (!profile) return {issue:'The profile trace needs a declared side-view frame.'};
-      if (Math.abs(ny) <= 1e-12) return {issue:'The edge-on profile trace is vertical; a full plan ellipse cannot lie on it.'};
-      var mz = -(nx*profile.s)/ny;
-      var bz = (eq.c - nx*(profile.xRef - profile.s*profile.dRef))/ny;
-      C = {x:cs.x, y:mz*(-cs.y)+bz, z:-cs.y};
-      A = {x:as.x, y:mz*(-as.y), z:-as.y};
-      B = {x:bs.x, y:mz*(-bs.y), z:-bs.y};
-    } else if (group.role === 'ELEVATION' && line.viewRole === 'PLAN') {
-      if (Math.abs(ny) <= 1e-12) return {issue:'The edge-on plan trace is vertical; a full elevation ellipse cannot lie on it.'};
-      var mx = nx/ny, bx = -eq.c/ny;
-      C = {x:cs.x, y:cs.y, z:mx*cs.x+bx};
-      A = {x:as.x, y:as.y, z:mx*as.x};
-      B = {x:bs.x, y:bs.y, z:mx*bs.x};
-    } else if (group.role === 'ELEVATION' && line.viewRole === 'PROFILE') {
-      if (!profile) return {issue:'The profile trace needs a declared side-view frame.'};
-      if (Math.abs(nx) <= 1e-12) return {issue:'The edge-on profile trace is horizontal; a full elevation ellipse cannot lie on it.'};
-      var my = -ny/(nx*profile.s);
-      var by = profile.dRef + (eq.c - nx*profile.xRef)/(nx*profile.s);
-      C = {x:cs.x, y:cs.y, z:my*cs.y+by};
-      A = {x:as.x, y:as.y, z:my*as.y};
-      B = {x:bs.x, y:bs.y, z:my*bs.y};
-    } else if (group.role === 'PROFILE' && line.viewRole === 'PLAN') {
-      if (!profile) return {issue:'The profile ellipse needs a declared side-view frame.'};
-      if (Math.abs(nx) <= 1e-12) return {issue:'The edge-on plan trace is horizontal; a full profile ellipse cannot lie on it.'};
-      var pz = profile.s, mx2 = ny/nx, bx2 = eq.c/nx;
-      var zC = profile.dRef + (cs.x-profile.xRef)/pz;
-      var zA = as.x/pz, zB = bs.x/pz;
-      C = {x:mx2*zC+bx2, y:cs.y, z:zC};
-      A = {x:mx2*zA, y:as.y, z:zA};
-      B = {x:mx2*zB, y:bs.y, z:zB};
-    } else if (group.role === 'PROFILE' && line.viewRole === 'ELEVATION') {
-      if (!profile) return {issue:'The profile ellipse needs a declared side-view frame.'};
-      if (Math.abs(nx) <= 1e-12) return {issue:'The edge-on elevation trace is vertical; a full profile ellipse cannot lie on it.'};
-      var pz2 = profile.s, my2 = -ny/nx, by2 = eq.c/nx;
-      var zC2 = profile.dRef + (cs.x-profile.xRef)/pz2;
-      var zA2 = as.x/pz2, zB2 = bs.x/pz2;
-      C = {x:my2*cs.y+by2, y:cs.y, z:zC2};
-      A = {x:my2*as.y, y:as.y, z:zA2};
-      B = {x:my2*bs.y, y:bs.y, z:zB2};
-    } else {
-      return {issue:'The exact ellipse and the edge-on trace are in the same view.'};
+  function lineCandidate(group, line, profile, registry) {
+    var ellipseFrame = observationFrame(group, profile, registry);
+    var lineFrame = observationFrame({role:line.viewRole, frameId:line.frameId}, profile, registry);
+    if (!ellipseFrame || !lineFrame)
+      return {issue:'The conic and its edge-on trace need resolved view frames.'};
+    var eq = lineEquation(line);
+    var normal = add3(mul3(lineFrame.u,eq.nx), mul3(lineFrame.v,eq.ny));
+    var denominator = dot3(normal,ellipseFrame.n);
+    if (Math.abs(denominator) <= 1e-12 * len3(normal))
+      return {issue:'The trace plane is parallel to the ellipse sight lines and leaves its depth unresolved.'};
+    var planePoint = ViewFrame.unproject(lineFrame,{x:line.x,y:line.y});
+    var flat = ViewFrame.unproject(ellipseFrame,group.center);
+    var centerDepth = dot3(normal,add3(planePoint,mul3(flat,-1)))/denominator;
+    var C = add3(flat,mul3(ellipseFrame.n,centerDepth));
+    function liftVector(v) {
+      var vector = add3(mul3(ellipseFrame.u,v.x),mul3(ellipseFrame.v,v.y));
+      return add3(vector,mul3(ellipseFrame.n,-dot3(normal,vector)/denominator));
     }
-    var Q = [[0,0,0],[0,0,0],[0,0,0]];
-    [A,B].forEach(function (v) {
-      var c = [v.x,v.y,v.z];
-      for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) Q[i][j] += c[i]*c[j];
-    });
-    var factor = rank2Factor(Q);
+    var A = liftVector(group.a), B = liftVector(group.b);
+    var Q = axesQ(A,B), factor = rank2Factor(Q);
     if (!factor || !(factor.values[1] > 0))
       return {issue:'The edge-on trace does not produce a rank-two spatial ellipse.'};
-    var A2 = projectVector(A, line.viewRole, profile), B2 = projectVector(B, line.viewRole, profile);
-    var center2 = projectVector(C, line.viewRole, profile);
-    if (!A2 || !B2 || !center2) return {issue:'The edge-on trace needs a declared side-view frame.'};
+    var A2 = ViewFrame.direction(lineFrame,A), B2 = ViewFrame.direction(lineFrame,B);
+    var center2 = ViewFrame.project(lineFrame,C);
     if (Math.abs(A2.x*B2.y - A2.y*B2.x) > 1e-7 * Math.max(1,
         Math.hypot(A2.x,A2.y) * Math.hypot(B2.x,B2.y)))
       return {issue:'The edge-on trace is not compatible with a rank-one projection of this ellipse.'};
@@ -1142,10 +1275,14 @@
     var ca = A2.x*dx + A2.y*dy, cb = B2.x*dx + B2.y*dy;
     var radius = Math.hypot(ca, cb), mid = center2.x*dx + center2.y*dy;
     var lo = mid - radius, hi = mid + radius;
-    var tol = 1e-7 * Math.max(1e-12, radius, Math.abs(lo), Math.abs(hi));
+    var auxiliary = group.role === 'AUX' || line.viewRole === 'AUX';
+    var tol = auxiliary ? 1e-7*radius + 32*Number.EPSILON*Math.max(Math.abs(lo),Math.abs(hi)) :
+      1e-7 * Math.max(1e-12, radius, Math.abs(lo), Math.abs(hi));
     var exact = unionExact(line, lo, hi, tol);
-    var contains = unionCovers(line, lo, hi, tol);
-    if (!contains) return {issue:'The edge-on trace covers only part of the spatial ellipse; the remaining bound is unresolved.'};
+    if (!unionCovers(line, lo, hi, tol))
+      return {issue:'The edge-on trace covers only part of the spatial ellipse; the remaining bound is unresolved.'};
+    if (!exact && auxiliary)
+      return {issue:'The auxiliary edge-on trace extends beyond the projected conic bounds.'};
     return {candidate:{center:C, q:Q, values:factor.values.slice(), vectors:factor.vectors.slice(),
       normal:factor.normal, scale:Math.sqrt(Math.max(0, factor.values[0]))}, line:line, group:group,
       coverage:exact ? 'exact' : 'contains', exact:exact,
@@ -1154,25 +1291,27 @@
   function liftLine(entities, options) {
     options = options || {};
     var profile = options.profile || null;
-    var collected = collect(entities);
+    var registry = options.frameRegistry || ViewFrame.resolve(entities);
     var used = new Set(options.usedGroups || []);
     var issues = [];
-    var groups = collected.groups.filter(function (g) { return !used.has(g.id); });
+    var groups = (options.groups || collect(entities).groups.concat(collectCircles(entities,true).groups))
+      .filter(function (g) { return !used.has(g.id); });
     var lines = lineRuns(entities);
     var entries = [];
     groups.forEach(function (group) {
       var list = [];
+      var groupKey = groupView(group);
       lines.forEach(function (line) {
-        if (line.viewRole === group.role) return;
-        var result = lineCandidate(group, line, profile);
+        if (line.viewKey === groupKey || group.nativePrincipal && line.viewRole !== 'AUX') return;
+        var result = lineCandidate(group, line, profile, registry);
         if (!result.candidate) {
           if (result.issue) list.push({group:group, line:line, issue:result.issue});
           return;
         }
         var candidate = result.candidate;
         candidate.third = groups.filter(function (other) {
-          return other.id !== group.id && other.role !== group.role &&
-            other.role !== line.viewRole && thirdMatches(candidate, other, profile);
+          var key = groupView(other);
+          return key !== groupKey && key !== line.viewKey && thirdMatches(candidate, other, profile, registry);
         });
         list.push({group:group, line:line, candidate:candidate,
           coverage:result.coverage, exact:result.exact, interval:result.interval});
@@ -1213,26 +1352,29 @@
     var curves = [], consumed = [], usedGroups = new Set();
     selected.forEach(function (entry) {
       if (blocked.has(entry)) return;
-      var curve = makeCurve(entry.candidate, [entry.group.role, entry.line.viewRole], [entry.group]);
+      var curve = makeCurve(entry.candidate, [groupView(entry.group), entry.line.viewKey], [entry.group]);
       if (!curve) return;
       curve.lineTrace = {role:entry.line.viewRole, ids:entry.line.ids.slice(), coverage:entry.coverage};
       curve.sourceIds = Array.from(new Set(curve.sourceIds.concat(entry.line.ids)));
       curve.sourceGroups = Array.from(new Set(curve.sourceGroups.concat(
         entry.line.ids.map(function (id) { return 'line:'+id; }))));
-      curve.viewDefinitions.push({kind:'line', ids:entry.line.ids.slice(),
+      var lineDefinition = {kind:'line', ids:entry.line.ids.slice(),
         segments:entry.line.segments.slice(), role:entry.line.viewRole,
-        x:entry.line.x, y:entry.line.y, x2:entry.line.x2, y2:entry.line.y2});
+        x:entry.line.x, y:entry.line.y, x2:entry.line.x2, y2:entry.line.y2};
+      if (entry.line.frameId) {
+        curve.lineTrace.frameId = entry.line.frameId;
+        lineDefinition.frameId = entry.line.frameId;
+      }
+      curve.viewDefinitions.push(lineDefinition);
       var same = curves.find(function (existing) { return sameCurveGeometry(existing, curve); });
-      if (same) {
-        same.sourceIds = Array.from(new Set(same.sourceIds.concat(curve.sourceIds)));
-        same.sourceGroups = Array.from(new Set(same.sourceGroups.concat(curve.sourceGroups)));
-      } else curves.push(curve);
+      if (same) mergeCurveSources(same,curve);
+      else curves.push(curve);
       consumed = consumed.concat(curve.sourceIds);
       usedGroups.add(entry.group.id);
     });
     entries.forEach(function (entry) {
       if (usedGroups.has(entry.group.id)) return;
-      if (entry.rejected.length) issues.push({code:'conic-line-partial',
+      if (entry.rejected.length && !entry.group.nativePrincipal) issues.push({code:'conic-line-partial',
         entityId:entry.group.segmentIds[0], message:entry.rejected[0].issue});
     });
     issues = issues.filter(function (issue, index, all) {

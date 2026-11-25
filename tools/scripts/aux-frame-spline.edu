@@ -1,0 +1,21 @@
+/datum -100 400
+/auxframe A1 10 4 3 0 0.7071067811865476 0.7071067811865476 1 0 0 100 30
+/auxframe A2 0 0 0 0.7071067811865476 0 0.7071067811865476 0 1 0 220 0
+/point p0 0 -10 plan
+/point p1 20 -30 plan
+/point p2 40 -20 plan
+/point p3 60 -50 plan
+/point a0 90 29.292893218813454 aux:A1
+/point a1 110 39.89949493661167 aux:A1
+/point a2 130 34.24264068711929 aux:A1
+/point a3 150 36.36396103067893 aux:A1
+/point b0 230 7.071067811865475 aux:A2
+/point b1 265 7.071067811865475 aux:A2
+/point b2 247 -14.14213562373095 aux:A2
+/point b3 280 -7.071067811865475 aux:A2
+/curve-through p0 p1 p2 p3 plan
+/curve-through a0 a1 a2 a3
+/curve-through b3 b2 b1 b0 aux:A2
+# expect: parametricCurves=1 curveFit=ok curveReprojection=ok curveStationReprojection=ok curveEvidence=3 curveEvidenceViews=AUX:A1,AUX:A2,PLAN throughEdit=ok
+# expect: auxFrames=2 auxFrameStatus=ok auxUnresolved=0 previewAux=ok previewAuxParity=ok previewCurveParity=ok previewParity=ok
+# expect: diagnostics=curve-surface-unresolved unresolved=1 status=partial

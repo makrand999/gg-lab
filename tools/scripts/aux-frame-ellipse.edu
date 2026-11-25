@@ -1,0 +1,10 @@
+/datum -100 400
+/auxframe LEFT 5 4 3 0 0.7071067811865476 0.7071067811865476 1 0 0 100 15
+/auxframe RIGHT 0 0 0 0.7071067811865476 0 0.7071067811865476 0 1 0 200 10
+/conic 10 -30 9 -1 -1 -6 8 A plan
+/conic 10 20 9 2 -1 4 12 A elevation
+/conic 105 7.221825406947977 9 0.7071067811865476 -1 -1.4142135623730951 16 A aux:LEFT
+/conic 220 24.14213562373095 2 -5.656854249492381 4 4.949747468305833 24 A aux:RIGHT
+# expect: curves=1 analyticConics=1 conicProjection=ok conicDefinitions=ok conicJSON=ok conicQueries=ok
+# expect: auxFrames=2 auxFrameStatus=ok auxUnresolved=0 previewAuxParity=ok previewCurveParity=ok previewParity=ok diagnostics=none
+# conic-query: {"expect":{"count":1,"kind":"ellipse","center":{"x":10,"y":20,"z":30},"axes":[9.313481607302753,7.229042837778272],"projectionOk":true,"viewDefinitions":{"2":{"role":"AUX","frameId":"LEFT"},"3":{"role":"AUX","frameId":"RIGHT"}}}}

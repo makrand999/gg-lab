@@ -258,8 +258,8 @@
     <p class="lede">
       The target is to reconstruct every sufficiently specified geometric solid in Major’s scope,
       including combinations of its geometric surfaces, holes, recesses and cuts.
-      Verified rows show the cases covered by drawing scripts. To-build rows give the
-      remaining capabilities and what a drawing script must show to verify them.
+      Drawing scripts show the verified cases and the supported scope of partial capabilities.
+      To-build rows give the criteria for verification.
     </p>
     <p class="lede">
       A drawing can specify geometry through orthographic views, dimensions, sections, member
@@ -512,38 +512,38 @@
         {
           group: 'evidence', status: 'verified', title: 'Full sections',
           text: 'Cutting-plane traces and drawn section boundaries support full retained sections of spheres and convex planar shells.',
-          limit: 'The retained shell is analytic. General oblique retained cuts and mixed-face repairs remain open.',
-          fixtures: ['full-section-sphere-retain', 'full-section-planar-prism', 'section-evidence-missing-boundary']
+          limit: 'The retained shell is analytic. An oblique cut needs a boundary in a view normal to the cutting plane. Mixed-face repairs remain open.',
+          fixtures: ['full-section-sphere-retain', 'full-section-oblique-sphere', 'full-section-planar-prism', 'section-evidence-missing-boundary']
         },
         {
           group: 'evidence', status: 'verified', title: 'Arbitrary auxiliary view frames',
           text: 'An orthonormal auxiliary frame at a declared sheet position supplies point and straight-edge evidence to the shared reconstruction.',
-          limit: 'Auxiliary curve lifting and hidden-line visibility remain open. Rank-deficient and contradictory point observations are reported.',
+          limit: 'Rank-deficient and contradictory point observations are reported. Auxiliary curves and visibility are tracked separately.',
           fixtures: ['aux-frame-face', 'aux-frame-point-supply', 'aux-frame-conflict', 'aux-frame-underdetermined']
         },
         {
-          group: 'surfaces', status: 'planned', title: 'General planar shell reconstruction',
-          text: 'Recover planar faces from projected boundaries with concave outlines, inner loops, coplanar subdivisions and partial hidden-edge evidence.',
-          limit: 'Verify face regions and closed shell topology for nonconvex, perforated and multi-component drawings when the evidence determines them.',
-          fixtures: []
+          group: 'surfaces', status: 'partial', title: 'General planar shell reconstruction',
+          text: 'A notched prism closes, and planar sheets retain inner loops and partial hidden edges in the tested drawings.',
+          limit: 'General perforated and multi-component closed shells with coplanar subdivisions remain open.',
+          fixtures: ['notched-prism', 'plate-hole', 'partial-hidden-edge']
         },
         {
-          group: 'surfaces', status: 'planned', title: 'General spatial curves and conics',
-          text: 'Lift bounded circles, conic arcs, exact splines and other defined spatial curves from their projections, including edge-on and partially visible projections.',
-          limit: 'Recover each curve’s 3D definition, span and source evidence. Verify its reprojection independently of display sampling.',
-          fixtures: []
+          group: 'surfaces', status: 'partial', title: 'General spatial curves and conics',
+          text: 'Ellipses, circular arcs and station-based splines lift from compatible views with analytic definitions and separate display geometry.',
+          limit: 'General conic arcs and arbitrary exact curve definitions with degenerate or partially visible projections remain open.',
+          fixtures: ['conic-thin-three-view', 'aux-frame-spline']
         },
         {
-          group: 'surfaces', status: 'planned', title: 'Inclined and general quadric patches',
-          text: 'Extend drawing lift to general bounded cylinder, cone, ellipsoid, paraboloid and hyperboloid patches, including oblique axes and noncircular sections.',
-          limit: 'Recover the analytic support, bounded domains and joins from compatible evidence. Verify orientation, section geometry and closure where the drawing defines a shell.',
-          fixtures: []
+          group: 'surfaces', status: 'partial', title: 'Inclined and general quadric patches',
+          text: 'Inclined frusta with matching scaled rings recover a bounded analytic quadric and close with planar caps.',
+          limit: 'General bounded quadric inference, including ellipsoids, paraboloids and hyperboloids, remains open.',
+          fixtures: ['frustum-inclined-homothetic', 'frustum-small-inclined']
         },
         {
-          group: 'surfaces', status: 'planned', title: 'Inclined-axis tori and bounded toroidal patches',
-          text: 'Recover toroidal surfaces from inclined projected contours, section curves and trim boundaries.',
-          limit: 'Verify the axis, both radii, angular domains and shared boundaries for an inclined ring torus and a trimmed toroidal patch.',
-          fixtures: []
+          group: 'surfaces', status: 'kernel', title: 'Inclined-axis tori and bounded toroidal patches',
+          text: 'The surface kernel evaluates oblique torus contours and clips intersections against bounded angular domains.',
+          limit: 'Reconstructing inclined axes, both radii and trim boundaries from the drawing remains open.',
+          fixtures: ['surface-torus']
         },
         {
           group: 'surfaces', status: 'planned', title: 'General meridians for surfaces of revolution',
@@ -558,16 +558,16 @@
           fixtures: []
         },
         {
-          group: 'surfaces', status: 'planned', title: 'General ruled surfaces',
-          text: 'Extend generator-based inference to supported open or closed boundary curves with nonuniform correspondence, singular stations and multiple bands.',
-          limit: 'Verify chosen generator correspondences, bounded analytic patches and joins, including competing generator assignments.',
-          fixtures: []
+          group: 'surfaces', status: 'partial', title: 'General ruled surfaces',
+          text: 'Evidenced generators connect multiple conic rings with nonuniform correspondence and join the resulting analytic bands.',
+          limit: 'Singular stations and insufficient generator evidence are reported. General nonconic boundary families remain open.',
+          fixtures: ['surface-ruled-graph-three-rings-nonuniform', 'general-affine-ruled-conic-singular-station', 'general-affine-ruled-conic-insufficient-source']
         },
         {
-          group: 'surfaces', status: 'planned', title: 'Closed and multi-section lofts',
-          text: 'Recover lofts with more than two sections, closed profiles, skew section frames and guide curves.',
-          limit: 'Verify section order, phase, interpolation and capped or periodic closure when those choices are evidenced. Surface alternatives remain visible when a choice is unresolved.',
-          fixtures: []
+          group: 'surfaces', status: 'partial', title: 'Closed and multi-section lofts',
+          text: 'Three closed conic sections join through successive ruled bands with generator evidence and planar end caps.',
+          limit: 'General spline interpolation between more than two sections, periodic closure and curved guides remain open.',
+          fixtures: ['surface-ruled-graph-three-rings-nonuniform']
         },
         {
           group: 'surfaces', status: 'planned', title: 'General bounded spline and parametric patches',
@@ -576,10 +576,10 @@
           fixtures: []
         },
         {
-          group: 'surfaces', status: 'planned', title: 'General bounded implicit patches',
-          text: 'Lift defined implicit surfaces and select their bounded branches from sections, projections, trim curves or an explicit geometric equation.',
-          limit: 'Verify branch and domain selection, intersections and reproducible display near regular points and singularities.',
-          fixtures: []
+          group: 'surfaces', status: 'partial', title: 'General bounded implicit patches',
+          text: 'Inferred cones and conic ruled bands carry implicit equations, analytic charts and domain evidence into saved previews.',
+          limit: 'General drawing-supplied equations, trim loops and reproducible branch selection near singularities remain open.',
+          fixtures: ['surface-implicit-reconstruction', 'surface-ruled-graph-three-rings-nonuniform']
         },
         {
           group: 'operations', status: 'planned', title: 'Inclined holes and curved hosts',
@@ -588,10 +588,10 @@
           fixtures: []
         },
         {
-          group: 'operations', status: 'planned', title: 'Intersecting holes and mixed cavities',
-          text: 'Resolve interactions among through holes and blind, stepped, tapered, spherical or otherwise defined recesses.',
-          limit: 'Verify overlap, contact and separation, exposed trim branches and material boundaries for several intersecting cavity types.',
-          fixtures: []
+          group: 'operations', status: 'partial', title: 'Intersecting holes and mixed cavities',
+          text: 'Drawing-derived cylindrical, spherical and tapered cavities report supported interactions and form joined display boundaries.',
+          limit: 'Mixed unions can be approximate. Exact exposed trims and closed analytic shells for general mixed cavities remain open.',
+          fixtures: ['mixed-spherical-cylindrical-interaction', 'tapered-recess-mixed-through', 'cylindrical-recess-interaction-tangent']
         },
         {
           group: 'operations', status: 'planned', title: 'Noncircular pockets, slots and channels',
@@ -612,10 +612,10 @@
           fixtures: []
         },
         {
-          group: 'operations', status: 'planned', title: 'Bounded intersections across surface families',
-          text: 'Compute the intersection branches needed by joins and cuts across planar, quadric, toroidal, ruled, lofted, swept and defined freeform patches.',
-          limit: 'Verify bounded transverse, tangent, coincident and near-degenerate cases. Record whether branches are exact or have numerical error bounds.',
-          fixtures: []
+          group: 'operations', status: 'partial', title: 'Bounded intersections across surface families',
+          text: 'Plane intersections with reconstructed cylinders recover bounded circles and ellipses. Kernel queries also exercise bounded toroidal branches.',
+          limit: 'General bounded branches and error guarantees across ruled, lofted, swept and freeform patches remain open.',
+          fixtures: ['surface-bounded-clip', 'surface-torus']
         },
         {
           group: 'operations', status: 'planned', title: 'General curved trimming and topology repair',
@@ -630,10 +630,10 @@
           fixtures: []
         },
         {
-          group: 'operations', status: 'planned', title: 'Oblique and compound sections of mixed solids',
-          text: 'Resolve full, partial and offset cutting traces where section evidence defines a plane or a sequence of planes through mixed planar and curved faces.',
-          limit: 'Verify section loops and, when a retained side is specified, the capped retained shell and its displayed section.',
-          fixtures: []
+          group: 'operations', status: 'partial', title: 'Oblique and compound sections of mixed solids',
+          text: 'An oblique trace and a boundary drawn in an auxiliary view normal to the cut produce retained, capped sections of spheres and convex planar shells.',
+          limit: 'Compound and offset sections and general retained sections through mixed shells remain open.',
+          fixtures: ['full-section-oblique-sphere', 'full-section-planar-prism', 'section-evidence-oblique-boundary-view-conflict']
         },
         {
           group: 'operations', status: 'planned', title: 'General solid booleans',
@@ -642,22 +642,22 @@
           fixtures: []
         },
         {
-          group: 'operations', status: 'planned', title: 'Mixed shells, multiple bodies and singular contacts',
-          text: 'Assemble general shells with mixed faces, inner loops, distinct bodies and point or edge contacts.',
-          limit: 'Verify component ownership, consistent orientation and shared-boundary incidence. Open or nonmanifold geometry carries a specific diagnostic.',
-          fixtures: []
+          group: 'operations', status: 'partial', title: 'Mixed shells, multiple bodies and singular contacts',
+          text: 'Independent conic-band shells reconstruct as separate oriented bodies. A planar sheet with an inner loop reports its open boundary.',
+          limit: 'General mixed shells and solids that touch at a single point or edge remain open.',
+          fixtures: ['surface-ruled-graph-two-components', 'plate-hole']
         },
         {
-          group: 'evidence', status: 'planned', title: 'Auxiliary curve lifting',
-          text: 'Use circular, conic and spline observations in arbitrary orthographic frames to determine or check ordinary 3D curves.',
-          limit: 'Verify a curve whose auxiliary projection supplies an independent missing constraint, and report an incompatible or rank-deficient projection.',
-          fixtures: []
+          group: 'evidence', status: 'verified', title: 'Auxiliary curve lifting',
+          text: 'Auxiliary views supply missing constraints for circles, ellipses and station-based splines. Edge-on traces and linked boundary points can resolve the spatial curve.',
+          limit: 'Covers full conics and uniform spline stations. Conflicting or rank-deficient observations are reported. Partial conic arcs and auxiliary visibility remain open.',
+          fixtures: ['aux-frame-circle', 'aux-frame-ellipse', 'aux-frame-conic-edge-on', 'aux-frame-conic-linked-point', 'aux-frame-conic-conflict', 'aux-frame-conic-underdetermined', 'aux-frame-spline']
         },
         {
-          group: 'evidence', status: 'planned', title: 'Hidden lines and silhouettes across surfaces and frames',
-          text: 'Use visible and hidden portions of edges, curves and silhouettes across supported surface families in principal and auxiliary views.',
-          limit: 'Verify partial occlusion, tangency, depth ordering and overlapping strokes. Only source-supported visibility constraints resolve competing models.',
-          fixtures: []
+          group: 'evidence', status: 'partial', title: 'Hidden lines and silhouettes across surfaces and frames',
+          text: 'Principal-view hidden strokes can split a planar edge or resolve mirrored curve candidates. The kernel produces oblique torus silhouettes.',
+          limit: 'Auxiliary visibility and general mixed-surface occlusion as drawing constraints remain open.',
+          fixtures: ['partial-hidden-edge', 'oblique-visibility-mirror', 'surface-torus']
         },
         {
           group: 'evidence', status: 'planned', title: 'General dimensional and geometric constraints',
@@ -666,10 +666,10 @@
           fixtures: []
         },
         {
-          group: 'evidence', status: 'planned', title: 'Degenerate, coincident and repeated projections',
-          text: 'Match primitives and members when edges collapse to points, profiles repeat or overlap, or partial strokes share a projected location.',
-          limit: 'Verify unique solutions, alternative matches and conflicts across view combinations. Explicit identities constrain the same underlying reconstruction.',
-          fixtures: []
+          group: 'evidence', status: 'verified', title: 'Degenerate, coincident and repeated projections',
+          text: 'The tested drawings distinguish rings on separate levels with a shared plan projection, recover thin conics, and use identities to resolve repeated spline stations.',
+          limit: 'The scripts also cover ambiguous spline assignments and conflicting conic projections.',
+          fixtures: ['coincident-plan-circle-levels', 'conic-thin-three-view', 'conic-thin-three-view-conflict', 'spline-multiple-identity', 'spline-multiple-ambiguous']
         },
         {
           group: 'evidence', status: 'planned', title: 'Surface definitions and missing geometric constraints',
@@ -678,10 +678,10 @@
           fixtures: []
         },
         {
-          group: 'evidence', status: 'planned', title: 'Scale, orientation and tolerance coverage',
-          text: 'Apply supported reconstruction consistently to reflected, translated, rotated, small and large drawings, with tolerances appropriate to the evidence.',
-          limit: 'Verify equivalent geometry under those changes and distinguish near-degenerate geometry, measurement tolerance and contradictory evidence.',
-          fixtures: []
+          group: 'evidence', status: 'partial', title: 'Scale, orientation and tolerance coverage',
+          text: 'Inclined conic frusta and multi-ring reconstructions have fixture coverage at small scales and under reflected and translated coordinates.',
+          limit: 'Equivalent behavior across all surface families and near-degenerate drawing evidence remains open.',
+          fixtures: ['frustum-small-inclined', 'surface-ruled-graph-transformed']
         },
         {
           group: 'evidence', status: 'planned', title: 'End-to-end reconstruction of supported combinations',

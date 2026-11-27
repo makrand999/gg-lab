@@ -33,12 +33,13 @@
     coordsHud: true,
     showLocusLines: true,
     projectionGuides: true,
-    solidPreview: true
+    solidPreview: true,
+    sidePanels: false
   };
 
   var KEYS = ['commandPreview', 'commandSuggestions', 'showDemos',
     'showTutorials', 'commandHistory', 'coordsHud', 'showLocusLines',
-    'projectionGuides', 'solidPreview'];
+    'projectionGuides', 'solidPreview', 'sidePanels'];
 
   var LABELS = {
     commandPreview: 'Preview commands while typing',
@@ -49,10 +50,13 @@
     coordsHud: 'Show coordinate readout',
     showLocusLines: 'Show locus lines (L)',
     projectionGuides: 'Show projection guides',
-    solidPreview: 'Show 3D preview'
+    solidPreview: 'Show 3D preview',
+    sidePanels: 'Show View & Pose side panels'
   };
 
   var INSPECTION_FIELDS = {
+    modelStyle: { label: '3D model style', default: 'shaded', options: ['shaded', 'wireframe'] },
+    modelColor: { label: 'Surface colour', default: 'theme', options: ['theme', 'teal', 'blue', 'amber'] },
     overlay: { label: 'Measurements on model', default: 'selected', options: ['selected', 'pinned', 'all'] },
     coordinates: { label: 'Point coordinates', default: true },
     planeDistances: { label: 'Distances to HP / VP', default: true },
@@ -77,6 +81,8 @@
     angles: { label: 'Orientation and arc sweep', default: true },
     radii: { label: 'Radius and diameter', default: true },
     curveProperties: { label: 'Circumference, circle area and arc length', default: true },
+    comparisonDimensions: { label: 'Keep individual dimensions when comparing two items', default: false },
+    components: { label: 'Component dimensions on measured spans', default: false },
     dimensions: { label: 'Dimension guides for selected / pinned items', default: true },
     links: { label: 'Highlight corresponding projections', default: true },
     labels: { label: 'Measurement labels on sheet', default: true },

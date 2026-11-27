@@ -1418,11 +1418,7 @@
       'tutorial'].indexOf(p.name) !== -1;
 
 
-    if (p.name === 'demo' && env.mobileDemoLoad === true) mutating = false;
     if (readOnly && mutating) {
-      if (env.mobileNoEdit === true) {
-        return fail('Inspection-only on this device — drawing is read-only. Demos and saved drawings open in View.');
-      }
       return fail('View mode is read-only — /mode edit to draw.');
     }
 
@@ -2168,9 +2164,6 @@
         if (bm) return bm;
         var mn = String(args[0]).toLowerCase();
         if (MODES.indexOf(mn) === -1) return fail('Mode must be edit or view.');
-        if (mn === 'edit' && env.mobileNoEdit === true) {
-          return fail('Inspection-only on this device — the sheet stays in View.');
-        }
         if (typeof env.setMode !== 'function') {
           return fail('Modes are unavailable here.');
         }

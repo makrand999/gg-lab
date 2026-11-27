@@ -1182,6 +1182,113 @@
     return null;
   }
 
+  function fmtNum(n, digits) {
+    var p10 = Math.pow(10, digits === undefined ? 1 : digits);
+    var v = Math.round(n * p10) / p10;
+    return String(Object.is(v, -0) ? 0 : v);
+  }
+
+  function gestureDelta(startPose, curPose, gesture) {
+    if (!startPose || !curPose || !gesture) return null;
+    var op = gesture.op;
+    var axis = gesture.axis || null;
+    if (op === 'grab') {
+      var dx = curPose.t[0] - startPose.t[0];
+      var dy = curPose.t[1] - startPose.t[1];
+      var dz = curPose.t[2] - startPose.t[2];
+      return { op: 'grab', axis: axis, dx: dx, dy: dy, dz: dz, dist: Math.hypot(dx, dy, dz) };
+    }
+    if (op === 'rotate') {
+      var r0 = startPose.rm, r1 = curPose.rm;
+      var r0T = [r0[0], r0[3], r0[6], r0[1], r0[4], r0[7], r0[2], r0[5], r0[8]];
+      var dR = matMul3(r1, r0T);
+      var u = null, theta = 0;
+      if (axis && AXES[axis]) {
+        u = AXES[axis];
+        var ref = Math.abs(u[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+        var dotRef = ref[0] * u[0] + ref[1] * u[1] + ref[2] * u[2];
+        var vx = ref[0] - dotRef * u[0], vy = ref[1] - dotRef * u[1], vz = ref[2] - dotRef * u[2];
+        var vl = Math.hypot(vx, vy, vz) || 1;
+        vx /= vl; vy /= vl; vz /= vl;
+        var wx = dR[0] * vx + dR[1] * vy + dR[2] * vz;
+        var wy = dR[3] * vx + dR[4] * vy + dR[5] * vz;
+        var wz = dR[6] * vx + dR[7] * vy + dR[8] * vz;
+        var c = vx * wx + vy * wy + vz * wz;
+        var cxp = vy * wz - vz * wy, cyp = vz * wx - vx * wz, czp = vx * wy - vy * wx;
+        var s = cxp * u[0] + cyp * u[1] + czp * u[2];
+        theta = Math.atan2(s, c);
+      } else {
+        var sx = dR[7] - dR[5], sy = dR[2] - dR[6], sz = dR[3] - dR[1];
+        var sn = Math.hypot(sx, sy, sz);
+        if (sn > 1e-6) {
+          u = [sx / sn, sy / sn, sz / sn];
+          theta = Math.atan2(sn / 2, (dR[0] + dR[4] + dR[8] - 1) / 2);
+        }
+      }
+      return { op: 'rotate', axis: axis, u: u, theta: theta, deg: theta * 180 / Math.PI };
+    }
+    if (op === 'scale') {
+      var ratio = startPose.s > 1e-9 ? (curPose.s / startPose.s) : 1;
+      return { op: 'scale', axis: axis, ratio: ratio, totalScale: curPose.s };
+    }
+    return null;
+  }
+
+  function formatPoseGesture(startPose, curPose, gesture, limited) {
+    var d = gestureDelta(startPose, curPose, gesture);
+    if (!d) return '';
+    var text = '';
+    if (d.op === 'grab') {
+      if (d.dist > 0.05) {
+        if (d.axis) {
+          var sv = d.axis === 'X' ? d.dx : d.axis === 'Y' ? d.dy : d.dz;
+          text = 'Move ' + (sv >= 0 ? '+' : '') + fmtNum(sv, 1) + ' mm ' + d.axis;
+        } else {
+          var comps = [['X', d.dx], ['Y', d.dy], ['Z', d.dz]].filter(function (c) { return Math.abs(c[1]) > 0.05; });
+          if (comps.length <= 2) {
+            text = 'Move ' + comps.map(function (c) { return (c[1] >= 0 ? '+' : '') + fmtNum(c[1], 1) + ' ' + c[0]; }).join(', ') + ' mm';
+          } else {
+            text = 'Move ' + fmtNum(d.dist, 1) + ' mm (' + comps.map(function (c) { return (c[1] >= 0 ? '+' : '') + fmtNum(c[1], 1) + ' ' + c[0]; }).join(', ') + ')';
+          }
+        }
+      } else {
+        text = d.axis ? ('Move · ' + d.axis + ' axis') : 'Move';
+      }
+    } else if (d.op === 'rotate') {
+      if (Math.abs(d.deg) > 0.05) {
+        if (d.axis) text = 'Rotate ' + (d.deg >= 0 ? '+' : '') + fmtNum(d.deg, 1) + '° ' + d.axis;
+        else text = 'Rotate ' + fmtNum(Math.abs(d.deg), 1) + '°';
+      } else {
+        text = d.axis ? ('Rotate · ' + d.axis + ' axis') : 'Rotate';
+      }
+    } else if (d.op === 'scale') {
+      text = Math.abs(d.ratio - 1) > 0.005 ? ('Scale ' + d.ratio.toFixed(2) + '×') : 'Scale';
+    }
+    if (limited && text) text += ' · Limit';
+    return text;
+  }
+
+  function formatPoseSummary(pose, limited) {
+    if (!pose) return '';
+    var parts = [];
+    if (Math.hypot(pose.t[0], pose.t[1], pose.t[2]) > 0.05) {
+      var axes = ['X', 'Y', 'Z'].map(function (a, i) {
+        return Math.abs(pose.t[i]) > 0.05 ? ((pose.t[i] > 0 ? '+' : '') + fmtNum(pose.t[i], 1) + ' ' + a) : '';
+      }).filter(Boolean);
+      parts.push('Moved ' + axes.join(', ') + ' mm');
+    }
+    var e = eulerXYZOf(pose.rm);
+    if (Math.hypot(e[0], e[1], e[2]) > 0.05) {
+      var rots = ['X', 'Y', 'Z'].map(function (a, i) {
+        return Math.abs(e[i]) > 0.05 ? (fmtNum(e[i], 1) + '° ' + a) : '';
+      }).filter(Boolean);
+      parts.push('Rotated ' + rots.join(', '));
+    }
+    if (Math.abs(pose.s - 1) > 0.005) parts.push('Scaled ' + pose.s.toFixed(2) + '×');
+    if (limited && parts.length) parts.push('Limit');
+    return parts.join(' · ');
+  }
+
   return {
     VERSION: VERSION,
     WORLD_UNITS: WORLD_UNITS,
@@ -1236,6 +1343,9 @@
     clearScale: clearScale,
     resetPose: resetPose,
     eulerXYZOf: eulerXYZOf,
+    gestureDelta: gestureDelta,
+    formatPoseGesture: formatPoseGesture,
+    formatPoseSummary: formatPoseSummary,
     keyAction: keyAction
   };
 });

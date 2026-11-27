@@ -28,6 +28,11 @@
 
   var TAP_SLOP_PX = 10;
   var TAP_MAX_MS = 500;
+  var LONG_PRESS_MS = 280;
+  var DOUBLE_TAP_MS = 340;
+  var DOUBLE_TAP_SLOP_PX = 28;
+  var TWO_FINGER_TAP_MAX_MS = 260;
+  var TWO_FINGER_TAP_SLOP_PX = 16;
   var TOUCH_TOL_PX = 24;
   var PINCH_MIN_DIST_PX = 8;
   var CLICK_SUPPRESS_MS = 800;
@@ -225,10 +230,22 @@
     var startX = 0, startY = 0, startT = 0;
     var lastX = 0, lastY = 0;
     var pinchDist = 0, pinchX = 0, pinchY = 0;
+    var pinchStartT = 0, pinchStartDist = 0, pinchStartX = 0, pinchStartY = 0;
+    var pinchMoved = false;
+    var hadTwoFingers = false;
     var moved = false;
+    var longTimer = null;
+    var longFired = false;
+    var lastTapT = -1e12, lastTapX = 0, lastTapY = 0;
 
     function emit(name, arg) {
       if (typeof callbacks[name] === 'function') callbacks[name](arg);
+    }
+    function clearLongTimer() {
+      if (longTimer !== null) {
+        try { clearTimeout(longTimer); } catch (err) {}
+        longTimer = null;
+      }
     }
     function count() { return order.length; }
     function centroid() {
@@ -248,7 +265,7 @@
     return {
       has: function (id) { return pointers[id] !== undefined; },
       state: function () {
-        return { mode: mode, count: count(), moved: moved };
+        return { mode: mode, count: count(), moved: moved, longFired: longFired };
       },
       down: function (id, x, y, ms) {
         if (pointers[id] !== undefined) return;
@@ -263,13 +280,37 @@
           lastY = y;
           startT = finite(ms, 0);
           moved = false;
+          hadTwoFingers = false;
+          longFired = false;
+          clearLongTimer();
+          emit('onDown', { x: x, y: y, ms: startT });
+          if (typeof callbacks.onLongPress === 'function') {
+            longTimer = setTimeout(function () {
+              longTimer = null;
+              if (mode === 'single' && order.length === 1 && !moved && !hadTwoFingers) {
+                longFired = true;
+                emit('onLongPress', { x: startX, y: startY });
+              }
+            }, LONG_PRESS_MS);
+          }
         } else if (order.length === 2) {
+          clearLongTimer();
+          if (mode === 'single' && moved && !hadTwoFingers) {
+            emit('onDragEnd', { startX: startX, startY: startY,
+              x: lastX, y: lastY, cancelled: true });
+          }
           var c = centroid();
           mode = 'pinch';
           moved = true;
+          hadTwoFingers = true;
           pinchDist = Math.max(PINCH_MIN_DIST_PX, span());
           pinchX = c.x;
           pinchY = c.y;
+          pinchStartT = finite(ms, 0);
+          pinchStartDist = pinchDist;
+          pinchStartX = c.x;
+          pinchStartY = c.y;
+          pinchMoved = false;
           lastX = c.x;
           lastY = c.y;
           emit('onPinchStart', { x: c.x, y: c.y });
@@ -280,20 +321,28 @@
         pointers[id].x = x;
         pointers[id].y = y;
         if (mode === 'single' && order.length === 1) {
+          if (longFired) return;
           if (!moved &&
               Math.sqrt((x - startX) * (x - startX) +
                 (y - startY) * (y - startY)) > TAP_SLOP_PX) {
+            clearLongTimer();
             moved = true;
-            emit('onDragStart', { x: x, y: y });
+            emit('onDragStart', { startX: startX, startY: startY, x: x, y: y });
           }
           if (moved) {
-            emit('onDrag', { dx: x - lastX, dy: y - lastY, x: x, y: y });
+            emit('onDrag', { startX: startX, startY: startY,
+              dx: x - lastX, dy: y - lastY, x: x, y: y });
             lastX = x;
             lastY = y;
           }
         } else if (mode === 'pinch' && order.length >= 2) {
           var c = centroid();
           var d = Math.max(PINCH_MIN_DIST_PX, span());
+          if (!pinchMoved &&
+              (Math.hypot(c.x - pinchStartX, c.y - pinchStartY) > TWO_FINGER_TAP_SLOP_PX ||
+               Math.abs(d - pinchStartDist) > TWO_FINGER_TAP_SLOP_PX)) {
+            pinchMoved = true;
+          }
           var factor = pinchDist > 0 ? d / pinchDist : 1;
           if (isFinite(factor) && factor > 0) {
             emit('onPinch', { factor: factor, x: c.x, y: c.y,
@@ -306,19 +355,44 @@
       },
       up: function (id, ms) {
         if (pointers[id] === undefined) return;
+        clearLongTimer();
         delete pointers[id];
         for (var i = 0; i < order.length; i++) {
           if (order[i] === id) { order.splice(i, 1); break; }
         }
+        var now = finite(ms, 0);
         if (order.length === 0) {
-          if (mode === 'single' && !moved) {
-            var dt = finite(ms, 0) - startT;
-            if (dt >= 0 && dt <= TAP_MAX_MS) {
-              emit('onTap', { x: startX, y: startY, ms: finite(ms, 0) });
+          if (hadTwoFingers) {
+            if (!pinchMoved && (now - pinchStartT) >= 0 &&
+                (now - pinchStartT) <= TWO_FINGER_TAP_MAX_MS) {
+              emit('onTwoFingerTap', { x: pinchStartX, y: pinchStartY, ms: now });
+            }
+          } else if (mode === 'single' && !longFired) {
+            if (!moved) {
+              var dt = now - startT;
+              if (dt >= 0 && dt <= TAP_MAX_MS) {
+                var isDouble = typeof callbacks.onDoubleTap === 'function' &&
+                  (now - lastTapT) >= 0 && (now - lastTapT) <= DOUBLE_TAP_MS &&
+                  Math.hypot(startX - lastTapX, startY - lastTapY) <= DOUBLE_TAP_SLOP_PX;
+                if (isDouble) {
+                  lastTapT = -1e12;
+                  emit('onDoubleTap', { x: startX, y: startY, ms: now });
+                } else {
+                  lastTapT = now;
+                  lastTapX = startX;
+                  lastTapY = startY;
+                  emit('onTap', { x: startX, y: startY, ms: now });
+                }
+              }
+            } else {
+              emit('onDragEnd', { startX: startX, startY: startY,
+                x: lastX, y: lastY, cancelled: false });
             }
           }
           mode = 'idle';
           moved = false;
+          hadTwoFingers = false;
+          longFired = false;
           emit('onEnd', {});
         } else if (order.length === 1) {
           var p = pointers[order[0]];
@@ -332,10 +406,17 @@
         }
       },
       cancel: function () {
+        clearLongTimer();
+        if (mode === 'single' && moved && !hadTwoFingers) {
+          emit('onDragEnd', { startX: startX, startY: startY,
+            x: lastX, y: lastY, cancelled: true });
+        }
         pointers = {};
         order = [];
         mode = 'idle';
         moved = false;
+        hadTwoFingers = false;
+        longFired = false;
         emit('onCancel', {});
       }
     };
@@ -409,6 +490,9 @@
       setTitle: function () {},
       setInspect: function () {},
       setSpatialNote: function () {},
+      setDrawState: function () {},
+      updateUndo: function () {},
+      updateRedo: function () {},
       refreshPoseDock: function () {},
       updatePoseReadout: function () {},
       shouldDesktopIgnore: function () { return false; },
@@ -429,8 +513,6 @@
       return ctx[name];
     }
     var getMode = need('getMode');
-    var isInspection = need('isInspection');
-    var canEdit = ctx.canEdit || function () { return !isInspection(); };
     var applySizes = need('applySizes');
     var setSheetMode = need('setSheetMode');
     var loadDemo = need('loadDemo');
@@ -466,6 +548,10 @@
     var candidatesAt = ctx.candidatesAt || function () { return []; };
     var inspectChoice = ctx.inspectChoice || function () {};
     var openSettings = ctx.openSettings || function () {};
+    var doUndo = ctx.undo || function () {};
+    var doRedo = ctx.redo || function () {};
+    var touchDraw = ctx.touchDraw || null;
+    var drawAction = ctx.drawAction || function () {};
 
     var suppressUntil = 0;
     function nowMs() {
@@ -520,7 +606,7 @@
     btnEdit.addEventListener('click', function () { setSheetMode('edit'); });
     btnView.addEventListener('click', function () { setSheetMode('view'); });
     btnPose.addEventListener('click', function () {
-      if (getMode() === 'pose') setSheetMode(isInspection() ? 'view' : 'edit');
+      if (getMode() === 'pose') setSheetMode('edit');
       else setSheetMode('pose');
     });
 
@@ -569,20 +655,38 @@
     var lab2d = document.createElement('span');
     lab2d.className = 'mobile-pane-label';
     lab2d.textContent = 'Sheet';
+    var btnUndo2d = button('Undo', 'Undo last change', 'mobile-btn');
+    btnUndo2d.id = 'mobile-undo-btn';
+    btnUndo2d.hidden = true;
+    btnUndo2d.disabled = true;
+    var btnRedo2d = button('Redo', 'Redo last change', 'mobile-btn');
+    btnRedo2d.id = 'mobile-redo-btn';
+    btnRedo2d.hidden = true;
+    btnRedo2d.disabled = true;
     var btnFit2d = button('Fit', 'Fit sheet to pane', 'mobile-btn');
     var btnExpand2d = button('Expand', 'Expand sheet pane', 'mobile-btn');
     bar2d.appendChild(lab2d);
+    bar2d.appendChild(btnUndo2d);
+    bar2d.appendChild(btnRedo2d);
     bar2d.appendChild(btnFit2d);
     bar2d.appendChild(btnExpand2d);
     var sheetSlot = document.createElement('div');
     sheetSlot.id = 'mobile-sheet-slot';
+    var drawBar = document.createElement('div');
+    drawBar.id = 'mobile-draw-bar';
+    drawBar.hidden = true;
+    drawBar.setAttribute('role', 'region');
+    drawBar.setAttribute('aria-label', 'Touch drawing controls');
     pane2d.appendChild(bar2d);
     pane2d.appendChild(sheetSlot);
+    pane2d.appendChild(drawBar);
     panes.appendChild(pane3d);
     panes.appendChild(divider);
     panes.appendChild(pane2d);
     appContainer.appendChild(panes);
 
+    btnUndo2d.addEventListener('click', function () { doUndo(); });
+    btnRedo2d.addEventListener('click', function () { doRedo(); });
     btnFit2d.addEventListener('click', function () { fitSheet(); });
     btnFit3d.addEventListener('click', function () { fitGlass(); });
     btnReset3d.addEventListener('click', function () { resetGlass(); });
@@ -966,15 +1070,14 @@
     menu.appendChild(displaySection);
     if (acctSection) menu.appendChild(acctSection);
     function refreshMenu() {
-      var edit = canEdit();
       poseMenuSection.hidden = getMode() !== 'pose';
       demoSection.style.display = demosVisible() ? '' : 'none';
-      btnTutSquare.disabled = !edit;
-      btnTutPrism.disabled = !edit;
-      btnClear.disabled = !edit;
-      btnTutSquare.title = edit ? '' : 'Tutorials draw, so they need a desktop.';
-      btnTutPrism.title = edit ? '' : 'Tutorials draw, so they need a desktop.';
-      btnClear.title = edit ? '' : 'Inspection-only: the sheet cannot be cleared here.';
+      btnTutSquare.disabled = false;
+      btnTutPrism.disabled = false;
+      btnClear.disabled = false;
+      btnTutSquare.title = '';
+      btnTutPrism.title = '';
+      btnClear.title = '';
       btnGrid.setAttribute('aria-pressed', String(isGridOn()));
       btnPlanes.setAttribute('aria-pressed', String(planesOn()));
       if (homeLink) {
@@ -1205,8 +1308,8 @@
 
       if (!appContainer.isConnected) return;
       var box = viewportBox();
-      var inspection = isInspection();
-      var split = shouldSplitLayout(box.w, box.h, inspection);
+      var touchOnly = detectFromWindow(window).touchOnly;
+      var split = shouldSplitLayout(box.w, box.h, touchOnly);
       var orient = orientationOf(box.w, box.h);
       if ((orient !== shell.orientation || split !== shell.split) && gestureOwner) {
         gestureOwner.tracker.cancel();
@@ -1214,9 +1317,9 @@
       }
       shell.split = split;
       shell.orientation = orient;
-      shell.inspectionNow = inspection;
+      shell.inspectionNow = false;
       body.classList.toggle('mobile-layout', split);
-      body.classList.toggle('mobile-inspect', inspection);
+      body.classList.remove('mobile-inspect');
       body.classList.toggle('mobile-portrait', split && orient === 'portrait');
       body.classList.toggle('mobile-landscape',
         split && orient === 'landscape');
@@ -1236,6 +1339,7 @@
         poseDock.hidden = true;
         sheet.hidden = true;
         expandBar.hidden = true;
+        drawBar.hidden = true;
         closeMenu();
         closeChooser();
         applySizes(null);
@@ -1246,7 +1350,7 @@
       panes.hidden = false;
       sheet.hidden = false;
       expandBar.hidden = shell.expand === null;
-      btnEdit.style.display = canEdit() ? '' : 'none';
+      btnEdit.style.display = '';
       if (!shell.moved) {
         var c1 = document.querySelector('#app-container canvas[data-layer="layer1"]');
         var c2 = document.querySelector('#app-container canvas[data-layer="layer2"]');
@@ -1406,6 +1510,270 @@
     });
 
 
+    ['pointerdown', 'pointermove', 'pointerup', 'click', 'dblclick', 'wheel'].forEach(function (evName) {
+      drawBar.addEventListener(evName, function (e) { e.stopPropagation(); });
+    });
+
+    var lastDrawSig = '';
+    var numpadBuf = '';
+    var numpadDir = 'right';
+    var numpadState = null;
+
+    function drawBisCanvas(code) {
+      var cv = document.createElement('canvas');
+      var w = 44, h = 14, dpr = Math.min(2, window.devicePixelRatio || 1);
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+      cv.style.width = w + 'px';
+      cv.style.height = h + 'px';
+      cv.className = 'mobile-bis-preview';
+      try {
+        var g = cv.getContext('2d');
+        var E = window.EduCADEntities;
+        var st = E && E.BIS_STYLES && E.BIS_STYLES[code];
+        if (g && st) {
+          g.setTransform(dpr, 0, 0, dpr, 0, 0);
+          var theme = window.EduCADTheme;
+          g.strokeStyle = (theme && typeof theme.color === 'function') ? theme.color('ink') : '#0f172a';
+          g.lineWidth = E.cosmeticWidthPx(st.widthMm);
+          g.setLineDash(E.cosmeticDashPx(st.dashMm));
+          g.beginPath();
+          g.moveTo(2, h / 2);
+          g.lineTo(w - 2, h / 2);
+          g.stroke();
+        }
+      } catch (err) {}
+      return cv;
+    }
+
+    function renderDrawBar(state) {
+      if (!shell || !shell.split || getMode() !== 'edit' || !state) {
+        drawBar.hidden = true;
+        if (lastDrawSig !== '') {
+          drawBar.replaceChildren();
+          lastDrawSig = '';
+          numpadState = null;
+        }
+        return;
+      }
+      if (state.mode === 'numpad') {
+        var nextKey = JSON.stringify([state.mode, state.title, state.unit, state.dirs, state.presets, state.targetKey, state.initialDir]);
+        if (nextKey !== lastDrawSig) {
+          lastDrawSig = nextKey;
+          numpadState = state;
+          numpadBuf = state.initialValue !== undefined && state.initialValue !== null ? String(state.initialValue) : '';
+          numpadDir = state.initialDir || 'right';
+          drawBar.replaceChildren();
+          var wrap = document.createElement('div');
+          wrap.className = 'mobile-numpad';
+          var head = document.createElement('div');
+          head.className = 'mobile-numpad-head';
+          var title = document.createElement('span');
+          title.className = 'mobile-numpad-title';
+          title.textContent = state.title || 'Distance';
+          var readout = document.createElement('span');
+          readout.className = 'mobile-numpad-val';
+          var closeBtn = button('×', 'Close keypad', 'mobile-draw-chip mobile-draw-close');
+          closeBtn.addEventListener('click', function () { drawAction('numpad-cancel'); });
+          head.appendChild(title);
+          head.appendChild(readout);
+          head.appendChild(closeBtn);
+          wrap.appendChild(head);
+
+          function syncReadout() {
+            var u = state.unit || 'mm';
+            readout.textContent = (numpadBuf === '' ? '0' : numpadBuf) + (u === '°' ? '°' : ' ' + u);
+          }
+          syncReadout();
+
+          if (state.dirs) {
+            var dirRow = document.createElement('div');
+            dirRow.className = 'mobile-numpad-presets';
+            var dirDefs = [
+              ['left', '← −X'], ['right', '→ +X'], ['up', '↑ +Y'], ['down', '↓ −Y']
+            ];
+            var dirBtns = {};
+            dirDefs.forEach(function (d) {
+              var b = button(d[1], d[1], 'mobile-draw-chip');
+              b.classList.toggle('is-active', numpadDir === d[0]);
+              b.addEventListener('click', function () {
+                numpadDir = d[0];
+                Object.keys(dirBtns).forEach(function (k) {
+                  dirBtns[k].classList.toggle('is-active', k === numpadDir);
+                });
+              });
+              dirBtns[d[0]] = b;
+              dirRow.appendChild(b);
+            });
+            wrap.appendChild(dirRow);
+          }
+
+          if (Array.isArray(state.presets) && state.presets.length) {
+            var pRow = document.createElement('div');
+            pRow.className = 'mobile-numpad-presets';
+            state.presets.forEach(function (pv) {
+              var lbl = String(pv) + (state.unit === '°' ? '°' : '');
+              var pb = button(lbl, lbl, 'mobile-draw-chip');
+              pb.addEventListener('click', function () {
+                drawAction('numpad-apply', { value: pv, dir: numpadDir, target: state.target });
+              });
+              pRow.appendChild(pb);
+            });
+            wrap.appendChild(pRow);
+          }
+
+          var grid = document.createElement('div');
+          grid.className = 'mobile-numpad-grid';
+          var keys = ['7', '8', '9', '⌫', '4', '5', '6', 'C', '1', '2', '3', '.', '0', 'Apply'];
+          keys.forEach(function (k) {
+            var kb = button(k === 'Apply' ? 'Apply ✓' : k, k,
+              k === 'Apply' ? 'mobile-numpad-key is-apply' :
+              (k === '0' ? 'mobile-numpad-key is-zero' : 'mobile-numpad-key'));
+            kb.addEventListener('click', function () {
+              if (k === '⌫') {
+                numpadBuf = numpadBuf.slice(0, -1);
+                syncReadout();
+              } else if (k === 'C') {
+                numpadBuf = '';
+                syncReadout();
+              } else if (k === 'Apply') {
+                var val = parseFloat(numpadBuf);
+                if (!isFinite(val) || val <= 0) {
+                  flash('Enter a value greater than 0');
+                  return;
+                }
+                drawAction('numpad-apply', { value: val, dir: numpadDir, target: state.target });
+              } else if (k === '.') {
+                if (numpadBuf.indexOf('.') === -1) {
+                  numpadBuf = numpadBuf === '' ? '0.' : (numpadBuf + '.');
+                  syncReadout();
+                }
+              } else {
+                if (numpadBuf.length < 10) {
+                  numpadBuf = numpadBuf === '0' ? k : (numpadBuf + k);
+                  syncReadout();
+                }
+              }
+            });
+            grid.appendChild(kb);
+          });
+          wrap.appendChild(grid);
+          drawBar.appendChild(wrap);
+        }
+        drawBar.hidden = false;
+        return;
+      }
+
+      if (state.mode === 'rename') {
+        var rKey = JSON.stringify([state.mode, state.pointId, state.value]);
+        if (rKey !== lastDrawSig) {
+          lastDrawSig = rKey;
+          drawBar.replaceChildren();
+          var form = document.createElement('form');
+          form.className = 'mobile-rename-form';
+          var inp = document.createElement('input');
+          inp.type = 'text';
+          inp.className = 'mobile-rename-input';
+          inp.value = String(state.value || '');
+          inp.setAttribute('aria-label', 'Point name');
+          inp.setAttribute('autocomplete', 'off');
+          inp.setAttribute('autocapitalize', 'off');
+          inp.setAttribute('spellcheck', 'false');
+          var okBtn = document.createElement('button');
+          okBtn.type = 'submit';
+          okBtn.className = 'mobile-draw-chip is-primary';
+          okBtn.textContent = 'Done';
+          var cancelBtn = button('×', 'Cancel rename', 'mobile-draw-chip mobile-draw-close');
+          cancelBtn.addEventListener('click', function () { drawAction('rename-cancel'); });
+          form.addEventListener('submit', function (ev) {
+            ev.preventDefault();
+            drawAction('rename-commit', inp.value);
+          });
+          inp.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape') {
+              ev.preventDefault();
+              drawAction('rename-cancel');
+            }
+          });
+          form.appendChild(inp);
+          form.appendChild(okBtn);
+          form.appendChild(cancelBtn);
+          drawBar.appendChild(form);
+          drawBar.hidden = false;
+          setTimeout(function () {
+            try { inp.focus(); inp.select(); } catch (err) {}
+          }, 0);
+        }
+        return;
+      }
+
+      if (state.mode === 'line-menu') {
+        var lKey = JSON.stringify([state.mode, state.subtitle || '']);
+        if (lKey !== lastDrawSig) {
+          lastDrawSig = lKey;
+          drawBar.replaceChildren();
+          var box = document.createElement('div');
+          box.className = 'mobile-bis-strip';
+          var headRow = document.createElement('div');
+          headRow.className = 'mobile-bis-head';
+          var label = document.createElement('span');
+          label.className = 'mobile-draw-note';
+          label.textContent = state.subtitle ? ('Line · ' + state.subtitle) : 'Line style';
+          var xBtn = button('×', 'Cancel line', 'mobile-draw-chip mobile-draw-close');
+          xBtn.addEventListener('click', function () { drawAction('cancel'); });
+          headRow.appendChild(label);
+          headRow.appendChild(xBtn);
+          var swatches = document.createElement('div');
+          swatches.className = 'mobile-bis-row';
+          var defs = [
+            ['A', 'Thick'], ['B', 'Thin'], ['E', 'Dash'], ['G', 'Axis'], ['K', 'Const']
+          ];
+          defs.forEach(function (d) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'mobile-bis-btn';
+            b.setAttribute('aria-label', d[1] + ' line (Type ' + d[0] + ')');
+            b.appendChild(drawBisCanvas(d[0]));
+            var cap = document.createElement('span');
+            cap.textContent = d[1];
+            b.appendChild(cap);
+            b.addEventListener('click', function () { drawAction('bis', d[0]); });
+            swatches.appendChild(b);
+          });
+          box.appendChild(headRow);
+          box.appendChild(swatches);
+          drawBar.appendChild(box);
+        }
+        drawBar.hidden = false;
+        return;
+      }
+
+      var sig = JSON.stringify(state);
+      if (sig !== lastDrawSig) {
+        lastDrawSig = sig;
+        drawBar.replaceChildren();
+        var row = document.createElement('div');
+        row.className = 'mobile-draw-pill';
+        if (state.note) {
+          var n = document.createElement('span');
+          n.className = 'mobile-draw-note';
+          n.textContent = state.note;
+          row.appendChild(n);
+        }
+        (state.actions || []).forEach(function (a) {
+          var cls = 'mobile-draw-chip';
+          if (a.primary) cls += ' is-primary';
+          if (a.active) cls += ' is-active';
+          if (a.close) cls += ' mobile-draw-close';
+          var b = button(a.label, a.aria || a.label, cls);
+          b.addEventListener('click', function () { drawAction(a.id, a.payload); });
+          row.appendChild(b);
+        });
+        drawBar.appendChild(row);
+      }
+      drawBar.hidden = false;
+    }
+
     function relOf(el, x, y) {
       try {
         var r = el.getBoundingClientRect();
@@ -1422,7 +1790,7 @@
         if (!shell.split) return;
         if (e.pointerType === 'mouse' || e.pointerType === '') return;
         if (e.target && typeof e.target.closest === 'function' &&
-            e.target.closest('button, input, select, textarea, a, summary, .mobile-pane-bar')) {
+            e.target.closest('button, input, select, textarea, a, summary, .mobile-pane-bar, #mobile-draw-bar, .edugraphics-menu')) {
           return;
         }
         lastTouchDownMs = nowMs();
@@ -1475,13 +1843,74 @@
       });
     }
     var sheetTracker = createGestureTracker({
-      onDrag: function (g) { panSheetBy(g.dx, g.dy); },
+      onDown: function (g) {
+        if (getMode() === 'edit' && touchDraw && typeof touchDraw.down === 'function') {
+          touchDraw.down(g);
+        }
+      },
+      onLongPress: function (g) {
+        if (getMode() === 'edit' && touchDraw && typeof touchDraw.longPress === 'function') {
+          noteGestureEnd();
+          touchDraw.longPress(g);
+        }
+      },
+      onDragStart: function (g) {
+        if (getMode() === 'edit' && touchDraw && typeof touchDraw.dragStart === 'function') {
+          touchDraw.dragStart(g);
+        }
+      },
+      onDrag: function (g) {
+        if (getMode() === 'edit' && touchDraw && typeof touchDraw.drag === 'function') {
+          touchDraw.drag(g);
+        } else {
+          panSheetBy(g.dx, g.dy);
+        }
+      },
+      onDragEnd: function (g) {
+        if (getMode() === 'edit' && touchDraw && typeof touchDraw.dragEnd === 'function') {
+          noteGestureEnd();
+          touchDraw.dragEnd(g);
+        }
+      },
       onPinch: function (g) {
         panSheetBy(g.dx, g.dy);
         pinchSheet(g.factor, g.x, g.y);
       },
+      onTwoFingerTap: function (g) {
+        if (getMode() === 'edit' && touchDraw && typeof touchDraw.twoFingerTap === 'function') {
+          noteGestureEnd();
+          touchDraw.twoFingerTap(g);
+        }
+      },
+      onDoubleTap: function (g) {
+        noteGestureEnd();
+        if (getMode() === 'edit' && touchDraw && typeof touchDraw.doubleTap === 'function') {
+          touchDraw.doubleTap(g);
+          return;
+        }
+        var box = contentBox(sheetSlot);
+        var client = null;
+        try {
+          var r = sheetSlot.getBoundingClientRect();
+          client = { x: r.left + g.x, y: r.top + g.y };
+        } catch (err) {}
+        if (pressSheet) {
+          var handled = pressSheet(g.x, g.y, box, client);
+          if (handled === 'chooser') {
+            var cands = candidatesAt(g.x, g.y);
+            if (cands.length >= 2) openChooser(cands.slice(0, 6), client);
+            else tapSheet(g.x, g.y);
+          }
+        } else {
+          tapSheet(g.x, g.y);
+        }
+      },
       onTap: function (g) {
         noteGestureEnd();
+        if (getMode() === 'edit' && touchDraw && typeof touchDraw.tap === 'function') {
+          touchDraw.tap(g);
+          return;
+        }
         var box = contentBox(sheetSlot);
         var client = null;
         try {
@@ -1519,12 +1948,13 @@
     attachSurface(glassSlot, glassTracker);
 
 
-    var peekMode = 'view';
+    var peekMode = 'edit';
     var peekTitle = 'EduCAD';
     var peekInspect = '';
     var peekSpatial = '';
     function renderPeek() {
-      var parts = [peekTitle, peekMode === 'pose' ? 'Pose' : 'View'];
+      var modeLabel = peekMode === 'pose' ? 'Pose' : peekMode === 'view' ? 'View' : 'Edit';
+      var parts = [peekTitle, modeLabel];
       if (peekInspect) parts.push(peekInspect);
       if (peekSpatial) parts.push(peekSpatial);
       peekEl.textContent = parts.join(' · ');
@@ -1537,7 +1967,7 @@
       moved: false,
       inspectionNow: false,
       active: function () { return shell.split; },
-      inspection: function () { return shell.inspectionNow; },
+      inspection: function () { return false; },
       sync: sync,
       scheduleSync: scheduleSync,
       setExpand: setExpand,
@@ -1546,13 +1976,16 @@
       noteGestureEnd: noteGestureEnd,
       flash: flash,
       setMode: function (mode) {
-        peekMode = mode === 'pose' ? 'pose' : 'view';
+        peekMode = mode === 'pose' ? 'pose' : mode === 'view' ? 'view' : 'edit';
         btnEdit.classList.toggle('active', mode === 'edit');
         btnView.classList.toggle('active', mode === 'view');
         btnPose.classList.toggle('active', mode === 'pose');
         btnEdit.setAttribute('aria-pressed', String(mode === 'edit'));
         btnView.setAttribute('aria-pressed', String(mode === 'view'));
         btnPose.setAttribute('aria-pressed', String(mode === 'pose'));
+        btnUndo2d.hidden = mode !== 'edit';
+        btnRedo2d.hidden = mode !== 'edit';
+        if (mode !== 'edit') renderDrawBar(null);
         if (mode !== 'pose') {
           poseUI.angles = { X: 0, Y: 0, Z: 0 };
         } else {
@@ -1561,6 +1994,13 @@
         renderPeek();
         refreshPoseDock();
         scheduleSync();
+      },
+      setDrawState: renderDrawBar,
+      updateUndo: function (canUndo) {
+        btnUndo2d.disabled = !canUndo;
+      },
+      updateRedo: function (canRedo) {
+        btnRedo2d.disabled = !canRedo;
       },
       setTitle: function (t) {
         peekTitle = String(t || 'EduCAD');
@@ -1616,9 +2056,7 @@
       poseAdvanced.style.display = ok ? '' : 'none';
       poseReadout.style.display = ok ? '' : 'none';
       if (!ok) {
-        poseEmpty.textContent = isInspection() ?
-          'Pose needs a 3D model — open a demo or a saved drawing with matching front and top views, then try Pose again. The sheet stays in View.' :
-          'Pose needs a point — draw a point in both views first.';
+        poseEmpty.textContent = 'Pose needs a point — draw a point in both views first.';
       } else {
         syncPoseValues();
       }

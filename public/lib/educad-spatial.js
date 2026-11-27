@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-settings.js'));
-  else root.EduCADSpatial = factory(root.EduCADSettings);
-})(typeof window !== 'undefined' ? window : globalThis, function (Settings) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./educad-settings.js'), require('./educad-measure.js'));
+  else root.EduCADSpatial = factory(root.EduCADSettings, root.EduCADMeasure);
+})(typeof window !== 'undefined' ? window : globalThis, function (Settings, Measure) {
   'use strict';
   var THEME_ROOT = typeof window !== 'undefined' ? window :
     (typeof globalThis !== 'undefined' ? globalThis : null);
@@ -165,7 +165,7 @@
   }
   function overlayLayout(st, solid, refs, selection, pins, prefs, measure, obstacles) {
     var g = st.geometryMm, items = inspectionItems(g, selection, pins, prefs);
-    var layout = { labels: [], guides: [], marks: [], suppressed: 0 }, occupied = (obstacles || []).slice();
+    var layout = { labels: [], guides: [], arcs: [], marks: [], suppressed: 0 }, occupied = (obstacles || []).slice();
     if (!g || !st.geometryTransform || !refs) return layout;
     var points = g.vertices.map(function (p) { return projectMm(p, st, solid); });
     var modelBounds = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
@@ -173,29 +173,39 @@
       modelBounds.x0 = Math.min(modelBounds.x0, p.x - 8); modelBounds.x1 = Math.max(modelBounds.x1, p.x + 8);
       modelBounds.y0 = Math.min(modelBounds.y0, p.y - 8); modelBounds.y1 = Math.max(modelBounds.y1, p.y + 8);
     });
+    var guideSpace = occupied.slice();
     occupied.push(modelBounds);
     function label(anchor, lines, color) {
       if (!prefs.labels) return;
       var placed = placeLabel(anchor, lines, measure, prefs, st, occupied, modelBounds);
-      if (placed) { placed.color = color; layout.labels.push(placed); }
+      if (placed) { placed.color = color; layout.labels.push(placed); guideSpace.push(placed.rect); }
       else layout.suppressed++;
+    }
+    function dimension(from, to, text, color, guide) {
+      if (guide) layout.guides.push({ from: from, to: to, color: color });
+      if (!prefs.labels) return;
+      var placed = Measure.guideLabel(from, to, text, measure, prefs.textSize, st, guideSpace);
+      if (!placed) { layout.suppressed++; return; }
+      placed.color = color;
+      occupied.push(placed.rect);
+      layout.labels.push(placed);
     }
     items.forEach(function (item) {
       var active = selection && itemKey(item) === itemKey(selection);
       var pinned = pins.some(function (p) { return itemKey(p) === itemKey(item); });
-      var p, point, edge, ends, info, lines = [itemTitle(g, item)];
+      var p, point, edge, ends, info, lines = [active && selection.label || itemTitle(g, item)];
       if (item.kind === 'point') {
         p = g.vertices[item.index]; point = projectMm(p, st, solid);
         if (active || pinned) layout.marks.push({ kind: 'point', points: [point], active: active });
         if (prefs.coordinates) lines.push([p.x, p.y, p.z].map(function (v) { return numberText(v, prefs); }).join(', ') + ' mm');
         if (prefs.planeDistances) {
-          lines.push(Math.abs(p.y) < EPS ? 'On HP' : 'HP ' + numberText(Math.abs(p.y), prefs) + ' mm ' + (p.y < 0 ? 'below' : 'above'));
-          lines.push(Math.abs(p.z) < EPS ? 'On VP' : 'VP ' + numberText(Math.abs(p.z), prefs) + ' mm ' + (p.z < 0 ? 'behind' : 'in front'));
-        }
-        if (prefs.planes && prefs.guides && prefs.planeDistances && (active || pinned)) {
-          [{ p: { x: p.x, y: 0, z: p.z }, color: themeColor('spatialHpGuide', '#9a8c72') },
-            { p: { x: p.x, y: p.y, z: 0 }, color: themeColor('spatialVpGuide', '#7a91ab') }].forEach(function (guide) {
-            layout.guides.push({ from: point, to: projectMm(guide.p, st, solid), color: guide.color });
+          [{ name: 'HP', distance: p.y, foot: { x: p.x, y: 0, z: p.z }, color: themeColor('spatialHpLabel', '#817a6c') },
+            { name: 'VP', distance: p.z, foot: { x: p.x, y: p.y, z: 0 }, color: themeColor('spatialVpLabel', '#718399') }
+          ].forEach(function (plane) {
+            var text = Math.abs(plane.distance) < EPS ? 'On ' + plane.name :
+              numberText(Math.abs(plane.distance), prefs) + ' mm' +
+              (plane.distance < 0 ? (plane.name === 'HP' ? ' below ' : ' behind ') : ' · ') + plane.name;
+            dimension(point, projectMm(plane.foot, st, solid), text, plane.color, prefs.guides && (active || pinned));
           });
         }
       } else {
@@ -203,12 +213,37 @@
         point = { x: (ends[0].x + ends[1].x) / 2, y: (ends[0].y + ends[1].y) / 2 };
         if (active || pinned) layout.marks.push({ kind: 'edge', points: ends, active: active });
         info = edgeInfo(g, item.index);
-        if (prefs.lengths) lines[0] += ' · ' + numberText(info.length, prefs) + ' mm';
-        if (prefs.inclinations) lines.push('HP ' + (info.hp === null ? '—' : numberText(info.hp, prefs) + '°') +
-          ' · VP ' + (info.vp === null ? '—' : numberText(info.vp, prefs) + '°'));
+        if (prefs.lengths) dimension(ends[0], ends[1], lines[0] + ' · ' + numberText(info.length, prefs) + ' mm',
+          themeColor('viewInspect', '#415c74'), false);
+        if (prefs.inclinations && info.length > EPS) {
+          var start = g.vertices[edge[0]], end = g.vertices[edge[1]];
+          [{ name: 'HP', angle: info.hp, foot: { x: end.x, y: start.y, z: end.z }, color: themeColor('spatialHpLabel', '#817a6c') },
+            { name: 'VP', angle: info.vp, foot: { x: start.x, y: end.y, z: start.z }, color: themeColor('spatialVpLabel', '#718399') }
+          ].forEach(function (plane) {
+            var hp = plane.name === 'HP';
+            var origin = hp ? start : end, target = hp ? end : start;
+            var projected = { x: plane.foot.x - origin.x, y: plane.foot.y - origin.y, z: plane.foot.z - origin.z };
+            var flatLength = Math.hypot(projected.x, projected.y, projected.z);
+            var axis = flatLength < EPS ? { x: 1, y: 0, z: 0 } :
+              { x: projected.x / flatLength, y: projected.y / flatLength, z: projected.z / flatLength };
+            var radius = 0.28 * info.length;
+            var sign = Math.sign(hp ? target.y - origin.y : target.z - origin.z);
+            var arc = [];
+            for (var step = 0; step <= 12; step++) {
+              var radians = plane.angle * Math.PI / 180 * step / 12;
+              var along = radius * Math.cos(radians), normal = sign * radius * Math.sin(radians);
+              arc.push(projectMm({ x: origin.x + along * axis.x, y: origin.y + along * axis.y + (hp ? normal : 0),
+                z: origin.z + along * axis.z + (hp ? 0 : normal) }, st, solid));
+            }
+            if (prefs.guides && (active || pinned)) {
+              layout.guides.push({ from: hp ? ends[0] : ends[1], to: arc[0], color: plane.color });
+              layout.arcs.push({ points: arc, color: plane.color });
+            }
+            dimension(arc[4], arc[8], numberText(plane.angle, prefs) + '° to ' + plane.name, plane.color, false);
+          });
+        }
       }
-      if (lines.length > 1 || (item.kind === 'edge' && prefs.lengths)) label(point, lines, active ? themeColor('viewInspect', '#415c74') :
-        themeColor('muted', '#64748b'));
+      if (lines.length > 1) label(point, lines, active ? themeColor('viewInspect', '#415c74') : themeColor('muted', '#64748b'));
     });
     if (prefs.planes) refs.labels.forEach(function (entry) {
       label(projectMm(entry.p, st, solid), [entry.text], entry.color);
@@ -330,6 +365,9 @@
       ctx.beginPath(); ctx.arc(guide.to.x, guide.to.y, 2.5, 0, Math.PI * 2);
       ctx.fillStyle = themeColor('spatialMarkFill', '#f8fafc'); ctx.fill(); ctx.stroke();
     });
+    layout.arcs.forEach(function (arc) {
+      ctx.strokeStyle = arc.color; ctx.lineWidth = 1.2; path(ctx, arc.points); ctx.stroke();
+    });
     layout.marks.forEach(function (mark) {
       ctx.strokeStyle = mark.active ? themeColor('draftingLine', '#58738c') :
         themeColor('viewGuide', '#8a9dad'); ctx.setLineDash([]);
@@ -360,17 +398,18 @@
     options = options || {};
     var st = widget.state, enabled = false, geometry, refs = null, selection = null, pins = [];
     var prefs = Settings.normalizeInspection(options.preferences), search = '';
+    st.modelStyle = prefs.modelStyle; st.modelColor = prefs.modelColor;
     var sourceRevision, geometryKey = '';
     var savedView = null;
     var panel = document.createElement('aside');
     panel.className = 'spatial-panel'; panel.hidden = true; panel.setAttribute('aria-label', '3D inspection');
-    panel.innerHTML = '<div class="spatial-head"><span>Spatial view</span><div><button type="button" data-action="planes" aria-pressed="true" title="Show or hide reference planes">HP / VP</button><button type="button" data-action="fit" title="Fit model and reference planes">Fit</button></div></div>' +
-      '<p class="spatial-summary"></p><p class="spatial-hint">Click a point or edge · Drag to orbit</p>' +
-      '<div class="spatial-tools" role="group" aria-label="Measurement overlays"><button type="button" data-overlay="selected">Selected</button><button type="button" data-overlay="pinned">Pinned</button><button type="button" data-overlay="all">All</button><details class="spatial-filter"><summary>Filter</summary><div class="spatial-filter-fields"></div></details></div>' +
+    panel.innerHTML = '<div class="spatial-head"><span class="spatial-title-sr">Spatial view</span><div class="spatial-head-actions"><button type="button" data-action="planes" aria-pressed="true" title="Toggle reference planes">HP·VP</button><button type="button" data-action="fit" title="Fit 3D view">Fit</button></div></div>' +
+      '<p class="spatial-summary"></p>' +
+      '<div class="spatial-tools" role="group" aria-label="Measurement overlays"><div class="spatial-seg"><button type="button" data-overlay="selected">Selected</button><button type="button" data-overlay="pinned">Pinned</button><button type="button" data-overlay="all">All</button></div><details class="spatial-filter"><summary title="Measurement fields">Filter</summary><div class="spatial-filter-fields"></div></details></div>' +
       '<div class="spatial-selection" hidden aria-live="polite"></div>' +
       '<div class="spatial-pins" hidden></div>' +
       '<p class="spatial-label-note spatial-note" hidden></p>' +
-      '<details class="spatial-details"><summary>Geometry details</summary><input class="spatial-search" type="search" aria-label="Find a point or edge" placeholder="Find P1 or P1–P2"><div class="spatial-data"></div></details>';
+      '<details class="spatial-details"><summary>Index</summary><input class="spatial-search" type="search" aria-label="Find a point or edge" placeholder="Filter P1, P1–P2…"><div class="spatial-data"></div></details>';
     container.appendChild(panel);
     var summaryEl = panel.querySelector('.spatial-summary');
     var dataEl = panel.querySelector('.spatial-data');
@@ -399,7 +438,9 @@
     }
     function setPreferences(value) {
       var previousScope = prefs.overlay;
-      prefs = Settings.normalizeInspection(value); syncControls();
+      prefs = Settings.normalizeInspection(value);
+      st.modelStyle = prefs.modelStyle; st.modelColor = prefs.modelColor;
+      syncControls();
       if (prefs.overlay === 'all' && previousScope !== 'all') detailsEl.open = true;
       populate(); selectionReadout(); pinReadout(); widget.scheduleDraw();
     }
@@ -447,7 +488,7 @@
         var row = body.insertRow(); cell(row, r[0]); cell(row, numberText(r[1], prefs) + ' … ' + numberText(r[2], prefs));
       });
       var note = document.createElement('p'); note.className = 'spatial-note';
-      note.textContent = 'Coordinates in mm: X along XY, Y above HP, Z in front of VP. Negative HP / VP values mean below / behind. P1, P2… identify reconstructed vertices.'; dataEl.appendChild(note);
+      note.textContent = 'mm · X along XY · Y above HP · Z in front of VP'; dataEl.appendChild(note);
       var pointGroup = detailGroup('Points (' + geometry.vertices.length + ')', 'point');
       var pointHeaders = ['Point'];
       if (prefs.coordinates) pointHeaders = pointHeaders.concat(['X', 'Y', 'Z']);
@@ -493,10 +534,12 @@
       var clear = document.createElement('button'); clear.type = 'button'; clear.dataset.action = 'clear'; clear.textContent = '×'; clear.setAttribute('aria-label', 'Clear 3D selection'); actions.appendChild(clear); selectionEl.appendChild(title);
       var rows = measurementRows(geometry, selection, prefs);
       if (rows.length) {
-        var body = table(selectionEl, ['Measure', 'Value']);
+        var scroll = document.createElement('div'); scroll.className = 'spatial-table-scroll';
+        var tbl = document.createElement('table'), body = document.createElement('tbody');
+        tbl.appendChild(body); scroll.appendChild(tbl); selectionEl.appendChild(scroll);
         rows.forEach(function (r) { var row = body.insertRow(); cell(row, r[0]); cell(row, r[1]); });
       } else {
-        var note = document.createElement('p'); note.className = 'spatial-note'; note.textContent = 'Enable measurements in Filter.'; selectionEl.appendChild(note);
+        var note = document.createElement('p'); note.className = 'spatial-note'; note.textContent = 'No fields enabled.'; selectionEl.appendChild(note);
       }
     }
     function pinReadout() {
@@ -562,10 +605,9 @@
       geometry = st.geometryMm; refs = references(geometry); selection = null;
       labelNote.hidden = true;
       if (options.onSelect) options.onSelect(null);
-      summaryEl.textContent = geometry ? summary(geometry) : 'Draw matching front and top views to inspect geometry.';
+      summaryEl.textContent = geometry ? summary(geometry) : 'No 3D solid';
       detailsEl.hidden = !geometry;
       panel.querySelector('.spatial-tools').hidden = !geometry;
-      panel.querySelector('.spatial-hint').hidden = !geometry;
       planesBtn.disabled = !geometry;
       panel.querySelector('[data-action="fit"]').disabled = !geometry;
       populate(); selectionReadout(); pinReadout(); if (enabled) fit();
@@ -613,7 +655,7 @@
       panel: panel,
       setEnabled: function (value) {
         if (enabled === value) return;
-        enabled = value; st.inspection = value; panel.hidden = !value;
+        enabled = value; st.inspection = value; panel.hidden = !value || panel.dataset.sidePanelHidden === 'true';
         container.classList.toggle('spatial-inspection', value); selection = null; selectionReadout(); markRows();
         if (options.onSelect) options.onSelect(null);
         if (value) { savedView = { cx: st.cx, cy: st.cy, scale: st.scale, minScale: st.minScale }; refresh(); fit(); }
@@ -627,7 +669,7 @@
         var layout = layoutWith(function (text) { return ctx.measureText(text).width; }); ctx.restore();
         drawOverlay(ctx, layout, prefs);
         labelNote.hidden = !prefs.labels || !layout.suppressed;
-        var note = 'Some labels are hidden to avoid overlap. All values remain in Geometry details.';
+        var note = '+' + layout.suppressed + ' label' + (layout.suppressed === 1 ? '' : 's') + ' in Index';
         if (labelNote.textContent !== note) labelNote.textContent = note;
       },
       inspectAt: function (x, y, tolPx) { if (!enabled) return false; var hit = pick(st, x, y, solid, tolPx); if (!hit) return false; choose(hit); return true; },
@@ -683,5 +725,5 @@
   return { bounds: bounds, references: references, toStage: toStage, projectMm: projectMm,
     summary: summary, edgeInfo: edgeInfo, pick: pick, fmt: fmt, scanGaps: scanGaps, mount: mount,
     measurementRows: measurementRows, inspectionItems: inspectionItems, togglePin: togglePin,
-    overlayLayout: overlayLayout, placeLabel: placeLabel };
+    underlay: underlay, overlayLayout: overlayLayout, drawOverlay: drawOverlay, placeLabel: placeLabel };
 });

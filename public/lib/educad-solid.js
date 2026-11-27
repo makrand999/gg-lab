@@ -14,9 +14,13 @@
     return (theme && typeof theme.color === 'function') ? theme.color(name) : fallback;
   }
 
-  function themeFaces() {
+  function themeFaces(st) {
     var theme = THEME_ROOT && THEME_ROOT.EduCADTheme;
-    return (theme && typeof theme.faceShading === 'function') ? theme.faceShading() : null;
+    var faces = theme && typeof theme.faceShading === 'function' ? theme.faceShading() : null;
+    var hues = { teal: 172, blue: 212, amber: 38 };
+    var hue = st && (st.inspection || st.posing) && hues[st.modelColor];
+    if (typeof hue !== 'number') return faces;
+    return { hue: hue, sat: 58, base: faces && faces.base < 50 ? 22 : 42, range: 25 };
   }
 
 
@@ -959,9 +963,9 @@
     return shadeOfCameraNormal(cameraNormal(n, st));
   }
 
-  function litFaceColor(q) {
+  function litFaceColor(q, st) {
     var shade = shadeOfCameraNormal(q);
-    var faces = themeFaces();
+    var faces = themeFaces(st);
     var hue = faces ? faces.hue : FACE_HUE;
     var sat = faces ? faces.sat : FACE_SAT;
     var lightness = (faces ? faces.base : 82) + (faces ? faces.range : 13) * shade;
@@ -997,8 +1001,8 @@
   var SHADE_LUT = null;
   var SHADE_LUT_KEY = '';
 
-  function shadeLut() {
-    var faces = themeFaces();
+  function shadeLut(st) {
+    var faces = themeFaces(st);
     var hue = faces ? faces.hue : FACE_HUE;
     var sat = faces ? faces.sat : FACE_SAT;
     var base = faces ? faces.base : 82;
@@ -1059,7 +1063,7 @@
   }
 
   function flatFaceColor(n, st) {
-    return litFaceColor(cameraNormal(n, st));
+    return litFaceColor(cameraNormal(n, st), st);
   }
 
   function smoothVertexNormals(g) {
@@ -1317,7 +1321,7 @@
         }
       }
     }
-    var lut = shadeLut();
+    var lut = shadeLut(st);
     var data = buf.image.data;
     for (var pidx = 0; pidx < depth.length; pidx++) {
       if (depth[pidx] === -Infinity) continue;
@@ -1526,14 +1530,15 @@
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    drawFaces(ctx, st, g, pts, conics, runs, cx, cy);
+    var wireframe = (inspect || st.posing) && st.modelStyle === 'wireframe';
+    if (!wireframe) drawFaces(ctx, st, g, pts, conics, runs, cx, cy);
     var standalone = [];
     var edgeFaces = g.edgeFaces || [];
     for (var e = 0; e < edges.length; e++) {
       var f = edgeFaces[edges[e].index];
       if (!f || f.length === 0) standalone.push(edges[e]);
     }
-    if (inspect) {
+    if (inspect || wireframe) {
       drawEdgePass(ctx, st, edges, true, pts, conics, runs, cx, cy, true);
       drawEdgePass(ctx, st, edges, false, pts, conics, runs, cx, cy, true);
     } else {

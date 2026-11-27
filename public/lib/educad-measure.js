@@ -363,6 +363,9 @@
       var vx = o.cursorPx.x - C.x, vy = o.cursorPx.y - C.y;
       if (vx * vx + vy * vy > 1e-9) ang = Math.atan2(vy, vx);
     }
+    if (ent.type === 'CIRCULAR_ARC' && !Geometry.angleOnArc(-ang / Geometry.RAD, ent.startAngle, ent.endAngle)) {
+      ang = -(ent.startAngle + Geometry.arcSweep(ent.startAngle, ent.endAngle) / 2) * Geometry.RAD;
+    }
     var dir = { x: Math.cos(ang), y: Math.sin(ang) };
     var rim = { x: C.x + dir.x * rPx, y: C.y + dir.y * rPx };
     var elbow = { x: rim.x + dir.x * 12, y: rim.y + dir.y * 12 };
@@ -402,6 +405,27 @@
     };
   }
 
+  function guideLabel(from, to, text, measure, size, viewport, occupied) {
+    var w = measure(text) + 10, h = size + 8;
+    var dx = to.x - from.x, dy = to.y - from.y;
+    var positions = Math.hypot(dx, dy) > 24 ? [0.5, 0.32, 0.68] : [];
+    var mid = { x: from.x + dx / 2, y: from.y + dy / 2 };
+    var centers = positions.map(function (t) { return { x: from.x + t * dx, y: from.y + t * dy }; });
+    centers.push({ x: mid.x + w / 2 + 6, y: mid.y - h / 2 - 4 },
+      { x: mid.x - w / 2 - 6, y: mid.y + h / 2 + 4 },
+      { x: mid.x + w / 2 + 6, y: mid.y + h / 2 + 4 },
+      { x: mid.x - w / 2 - 6, y: mid.y - h / 2 - 4 });
+    for (var i = 0; i < centers.length; i++) {
+      var x = centers[i].x - w / 2, y = centers[i].y - h / 2;
+      var rect = { x0: x, y0: y, x1: x + w, y1: y + h };
+      if (x < 2 || y < 2 || rect.x1 > viewport.w - 2 || rect.y1 > viewport.h - 2) continue;
+      if (occupied.some(function (r) { return x < r.x1 + 2 && r.x0 < rect.x1 + 2 && y < r.y1 + 2 && r.y0 < rect.y1 + 2; })) continue;
+      occupied.push(rect);
+      return { anchor: i < positions.length ? centers[i] : mid, rect: rect, lines: [text] };
+    }
+    return null;
+  }
+
   return {
     MODE_EDIT: MODE_EDIT,
     MODE_VIEW: MODE_VIEW,
@@ -423,6 +447,7 @@
     dimSideFor: dimSideFor,
     linearDimLayout: linearDimLayout,
     radiusLeaderLayout: radiusLeaderLayout,
+    guideLabel: guideLabel,
     pointWitnessLayout: pointWitnessLayout,
     fmtMm: fmtMm,
     fmtDeg: fmtDeg
